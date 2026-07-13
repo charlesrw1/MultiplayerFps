@@ -2,6 +2,7 @@
 #include "RagdollGizmoMesh.h"
 #include "Game/Entity.h"
 #include "Game/Components/MeshComponent.h"
+#include "Game/Components/MeshbuilderComponent.h"
 #include "Render/Model.h"
 #include "Render/ModelManager.h"
 #include "Render/MaterialPublic.h"
@@ -16,35 +17,12 @@ namespace {
 std::shared_ptr<MaterialInstance> get_ragdoll_body_gizmo_material() {
 	// MaterialInstance is an asset-database-owned object (never deleted directly); wrap it in a
 	// non-owning shared_ptr (no-op deleter) purely to satisfy ModelBuilder::begin_submesh's signature.
+	// Alpha-blended (ragdollGhost.mm) -- unlike the joint gizmo, a capsule is convex/watertight
+	// (no coincident overlapping surfaces like the cone's cap+lateral wall), so translucency
+	// doesn't hit the same draw-order sorting artifacts.
 	static std::shared_ptr<MaterialInstance> mat(MaterialInstance::load("eng/ragdollGhost.mm"),
 												  [](MaterialInstance*) {});
 	return mat;
-}
-
-// Solid capsule for the gizmo -- doesn't need to be geometrically exact, just readable.
-void ragdoll_body_append_capsule_solid(ModelBuilder& mb, glm::vec3 p0, glm::vec3 p1, float radius) {
-	const int segs = 10;
-	glm::vec3 axis = p1 - p0;
-	float len = glm::length(axis);
-	glm::vec3 dir = (len > 0.0001f) ? axis / len : glm::vec3(0, 1, 0);
-	glm::vec3 tangent, bitangent;
-	ragdoll_make_basis(dir, glm::vec3(0, 0, 1), tangent, bitangent);
-
-	std::vector<uint16_t> ring0(segs), ring1(segs);
-	for (int i = 0; i < segs; i++) {
-		float t = TWOPI * i / segs;
-		glm::vec3 n = tangent * cosf(t) + bitangent * sinf(t);
-		ring0[i] = mb.add_vertex(p0 + n * radius, {0, 0}, n);
-		ring1[i] = mb.add_vertex(p1 + n * radius, {0, 0}, n);
-	}
-	uint16_t capc0 = mb.add_vertex(p0, {0, 0}, -dir);
-	uint16_t capc1 = mb.add_vertex(p1, {0, 0}, dir);
-	for (int i = 0; i < segs; i++) {
-		int ni = (i + 1) % segs;
-		mb.add_quad(ring0[i], ring1[i], ring1[ni], ring0[ni]);
-		mb.add_triangle(capc0, ring0[ni], ring0[i]);
-		mb.add_triangle(capc1, ring1[i], ring1[ni]);
-	}
 }
 } // namespace
 
@@ -53,9 +31,10 @@ void RagdollPhysicsBodyComponent::editor_start() {
 }
 
 void RagdollPhysicsBodyComponent::stop() {
-	// Destroy the gizmo entity (and its MeshComponent) FIRST so the renderer drops its proxy
-	// through the normal entity-teardown path, THEN free the underlying dynamic Model -- never
-	// the other way around (a freed-but-still-referenced Model crashes the next scene draw).
+	// Destroy the gizmo entity (and its MeshComponent/MeshBuilderComponent) FIRST so the renderer
+	// drops their proxies through the normal entity-teardown path, THEN free the underlying
+	// dynamic Model -- never the other way around (a freed-but-still-referenced Model crashes the
+	// next scene draw).
 	if (gizmo_entity.get())
 		gizmo_entity->destroy();
 	gizmo_entity = obj<Entity>();
@@ -84,23 +63,42 @@ void RagdollPhysicsBodyComponent::rebuild_gizmo_mesh() {
 		g->dont_serialize_or_edit = true;
 		gizmo_entity = g;
 	}
+	Entity* g = gizmo_entity.get();
 
+	// Matches CapsuleComponent::add_actor_shapes() / PxCapsuleGeometry exactly: `height_offset` is
+	// the capsule's CENTER (not its base), and `height` is the TOTAL capsule length including both
+	// hemisphere caps -- so the cylindrical segment (p0/p1, the sphere centers the caps bulge out
+	// from) is only `height - 2*radius` long, split evenly above/below center.
+	glm::vec3 center(0.f, height_offset, 0.f);
+	float half_cyl = glm::max(height * 0.5f - radius, 0.f);
+	glm::vec3 p0 = center - glm::vec3(0.f, half_cyl, 0.f);
+	glm::vec3 p1 = center + glm::vec3(0.f, half_cyl, 0.f);
+
+	// Solid, alpha-blended capsule.
 	ModelBuilder mb;
 	mb.begin_submesh(get_ragdoll_body_gizmo_material());
-	glm::vec3 p0(0.f, height_offset, 0.f);
-	glm::vec3 p1 = p0 + glm::vec3(0.f, height, 0.f);
-	ragdoll_body_append_capsule_solid(mb, p0, p1, radius);
-
+	ragdoll_append_capsule_solid(mb, p0, p1, radius);
 	if (!gizmo_model)
 		gizmo_model.reset(g_modelMgr.create_dynamic_model(mb, "ragdoll_body_gizmo"));
 	else
 		g_modelMgr.refresh_dynamic_model(gizmo_model.get(), mb);
 
-	Entity* g = gizmo_entity.get();
 	auto* mc = g->get_component<MeshComponent>();
 	if (!mc)
 		mc = g->create_component<MeshComponent>();
 	mc->set_model(gizmo_model.get());
 	mc->set_casts_shadows(false);
+
+	// Depth-tested wireframe outline over the solid, Unity-collider-gizmo style.
+	auto* mbc = g->get_component<MeshBuilderComponent>();
+	if (!mbc)
+		mbc = g->create_component<MeshBuilderComponent>();
+	mbc->use_background_color = false;
+	mbc->depth_tested = true;
+	mbc->use_transform = true;
+	mbc->mb.Begin();
+	ragdoll_append_capsule_lines(mbc->mb, p0, p1, radius, COLOR_WHITE);
+	mbc->mb.End();
+	mbc->sync_render_data();
 }
 #endif

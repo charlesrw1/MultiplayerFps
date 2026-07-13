@@ -203,7 +203,14 @@ static void start_preview_common(RagdollJointComponent* self, MeshComponent* mes
 	auto mb = builder.alloc<agModifyBone>();
 	mb->input = bind;
 	mb->boneName = self->get_owner()->get_parent_bone();
-	mb->rotation = ModifyBoneType::Bonespace;
+	// BonespaceAdd (not the absolute "Bonespace", which discards the bind pose and sets pose.q[B]
+	// directly, ignoring both the skeleton's bind rotation AND this scaffolding entity's own
+	// authored rotation): pose.q[B] = pose.q[B] * set_rot post-multiplies set_rot onto the bone's
+	// own bind mesh-space orientation, i.e. set_rot is interpreted in the bone's own rest frame --
+	// exactly the frame the scaffolding entity's ls_rotation is ALSO expressed in (it's bone-
+	// parented directly to this bone). See compute_preview_rotation(), which folds that
+	// ls_rotation in so "local +X" during preview means the same thing it does for the gizmo/joint.
+	mb->rotation = ModifyBoneType::BonespaceAdd;
 	mb->rotationVal = preview_rot_var();
 	mb->alpha = 1.f;
 	builder.set_root(mb);
@@ -211,8 +218,9 @@ static void start_preview_common(RagdollJointComponent* self, MeshComponent* mes
 	// Seed a default value immediately -- the graph can evaluate (AnimatorObject::update) before
 	// this component's own update() first runs and sets a real value, and an unset variable
 	// throws inside agGetPoseCtx::get_quat_var (see AnimGraphTester.cpp's identical seeding for
-	// the same reason).
-	mesh->get_animator()->set_quat_variable(preview_rot_var(), glm::quat(1.f, 0.f, 0.f, 0.f));
+	// the same reason). Seed with the entity's own rest rotation (not identity) so the very first
+	// frame matches the gizmo's rest orientation instead of snapping to raw bone-space zero.
+	mesh->get_animator()->set_quat_variable(preview_rot_var(), self->get_owner()->get_ls_rotation());
 }
 
 void RagdollJointComponent::start_preview_twist() {
@@ -264,13 +272,18 @@ void RagdollJointComponent::stop_preview() {
 }
 
 glm::quat RagdollJointComponent::compute_preview_rotation() const {
+	// Computed relative to this scaffolding entity's OWN rest local axes (matching the gizmo's
+	// convention: local +X = twist axis, Y/Z = swing1/swing2). Composed with the entity's own
+	// ls_rotation below so it lines up with what get_owner()->get_ls_rotation() actually is --
+	// otherwise rotating the scaffolding entity in the editor would visibly reorient the gizmo
+	// and joint but leave the preview animation sweeping around fixed bone-space axes instead.
 	const glm::vec3 twist_axis(1.f, 0.f, 0.f);
+	glm::quat local_r(1.f, 0.f, 0.f, 0.f);
 	if (preview_mode == PreviewMode::Twist) {
 		float phase = 0.5f + 0.5f * sinf(preview_t * PREVIEW_PING_PONG_SPEED);
 		float angle = twist_limit_min + (twist_limit_max - twist_limit_min) * phase;
-		return glm::angleAxis(angle, twist_axis);
-	}
-	if (preview_mode == PreviewMode::Swing) {
+		local_r = glm::angleAxis(angle, twist_axis);
+	} else if (preview_mode == PreviewMode::Swing) {
 		const bool swing_2dof = is_dof_open(ang_y_motion) && is_dof_open(ang_z_motion);
 		if (swing_2dof) {
 			// Rotate AROUND the limits: continuously sweep the azimuth at the cone's limit
@@ -282,17 +295,26 @@ glm::quat RagdollJointComponent::compute_preview_rotation() const {
 			float theta = preview_t * PREVIEW_RIM_SWEEP_SPEED;
 			glm::vec3 rim_dir = glm::normalize(twist_axis * GIZMO_LENGTH + tangent * (cosf(theta) * ry) +
 												bitangent * (sinf(theta) * rz));
-			return glm::rotation(twist_axis, rim_dir);
+			local_r = glm::rotation(twist_axis, rim_dir);
+		} else {
+			// Single-axis swing (hinge): ping-pong between the open axis's limit extremes, same as twist.
+			const bool swing_1dof_y = is_dof_open(ang_y_motion);
+			glm::vec3 hinge_axis = swing_1dof_y ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
+			float limit = swing_1dof_y ? swing1_limit : swing2_limit;
+			float phase = 0.5f + 0.5f * sinf(preview_t * PREVIEW_PING_PONG_SPEED);
+			float angle = -limit + (2.f * limit) * phase;
+			local_r = glm::angleAxis(angle, hinge_axis);
 		}
-		// Single-axis swing (hinge): ping-pong between the open axis's limit extremes, same as twist.
-		const bool swing_1dof_y = is_dof_open(ang_y_motion);
-		glm::vec3 hinge_axis = swing_1dof_y ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
-		float limit = swing_1dof_y ? swing1_limit : swing2_limit;
-		float phase = 0.5f + 0.5f * sinf(preview_t * PREVIEW_PING_PONG_SPEED);
-		float angle = -limit + (2.f * limit) * phase;
-		return glm::angleAxis(angle, hinge_axis);
 	}
-	return glm::quat(1, 0, 0, 0);
+	// Matches the physx side exactly (RagdollSetupComponent::preview_ragdoll's anchor_q stays
+	// canonical -- inverse(body_rot) only -- while the joint entity's own rotation is applied
+	// separately via AdvancedJointComponent::set_target_anchor, on the world/target side only).
+	// That split means the simulated joint's visual bone orientation is a plain
+	// Bind * joint_rot * local_r, with no conjugation, so a plain left-multiply here matches it
+	// exactly -- including when joint_rot carries an intentional bias to make a swing limit
+	// asymmetric (see set_target_anchor's comment in PhysicsComponents.h for why the OLD anchor_q
+	// formula couldn't support that).
+	return get_owner()->get_ls_rotation() * local_r;
 }
 
 RagdollJointComponent* RagdollJointComponent::s_previewing_joint = nullptr;

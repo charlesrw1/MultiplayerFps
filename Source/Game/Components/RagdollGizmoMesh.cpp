@@ -1,6 +1,7 @@
 #include "RagdollGizmoMesh.h"
 #include "Render/Model.h"
 #include "Framework/Util.h"
+#include "Framework/MeshBuilder.h"
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -83,5 +84,104 @@ void ragdoll_append_wedge_solid(ModelBuilder& mb, glm::vec3 center, glm::vec3 ax
 		// close the two flat radial ends of the pie slice
 		mb.add_quad(top_center, top_ring[0], bot_ring[0], bot_center);
 		mb.add_quad(top_ring[segs], top_center, bot_center, bot_ring[segs]);
+	}
+}
+
+void ragdoll_append_capsule_solid(ModelBuilder& mb, glm::vec3 p0, glm::vec3 p1, float radius) {
+	const int segs = 12;
+	const int hemi_rings = 3; // latitude bands per hemisphere, excluding the pole and the equator
+	glm::vec3 axis = p1 - p0;
+	float len = glm::length(axis);
+	glm::vec3 dir = (len > 0.0001f) ? axis / len : glm::vec3(0, 1, 0);
+	glm::vec3 tangent, bitangent;
+	ragdoll_make_basis(dir, glm::vec3(0, 0, 1), tangent, bitangent);
+
+	// phi in [0, PI/2]: 0 = equator, PI/2 = pole. sign = -1 for the p0-side hemisphere (bulges
+	// toward -dir), +1 for the p1-side (bulges toward +dir).
+	auto add_ring = [&](glm::vec3 center, float phi, float sign) {
+		float ring_radius = radius * cosf(phi);
+		glm::vec3 ring_center = center + dir * (radius * sinf(phi) * sign);
+		std::vector<uint16_t> ring(segs);
+		for (int i = 0; i < segs; i++) {
+			float t = TWOPI * i / segs;
+			glm::vec3 n = tangent * cosf(t) + bitangent * sinf(t);
+			glm::vec3 normal = glm::normalize(n * cosf(phi) + dir * (sinf(phi) * sign));
+			ring[i] = mb.add_vertex(ring_center + n * ring_radius, {0, 0}, normal);
+		}
+		return ring;
+	};
+
+	uint16_t pole0 = mb.add_vertex(p0 - dir * radius, {0, 0}, -dir);
+	std::vector<std::vector<uint16_t>> rings;
+	for (int j = 1; j < hemi_rings; j++) // p0 hemisphere, near-pole -> equator
+		rings.push_back(add_ring(p0, (PI * 0.5f) * (1.f - (float)j / hemi_rings), -1.f));
+	rings.push_back(add_ring(p0, 0.f, -1.f)); // p0 equator == bottom of the cylindrical body
+	rings.push_back(add_ring(p1, 0.f, 1.f));  // p1 equator == top of the cylindrical body
+	for (int j = 1; j < hemi_rings; j++)      // p1 hemisphere, equator -> near-pole
+		rings.push_back(add_ring(p1, (PI * 0.5f) * ((float)j / hemi_rings), 1.f));
+	uint16_t pole1 = mb.add_vertex(p1 + dir * radius, {0, 0}, dir);
+
+	for (int i = 0; i < segs; i++) { // pole0 -> first ring
+		int ni = (i + 1) % segs;
+		mb.add_triangle(pole0, rings.front()[i], rings.front()[ni]);
+	}
+	for (size_t r = 0; r + 1 < rings.size(); r++) { // consecutive latitude bands, including the
+													 // p0-equator -> p1-equator cylinder band
+		auto& a = rings[r];
+		auto& b = rings[r + 1];
+		for (int i = 0; i < segs; i++) {
+			int ni = (i + 1) % segs;
+			mb.add_quad(a[i], b[i], b[ni], a[ni]);
+		}
+	}
+	for (int i = 0; i < segs; i++) { // last ring -> pole1 (reversed winding, matches the far-cap
+									  // convention used elsewhere in this file)
+		int ni = (i + 1) % segs;
+		mb.add_triangle(pole1, rings.back()[ni], rings.back()[i]);
+	}
+}
+
+void ragdoll_append_capsule_lines(MeshBuilder& mb, glm::vec3 p0, glm::vec3 p1, float radius, Color32 color) {
+	const int segs = 16;
+	glm::vec3 axis = p1 - p0;
+	float len = glm::length(axis);
+	glm::vec3 dir = (len > 0.0001f) ? axis / len : glm::vec3(0, 1, 0);
+	glm::vec3 tangent, bitangent;
+	ragdoll_make_basis(dir, glm::vec3(0, 0, 1), tangent, bitangent);
+
+	auto ring_point = [&](glm::vec3 center, float t) {
+		return center + tangent * (cosf(t) * radius) + bitangent * (sinf(t) * radius);
+	};
+	// equator ring at each cap
+	for (int i = 0; i < segs; i++) {
+		float t0 = TWOPI * i / segs;
+		float t1 = TWOPI * (i + 1) / segs;
+		mb.PushLine(ring_point(p0, t0), ring_point(p0, t1), color);
+		mb.PushLine(ring_point(p1, t0), ring_point(p1, t1), color);
+	}
+	// A handful of longitude arcs running pole -> equator -> (straight through the cylinder) ->
+	// equator -> pole, Unity-collider-gizmo style.
+	const int longitudes = 4;
+	const int arc_segs = 8;
+	for (int L = 0; L < longitudes; L++) {
+		float t = TWOPI * L / longitudes;
+		glm::vec3 n = tangent * cosf(t) + bitangent * sinf(t);
+
+		glm::vec3 prev = p0 - dir * radius; // p0-side pole
+		for (int k = 1; k <= arc_segs; k++) {
+			float phi = (PI * 0.5f) * (float)k / arc_segs; // 0=pole .. PI/2=equator
+			glm::vec3 pt = p0 - dir * (radius * cosf(phi)) + n * (radius * sinf(phi));
+			mb.PushLine(prev, pt, color);
+			prev = pt;
+		}
+		glm::vec3 p1_eq = p1 + n * radius;
+		mb.PushLine(prev, p1_eq, color); // straight run through the cylindrical body
+		prev = p1_eq;
+		for (int k = 1; k <= arc_segs; k++) {
+			float psi = (PI * 0.5f) * (float)k / arc_segs; // 0=equator .. PI/2=pole
+			glm::vec3 pt = p1 + dir * (radius * sinf(psi)) + n * (radius * cosf(psi));
+			mb.PushLine(prev, pt, color);
+			prev = pt;
+		}
 	}
 }

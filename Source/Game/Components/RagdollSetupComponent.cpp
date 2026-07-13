@@ -12,6 +12,7 @@
 #include "Animation/Runtime/RuntimeNodesNew2.h"
 #include "GameEnginePublic.h"
 #include "Framework/Log.h"
+#include "Framework/MathLib.h"
 #include <unordered_map>
 
 #ifdef EDITOR_BUILD
@@ -91,7 +92,16 @@ void RagdollSetupComponent::preview_ragdoll() {
 
 	// Pass A -- collect authored (right-side or center only) scaffolding bones. Scaffolding
 	// entities are direct children of this component's OWNER entity (which itself carries the
-	// rig MeshComponent -- bone-parenting resolves one level deep).
+	// rig MeshComponent -- bone-parenting resolves one level deep). RagdollPhysicsBodyComponent
+	// and RagdollJointComponent are NOT required to be on the same entity -- a joint may be
+	// authored on a separate sibling entity that's bone-parented to the same bone as the body, so
+	// resolve joints by bone name across ALL children first, not just the body's own entity.
+	std::unordered_map<uint64_t, RagdollJointComponent*> joints_by_bone;
+	for (Entity* child : get_owner()->get_children()) {
+		if (auto* joint = child->get_component<RagdollJointComponent>())
+			joints_by_bone[child->get_parent_bone().get_hash()] = joint;
+	}
+
 	std::unordered_map<uint64_t, AuthoredBone> authored;
 	for (Entity* child : get_owner()->get_children()) {
 		auto* body = child->get_component<RagdollPhysicsBodyComponent>();
@@ -115,7 +125,8 @@ void RagdollSetupComponent::preview_ragdoll() {
 		AuthoredBone ab;
 		ab.scaffold_entity = child;
 		ab.body = body;
-		ab.joint = child->get_component<RagdollJointComponent>();
+		auto jit = joints_by_bone.find(bone_name.get_hash());
+		ab.joint = (jit != joints_by_bone.end()) ? jit->second : nullptr;
 		ab.bone_index = idx;
 		authored[bone_name.get_hash()] = ab;
 	}
@@ -158,6 +169,29 @@ void RagdollSetupComponent::preview_ragdoll() {
 						   "RagdollJointComponent), found %d\n",
 				  root_count);
 	}
+
+	// Single-joint isolation debugging: a bone with a RagdollJointComponent but no authored
+	// ancestor (the "unconnected extra root" case just above) normally ends up as a free-falling
+	// dynamic body with no joint wired at all -- there's nothing authored to connect it to. If it's
+	// the ONLY joint in the whole scaffolding, that's really someone testing one joint in isolation
+	// (e.g. a single head bone carrying both the body and the joint), so instead pin that joint
+	// rigidly to its own skeleton bind-pose position rather than leaving it unwired.
+	int authored_joint_count = 0;
+	int unconnected_joint_count = 0;
+	uint64_t pinned_bone_hash = 0;
+	for (auto& [hash, ab] : authored) {
+		if (!ab.joint)
+			continue;
+		authored_joint_count++;
+		if (ab.parent_bone.is_null()) {
+			unconnected_joint_count++;
+			pinned_bone_hash = hash;
+		}
+	}
+	bool pin_root_to_skeleton = (authored_joint_count == 1 && unconnected_joint_count == 1);
+	if (pin_root_to_skeleton)
+		sys_print(Info, "RagdollSetupComponent: single-joint scaffolding detected -- pinning its joint rigidly to "
+						"its skeleton bind-pose position instead of leaving it unconnected\n");
 
 	// Spawn a transient preview mesh + RagdollComponent to hold the simulated bodies.
 	preview_mesh_entity = eng->get_level()->spawn_entity();
@@ -203,7 +237,7 @@ void RagdollSetupComponent::preview_ragdoll() {
 
 		orig_side_map[hash] = spawn_body(ab, own_bone.get_c_str(), is_root);
 
-		if (is_right) {
+		if (is_right && mirror_bodies_in_preview) {
 			std::string mirror_name = ragdoll_mirror_bone_name(own_bone.get_c_str());
 			if (skel->get_bone_index(StringName(mirror_name.c_str())) == -1) {
 				sys_print(Warning,
@@ -232,14 +266,58 @@ void RagdollSetupComponent::preview_ragdoll() {
 		return oit != orig_side_map.end() ? oit->second : nullptr;
 	};
 	for (auto& [hash, ab] : authored) {
-		if (!ab.joint || ab.parent_bone.is_null())
+		bool is_pinned = pin_root_to_skeleton && hash == pinned_bone_hash;
+		if (!ab.joint || (ab.parent_bone.is_null() && !is_pinned))
 			continue;
-		uint64_t parent_hash = ab.parent_bone.get_hash();
+		uint64_t parent_hash = is_pinned ? 0 : ab.parent_bone.get_hash();
+
+		// The joint's pivot/orientation is authored on ab.joint's OWN scaffold entity, which may
+		// be a separate sibling entity from ab.scaffold_entity (the body) -- both are bone-parented
+		// to the same bone, so express the joint's transform as an offset relative to the body's
+		// own local frame; that's exactly what AdvancedJointComponent::set_joint_anchor expects
+		// (an anchor local to the body it's created on). This also makes the joint's actual
+		// twist/swing axes match RagdollJointComponent's own gizmo (which is drawn in the joint
+		// entity's own local space, and its "Preview Twist/Swing" animation is composed the same
+		// way -- see RagdollJointComponent::compute_preview_rotation), instead of silently
+		// defaulting to the body's rotation whenever the joint entity was authored with a
+		// different orientation than the body entity.
+		// Derive the offset from rotation/position directly (not get_ls_transform()'s full 4x4,
+		// which also carries each entity's authored scale) -- scale has no business leaking into
+		// a joint anchor, and decomposing a matrix product of two independently-scaled transforms
+		// does not recover a clean rotation in general.
+		// anchor_q (this body's own attached joint frame) intentionally stays canonical -- just
+		// cancels the capsule's own shape-alignment rotation, landing at the bone's plain bind
+		// frame -- and does NOT include the joint entity's own rotation. PxD6 swing limits are
+		// always symmetric around whatever frame is attached to the body, so any bias baked in here
+		// would get conjugated away for a bias sharing an axis with the swing itself (see
+		// set_target_anchor's comment in PhysicsComponents.h). The joint entity's own rotation
+		// (which defines the twist/swing axis convention AND lets you bias an asymmetric limit by
+		// rotating it) goes to set_target_anchor below instead, which only affects the world/target
+		// side and isn't subject to that cancellation.
+		glm::quat body_rot = ab.scaffold_entity->get_ls_rotation();
+		glm::quat anchor_q = glm::inverse(body_rot);
+		glm::vec3 anchor_p = glm::inverse(body_rot) *
+							  (ab.joint->get_owner()->get_ls_position() - ab.scaffold_entity->get_ls_position());
+		glm::quat joint_rot = ab.joint->get_owner()->get_ls_rotation();
 
 		auto wire_one = [&](Entity* body_entity, bool for_mirror_side) {
 			if (!body_entity)
 				return;
-			Entity* parent_entity = resolve_parent_body(parent_hash, for_mirror_side);
+			Entity* parent_entity;
+			if (is_pinned) {
+				// Bare anchor entity, deliberately with no PhysicsBody and never added to `rag` --
+				// its transform is never touched again after this. PhysicsJointComponent::init_joint
+				// treats a target with no PhysicsBody as "anchor to world frame" (PhysicsJoints.cpp,
+				// make_joint_shared's b==nullptr branch), so the joint locks rigidly to this position
+				// instead of connecting to another authored ancestor body.
+				Entity* anchor = eng->get_level()->spawn_entity();
+				anchor->dont_serialize_or_edit = true;
+				anchor->set_ws_transform(body_entity->get_ws_transform());
+				preview_body_entities.push_back(anchor);
+				parent_entity = anchor;
+			} else {
+				parent_entity = resolve_parent_body(parent_hash, for_mirror_side);
+			}
 			if (!parent_entity) {
 				sys_print(Error, "RagdollSetupComponent: could not resolve parent body for joint on '%s'\n",
 						  ab.scaffold_entity->get_parent_bone().get_c_str());
@@ -252,7 +330,8 @@ void RagdollSetupComponent::preview_ragdoll() {
 								   ab.joint->stiffness);
 			joint->set_cone_vars(ab.joint->swing1_limit, ab.joint->swing2_limit, ab.joint->damping,
 								  ab.joint->stiffness);
-			joint->set_joint_anchor(glm::vec3(0.f), glm::quat(1, 0, 0, 0), 0);
+			joint->set_joint_anchor(anchor_p, anchor_q, 0);
+			joint->set_target_anchor(glm::vec3(0.f), joint_rot);
 			joint->set_target(parent_entity);
 		};
 		auto oit = orig_side_map.find(hash);
@@ -265,13 +344,25 @@ void RagdollSetupComponent::preview_ragdoll() {
 	rag->enable();
 }
 
+void RagdollSetupComponent::end_preview() {
+	teardown_preview();
+}
+
 #ifdef EDITOR_BUILD
 void RagdollSetupComponent::editor_on_change_property() {
 	ensure_rig_mesh();
 }
 
 void RagdollSetupComponent::on_inspector_imgui() {
-	if (ImGui::Button("Preview Ragdoll"))
-		preview_ragdoll();
+	if (!is_previewing()) {
+		if (ImGui::Button("Start Preview"))
+			preview_ragdoll();
+	} else {
+		if (ImGui::Button("End Preview"))
+			end_preview();
+		ImGui::SameLine();
+		if (ImGui::Button("Reset Preview"))
+			preview_ragdoll();
+	}
 }
 #endif

@@ -109,14 +109,20 @@ void PhysicsJointComponent::draw_meshbuilder() {
 }
 
 template <typename T>
-static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, int local_joint_axis,
+static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, JointAnchor target_anchor,
+							int local_joint_axis,
 							T* (*create_func)(PxPhysics&, PxRigidActor*, const PxTransform&, PxRigidActor*,
 											  const PxTransform&),
 							PhysicsBody* a, PhysicsBody* b) {
 	ASSERT(a);
 	T* joint = nullptr;
 	auto my_local = get_transform_joint(anchor, local_joint_axis);
-	auto my_world = ws_transform * my_local;
+	// target_anchor is deliberately NOT folded into my_local -- my_local stays this actor's own
+	// fixed attached frame (used as-is below for actor a), while target_anchor only biases the
+	// world/other-actor side (see PhysicsComponents.h's set_target_anchor comment for why that
+	// split matters: baking a bias into my_local instead gets conjugated away).
+	auto target_local = glm::translate(glm::mat4(1), target_anchor.p) * glm::mat4_cast(target_anchor.q);
+	auto my_world = ws_transform * my_local * target_local;
 	if (b) {
 		auto& other_world = b->get_ws_transform();
 		auto other_local = glm::inverse(other_world) * my_world;
@@ -135,7 +141,7 @@ static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, i
 void HingeJointComponent::init_joint(PhysicsBody* a, PhysicsBody* b) {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
-	joint = make_joint_shared(get_ws_transform(), anchor, local_joint_axis, PxRevoluteJointCreate, a, b);
+	joint = make_joint_shared(get_ws_transform(), anchor, target_anchor, local_joint_axis, PxRevoluteJointCreate, a, b);
 }
 physx::PxJoint* HingeJointComponent::get_joint() const {
 	return joint;
@@ -150,7 +156,7 @@ void HingeJointComponent::free_joint() {
 void BallSocketJointComponent::init_joint(PhysicsBody* a, PhysicsBody* b) {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
-	joint = make_joint_shared(get_ws_transform(), anchor, local_joint_axis, PxSphericalJointCreate, a, b);
+	joint = make_joint_shared(get_ws_transform(), anchor, target_anchor, local_joint_axis, PxSphericalJointCreate, a, b);
 }
 physx::PxJoint* BallSocketJointComponent::get_joint() const {
 	return joint;
@@ -186,7 +192,7 @@ PxJoint* AdvancedJointComponent::get_joint() const {
 void AdvancedJointComponent::init_joint(PhysicsBody* a, PhysicsBody* b) {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
-	joint = make_joint_shared(get_ws_transform(), anchor, local_joint_axis, PxD6JointCreate, a, b);
+	joint = make_joint_shared(get_ws_transform(), anchor, target_anchor, local_joint_axis, PxD6JointCreate, a, b);
 	auto get_jm_enum = [&](JointMotion jm) {
 		if (jm == JM::Free)
 			return PxD6Motion::eFREE;
@@ -201,14 +207,18 @@ void AdvancedJointComponent::init_joint(PhysicsBody* a, PhysicsBody* b) {
 	joint->setMotion(PxD6Axis::eY, get_jm_enum(x_motion));
 	joint->setMotion(PxD6Axis::eZ, get_jm_enum(x_motion));
 	joint->setMotion(PxD6Axis::eTWIST, get_jm_enum(ang_x_motion));
-	joint->setMotion(PxD6Axis::eSWING1, get_jm_enum(ang_y_motion));
-	joint->setMotion(PxD6Axis::eSWING2, get_jm_enum(ang_z_motion));
+	// ang_y_motion/ang_y_limit <-> eSWING2, ang_z_motion/ang_z_limit <-> eSWING1 (swapped from the
+	// naive same-letter mapping): PxD6Axis::eSWING1 is the actual physical rotation axis about Z,
+	// and eSWING2 about Y (verified physically -- torquing a real PxD6Joint with ang_y Locked/ang_z
+	// Limited actually rotates around Z, not Y).
+	joint->setMotion(PxD6Axis::eSWING1, get_jm_enum(ang_z_motion));
+	joint->setMotion(PxD6Axis::eSWING2, get_jm_enum(ang_y_motion));
 	joint->setTwistLimit(PxJointAngularLimitPair(twist_limit_min, twist_limit_max, PxSpring(twist_stiff, twist_damp)));
 	if (ang_y_limit <= 0)
 		ang_y_limit = 0.00001;
 	if (ang_z_limit <= 0)
 		ang_z_limit = 0.00001;
-	joint->setSwingLimit(PxJointLimitCone(ang_y_limit, ang_z_limit, PxSpring(cone_stiff, cone_damp)));
+	joint->setSwingLimit(PxJointLimitCone(ang_z_limit, ang_y_limit, PxSpring(cone_stiff, cone_damp)));
 }
 void AdvancedJointComponent::free_joint() {
 	if (joint) {

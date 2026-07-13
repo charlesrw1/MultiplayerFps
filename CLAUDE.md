@@ -40,8 +40,9 @@ Use ASSERTS() liberaly, documenting its preconditions and invariants.
 Follow DRY, SOLID principles. SELF DOCUMENTING code. Single Responsiblity Principle!
 
 Uses RmlUI for the gameplay UI framework, a C++/lua UI framework that is very similar to Css/Html/Js (using .rml files for layout and .rcss for styling). Includes the lua plugin for it. See '..vcpkg\buildtrees\rmlui\src\6.2-203a9587f9.clean\' for the source files for it. Also see 'D:\Data\scripts\rmlui_lua_stubs.lua' for a list of callable functions from the lua api. Look at '...rmlui\src\6.2-203a9587f9.clean\Samples' for samples of using rmlui and lua. See 'https://mikke89.github.io/RmlUiDoc/index.html' for documentation about RmlUI in general. 
-Note that rmlui script operates in the same enviorment as the rest of the engine's lua. So you can call the same ClassBase REF'd functions, or lua global variables, and such.
+Note that rmlui script operates in the same enviorment as the rest of the engine's lua. So you can call the same ClassBase REF'd functions, or lua global variables, and such. You can attach scripts by using inline <script> or by doing 'onclick=' etc.
 
+Editor architecture only allows placing entities with 1 component that can be edited/serialized. Runtime allows multiple components per entity.
 
 ## Documentation
 

@@ -1,7 +1,9 @@
 #pragma once
 #include "glm/glm.hpp"
+#include "Framework/Util.h" // Color32
 
 class ModelBuilder;
+class MeshBuilder;
 
 // Solid-mesh builders for RagdollJointComponent's degrees-of-freedom gizmo. These append real
 // triangles (via ModelBuilder) so the gizmo can be shaded with a front/back-facing material
@@ -28,3 +30,14 @@ void ragdoll_append_cone_solid(ModelBuilder& mb, glm::vec3 apex, glm::vec3 dir, 
 // double-sided quad. Used for the twist semicircle and the single-axis swing (hinge) case.
 void ragdoll_append_wedge_solid(ModelBuilder& mb, glm::vec3 center, glm::vec3 axis, glm::vec3 zero_ref,
 								 float min_rad, float max_rad, float radius, float thickness);
+
+// A real capsule (cylindrical body + two hemispherical end caps), p0/p1 = the two sphere centers.
+// Used for RagdollPhysicsBodyComponent's shape gizmo -- solid + wireframe pair, Unity-collider
+// style: draw the solid (see ragdoll_append_capsule_solid, alpha-blended) and the wireframe (see
+// ragdoll_append_capsule_lines, depth-tested) as separate render components.
+void ragdoll_append_capsule_solid(ModelBuilder& mb, glm::vec3 p0, glm::vec3 p1, float radius);
+
+// Wireframe companion to ragdoll_append_capsule_solid: latitude rings at each hemisphere's base
+// plus a handful of longitude arcs running pole-to-pole (through the cylindrical body), matching
+// the solid mesh's geometry exactly.
+void ragdoll_append_capsule_lines(MeshBuilder& mb, glm::vec3 p0, glm::vec3 p1, float radius, Color32 color);

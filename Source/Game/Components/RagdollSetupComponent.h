@@ -27,6 +27,11 @@ public:
 
 	REF AssetPtr<Model> model;
 
+	// When true (default), preview_ragdoll mirrors authored right-side bones to their left-side
+	// counterparts as usual. Turn off to preview only the authored (right/center) bones -- useful
+	// when debugging a single joint/chain in isolation without the mirrored half cluttering things.
+	REF bool mirror_bodies_in_preview = true;
+
 	void start() final;
 	void stop() final;
 	void editor_start() final;
@@ -41,10 +46,16 @@ public:
 	// any scaffolding children placed under the owner are all normally serialized.
 	void ensure_rig_mesh();
 
-	// "Preview Ragdoll" button: tears down any previous preview set and rebuilds a fresh,
-	// simulated ragdoll from the current scaffolding (mirroring right-side bones to left) on a
-	// separate transient entity. The authoring entity (this component's owner) is never simulated.
+	// "Start Preview" / "Reset Preview" buttons: tears down any previous preview set and rebuilds
+	// a fresh, simulated ragdoll from the current scaffolding (mirroring right-side bones to left)
+	// on a separate transient entity. The authoring entity (this component's owner) is never
+	// simulated. Same call either way -- "reset" is just "start" run again while already running.
 	void preview_ragdoll();
+
+	// "End Preview" button: tears down the preview set without rebuilding it.
+	void end_preview();
+
+	bool is_previewing() const { return preview_mesh_entity.get() != nullptr; }
 
 private:
 	obj<Entity> preview_mesh_entity; // transient, dont_serialize_or_edit=true

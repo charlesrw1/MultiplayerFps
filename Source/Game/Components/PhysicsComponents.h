@@ -331,6 +331,19 @@ public:
 		local_joint_axis = axis;
 	}
 
+	// Extra local-space offset applied ONLY to the target/world side of the joint (never to this
+	// component's own attached body frame -- see make_joint_shared in PhysicsJoints.cpp). Use this
+	// to bias where a swing cone's limits are centered: PxD6 swing limits are always symmetric
+	// around whatever the joint's own attached-body frame is, so baking a bias rotation into
+	// `anchor` instead gets conjugated away for any bias that shares an axis with the swing itself
+	// (rotations about the same axis commute, so the bias cancels out of the conjugation exactly).
+	// Putting the SAME bias here instead -- multiplied onto the world/other-actor side only --
+	// shifts the limit's center for real, without that cancellation. Defaults to identity (no-op).
+	REF void set_target_anchor(glm::vec3 p, glm::quat q) {
+		target_anchor.p = p;
+		target_anchor.q = q;
+	}
+
 	// call after changing stuff
 	REF void refresh_joint();
 
@@ -347,6 +360,7 @@ protected:
 
 	REF obj<Entity> target;
 	REF JointAnchor anchor;
+	REF JointAnchor target_anchor; // identity by default -- see set_target_anchor()
 	REF int local_joint_axis = 0; // 0=x,1=y,2=z
 
 	MeshBuilderComponent* editor_meshbuilder = nullptr;

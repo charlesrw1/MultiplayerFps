@@ -1,6 +1,6 @@
 Useful console commands:
 	r.debug_mode 0-9, sets debug output like normals,object id,material id, look at Draw.cpp for the numbers
-	g_draw_physx_scene, draw physx debug shapes
+	g_draw_physx_scene, bitmask: 1=collision shapes, 2=joints, 3=both
 	g_slomo, set a time speedup/slowdown multiplier
 	
 Useful editor controls:
