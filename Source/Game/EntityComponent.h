@@ -66,8 +66,31 @@ public:
 	virtual void refresh_after_prefab_reload(PrefabAsset* reloaded) {}
 	REFLECT(no_nil)
 	Entity* get_owner() const { return entity_owner; }
-	const glm::mat4& get_ws_transform();
-	glm::vec3 get_ws_position() { return get_ws_transform()[3]; }
+	
+	// for convenience, just calls get_owner()->get_XYZ
+	REF void set_ls_transform(const glm::mat4& transform);
+	REF void set_ls_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
+	REF void set_ls_position(const glm::vec3& v);
+	REF void set_ls_euler_rotation(const glm::vec3& euler);
+	REF void set_ls_rotation(const glm::quat& quat);
+	REF void set_ls_scale(const glm::vec3& scale);
+	REF glm::mat4 get_ls_transform() const;
+	REF const glm::vec3& get_ls_position() const;
+	REF const glm::vec3& get_ls_scale() const;
+	REF const glm::quat& get_ls_rotation() const;
+	REF void set_ws_transform(const glm::mat4& transform);
+	REF void set_ws_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
+	REF const glm::mat4& get_ws_transform();
+	REF glm::vec3 get_ws_position();
+	REF glm::quat get_ws_rotation();
+	REF glm::vec3 get_ws_scale();
+	REF void set_ws_position(const glm::vec3& v);
+	REF void set_ws_position_rotation(const glm::vec3& pos, const glm::quat& rot);
+	REF void set_ls_position_rotation(const glm::vec3& pos, const glm::quat& rot);
+	REF void set_ws_rotation(const glm::quat& q);
+	REF void set_ws_scale(const glm::vec3& s);
+
+
 	// helper function which calls eng->get_level()->add_to_sync_render_data_list(this)
 	void sync_render_data();
 	REF void set_owner_dont_serialize_or_edit(bool b);
@@ -81,6 +104,7 @@ public:
 	// im_* imgui bindings (im_button, im_text, im_drag_float, etc).
 	REF virtual void on_inspector_imgui() {}
 #endif
+
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
 	virtual void on_changed_transform() {}

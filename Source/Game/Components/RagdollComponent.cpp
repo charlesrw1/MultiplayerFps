@@ -162,3 +162,23 @@ REF void RagdollComponent::add_root_body(StringName parented_bone, PhysicsBody* 
 	}
 	root_body_index = (int)bodies.size() - 1;
 }
+
+REF PhysicsBody* RagdollComponent::get_physics_body_for_bone(StringName name) {
+	MeshComponent* mesh = meshComponent.get();
+	if (!mesh) {
+		sys_print(Warning, "get_physics_body_for_bone: no mesh\n");
+		return nullptr;
+	}
+	int bone_idx = mesh->get_index_of_bone(name);
+	if (bone_idx==-1) {
+		sys_print(Warning, "get_physics_body_for_bone: invalid bone %s\n", name.get_c_str());
+		return nullptr;
+	}
+	for (auto& body : bodies) {
+		if (body.bone_index == bone_idx) {
+			return body.ptr.get();
+		}
+	}
+	sys_print(Warning, "get_physics_body_for_bone: no matching body for bone %s\n",name.get_c_str());
+	return nullptr;
+}

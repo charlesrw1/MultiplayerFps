@@ -1,4 +1,4 @@
-$src = Join-Path $PSScriptRoot "..\Data\scripts"
+$src = Join-Path $PSScriptRoot "..\TestFilesData\scripts"
 $dst = "D:/Data/scripts"
 
 New-Item -ItemType Directory -Force -Path $dst | Out-Null

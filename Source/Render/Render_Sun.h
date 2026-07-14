@@ -16,6 +16,7 @@ struct Render_Sun
 	bool fit_to_scene = true;
 	float log_lin_lerp_factor = 0.5;
 	float max_shadow_dist = 80.f;
+	float near_plane = 0.0f; // 0 = use camera's near plane
 	float epsilon = 0.008f;
 	float z_dist_scaling = 1.f;
 };

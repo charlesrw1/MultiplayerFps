@@ -158,6 +158,7 @@ void CascadeShadowMapSystem::update_matricies() {
 	tweak.log_lin_lerp_factor = sun.log_lin_lerp_factor;
 	tweak.max_shadow_dist = sun.max_shadow_dist;
 	tweak.z_dist_scaling = sun.z_dist_scaling;
+	tweak.near_plane = sun.near_plane;
 	{
 		GPU_SCOPE("CSM_SETUP");
 
@@ -213,6 +214,8 @@ void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& v
 	float near = (cascade_idx == 0) ? view.near : split_distances[cascade_idx - 1];
 	if (tweak.fit_to_scene)
 		near = view.near;
+	if (tweak.near_plane > 0.0f)
+		near = tweak.near_plane;
 
 	// 7/30: this doesnt need to be zero to one, not used to rendering, just in GetFrustumnCorners
 	mat4 camera_cascaded_proj = glm::perspective(view.fov, (float)view.width / view.height, near, far);

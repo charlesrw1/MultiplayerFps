@@ -82,7 +82,8 @@ public:
 	void move_child_entity_index(Entity* who, int move_to);
 	int get_child_entity_index(Entity* who) const;
 	const std::vector<Component*>& get_components() const { return all_components; }
-	const std::vector<Entity*>& get_children() const { return children; }
+	REF const std::vector<Entity*>& get_children() const { return children; }
+
 	EntityPtr get_self_ptr() const { return EntityPtr(this); }
 	void invalidate_transform(Component* skipthis);
 	virtual void editor_on_change_properties() {}

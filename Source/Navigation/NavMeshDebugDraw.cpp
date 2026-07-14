@@ -175,7 +175,7 @@ void draw_agents() {
 		for (size_t i = 1; i < corners.size(); i++)
 			Debug::add_line(corners[i - 1], corners[i], kAgentPath, 0.f, false);
 		if (!corners.empty()) {
-			Debug::add_sphere(corners.back(), agent->arrive_radius, kAgentArrive, 0.f, false);
+			Debug::add_sphere(corners.back(), agent->get_arrive_radius(), kAgentArrive, 0.f, false);
 		}
 	}
 }

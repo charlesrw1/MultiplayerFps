@@ -123,6 +123,7 @@ void SunLightComponent::on_sync_render_data() {
 	light.log_lin_lerp_factor = log_lin_lerp_factor;
 	light.z_dist_scaling = z_dist_scaling;
 	light.max_shadow_dist = max_shadow_dist;
+	light.near_plane = near_plane;
 	light.epsilon = epsilon;
 	light.angular_radius = sun_angular_radius;
 	light.cast_shadows = true;

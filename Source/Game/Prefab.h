@@ -45,7 +45,7 @@ public:
 
 	// Root entities (no parent) of the static, never-started tree. Lazily built on first call
 	// and cached; invalidated on reload.
-	const std::vector<Entity*>& get_root_entities() const;
+	REF const std::vector<Entity*>& get_root_entities() const;
 
 	// Searches every entity/component in the static, never-started tree (not just roots) for the
 	// first one matching. Returns nullptr if none found. Use these to fetch a specific authored

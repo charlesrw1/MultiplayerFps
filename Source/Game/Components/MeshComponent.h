@@ -83,8 +83,10 @@ public:
 #endif
 	void set_ignore_baking(bool ignore) { this->ignore_in_baking = ignore; }
 	void set_ignore_cubemap_view(bool ignore) { this->ignore_in_cubemap = ignore; }
-	void set_add_collision(bool add_col) { this->add_collision_if_available = true; }
-	bool get_add_collision() const { return add_collision_if_available; }
+	// Must be called before set_model()/set_model_str() — those bake collision presence into
+	// the owner's components immediately via update_physics_mesh().
+	REF void set_add_collision(bool add_col) { this->add_collision_if_available = add_col; }
+	REF bool get_add_collision() const { return add_collision_if_available; }
 
 	// public so the static-prop bake (free function below) can call it without becoming a friend.
 	void populate_render_object(struct Render_Object& out, const glm::mat4& ws_transform) const;

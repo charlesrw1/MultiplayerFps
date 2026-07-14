@@ -207,3 +207,67 @@ Component::~Component() {
 const glm::mat4& Component::get_ws_transform() {
 	return get_owner()->get_ws_transform();
 }
+void Component::set_ls_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale) {
+	get_owner()->set_ls_transform_comp(v, q, scale);
+}
+void Component::set_ls_position(const glm::vec3& v) {
+	get_owner()->set_ls_position(v);
+}
+void Component::set_ls_euler_rotation(const glm::vec3& euler) {
+	get_owner()->set_ls_euler_rotation(euler);
+}
+void Component::set_ls_rotation(const glm::quat& quat) {
+	get_owner()->set_ls_rotation(quat);
+}
+void Component::set_ls_scale(const glm::vec3& scale) {
+	get_owner()->set_ls_scale(scale);
+}
+glm::mat4 Component::get_ls_transform() const {
+	return get_owner()->get_ls_transform();
+}
+void Component::set_ws_transform(const glm::mat4& transform) {
+	get_owner()->set_ws_transform(transform);
+}
+void Component::set_ws_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale) {
+	get_owner()->set_ws_transform_comp(v, q, scale);
+}
+glm::vec3 Component::get_ws_position() {
+	return get_owner()->get_ws_position();
+}
+glm::quat Component::get_ws_rotation() {
+	return get_owner()->get_ws_rotation();
+}
+glm::vec3 Component::get_ws_scale() {
+	return get_owner()->get_ws_scale();
+}
+void Component::set_ws_position(const glm::vec3& v) {
+	get_owner()->set_ws_position(v);
+}
+void Component::set_ws_position_rotation(const glm::vec3& pos, const glm::quat& rot) {
+	get_owner()->set_ws_position_rotation(pos, rot);
+}
+void Component::set_ls_position_rotation(const glm::vec3& pos, const glm::quat& rot) {
+	get_owner()->set_ls_position_rotation(pos, rot);
+}
+
+void Component::set_ws_rotation(const glm::quat& q) {
+	set_ws_transform_comp(get_ws_position(), q, get_ws_scale());
+}
+
+void Component::set_ws_scale(const glm::vec3& s) {
+	set_ws_transform_comp(get_ws_position(), get_ws_rotation(), s);
+}
+
+// for convenience, just calls get_owner()->get_XYZ
+void Component::set_ls_transform(const glm::mat4& transform) {
+	return get_owner()->set_ls_transform(transform);
+}
+const glm::vec3& Component::get_ls_position() const {
+	return get_owner()->get_ls_position();
+}
+const glm::vec3& Component::get_ls_scale() const {
+	return get_owner()->get_ls_scale();
+}
+const glm::quat& Component::get_ls_rotation() const {
+	return get_owner()->get_ls_rotation();
+}

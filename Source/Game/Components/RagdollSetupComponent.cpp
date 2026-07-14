@@ -140,7 +140,8 @@ glm::mat4 ragdoll_mirror_bone_offset(const glm::mat4& ls_offset, const glm::mat4
 }
 } // namespace
 
-Entity* RagdollSetupComponent::build_ragdoll(std::vector<obj<Entity>>* out_spawned_bodies) const {
+Entity* RagdollSetupComponent::build_ragdoll(const glm::mat4& transform, bool enabled, std::vector<obj<Entity>>* out_spawned_bodies) const {
+	CPU_FUNCTION();
 	if (!model.get() || !model.get()->get_skel()) {
 		sys_print(Error, "RagdollSetupComponent::create_ragdoll_entity: no model / skeleton set\n");
 		return nullptr;
@@ -286,7 +287,7 @@ Entity* RagdollSetupComponent::build_ragdoll(std::vector<obj<Entity>>* out_spawn
 	// Spawn the mesh + RagdollComponent entity that will hold the simulated bodies.
 	Entity* pm = eng->get_level()->spawn_entity();
 	pm->dont_serialize_or_edit = true;
-	pm->set_ws_transform(get_owner()->get_ws_transform());
+	pm->set_ws_transform(transform);
 	auto* pm_mesh = pm->create_component<MeshComponent>();
 	pm_mesh->set_model(model.get());
 	agBuilder bind_builder;
@@ -382,29 +383,6 @@ Entity* RagdollSetupComponent::build_ragdoll(std::vector<obj<Entity>>* out_spawn
 			continue;
 		uint64_t parent_hash = is_pinned ? 0 : ab.parent_bone.get_hash();
 
-		// The joint's pivot/orientation is authored on ab.joint's OWN scaffold entity, which may
-		// be a separate sibling entity from ab.scaffold_entity (the body) -- both are bone-parented
-		// to the same bone, so express the joint's transform as an offset relative to the body's
-		// own local frame; that's exactly what AdvancedJointComponent::set_joint_anchor expects
-		// (an anchor local to the body it's created on). This also makes the joint's actual
-		// twist/swing axes match RagdollJointComponent's own gizmo (which is drawn in the joint
-		// entity's own local space, and its "Preview Twist/Swing" animation is composed the same
-		// way -- see RagdollJointComponent::compute_preview_rotation), instead of silently
-		// defaulting to the body's rotation whenever the joint entity was authored with a
-		// different orientation than the body entity.
-		// Derive the offset from rotation/position directly (not get_ls_transform()'s full 4x4,
-		// which also carries each entity's authored scale) -- scale has no business leaking into
-		// a joint anchor, and decomposing a matrix product of two independently-scaled transforms
-		// does not recover a clean rotation in general.
-		// anchor_q (this body's own attached joint frame) intentionally stays canonical -- just
-		// cancels the capsule's own shape-alignment rotation, landing at the bone's plain bind
-		// frame -- and does NOT include the joint entity's own rotation. PxD6 swing limits are
-		// always symmetric around whatever frame is attached to the body, so any bias baked in here
-		// would get conjugated away for a bias sharing an axis with the swing itself (see
-		// set_target_anchor's comment in PhysicsComponents.h). The joint entity's own rotation
-		// (which defines the twist/swing axis convention AND lets you bias an asymmetric limit by
-		// rotating it) goes to set_target_anchor below instead, which only affects the world/target
-		// side and isn't subject to that cancellation.
 		glm::quat body_rot = ab.scaffold_entity->get_ls_rotation();
 		glm::quat anchor_q = glm::inverse(body_rot);
 		glm::vec3 anchor_p = glm::inverse(body_rot) *
@@ -484,19 +462,20 @@ Entity* RagdollSetupComponent::build_ragdoll(std::vector<obj<Entity>>* out_spawn
 		if (mit != mirror_side_map.end())
 			wire_one(mit->second, true);
 	}
-
-	rag->enable();
+	if (enabled)
+		rag->enable();
 	return pm;
 }
 
-Entity* RagdollSetupComponent::create_ragdoll_entity() const {
-	return build_ragdoll(nullptr);
+Entity* RagdollSetupComponent::create_ragdoll_entity(const glm::mat4& transform, bool create_enabled) const {
+	auto* entity = build_ragdoll(transform, create_enabled, nullptr);
+	return entity;
 }
 
 void RagdollSetupComponent::preview_ragdoll() {
 	teardown_preview();
 	ensure_rig_mesh();
-	preview_mesh_entity = build_ragdoll(&preview_body_entities);
+	preview_mesh_entity = build_ragdoll(get_owner()->get_ws_transform(), true, &preview_body_entities);
 	if (preview_mesh_entity.get())
 		preview_ragdoll_comp = preview_mesh_entity->get_component<RagdollComponent>();
 }

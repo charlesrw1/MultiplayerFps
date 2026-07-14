@@ -170,8 +170,8 @@ static TestTask test_nav_runtime_path(TestContext& t) {
 	Entity* e = eng->get_level()->spawn_entity();
 	e->set_ws_position(glm::vec3(-5.f, 0.f, -5.f));
 	auto* agent = e->create_component<NavAgentComponent>();
-	agent->move_speed    = 20.f;
-	agent->arrive_radius = 0.5f;
+	agent->set_move_speed(20.f);
+	agent->set_arrive_radius(0.5f);
 	t.require(agent->request_path_to(glm::vec3(5.f, 0.f, 5.f)),
 			  "agent built a path to target");
 

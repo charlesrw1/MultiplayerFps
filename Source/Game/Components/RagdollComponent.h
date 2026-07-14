@@ -58,6 +58,8 @@ public:
 	REF void add_body(StringName parented_bone, PhysicsBody* body);
 	REF void add_root_body(StringName parented_bone, PhysicsBody* body);
 
+	REF PhysicsBody* get_physics_body_for_bone(StringName name);
+
 private:
 	struct RagdollBody
 	{

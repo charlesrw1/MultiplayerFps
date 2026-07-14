@@ -76,7 +76,7 @@ public:
 	// inserted-into-a-Level) instance -- e.g. a node found via PrefabAsset's search functions -- to
 	// spawn a real, permanent ragdoll at runtime. preview_ragdoll() above is just this plus
 	// bookkeeping for its own transient teardown.
-	REF Entity* create_ragdoll_entity() const;
+	REF Entity* create_ragdoll_entity(const glm::mat4& transform, bool create_enabled) const;
 
 private:
 	obj<Entity> preview_mesh_entity; // transient, dont_serialize_or_edit=true
@@ -89,5 +89,5 @@ private:
 	// (and pin_root_to_skeleton's anchor entity, if any) is appended to *out_spawned_bodies when
 	// non-null, which is how preview_ragdoll() tracks its own set for teardown_preview() --
 	// create_ragdoll_entity() passes nullptr since that ragdoll is meant to persist.
-	Entity* build_ragdoll(std::vector<obj<Entity>>* out_spawned_bodies) const;
+	Entity* build_ragdoll(const glm::mat4& transform, bool enabled, std::vector<obj<Entity>>* out_spawned_bodies) const;
 };

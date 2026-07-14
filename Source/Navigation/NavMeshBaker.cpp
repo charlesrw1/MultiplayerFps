@@ -75,6 +75,8 @@ void collect_static_triangles(const std::vector<NavMeshVolumeComponent*>& volume
 		const Model* model = mc->get_model();
 		if (!model)
 			continue;
+		if (!model->get_physics_body())
+			continue;
 		const RawMeshData* raw = model->get_raw_mesh_data();
 		if (!raw)
 			continue;

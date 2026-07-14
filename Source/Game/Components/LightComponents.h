@@ -125,6 +125,7 @@ public:
 	REF bool fit_to_scene = true;
 	REF float log_lin_lerp_factor = 0.5;
 	REF float max_shadow_dist = 80.f;
+	REF float near_plane = 0.0f; // 0 = use camera's near plane; else override to fit shadow frustum tighter
 	REF float epsilon = 0.008f;
 	REF float z_dist_scaling = 1.f;
 	REF float sun_angular_radius = 0.00465f;
