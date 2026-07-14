@@ -79,6 +79,65 @@ struct AuthoredBone {
 	int bone_index = -1;
 	StringName parent_bone; // resolved by walking the skeleton hierarchy; null => root/unresolved
 };
+
+// Mirrors a WORLD/mesh-space rotation by reflecting each of its 3 local axis directions
+// individually across the mirror plane (normal n), then restoring a proper right-handed
+// orientation by re-negating whichever axis was most aligned with n (the limb's own
+// twist/long axis, for a typical bone). This is deliberately NOT the same as conjugating the
+// whole matrix by the reflection (reflect*R*reflect): that form is correct for mirroring a
+// standalone rigid body's pose, but it silently negates the rotation ANGLE for any DOF whose
+// swing axis is perpendicular to the mirror normal -- exactly the case for a limb's bend axes
+// -- which is why joints mirrored that way visibly bent the wrong way (e.g. a right elbow
+// flexing forward mirrored to a left elbow flexing backward) and fought PhysX's constraint
+// solver (the "spazzing"): the mirrored anchor/target frames came out skewed off the joint's
+// own local X/Y/Z convention instead of staying axis-aligned. Reflecting axes individually and
+// only fixing up the twist-like axis keeps that axis's own rotation sense intact and keeps the
+// other two axes cleanly axis-aligned, matching what "mirror image" actually looks like.
+glm::mat3 ragdoll_mirror_rotation(const glm::mat3& rot, const glm::vec3& n) {
+	glm::mat3 reflect3 = glm::mat3(1.f) - 2.f * glm::outerProduct(n, n);
+	glm::vec3 col0 = reflect3 * rot[0];
+	glm::vec3 col1 = reflect3 * rot[1];
+	glm::vec3 col2 = reflect3 * rot[2];
+	float d0 = fabsf(glm::dot(rot[0], n));
+	float d1 = fabsf(glm::dot(rot[1], n));
+	float d2 = fabsf(glm::dot(rot[2], n));
+	if (d0 >= d1 && d0 >= d2)
+		col0 = -col0;
+	else if (d1 >= d2)
+		col1 = -col1;
+	else
+		col2 = -col2;
+	return glm::mat3(col0, col1, col2);
+}
+
+// Mirrors a bone-local offset (a position+rotation expressed relative to bone R's own bind
+// frame -- e.g. a scaffolding entity's get_ls_transform(), or a joint anchor relative to its
+// body) onto bone L's bind frame. Reflects through the actual mirror plane of THIS skeleton --
+// the perpendicular bisector of the R/L bones' bind-pose mesh-space positions -- rather than
+// assuming a fixed world axis (e.g. "X is left/right"), which doesn't hold for every
+// skeleton/export convention and was the reason plain reuse of the right-side offset on the
+// left side never lined up right. Position mirrors by plain point-reflection (unambiguous);
+// rotation mirrors via ragdoll_mirror_rotation (see its comment for why that's not the same as
+// reflecting the position).
+glm::mat4 ragdoll_mirror_bone_offset(const glm::mat4& ls_offset, const glm::mat4& pose_r, const glm::mat4& pose_l) {
+	glm::vec3 pr(pose_r[3]);
+	glm::vec3 pl(pose_l[3]);
+	glm::vec3 n = pr - pl;
+	float len = glm::length(n);
+	if (len < 1e-6f)
+		return ls_offset; // R/L bones coincide in bind pose -- nothing sane to mirror against
+	n /= len;
+	glm::vec3 mid = (pr + pl) * 0.5f;
+
+	glm::mat4 world_r = pose_r * ls_offset;
+	glm::vec3 world_r_pos(world_r[3]);
+	glm::vec3 world_l_pos = world_r_pos - 2.f * glm::dot(world_r_pos - mid, n) * n;
+	glm::mat3 world_l_rot = ragdoll_mirror_rotation(glm::mat3(world_r), n);
+
+	glm::mat4 world_l(world_l_rot);
+	world_l[3] = glm::vec4(world_l_pos, 1.f);
+	return glm::inverse(pose_l) * world_l;
+}
 } // namespace
 
 void RagdollSetupComponent::preview_ragdoll() {
@@ -109,10 +168,10 @@ void RagdollSetupComponent::preview_ragdoll() {
 			continue;
 		StringName bone_name = child->get_parent_bone();
 		std::string lower = ragdoll_str_to_lower(bone_name.get_c_str());
-		if (ragdoll_is_left_side(lower)) {
+		if (!allow_left_side_authoring && ragdoll_is_left_side(lower)) {
 			sys_print(Error,
 					  "RagdollSetupComponent: left-side scaffolding bone '%s' ignored -- author right/center bones "
-					  "only, mirroring generates the left side\n",
+					  "only, mirroring generates the left side (set allow_left_side_authoring to author it by hand)\n",
 					  bone_name.get_c_str());
 			continue;
 		}
@@ -133,6 +192,39 @@ void RagdollSetupComponent::preview_ragdoll() {
 	if (authored.empty()) {
 		sys_print(Error, "RagdollSetupComponent::preview_ragdoll: no authored RagdollPhysicsBodyComponent "
 						 "scaffolding found under the rig entity\n");
+		return;
+	}
+
+	// Pass A.6 -- prune any bone whose own joint is disabled (RagdollJointComponent::enabled ==
+	// false), or that descends from one, by walking each bone's ancestors through the skeleton's
+	// actual bone hierarchy (same walk Pass A.5 uses below) and dropping it from `authored` if
+	// any authored bone along that path -- including itself -- has a disabled joint. This is what
+	// makes disabling a joint cut off that whole limb/chain instead of just leaving a dangling,
+	// unconnected body: descendants would otherwise still spawn as free-falling bodies with no
+	// path back to the rest of the ragdoll.
+	for (auto it = authored.begin(); it != authored.end();) {
+		bool pruned = false;
+		for (int idx = it->second.bone_index; idx >= 0; idx = skel->get_bone_parent(idx)) {
+			StringName bname = skel->get_all_bones().at(idx).name;
+			auto ait = authored.find(bname.get_hash());
+			if (ait != authored.end() && ait->second.joint && !ait->second.joint->enabled) {
+				pruned = true;
+				break;
+			}
+		}
+		if (pruned) {
+			sys_print(Info,
+					  "RagdollSetupComponent: bone '%s' pruned from preview -- a disabled joint on it or an "
+					  "ancestor bone\n",
+					  it->second.scaffold_entity->get_parent_bone().get_c_str());
+			it = authored.erase(it);
+		} else {
+			++it;
+		}
+	}
+	if (authored.empty()) {
+		sys_print(Error, "RagdollSetupComponent::preview_ragdoll: every authored bone was pruned by a disabled "
+						 "joint\n");
 		return;
 	}
 
@@ -209,15 +301,28 @@ void RagdollSetupComponent::preview_ragdoll() {
 
 	// Pass B -- mirrored spawn. bone-name-hash -> spawned free body entity, one map per side (right/center
 	// as authored, and the mirrored left side for right-side bones; center bones only ever populate orig).
+	// Looks up the mirror bone's index and returns both bones' bind-pose (bone->mesh space)
+	// matrices, or false if `own_bone` has no side suffix or its mirror isn't in this skeleton.
+	auto find_mirror_bone_poses = [&](int own_bone_index, StringName own_bone, glm::mat4& out_pose_r,
+									   glm::mat4& out_pose_l) -> bool {
+		int mirror_bone_index = skel->get_bone_index(StringName(ragdoll_mirror_bone_name(own_bone.get_c_str()).c_str()));
+		if (mirror_bone_index == -1)
+			return false;
+		out_pose_r = (glm::mat4)skel->get_all_bones().at(own_bone_index).posematrix;
+		out_pose_l = (glm::mat4)skel->get_all_bones().at(mirror_bone_index).posematrix;
+		return true;
+	};
+
 	std::unordered_map<uint64_t, Entity*> orig_side_map, mirror_side_map;
-	auto spawn_body = [&](const AuthoredBone& ab, const std::string& side_bone_name, bool is_root) -> Entity* {
+	auto spawn_body = [&](const AuthoredBone& ab, const std::string& side_bone_name, const glm::mat4& ls_offset,
+						   bool is_root) -> Entity* {
 		Entity* body_entity = eng->get_level()->spawn_entity();
 		body_entity->dont_serialize_or_edit = true;
-		// Free/unparented entity -- RagdollComponent::add_body ASSERTs this. Copy the scaffolding
-		// entity's own bone-relative local transform directly: both it and this new body are (or
-		// would be) bone-parented to equivalent-side bones, and get_ls_transform() is parent-
-		// independent local data, so the same offset is correct for either side.
-		body_entity->set_ws_transform(ab.scaffold_entity->get_ls_transform());
+		// Free/unparented entity -- RagdollComponent::add_body ASSERTs this. `ls_offset` is the
+		// bone-relative local transform to use -- the scaffolding entity's own get_ls_transform()
+		// as-authored for the original side, or that offset mirrored onto the opposite bone's
+		// bind frame for the mirror side (see ragdoll_mirror_bone_offset).
+		body_entity->set_ws_transform(ls_offset);
 		auto* capsule = body_entity->create_component<CapsuleComponent>();
 		capsule->set_data(ab.body->height, ab.body->radius, ab.body->height_offset);
 		capsule->set_body_type(BodyType::Dynamic);
@@ -235,17 +340,26 @@ void RagdollSetupComponent::preview_ragdoll() {
 		bool is_right = ragdoll_is_right_side(own_lower);
 		bool is_root = (ab.joint == nullptr);
 
-		orig_side_map[hash] = spawn_body(ab, own_bone.get_c_str(), is_root);
+		orig_side_map[hash] = spawn_body(ab, own_bone.get_c_str(), ab.scaffold_entity->get_ls_transform(), is_root);
 
 		if (is_right && mirror_bodies_in_preview) {
 			std::string mirror_name = ragdoll_mirror_bone_name(own_bone.get_c_str());
-			if (skel->get_bone_index(StringName(mirror_name.c_str())) == -1) {
+			if (allow_left_side_authoring && authored.count(StringName(mirror_name.c_str()).get_hash())) {
+				// Hand-authored left-side bone already claims this bone name -- let its own pass
+				// through `authored` spawn it as-authored instead of overwriting it with an
+				// auto-mirrored body.
+				continue;
+			}
+			glm::mat4 pose_r, pose_l;
+			if (!find_mirror_bone_poses(ab.bone_index, own_bone, pose_r, pose_l)) {
 				sys_print(Warning,
 						  "RagdollSetupComponent: mirrored bone '%s' not found in skeleton -- skipping left side "
 						  "for '%s'\n",
 						  mirror_name.c_str(), own_bone.get_c_str());
 			} else {
-				mirror_side_map[hash] = spawn_body(ab, mirror_name, is_root);
+				glm::mat4 mirrored_ls =
+					ragdoll_mirror_bone_offset(ab.scaffold_entity->get_ls_transform(), pose_r, pose_l);
+				mirror_side_map[hash] = spawn_body(ab, mirror_name, mirrored_ls, is_root);
 			}
 		}
 	}
@@ -300,6 +414,33 @@ void RagdollSetupComponent::preview_ragdoll() {
 							  (ab.joint->get_owner()->get_ls_position() - ab.scaffold_entity->get_ls_position());
 		glm::quat joint_rot = ab.joint->get_owner()->get_ls_rotation();
 
+		// Mirrored variants of the three quantities above, for the mirror-side body's own joint
+		// (only computed when this bone actually spawned one). Same derivation as anchor_q/
+		// anchor_p/joint_rot, just fed the body/joint local frames reflected onto the mirror
+		// bone (ragdoll_mirror_bone_offset) instead of the as-authored right-side ones -- reusing
+		// the right side's numbers verbatim here was the actual mirroring bug: it happened to
+		// work only when a bone's bind pose was numerically symmetric about the origin.
+		glm::quat anchor_q_mirror = anchor_q;
+		glm::vec3 anchor_p_mirror = anchor_p;
+		glm::quat joint_rot_mirror = joint_rot;
+		if (mirror_side_map.count(hash)) {
+			StringName own_bone = ab.scaffold_entity->get_parent_bone();
+			glm::mat4 pose_r, pose_l;
+			if (find_mirror_bone_poses(ab.bone_index, own_bone, pose_r, pose_l)) {
+				glm::mat4 body_ls = compose_transform(ab.scaffold_entity->get_ls_position(), body_rot, glm::vec3(1.f));
+				glm::mat4 joint_ls = compose_transform(ab.joint->get_owner()->get_ls_position(),
+														ab.joint->get_owner()->get_ls_rotation(), glm::vec3(1.f));
+				glm::mat4 mirrored_body_ls = ragdoll_mirror_bone_offset(body_ls, pose_r, pose_l);
+				glm::mat4 mirrored_joint_ls = ragdoll_mirror_bone_offset(joint_ls, pose_r, pose_l);
+				glm::vec3 mbody_p, mjoint_p, scale_unused;
+				glm::quat mbody_rot;
+				decompose_transform(mirrored_body_ls, mbody_p, mbody_rot, scale_unused);
+				decompose_transform(mirrored_joint_ls, mjoint_p, joint_rot_mirror, scale_unused);
+				anchor_q_mirror = glm::inverse(mbody_rot);
+				anchor_p_mirror = glm::inverse(mbody_rot) * (mjoint_p - mbody_p);
+			}
+		}
+
 		auto wire_one = [&](Entity* body_entity, bool for_mirror_side) {
 			if (!body_entity)
 				return;
@@ -330,8 +471,13 @@ void RagdollSetupComponent::preview_ragdoll() {
 								   ab.joint->stiffness);
 			joint->set_cone_vars(ab.joint->swing1_limit, ab.joint->swing2_limit, ab.joint->damping,
 								  ab.joint->stiffness);
-			joint->set_joint_anchor(anchor_p, anchor_q, 0);
-			joint->set_target_anchor(glm::vec3(0.f), joint_rot);
+			if (for_mirror_side) {
+				joint->set_joint_anchor(anchor_p_mirror, anchor_q_mirror, 0);
+				joint->set_target_anchor(glm::vec3(0.f), joint_rot_mirror);
+			} else {
+				joint->set_joint_anchor(anchor_p, anchor_q, 0);
+				joint->set_target_anchor(glm::vec3(0.f), joint_rot);
+			}
 			joint->set_target(parent_entity);
 		};
 		auto oit = orig_side_map.find(hash);

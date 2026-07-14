@@ -32,6 +32,12 @@ public:
 	// when debugging a single joint/chain in isolation without the mirrored half cluttering things.
 	REF bool mirror_bodies_in_preview = true;
 
+	// When false (default), left-side scaffolding bones are pruned (logged and skipped) since
+	// mirroring auto-generates the left side from the authored right/center bones. Set true to
+	// author the left side by hand instead -- e.g. for an asymmetric ragdoll -- and have it
+	// spawned as-authored rather than pruned or mirror-generated.
+	REF bool allow_left_side_authoring = false;
+
 	void start() final;
 	void stop() final;
 	void editor_start() final;

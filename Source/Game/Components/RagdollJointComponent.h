@@ -25,6 +25,12 @@ public:
 	// render-proxy teardown and crashing on the next scene draw. See stop().
 	RagdollJointComponent() { set_call_init_in_editor(true); }
 
+	// Debug toggle: when false, RagdollSetupComponent::preview_ragdoll prunes this joint's own
+	// bone AND every descendant bone (their bodies and joints) from the preview entirely --
+	// lets you cut off a whole limb/chain to isolate the rest of the ragdoll without deleting
+	// or reparenting any scaffolding.
+	REF bool enabled = true;
+
 	REF JM ang_x_motion = JM::Limited; // twist
 	REF JM ang_y_motion = JM::Limited; // swing1
 	REF JM ang_z_motion = JM::Limited; // swing2
