@@ -4,6 +4,7 @@
 #include "Game/Components/MeshComponent.h"
 #include "Render/Model.h"
 #include "Render/ModelManager.h"
+#include "Animation/SkeletonData.h"
 #include "Render/MaterialPublic.h"
 #include "Framework/Util.h"
 #include "Framework/Log.h"
@@ -34,10 +35,54 @@ constexpr float PREVIEW_PING_PONG_SPEED = 1.5f;  // rad/s (in the sin() phase, n
 constexpr float PREVIEW_RIM_SWEEP_SPEED = 1.2f;  // rad/s around the cone rim
 
 StringName preview_rot_var() { return StringName("vRagdollJointPreviewRot"); }
+
+// Whether this joint's own local +X (twist axis, this entity's authored rotation composed with
+// its bone's bind pose) points toward the bone's own nearest child bone -- i.e. down the limb,
+// the direction the swing gizmo is expected to visibly open toward -- rather than back toward
+// the parent. PhysX's swing/twist limits are relative to this joint's own rest frame and don't
+// care which absolute direction gets called "+X", so an inconsistent per-side authoring
+// convention here never shows up as a physics bug, only as the swing gizmo visibly pointing the
+// wrong way. Returns true (nothing to flip) when indeterminate, e.g. a leaf bone with no child.
+bool ragdoll_gizmo_swing_faces_forward(Entity* owner, MSkeleton* skel) {
+	if (!skel)
+		return true;
+	int own_idx = skel->get_bone_index(owner->get_parent_bone());
+	if (own_idx == -1)
+		return true;
+	int child_idx = -1;
+	for (int i = 0; i < skel->get_num_bones(); i++) {
+		if (skel->get_bone_parent(i) == own_idx) {
+			child_idx = i;
+			break;
+		}
+	}
+	if (child_idx == -1)
+		return true;
+	const auto& own_bone = skel->get_all_bones().at(own_idx);
+	glm::vec3 own_pos = own_bone.posematrix[3];
+	glm::vec3 child_pos = skel->get_all_bones().at(child_idx).posematrix[3];
+	glm::vec3 to_child = child_pos - own_pos;
+	if (glm::length(to_child) < 1e-6f)
+		return true;
+	to_child = glm::normalize(to_child);
+	glm::mat3 own_bone_rot(own_bone.posematrix[0], own_bone.posematrix[1], own_bone.posematrix[2]);
+	glm::vec3 local_x_mesh = own_bone_rot * (glm::mat3_cast(owner->get_ls_rotation()) * glm::vec3(1.f, 0.f, 0.f));
+	return glm::dot(local_x_mesh, to_child) >= 0.f;
+}
 } // namespace
 
 void RagdollJointComponent::editor_start() {
 	rebuild_gizmo_mesh();
+	// Component init order across a scene/prefab load isn't guaranteed parent-before-child --
+	// this can run before the sibling RagdollSetupComponent has set up the rig MeshComponent's
+	// model, in which case rebuild_gizmo_mesh() just built with no skeleton to check facing
+	// against. Keep ticking until the model shows up, then rebuild once for real; see update().
+	MeshComponent* rig_mesh = get_rig_mesh();
+	bool skel_ready = rig_mesh && rig_mesh->get_model() && rig_mesh->get_model()->get_skel();
+	if (!skel_ready) {
+		gizmo_awaiting_skeleton = true;
+		set_ticking(true);
+	}
 }
 
 void RagdollJointComponent::stop() {
@@ -106,6 +151,18 @@ void RagdollJointComponent::rebuild_gizmo_mesh() {
 	// with an identity joint anchor).
 	const glm::vec3 twist_axis(1.f, 0.f, 0.f);
 
+	// The swing gizmo (cone/wedge) is expected to visibly open down the limb, toward this bone's
+	// child bone -- but that's purely a display convention PhysX doesn't enforce (see
+	// ragdoll_gizmo_swing_faces_forward's comment), so a scaffold entity authored with local +X
+	// pointing back toward the parent renders a backward-facing cone despite behaving correctly.
+	// Flip only the SWING gizmo's forward direction to compensate -- NOT twist_axis itself, which
+	// stays the real local +X and is still used as-is for the twist ring below (that one's
+	// rotational sense is tied to twist_limit_min/max and already correct; flipping it would
+	// introduce a new inconsistency instead of fixing one).
+	MeshComponent* rig_mesh = get_rig_mesh();
+	MSkeleton* skel = (rig_mesh && rig_mesh->get_model()) ? rig_mesh->get_model()->get_skel() : nullptr;
+	const glm::vec3 swing_dir = ragdoll_gizmo_swing_faces_forward(owner, skel) ? twist_axis : -twist_axis;
+
 	const bool swing_2dof = is_dof_open(ang_y_motion) && is_dof_open(ang_z_motion);
 	const bool swing_1dof_y = is_dof_open(ang_y_motion) && !is_dof_open(ang_z_motion);
 	const bool swing_1dof_z = is_dof_open(ang_z_motion) && !is_dof_open(ang_y_motion);
@@ -114,7 +171,7 @@ void RagdollJointComponent::rebuild_gizmo_mesh() {
 	bool has_swing = false;
 	if (swing_2dof) {
 		swing_mb.begin_submesh(get_ragdoll_joint_gizmo_material());
-		ragdoll_append_cone_solid(swing_mb, glm::vec3(0.f), twist_axis, swing1_limit, swing2_limit, GIZMO_LENGTH);
+		ragdoll_append_cone_solid(swing_mb, glm::vec3(0.f), swing_dir, swing1_limit, swing2_limit, GIZMO_LENGTH);
 		has_swing = true;
 	} else if (swing_1dof_y || swing_1dof_z) {
 		// Single-axis swing (hinge): the LOCKED swing axis is the hinge's rotation axis; the
@@ -122,7 +179,7 @@ void RagdollJointComponent::rebuild_gizmo_mesh() {
 		swing_mb.begin_submesh(get_ragdoll_joint_gizmo_material());
 		glm::vec3 hinge_axis = swing_1dof_y ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
 		float limit = swing_1dof_y ? swing1_limit : swing2_limit;
-		ragdoll_append_wedge_solid(swing_mb, glm::vec3(0.f), hinge_axis, twist_axis, -limit, limit, GIZMO_LENGTH,
+		ragdoll_append_wedge_solid(swing_mb, glm::vec3(0.f), hinge_axis, swing_dir, -limit, limit, GIZMO_LENGTH,
 								   GIZMO_THICKNESS);
 		has_swing = true;
 	}
@@ -323,6 +380,15 @@ RagdollJointComponent* RagdollJointComponent::s_previewing_joint = nullptr;
 
 void RagdollJointComponent::update() {
 #ifdef EDITOR_BUILD
+	if (gizmo_awaiting_skeleton) {
+		MeshComponent* rig_mesh = get_rig_mesh();
+		if (rig_mesh && rig_mesh->get_model() && rig_mesh->get_model()->get_skel()) {
+			gizmo_awaiting_skeleton = false;
+			rebuild_gizmo_mesh();
+			if (preview_mode == PreviewMode::None)
+				set_ticking(false); // stop_preview() re-enables this if a preview starts later
+		}
+	}
 	if (preview_mode == PreviewMode::None)
 		return;
 	preview_t += eng->get_dt();

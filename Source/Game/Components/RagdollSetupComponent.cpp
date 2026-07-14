@@ -510,5 +510,18 @@ void RagdollSetupComponent::on_inspector_imgui() {
 		if (ImGui::Button("Reset Preview"))
 			preview_ragdoll();
 	}
+
+	if (ImGui::Button("Enable All Joints"))
+		set_all_joints_enabled(true);
+	ImGui::SameLine();
+	if (ImGui::Button("Disable All Joints"))
+		set_all_joints_enabled(false);
+}
+
+void RagdollSetupComponent::set_all_joints_enabled(bool enabled) {
+	for (Entity* child : get_owner()->get_children()) {
+		if (auto* joint = child->get_component<RagdollJointComponent>())
+			joint->enabled = enabled;
+	}
 }
 #endif

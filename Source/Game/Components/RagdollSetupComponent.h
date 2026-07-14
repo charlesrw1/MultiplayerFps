@@ -44,6 +44,11 @@ public:
 #ifdef EDITOR_BUILD
 	void on_inspector_imgui() final;
 	void editor_on_change_property() override;
+
+	// "Enable All Joints" / "Disable All Joints" buttons: sets RagdollJointComponent::enabled on
+	// every direct child joint at once, for quickly toggling the whole scaffolding rather than
+	// clicking through each joint individually.
+	void set_all_joints_enabled(bool enabled);
 #endif
 
 	// Ensures this component's own owner entity has a MeshComponent(model) + bind-pose animator.

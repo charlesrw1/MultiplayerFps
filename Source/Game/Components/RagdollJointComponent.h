@@ -63,6 +63,14 @@ private:
 	float preview_t = 0.f;
 	static RagdollJointComponent* s_previewing_joint;
 
+	// Component init order across a scene/prefab load isn't guaranteed parent-before-child, so
+	// editor_start()'s first rebuild_gizmo_mesh() call can run before the sibling
+	// RagdollSetupComponent has set up the rig MeshComponent's model (ensure_rig_mesh()) --
+	// leaving the gizmo built with no skeleton to check facing against until something else
+	// happens to trigger a rebuild (e.g. editing a property). When that first attempt finds no
+	// skeleton, this flags update() to retry once the model becomes available. See update().
+	bool gizmo_awaiting_skeleton = false;
+
 	obj<Entity> gizmo_entity;
 	DynamicModelUniquePtr swing_model; // cone (2-DOF) or wedge (1-DOF); null when both swing axes are Locked
 	DynamicModelUniquePtr twist_model; // twist wedge/ring; null unless ang_x_motion is Limited/Free
