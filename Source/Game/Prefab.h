@@ -7,6 +7,8 @@
 #include "Game/EntityPtr.h"
 
 class Entity;
+class Component;
+class ClassTypeInfo;
 
 // PrefabFile — Simple file I/O for .tprefab files
 // Not an IAsset — just string-based path and serialization text
@@ -44,6 +46,17 @@ public:
 	// Root entities (no parent) of the static, never-started tree. Lazily built on first call
 	// and cached; invalidated on reload.
 	const std::vector<Entity*>& get_root_entities() const;
+
+	// Searches every entity/component in the static, never-started tree (not just roots) for the
+	// first one matching. Returns nullptr if none found. Use these to fetch a specific authored
+	// node (e.g. a RagdollSetupComponent) off a prefab in order to call a REF'd function on it,
+	// such as RagdollSetupComponent::create_ragdoll_entity().
+	REF Component* find_component_by_type(const ClassTypeInfo* type) const;
+	REF Entity* find_entity_by_name(const std::string& name) const;
+
+	// Loads (or returns the already-loaded) PrefabAsset for `name`, mirroring the
+	// Asset::load(name) pattern used by other asset types (e.g. AnimationSeqAsset::load).
+	REF static PrefabAsset* load(const std::string& name);
 
 	// Spawns a live instance of this prefab into the current Level: deserializes a fresh,
 	// independent copy of the prefab text (never touches the cached static tree above),

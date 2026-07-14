@@ -140,13 +140,11 @@ glm::mat4 ragdoll_mirror_bone_offset(const glm::mat4& ls_offset, const glm::mat4
 }
 } // namespace
 
-void RagdollSetupComponent::preview_ragdoll() {
-	teardown_preview();
+Entity* RagdollSetupComponent::build_ragdoll(std::vector<obj<Entity>>* out_spawned_bodies) const {
 	if (!model.get() || !model.get()->get_skel()) {
-		sys_print(Error, "RagdollSetupComponent::preview_ragdoll: no model / skeleton set\n");
-		return;
+		sys_print(Error, "RagdollSetupComponent::create_ragdoll_entity: no model / skeleton set\n");
+		return nullptr;
 	}
-	ensure_rig_mesh();
 	MSkeleton* skel = model.get()->get_skel();
 
 	// Pass A -- collect authored (right-side or center only) scaffolding bones. Scaffolding
@@ -190,9 +188,9 @@ void RagdollSetupComponent::preview_ragdoll() {
 		authored[bone_name.get_hash()] = ab;
 	}
 	if (authored.empty()) {
-		sys_print(Error, "RagdollSetupComponent::preview_ragdoll: no authored RagdollPhysicsBodyComponent "
+		sys_print(Error, "RagdollSetupComponent::create_ragdoll_entity: no authored RagdollPhysicsBodyComponent "
 						 "scaffolding found under the rig entity\n");
-		return;
+		return nullptr;
 	}
 
 	// Pass A.6 -- prune any bone whose own joint is disabled (RagdollJointComponent::enabled ==
@@ -223,9 +221,9 @@ void RagdollSetupComponent::preview_ragdoll() {
 		}
 	}
 	if (authored.empty()) {
-		sys_print(Error, "RagdollSetupComponent::preview_ragdoll: every authored bone was pruned by a disabled "
+		sys_print(Error, "RagdollSetupComponent::create_ragdoll_entity: every authored bone was pruned by a disabled "
 						 "joint\n");
-		return;
+		return nullptr;
 	}
 
 	// Pass A.5 -- resolve each joint's implicit parent by walking up the skeleton's actual bone
@@ -285,9 +283,8 @@ void RagdollSetupComponent::preview_ragdoll() {
 		sys_print(Info, "RagdollSetupComponent: single-joint scaffolding detected -- pinning its joint rigidly to "
 						"its skeleton bind-pose position instead of leaving it unconnected\n");
 
-	// Spawn a transient preview mesh + RagdollComponent to hold the simulated bodies.
-	preview_mesh_entity = eng->get_level()->spawn_entity();
-	Entity* pm = preview_mesh_entity.get();
+	// Spawn the mesh + RagdollComponent entity that will hold the simulated bodies.
+	Entity* pm = eng->get_level()->spawn_entity();
 	pm->dont_serialize_or_edit = true;
 	pm->set_ws_transform(get_owner()->get_ws_transform());
 	auto* pm_mesh = pm->create_component<MeshComponent>();
@@ -297,7 +294,6 @@ void RagdollSetupComponent::preview_ragdoll() {
 	bind_builder.set_root(bind_node);
 	pm_mesh->create_animator(&bind_builder);
 	auto* rag = pm->create_component<RagdollComponent>();
-	preview_ragdoll_comp = rag;
 
 	// Pass B -- mirrored spawn. bone-name-hash -> spawned free body entity, one map per side (right/center
 	// as authored, and the mirrored left side for right-side bones; center bones only ever populate orig).
@@ -326,7 +322,8 @@ void RagdollSetupComponent::preview_ragdoll() {
 		auto* capsule = body_entity->create_component<CapsuleComponent>();
 		capsule->set_data(ab.body->height, ab.body->radius, ab.body->height_offset);
 		capsule->set_body_type(BodyType::Dynamic);
-		preview_body_entities.push_back(body_entity);
+		if (out_spawned_bodies)
+			out_spawned_bodies->push_back(body_entity);
 		StringName side_name(side_bone_name.c_str());
 		if (is_root)
 			rag->add_root_body(side_name, capsule);
@@ -454,7 +451,8 @@ void RagdollSetupComponent::preview_ragdoll() {
 				Entity* anchor = eng->get_level()->spawn_entity();
 				anchor->dont_serialize_or_edit = true;
 				anchor->set_ws_transform(body_entity->get_ws_transform());
-				preview_body_entities.push_back(anchor);
+				if (out_spawned_bodies)
+					out_spawned_bodies->push_back(anchor);
 				parent_entity = anchor;
 			} else {
 				parent_entity = resolve_parent_body(parent_hash, for_mirror_side);
@@ -488,6 +486,19 @@ void RagdollSetupComponent::preview_ragdoll() {
 	}
 
 	rag->enable();
+	return pm;
+}
+
+Entity* RagdollSetupComponent::create_ragdoll_entity() const {
+	return build_ragdoll(nullptr);
+}
+
+void RagdollSetupComponent::preview_ragdoll() {
+	teardown_preview();
+	ensure_rig_mesh();
+	preview_mesh_entity = build_ragdoll(&preview_body_entities);
+	if (preview_mesh_entity.get())
+		preview_ragdoll_comp = preview_mesh_entity->get_component<RagdollComponent>();
 }
 
 void RagdollSetupComponent::end_preview() {

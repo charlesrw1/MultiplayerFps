@@ -3,6 +3,7 @@
 #include "Framework/Util.h"
 #include "Framework/StringName.h"
 #include "Game/Entity.h"
+#include "Game/EntityComponent.h"
 #include "Level.h"
 #include "GameEnginePublic.h"
 #include "Assets/AssetDatabase.h"
@@ -110,6 +111,30 @@ const std::vector<Entity*>& PrefabAsset::get_root_entities() const {
 		root_entities_valid = true;
 	}
 	return root_entities;
+}
+
+Component* PrefabAsset::find_component_by_type(const ClassTypeInfo* type) const {
+	ASSERT(type);
+	ASSERT(type->is_a(Component::StaticType));
+	for (BaseUpdater* bu : static_data.all_obj_vec) {
+		if (bu->get_type().is_a(*type))
+			return static_cast<Component*>(bu);
+	}
+	return nullptr;
+}
+
+Entity* PrefabAsset::find_entity_by_name(const std::string& name) const {
+	for (BaseUpdater* bu : static_data.all_obj_vec) {
+		if (auto* e = bu->cast_to<Entity>()) {
+			if (e->get_editor_name() == name)
+				return e;
+		}
+	}
+	return nullptr;
+}
+
+PrefabAsset* PrefabAsset::load(const std::string& name) {
+	return g_assets.find<PrefabAsset>(name).get();
 }
 
 std::vector<EntityPtr> PrefabAsset::spawn(const std::string& prefab_path, const glm::mat4& transform,
