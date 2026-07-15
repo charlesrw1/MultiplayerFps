@@ -78,13 +78,13 @@ layout (location = 1) in vec2 VS_IN_TexCoord;
 layout (location = 2) in vec3 VS_IN_Normal;
 layout (location = 3) in uvec3 VS_IN_Tangent;
 
-#ifdef LIGHTMAPPED
-layout (location = 4) in vec2 VS_IN_LightmapCoord;
-layout (location = 5) in vec4 VS_IN_VertexColor;
-#else
+#ifdef ANIMATED
 layout (location = 4) in ivec4 VS_IN_BoneIndicies;
 layout (location = 5) in vec4 VS_IN_BoneWeights;
-#endif // !LIGHTMAPPED
+#else
+layout (location = 4) in vec2 VS_IN_LightmapCoord;
+layout (location = 5) in vec4 VS_IN_VertexColor;
+#endif // !ANIMATED
 
 
 layout(location = 7) flat out uint FS_IN_Objid;
@@ -98,10 +98,9 @@ layout(location = 5) out vec4 FS_IN_NDC;
 layout(location = 8) out vec4 FS_IN_PrevNDC;// for motion vectors
 #endif
 layout(location = 9) out mat3 FS_IN_TBN;
-#ifdef LIGHTMAPPED
-layout(location = 3) out vec2 FS_IN_LightmapCoord;
-#endif
+
 #ifndef ANIMATED
+layout(location = 3) out vec2 FS_IN_LightmapCoord;
 layout(location = 13) out vec4 FS_IN_VertexColor;
 #endif
 
@@ -149,6 +148,13 @@ vec4 get_tangent_handedness()
 		(vec2(VS_IN_Tangent.xy) / 0x7FFF)*2.0-vec2(1.0), 
 		Tz),
 		handedness);
+}
+
+vec2 unpackIvec4ToVec2(ivec4 v) {
+    // v.xyzw are assumed to be in [0, 255]
+    float x = (float(v.x) + float(v.y) * 256.0) / 65535.0;
+    float y = (float(v.z) + float(v.w) * 256.0) / 65535.0;
+    return vec2(x, y);
 }
 
 void main()
@@ -267,14 +273,12 @@ void main()
 
 	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
-#ifdef LIGHTMAPPED
+
+
+#ifndef ANIMATED
 	FS_IN_LightmapCoord = VS_IN_LightmapCoord;
 	FS_IN_VertexColor = VS_IN_VertexColor;
-#else	// else not lightmapped
-#ifndef ANIMATED
-	FS_IN_VertexColor = VS_IN_BoneWeights;
 #endif // not Animated
-#endif	// !LIGHTMAPPED
 
 
 }
@@ -312,8 +316,8 @@ layout(location = 5) in vec4 FS_IN_NDC;
 #ifndef NO_TAA
 layout(location = 8) in vec4 FS_IN_PrevNDC;
 #endif
-layout(location = 3) in vec2 FS_IN_LightmapCoord;
 #ifndef ANIMATED
+layout(location = 3) in vec2 FS_IN_LightmapCoord;
 layout(location = 13) in vec4 FS_IN_VertexColor;
 #endif
 

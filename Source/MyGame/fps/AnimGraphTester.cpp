@@ -810,7 +810,7 @@ void AnimGraphTester::update() {
         if (slot_timer >= 3.f) {
             slot_timer = 0.f;
             if (slot_clip && !slot_clip->did_load_fail())
-				anim->play_animation(default_slot,slot_clip.get(), 1.f, 0.f);
+				anim->play_animation_ex(default_slot,slot_clip.get(), 1.f, 0.f);
         }
         break;
 

@@ -32,8 +32,10 @@ static bool read_game_file_text(const std::string& path, std::string& out) {
 
 const ClassTypeInfo* ScriptableObject::peek_concrete_type(const std::string& path) {
 	std::string text;
-	if (!read_game_file_text(path, text))
+	if (!read_game_file_text(path, text)) {
+		sys_print(Error, "ScriptableObject::peek_concrete_type: couldn't read file\n");
 		return nullptr;
+	}
 	try {
 		auto j = nlohmann::json::parse(text);
 		std::string classname = j.value("__classname", std::string());

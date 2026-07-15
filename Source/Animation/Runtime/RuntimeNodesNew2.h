@@ -570,6 +570,13 @@ class agSlotPlayer : public agStatemachineBase
 public:
 	CLASS_BODY(agSlotPlayer);
 	void update(agGetPoseCtx* ctx, bool wantsReset) final;
+	
+	REF void initialize(StringName slotName, bool updateChildrenWhenPlaying, agBaseNode* input) {
+		this->slotName = slotName;
+		this->updateChildrenWhenPlaying = updateChildrenWhenPlaying;
+		this->input = input;
+	}
+
 	bool updateChildrenWhenPlaying = false;
 	StringName slotName;
 	agBaseNode* input = nullptr;
@@ -588,11 +595,12 @@ public:
 		this->easing = easing;
 		this->blending_duration = duration;
 	}
-	void append_input(agBaseNode* node) final {
+	REF void set_integer_var(StringName str) { integer = str; }
+	REF void append_input(agBaseNode* node) final {
 		agStatemachineBase::append_input(node);
 		inputs.push_back(node);
 	}
-	REF void set_integer_var(StringName str) { integer = str; }
+
 
 	Easing easing = Easing::CubicEaseIn;
 	float blending_duration = 0.5;

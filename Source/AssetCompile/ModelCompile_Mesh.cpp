@@ -186,6 +186,7 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 					},
 					vert_start, mcd.verticies, &accessor);
 			} else if (strcmp(attribute.name, "TEXCOORD_0") == 0) {
+
 				location = CMA_UV;
 				convert_format_verts(
 					[](FATVertex& v, uint8_t* ptr, cgltf_component_type ct, cgltf_type type, bool normalized) {
@@ -193,6 +194,8 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 					},
 					vert_start, mcd.verticies, &accessor);
 			} else if (strcmp(attribute.name, "TEXCOORD_1") == 0) {
+				sys_print(Debug, "[modelcompile] found TEXCOORD_1");
+
 				location = CMA_UV2;
 				convert_format_verts(
 					[](FATVertex& v, uint8_t* ptr, cgltf_component_type ct, cgltf_type type, bool normalized) {
@@ -207,6 +210,8 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 					},
 					vert_start, mcd.verticies, &accessor);
 			} else if (strcmp(attribute.name, "JOINTS_0") == 0) {
+				sys_print(Debug, "[modelcompile] found JOINTS_0");
+
 				location = CMA_BONEINDEX;
 				convert_format_verts(
 					[](FATVertex& v, uint8_t* ptr, cgltf_component_type ct, cgltf_type type, bool normalized) {
@@ -214,6 +219,8 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 					},
 					vert_start, mcd.verticies, &accessor);
 			} else if (strcmp(attribute.name, "WEIGHTS_0") == 0) {
+				sys_print(Debug, "[modelcompile] found WEIGHTS_0");
+
 				location = CMA_BONEWEIGHT;
 				convert_format_verts(
 					[](FATVertex& v, uint8_t* ptr, cgltf_component_type ct, cgltf_type type, bool normalized) {
@@ -221,6 +228,8 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 					},
 					vert_start, mcd.verticies, &accessor);
 			} else if (strcmp(attribute.name, "COLOR_0") == 0) {
+				sys_print(Debug, "[modelcompile] found COLOR_0");
+
 				convert_format_verts(
 					[](FATVertex& v, uint8_t* ptr, cgltf_component_type ct, cgltf_type type, bool normalized) {
 						v.color = FormatConverter::convert_to_floatvec(ptr, ct, type, normalized, 1.f);
@@ -228,6 +237,8 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 					vert_start, mcd.verticies, &accessor);
 				location = CMA_COLOR;
 			} else if (strcmp(attribute.name, "TANGENT") == 0) {
+				sys_print(Debug, "[modelcompile] found TANGENT");
+
 				convert_format_verts(
 					[](FATVertex& v, uint8_t* ptr, cgltf_component_type ct, cgltf_type type, bool normalized) {
 						v.tangent = FormatConverter::convert_to_floatvec(ptr, ct, type, normalized);
@@ -235,6 +246,7 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 					vert_start, mcd.verticies, &accessor);
 				location = CMA_TANGENT;
 			} else if (strcmp(attribute.name, "COLOR_1") == 0) {
+				sys_print(Debug, "[modelcompile] found COLOR_1");
 				sys_print(Warning, "mesh has COLOR_1 attribute, ignoring it\n");
 			}
 
@@ -322,7 +334,7 @@ static void traverse_model_nodes(const ModelDefData& def, ModelCompileData& mcd,
 	bool has_mesh = node->mesh;
 	if (shape != ShapeType_e::None) {
 		if (has_mesh)
-			sys_print(Debug, "found collision item %s\n", node_name.c_str());
+			sys_print(Debug, "[modelcompile] found collision item %s\n", node_name.c_str());
 		else
 			sys_print(Warning, "node has collision name but no mesh %s\n", node_name.c_str());
 	} else if (using_skin != node->skin && has_mesh) {

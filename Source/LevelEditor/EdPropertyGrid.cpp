@@ -12,6 +12,7 @@
 
 #include "Game/Components/SpawnerComponenth.h"
 #include "PropertyEditors.h"
+#include "Game/Components/MeshComponent.h"
 
 class SpawnerIProped : public IPropertyEditor
 {
@@ -169,12 +170,103 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 					editor_ui_component = nullptr;
 				}
 			}
+		} else if (selected_vec.size() > 1) {
+			draw_batch_mesh_properties(selected_vec);
 		} else {
 			ImGui::Text("Nothing selected\n");
 		}
 	}
 	ImGui::End();
 	ImGui::PopStyleVar(); // WindowPadding
+}
+
+void EdPropertyGrid::draw_batch_mesh_properties(const std::vector<EntityPtr>& selected) {
+	std::vector<MeshComponent*> meshes;
+	for (auto& eptr : selected) {
+		Entity* e = eptr.get();
+		if (!e) continue;
+		Component* c = get_selected_component(e);
+		if (c && c->is_a<MeshComponent>())
+			meshes.push_back((MeshComponent*)c);
+	}
+
+	// "Properties" is opened with zero WindowPadding so the reflected property grid can butt
+	// up against the edges (see PushStyleVar in draw()); reinstate padding for this section.
+	const float pad = ImGui::GetStyle().WindowPadding.x;
+	ImGui::Dummy(ImVec2(0, pad));
+	ImGui::Indent(pad);
+
+	ImGui::Text("%d entities selected (%d with a mesh component)", (int)selected.size(), (int)meshes.size());
+
+	if (meshes.empty()) {
+		ImGui::Text("No mesh components in selection\n");
+		ImGui::Unindent(pad);
+		return;
+	}
+
+	ImGui::Spacing();
+
+	auto notify_changed = [&](MeshComponent* mc) {
+		mc->editor_on_change_property();
+		Entity* owner = mc->get_owner();
+		if (owner)
+			owner->editor_on_change_properties();
+	};
+
+	const ImGuiTableFlags table_flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp;
+	if (ImGui::BeginTable("batch_mesh_props", 4, table_flags)) {
+		ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthStretch, 1.6f);
+		ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_WidthStretch, 0.8f);
+		ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+		ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+		ImGui::TableHeadersRow();
+
+		auto draw_flag_row = [&](const char* label, std::function<bool(MeshComponent*)> get,
+								  std::function<void(MeshComponent*, bool)> set) {
+			int count_true = 0;
+			for (auto mc : meshes)
+				if (get(mc)) count_true++;
+
+			ImGui::PushID(label);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::AlignTextToFramePadding();
+			ImGui::Text("%s", label);
+			ImGui::TableNextColumn();
+			ImGui::AlignTextToFramePadding();
+			ImGui::Text("%d / %d", count_true, (int)meshes.size());
+			ImGui::TableNextColumn();
+			if (ImGui::Button("Set All", ImVec2(-FLT_MIN, 0))) {
+				for (auto mc : meshes) { set(mc, true); notify_changed(mc); }
+			}
+			ImGui::TableNextColumn();
+			if (ImGui::Button("Unset All", ImVec2(-FLT_MIN, 0))) {
+				for (auto mc : meshes) { set(mc, false); notify_changed(mc); }
+			}
+			ImGui::PopID();
+		};
+
+		draw_flag_row("Nav Static",
+			[](MeshComponent* mc) { return mc->get_nav_static(); },
+			[](MeshComponent* mc, bool b) { mc->set_nav_static(b); });
+		draw_flag_row("Add Collisions",
+			[](MeshComponent* mc) { return mc->get_add_collision(); },
+			[](MeshComponent* mc, bool b) { mc->set_add_collision(b); });
+		draw_flag_row("Probe Bake",
+			[](MeshComponent* mc) { return !mc->get_ignore_baking(); },
+			[](MeshComponent* mc, bool b) { mc->set_ignore_baking(!b); });
+		draw_flag_row("In Cubemap",
+			[](MeshComponent* mc) { return !mc->get_ignore_cubemap(); },
+			[](MeshComponent* mc, bool b) { mc->set_ignore_cubemap_view(!b); });
+		draw_flag_row("Cast Shadows",
+			[](MeshComponent* mc) { return mc->get_casts_shadows(); },
+			[](MeshComponent* mc, bool b) { mc->set_casts_shadows(b); });
+
+		ImGui::EndTable();
+	}
+
+	ImGui::Unindent(pad);
+	ImGui::Dummy(ImVec2(0, pad));
 }
 
 void EdPropertyGrid::refresh_grid(const ISelectionApi& api) {

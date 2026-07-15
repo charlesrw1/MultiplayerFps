@@ -56,7 +56,7 @@ public:
 	void release_animator();
 
 	bool get_is_visible() const { return is_visible; }
-	bool get_nav_static() const { return nav_static; }
+	REF bool get_nav_static() const { return nav_static; }
 	bool get_casts_shadows() const { return cast_shadows; }
 	bool get_is_skybox() const { return is_skybox; }
 	REF void set_material_override(const MaterialInstance* mi);
@@ -81,8 +81,11 @@ public:
 	void set_not_lightmapped();
 	void set_static_probe_lit(int index);
 #endif
-	void set_ignore_baking(bool ignore) { this->ignore_in_baking = ignore; }
-	void set_ignore_cubemap_view(bool ignore) { this->ignore_in_cubemap = ignore; }
+	REF void set_ignore_baking(bool ignore) { this->ignore_in_baking = ignore; }
+	REF bool get_ignore_baking() const { return ignore_in_baking; }
+	REF void set_ignore_cubemap_view(bool ignore) { this->ignore_in_cubemap = ignore; }
+	REF bool get_ignore_cubemap() const { return ignore_in_cubemap; }
+	REF void set_nav_static(bool b) { nav_static = b; }
 	// Must be called before set_model()/set_model_str() — those bake collision presence into
 	// the owner's components immediately via update_physics_mesh().
 	REF void set_add_collision(bool add_col) { this->add_collision_if_available = add_col; }

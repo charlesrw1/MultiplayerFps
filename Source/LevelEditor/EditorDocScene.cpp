@@ -10,6 +10,7 @@
 #include "Game/Components/LightComponents.h"
 #include "Game/Components/DecalComponent.h"
 #include "Game/Components/SpawnerComponenth.h"
+#include "Game/Components/MeshComponent.h"
 #include "Debug.h"
 #include "Commands.h"
 #include "Assets/AssetDatabase.h"
@@ -302,6 +303,44 @@ void EntityVisiblityFilter::tick() {
 	do_stuff(SkylightComponent::StaticType, res);
 	res = draw_item("Spawners");
 	do_stuff(SpawnerComponent::StaticType, res);
+
+	ImGui::Separator();
+	ImGui::Text("Show only...");
+
+	// One row per mesh flag: click the label to select matching (or inverse-matching, if
+	// that row's invert checkbox is on) entities. Selection only — no visibility change.
+	auto draw_mesh_flag_filter = [&](const string& label, const std::function<bool(MeshComponent*)>& pred) {
+		if (!MapUtil::contains(invert_status, label))
+			invert_status[label] = false;
+		bool inv = invert_status[label];
+
+		ImGui::PushID(label.c_str());
+		if (ImGui::Selectable(label.c_str(), false, 0, ImVec2(200, 0))) {
+			const bool remove = Input::is_ctrl_down();
+			if (!remove && !Input::is_shift_down())
+				doc.selection_state->clear_all_selected(); // plain click: replace selection
+			for (auto o : eng->get_level()->get_all_objects()) {
+				auto mc = o->cast_to<MeshComponent>();
+				if (!mc || pred(mc) == inv)
+					continue;
+				if (remove)
+					doc.selection_state->remove_from_selection(mc->get_owner());
+				else
+					doc.selection_state->add_to_entity_selection(mc->get_owner()); // shift: add to selection
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Checkbox("inv", &inv))
+			invert_status[label] = inv;
+		ImGui::PopID();
+	};
+
+	draw_mesh_flag_filter("Nav Static", [](MeshComponent* mc) { return mc->get_nav_static(); });
+	draw_mesh_flag_filter("Collisions", [](MeshComponent* mc) { return mc->get_add_collision(); });
+	draw_mesh_flag_filter("Probe Bake", [](MeshComponent* mc) { return !mc->get_ignore_baking(); });
+	draw_mesh_flag_filter("Cubemap", [](MeshComponent* mc) { return !mc->get_ignore_cubemap(); });
+	draw_mesh_flag_filter("Cast Shadows", [](MeshComponent* mc) { return mc->get_casts_shadows(); });
+
 	ImGui::End();
 }
 

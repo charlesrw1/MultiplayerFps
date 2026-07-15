@@ -66,10 +66,10 @@ public:
 
 	template <typename T> T* alloc() { return (T*)alloc(&T::StaticType); }
 
-	void add_cached_pose_root(agBaseNode* node);
+	REF void add_cached_pose_root(agBaseNode* node);
 	agBaseNode* get_root() const { return root; }
 	std::vector<agBaseNode*>& get_cache_nodes() { return cachePoseNodes; }
-	void add_slot_name(StringName name);
+	REF void add_slot_name(StringName name);
 	std::vector<StringName>& get_slots() { return slot_names; }
 	// Every node ever alloc()'d through this builder, flat. Lets refresh_after_model_reload
 	// notify every leaf directly instead of relying on tree/statemachine descent, which misses
@@ -107,7 +107,11 @@ public:
 	const MSkeleton* get_skel() const { return model.get_skel(); }
 	int num_bones() const { return cached_bonemats.size(); }
 	Entity* get_owner() const { return owner; }
-	bool play_animation(StringName slot, const AnimationSeqAsset* seq, float play_speed = 1.f, float start_pos = 0.f);
+	REF bool play_animation(StringName slot, const AnimationSeqAsset* seq) {
+		return play_animation_ex(slot,seq);
+	}
+	bool play_animation_ex(StringName slot, const AnimationSeqAsset* seq, float play_speed = 1.f, float start_pos = 0.f);
+	
 	// callback: returns true if interrupted, false if not. guaranteed to fire.
 	void play_animation(const AnimationSeqAsset* seq, float play_speed, float start_pos, function<void(bool)> callback);
 	void stop_animation_in_slot(StringName slot);
@@ -138,7 +142,7 @@ public:
 	opt<glm::quat> get_quat_variable(StringName name) const;
 	REF void set_float_variable(StringName name, float f);
 	REF void set_int_variable(StringName name, int f);
-	void set_bool_variable(StringName name, bool f);
+	REF void set_bool_variable(StringName name, bool f);
 	REF void set_vec3_variable(StringName name, const glm::vec3& f);
 	// Rotations are delivered as quaternions (no euler round-trip). agModifyBone reads
 	// rotationVal as a quat; a vec3 variable is still accepted and treated as euler radians.

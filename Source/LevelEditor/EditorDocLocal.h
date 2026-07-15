@@ -126,6 +126,7 @@ public:
 private:
 	EditorDoc& doc;
 	std::unordered_map<std::string, bool> status;
+	std::unordered_map<std::string, bool> invert_status; // per-row invert for "Show only..." mesh filters
 };
 
 template <class... Ts> struct overloads : Ts...

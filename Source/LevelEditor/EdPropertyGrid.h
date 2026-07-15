@@ -30,6 +30,7 @@ private:
 	Component* get_selected_component(Entity* e) const;
 
 	void draw_components(const ISelectionApi& api, Entity* entity);
+	void draw_batch_mesh_properties(const std::vector<EntityPtr>& selected);
 
 	string component_filter;
 	bool component_set_keyboard_focus = true;

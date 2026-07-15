@@ -38,11 +38,11 @@ ScriptManager::ScriptManager() {
 	lua = luaL_newstate();
 	luaL_openlibs(lua);
 
-	// Add Data/scripts/lib/ to package.path so require("socket"), etc. work.
+	// Add <g_project_base>/scripts/lib/ to package.path so require("socket"), etc. work.
 	// Files in lib/ are module-style (not auto-executed by reload_all_scripts).
 	lua_getglobal(lua, "package");
 	lua_getfield(lua, -1, "path");
-	std::string new_path = std::string(lua_tostring(lua, -1)) + ";Data/scripts/lib/?.lua";
+	std::string new_path = std::string(lua_tostring(lua, -1)) + ";" + FileSys::get_game_path() + "/scripts/lib/?.lua";
 	lua_pop(lua, 1);
 	lua_pushstring(lua, new_path.c_str());
 	lua_setfield(lua, -2, "path");

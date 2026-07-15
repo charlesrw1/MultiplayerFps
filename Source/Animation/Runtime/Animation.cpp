@@ -128,7 +128,7 @@ void AnimatorObject::ConcatWithInvPose() {
 	}
 }
 
-inline DirectAnimationSlot* AnimatorObject::find_slot_with_name(StringName name) {
+DirectAnimationSlot* AnimatorObject::find_slot_with_name(StringName name) {
 	for (int i = 0; i < slots.size(); i++)
 		if (slots[i].name == name)
 			return &slots[i];
@@ -368,7 +368,7 @@ SyncGroupData& AnimatorObject::find_or_create_sync_group(StringName name) {
 	return active_sync_groups.back();
 }
 
-bool AnimatorObject::play_animation(StringName slot, const AnimationSeqAsset* seqAsset, float play_speed, float start_pos) {
+bool AnimatorObject::play_animation_ex(StringName slot, const AnimationSeqAsset* seqAsset, float play_speed, float start_pos) {
 	if (!seqAsset || !seqAsset->seq) {
 		sys_print(Warning, "play_animation: sequence invalid\n");
 		return false;
