@@ -180,6 +180,8 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
 
 ConfigVar r_ddgi_halfres_blend("r.ddgi_halfres_blend", "0.8", CVAR_FLOAT,
                                "[0,1] blend input into ddgi temporal accumulation");
+ConfigVar r_ddgi_halfres_sharpness("r.ddgi_halfres_sharpness", "0.0", CVAR_FLOAT,
+                               "DDGI upsample post-blend sharpening strength", 0, 3.0);
 
 void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     ASSERT(ssao && shade_fs_halfres != -1);
@@ -230,6 +232,8 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         extern ConfigVar r_taa_flicker_remove;
         extern ConfigVar r_taa_reproject;
         extern ConfigVar r_taa_dilate_velocity;
+        extern ConfigVar r_taa_adaptive_blend;
+        extern ConfigVar r_taa_motion_blend;
         extern float taa_doc_mult;
         extern float taa_doc_vel_bias;
         extern float taa_doc_bias;
@@ -246,6 +250,14 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         tp.use_reproject = r_taa_reproject.get_bool();
         tp.dilate_velocity = r_taa_dilate_velocity.get_bool();
         tp.halfres_texel_offset = glm::ivec2(texel_offset.x, texel_offset.y);
+        // reuses the same checkerboard blend factor for both branches; ddgi
+        // updates 1-in-4 texels/frame vs TAA's every-frame, so this ends up
+        // averaging over a much longer effective history than the TAA pass at
+        // the same nominal amt/adaptive settings
+        tp.adaptive_blend = r_taa_adaptive_blend.get_bool();
+        tp.stationary_blending = r_ddgi_halfres_blend.get_float();
+        tp.motion_blending = r_taa_motion_blend.get_float();
+        tp.sharpness = r_ddgi_halfres_sharpness.get_float();
         draw.ubo.temporal_params->upload(&tp, sizeof(tp));
         gfx().bind_uniform_buffer_base(7, draw.ubo.temporal_params);
 

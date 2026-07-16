@@ -58,7 +58,7 @@ glm::vec3 NavAgentComponent::compute_avoidance_force(const glm::vec3& pos) const
 	}
 	return force;
 }
-
+#include <Framework/MathLib.h>
 void NavAgentComponent::update() {
 	const float dt  = (float)eng->get_dt();
 	const glm::vec3 pos = get_owner()->get_ws_position();
@@ -97,8 +97,10 @@ void NavAgentComponent::update() {
 	face_dir.y = 0.f;
 	if (glm::length2(face_dir) > 1e-8f) {
 		face_dir = glm::normalize(face_dir);
-		const glm::quat face_rot = glm::quat_cast(glm::inverse(glm::lookAt(new_pos, new_pos + face_dir, glm::vec3(0, 1, 0))));
-		get_owner()->set_ws_position_rotation(new_pos, face_rot);
+		const glm::quat face_rot_target = glm::quat_cast(glm::inverse(glm::lookAt(new_pos, new_pos + face_dir, glm::vec3(0, 1, 0))));
+		const auto current_rotation = damp_dt_independent<glm::quat>(face_rot_target, get_owner()->get_ws_rotation(),
+														rotation_damping, eng->get_dt());
+		get_owner()->set_ws_position_rotation(new_pos, current_rotation);
 	} else {
 		get_owner()->set_ws_position(new_pos);
 	}

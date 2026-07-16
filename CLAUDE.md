@@ -44,6 +44,8 @@ Note that rmlui script operates in the same enviorment as the rest of the engine
 
 Editor architecture only allows placing entities with 1 component that can be edited/serialized. Runtime allows multiple components per entity.
 
+Engine uses depth buffer is reverse-Z, standard perspective projection matrix is infinite Z.
+
 ## Documentation
 
 Project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases.  Quick index at [[README]].

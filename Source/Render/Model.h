@@ -205,6 +205,8 @@ public:
 	// otherwise checks the 1st render material for a physics material
 	REF PhysicsMaterialWrapper* get_physics_material_to_use() const;
 
+	REF bool has_skeleton() const { return get_skel() != nullptr; }
+
 	/// Returns true if this model was created via ModelMan::create_dynamic_model()
 	/// rather than loaded from disk.  Dynamic models must be freed with
 	/// ModelMan::free_dynamic_model() or held via DynamicModelUniquePtr.

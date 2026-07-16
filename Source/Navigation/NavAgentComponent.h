@@ -36,6 +36,9 @@ public:
 	// Per-agent debug overlay; honored independently of the global nav.debug.agents cvar.
 	REF bool  debug_draw_path = false;
 
+	REF void set_rotation_damping(float f) { rotation_damping = f; }
+	float rotation_damping = 0.05;
+
 	REF bool request_path_to(glm::vec3 dest);
 	REF bool is_path_valid() const { return !corners.empty(); }
 	REF bool has_arrived() const { return arrived; }

@@ -157,6 +157,9 @@ int find_best_ddgi_volume(vec3 worldpos)
 // covered by any loaded DDGI volume; caller should use sky ambient instead.
 bool calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_position, out vec3 out_irradiance)
 {
+	//return false;
+
+
 	const int volume_index = find_best_ddgi_volume(worldspace);
 	if(volume_index < 0) {
 		return false;
