@@ -342,13 +342,25 @@ bool FileSys::create_directory(std::string_view relative_path, WhereEnum where) 
 
 
 // stick it here for windows.h
-void start_play_process(const std::string& play_map_path) {
+// lua_debug: appends --lua_debug so the spawned process opens its lua-debug socket immediately
+// and leaves it listening for the whole session -- VS Code can attach at any point during play,
+// no relaunch or --lua_debug_wait needed.
+// cpp_debug: appends --wait-for-debugger (see wait_for_debugger_windows() below), then shells out
+// to Scripts/_vs_attach.ps1's Attach-VSDebugger, which attaches any already-running VS instance
+// via DTE (falling back to vsjitdebugger.exe) -- the exact same helper run_editor.ps1/
+// run_game.ps1 -WaitForDebugger already use, just reused here instead of reimplementing DTE COM
+// attach in C++.
+void start_play_process(const std::string& play_map_path, bool lua_debug, bool cpp_debug) {
 
 	const std::string pathToProcess = "./x64/Debug/App.exe";
 
 	std::string commandLine = pathToProcess;
 	if (!play_map_path.empty())
 		commandLine += " --play \"" + play_map_path + "\"";
+	if (lua_debug)
+		commandLine += " --lua_debug";
+	if (cpp_debug)
+		commandLine += " --wait-for-debugger";
 
 	STARTUPINFOA startup = {};
 	PROCESS_INFORMATION out = {};
@@ -356,7 +368,25 @@ void start_play_process(const std::string& play_map_path) {
 	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
 						&out)) {
 		sys_print(Error, "start_play_process: couldn't create process\n");
+		return;
 	}
+
+	if (cpp_debug) {
+		std::string psCommand = ". 'Scripts/_vs_attach.ps1'; Attach-VSDebugger -TargetPid " +
+								 std::to_string(out.dwProcessId);
+		std::string psCommandLine = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"" +
+									 psCommand + "\"";
+		STARTUPINFOA psStartup = {};
+		PROCESS_INFORMATION psOut = {};
+		if (CreateProcessA(nullptr, (char*)psCommandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr,
+						   &psStartup, &psOut)) {
+			CloseHandle(psOut.hProcess);
+			CloseHandle(psOut.hThread);
+		} else {
+			sys_print(Error, "start_play_process: couldn't launch VS attach helper\n");
+		}
+	}
+
 	CloseHandle(out.hProcess);
 	CloseHandle(out.hThread);
 }

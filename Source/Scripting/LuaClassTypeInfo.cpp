@@ -410,7 +410,12 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 	// values -- sync_shadow_to_lua_table() no-ops when the shadow is null. Components that
 	// *do* get a shadow (via level deserialization or the editor) simply have this default
 	// overwritten later by sync_shadow_to_lua_table() before start() runs.
-	const bool skip_lua_backed = eng && eng->is_editor_level();
+	// ScriptableObjects always skip the copy too, in every mode: unlike Component they have
+	// no start()/sync_shadow_to_lua_table() call to ever overwrite a stale copied default with
+	// the real loaded value, so the instance table must never get one -- __index/__newindex
+	// (ScriptManager.cpp) must always be the ones serving/writing these fields, straight from
+	// the shadow buffer that ScriptableObject::load_asset() actually populates.
+	const bool skip_lua_backed = (eng && eng->is_editor_level()) || out->cast_to<ScriptableObject>() != nullptr;
 	lua_pushnil(L); // first key
 	check_top(3);
 

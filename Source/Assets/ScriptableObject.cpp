@@ -56,6 +56,8 @@ ScriptableObject* ScriptableObject::load(const ClassTypeInfo* type, const std::s
 }
 
 bool ScriptableObject::load_asset() {
+	load_warnings.clear();
+
 	std::string text;
 	if (!read_game_file_text(get_name(), text)) {
 		sys_print(Warning, "ScriptableObject: failed to open %s\n", get_name().c_str());
@@ -72,8 +74,28 @@ bool ScriptableObject::load_asset() {
 	}
 
 	// __classname was already consumed by peek_concrete_type to pick this instance's
-	// concrete type; the reflection-driven reader below just ignores the extra key.
-	ReadSerializerBackendJson2 reader("sobj", j, *this);
+	// concrete type. A value whose JSON type doesn't match its reflected field (e.g. a string
+	// where a float is expected) throws mid-read; caught here so one bad field degrades to a
+	// warning instead of taking the whole asset load down with it -- fields read before the
+	// bad one keep their values, fields after it keep their in-memory defaults.
+	try {
+		ReadSerializerBackendJson2 reader("sobj", j, *this);
+		for (auto it = j.begin(); it != j.end(); ++it) {
+			const std::string& key = it.key();
+			if (key.size() >= 2 && key[0] == '_' && key[1] == '_')
+				continue; // __classname etc. -- meta keys handled outside reflection
+			if (reader.get_consumed_keys().count(key) == 0) {
+				std::string msg = "unknown property '" + key + "' (typo or stale field?)";
+				sys_print(Warning, "ScriptableObject: %s: %s\n", get_name().c_str(), msg.c_str());
+				load_warnings.push_back(std::move(msg));
+			}
+		}
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::string msg = std::string("bad property value: ") + e.what();
+		sys_print(Warning, "ScriptableObject: %s: %s\n", get_name().c_str(), msg.c_str());
+		load_warnings.push_back(std::move(msg));
+	}
 	return true;
 }
 

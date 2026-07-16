@@ -310,3 +310,70 @@ static TestTask test_sobj_load_static_factory(TestContext& t) {
 	FileSys::delete_game_file(kTargetName);
 }
 EDITOR_TEST("editor/sobj_load_static_factory", 20.f, test_sobj_load_static_factory);
+
+// 7. Regression, GAME mode (not editor): self.field on a ScriptableObject must see the value
+//    load_asset() actually loaded from disk, not the template's literal default that
+//    lua_class_alloc copies into the Lua instance table at allocation time. Every test above
+//    runs under EDITOR_TEST, where eng->is_editor_level() was already true and happened to mask
+//    this: the __index/__newindex metamethods only served the shadow buffer while that flag was
+//    set, so outside the editor a plain table lookup silently returned the pre-load default
+//    instead of the loaded value. Exercises both directions: self.loaded_num = target.num (read
+//    via __index on target) and the assignment itself (write via __newindex on self).
+constexpr const char* kLuaSrcGameRead =
+	"---@class TestLuaSobjGameRead : ScriptableObject\n"
+	"TestLuaSobjGameRead = {\n"
+	"  ---@type integer\n"
+	"  num = 0,\n"
+	"}\n";
+constexpr const char* kLuaSrcGameReadLoader =
+	"---@class TestLuaSobjGameReadLoader : ScriptableObject\n"
+	"TestLuaSobjGameReadLoader = {\n"
+	"  ---@type integer\n"
+	"  loaded_num = -1,\n"
+	"}\n"
+	"function TestLuaSobjGameReadLoader:on_property_change()\n"
+	"  local target = ScriptableObject.load(TestLuaSobjGameRead, \"_integration_test_sobj_game_read.sobj\")\n"
+	"  self.loaded_num = target.num\n"
+	"end\n";
+
+static TestTask test_sobj_field_read_in_game_mode(TestContext& t) {
+	ScriptManager::inst->reload_from_content(kLuaSrcGameRead, "test_lua_scriptable_object_game_read");
+	ScriptManager::inst->reload_from_content(kLuaSrcGameReadLoader, "test_lua_scriptable_object_game_read_loader");
+	ScriptManager::inst->check_for_reload();
+	co_await t.wait_ticks(1);
+
+	t.require(eng && !eng->is_editor_level(), "test actually runs outside the editor (GAME_TEST)");
+
+	auto* target_ti = ClassBase::find_class("TestLuaSobjGameRead");
+	auto* loader_ti = ClassBase::find_class("TestLuaSobjGameReadLoader");
+	t.require(target_ti != nullptr && loader_ti != nullptr, "both Lua classes registered");
+
+	const std::string kTargetName = "_integration_test_sobj_game_read.sobj";
+	FileSys::delete_game_file(kTargetName);
+	auto created = AssetTemplates::create_scriptable_object("", "_integration_test_sobj_game_read", "TestLuaSobjGameRead");
+	t.require(created.has_value(), "create_scriptable_object succeeded");
+	co_await t.wait_ticks(1);
+
+	auto target_asset = g_assets.find<ScriptableObject>(kTargetName);
+	t.require(target_asset.get_unsafe() != nullptr, "target .sobj loaded");
+	auto* num_pi = find_field_sobj(target_ti, "num");
+	t.require(num_pi != nullptr, "num field found on target");
+	num_pi->set_int(target_asset.get_unsafe(), 99);
+	static_cast<ScriptableObject*>(target_asset.get_unsafe())->save_to_disk();
+	co_await t.wait_ticks(1);
+
+	std::unique_ptr<ClassBase> loader_instance(loader_ti->allocate_this_type());
+	t.require(loader_instance != nullptr, "allocated TestLuaSobjGameReadLoader instance");
+	auto* loader_obj = static_cast<ScriptableObject*>(loader_instance.get());
+
+	loader_obj->on_property_change();
+	co_await t.wait_ticks(1);
+
+	auto* loaded_num_pi = find_field_sobj(loader_ti, "loaded_num");
+	t.require(loaded_num_pi != nullptr, "loaded_num field found");
+	t.check(loaded_num_pi->get_int(loader_obj) == 99,
+			"self.field read the loaded value (not the stale template default) outside the editor");
+
+	FileSys::delete_game_file(kTargetName);
+}
+GAME_TEST("game/sobj_field_read_in_game_mode", 20.f, test_sobj_field_read_in_game_mode);

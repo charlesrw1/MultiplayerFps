@@ -1097,6 +1097,21 @@ void AssetInspectorPane::draw_scriptable_object(const std::string& gamepath) {
     ImGui::TextDisabled("Type: %s", s.obj->get_type().classname);
     ImGui::Separator();
 
+    // Surface any unknown/bad properties found on last load *before* the grid and Save button,
+    // so the user knows a save will bake in whatever the reflection-driven reader could recover
+    // (unknown keys are dropped; bad-typed values keep their in-memory default) instead of
+    // silently losing/corrupting data on disk.
+    const auto& warnings = s.obj->get_load_warnings();
+    if (!warnings.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.75f, 0.2f, 1.0f));
+        ImGui::TextWrapped("Warning: this asset had %zu problem(s) loading from disk:", warnings.size());
+        for (auto& w : warnings)
+            ImGui::BulletText("%s", w.c_str());
+        ImGui::TextWrapped("Saving will write out only the recovered values above.");
+        ImGui::PopStyleColor();
+        ImGui::Separator();
+    }
+
     bool changed = false;
     if (s.pg) {
         s.pg->update();

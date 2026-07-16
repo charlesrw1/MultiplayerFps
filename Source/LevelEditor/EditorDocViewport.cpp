@@ -36,7 +36,7 @@
 #include <algorithm>
 
 extern void export_level_scene();
-extern void start_play_process(const std::string& play_map_path);
+extern void start_play_process(const std::string& play_map_path, bool lua_debug, bool cpp_debug);
 extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL, "");
@@ -944,7 +944,18 @@ void EditorDoc::hook_menu_bar() {
 		}
 		ImGui::Separator();
 		if (ImGui::MenuItem("Play")) {
-			start_play_process(get_asset_path());
+			start_play_process(get_asset_path(), /*lua_debug=*/false, /*cpp_debug=*/false);
+		}
+		// Opens the lua-debug socket immediately and leaves it listening for the whole session
+		// (no --lua_debug_wait) -- attach VS Code's "lua-debug Attach" config at any point during
+		// play, see docs/scripting/vscode_debugger.md.
+		if (ImGui::MenuItem("Play with Lua Debugger")) {
+			start_play_process(get_asset_path(), /*lua_debug=*/true, /*cpp_debug=*/false);
+		}
+		// Spawns App.exe with --wait-for-debugger, which spins until a debugger attaches, and
+		// auto-attaches VS via Scripts/_vs_attach.ps1 (DTE, falling back to vsjitdebugger.exe).
+		if (ImGui::MenuItem("Play with C++ Debugger")) {
+			start_play_process(get_asset_path(), /*lua_debug=*/false, /*cpp_debug=*/true);
 		}
 
 		ImGui::Separator();

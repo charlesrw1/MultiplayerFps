@@ -101,20 +101,21 @@ static const PropertyInfo* find_lua_backed_prop(lua_State* L, int key_idx, Class
 }
 
 // __index metamethod for every scriptable class's per-class metatable. Only invoked by Lua when
-// the key is absent from the instance table -- which, for PROP_LUA_BACKED fields, is only true
-// while sitting in the level editor (design mode): sync_shadow_to_lua_table only ever populates
-// those keys into the table from start(), i.e. when actually playing. So in the editor this
-// serves the live shadow-buffer value (kept current by the property grid via
-// PropertyInfo::get_ptr); everywhere else it's the normal method-table lookup (bound as upvalue
-// 1), unchanged from before.
+// the key is genuinely absent from the instance table -- which is guaranteed for PROP_LUA_BACKED
+// fields in two cases: (1) a Component sitting in the level editor (design mode), where
+// lua_class_alloc deliberately withholds the copy so this serves the live shadow-buffer value
+// kept current by the property grid via PropertyInfo::get_ptr; (2) any ScriptableObject in any
+// mode, since unlike Component it has no start()/sync_shadow_to_lua_table() call to ever refresh
+// a stale copied default, so lua_class_alloc withholds the copy unconditionally for it too and
+// this always serves the shadow buffer that ScriptableObject::load_asset() actually populates.
+// Everywhere else the key IS present in the instance table (this function is never even called
+// for it), so no explicit gate is needed here -- find_lua_backed_prop just won't match.
 static int lua_component_index(lua_State* L) {
-	if (eng && eng->is_editor_level()) {
-		ClassBase* obj = nullptr;
-		if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &obj)) {
-			obj->ensure_lua_shadow();
-			push_lua_shadow_field(L, *pi, obj->get_lua_field_shadow() + pi->offset);
-			return 1;
-		}
+	ClassBase* obj = nullptr;
+	if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &obj)) {
+		obj->ensure_lua_shadow();
+		push_lua_shadow_field(L, *pi, obj->get_lua_field_shadow() + pi->offset);
+		return 1;
 	}
 	lua_pushvalue(L, lua_upvalueindex(1));
 	lua_pushvalue(L, 2);
@@ -122,19 +123,17 @@ static int lua_component_index(lua_State* L) {
 	return 1;
 }
 
-// __newindex counterpart: while in the editor, writes to a PROP_LUA_BACKED field go straight
-// into the shadow buffer instead of the instance table, so a Lua-side edit (e.g. from an
-// editor_on_change_property() override) is visible to the property grid immediately.
-// Everywhere else (actually playing, or a non-reflected field) this is a plain rawset, i.e. the
-// same behavior as if no metatable were installed at all.
+// __newindex counterpart: see lua_component_index above for when this fires. Writes to a
+// PROP_LUA_BACKED field go straight into the shadow buffer instead of the instance table (so an
+// editor-side edit is visible to the property grid immediately, and a ScriptableObject field
+// write always lands somewhere save_to_disk() will actually see). Everywhere else this is a
+// plain rawset, i.e. the same behavior as if no metatable were installed at all.
 static int lua_component_newindex(lua_State* L) {
-	if (eng && eng->is_editor_level()) {
-		ClassBase* obj = nullptr;
-		if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &obj)) {
-			obj->ensure_lua_shadow();
-			write_lua_shadow_field(L, 3, *pi, obj->get_lua_field_shadow() + pi->offset);
-			return 0;
-		}
+	ClassBase* obj = nullptr;
+	if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &obj)) {
+		obj->ensure_lua_shadow();
+		write_lua_shadow_field(L, 3, *pi, obj->get_lua_field_shadow() + pi->offset);
+		return 0;
 	}
 	lua_rawset(L, 1);
 	return 0;

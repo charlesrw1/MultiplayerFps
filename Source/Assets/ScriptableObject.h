@@ -1,6 +1,8 @@
 #pragma once
 #include <memory>
 #include <cstdint>
+#include <string>
+#include <vector>
 #include "Assets/IAsset.h"
 #include "Framework/Reflection2.h"
 
@@ -36,6 +38,13 @@ public:
 	// (not part of the IAsset interface), same pattern as PostProcessSettings::save_to_disk.
 	void save_to_disk();
 
+	// Non-fatal problems found while parsing this instance's fields out of the .sobj file on
+	// the last load_asset() call: unrecognized JSON keys (typo/stale field) or a value whose
+	// JSON type doesn't match the reflected field's type. load_asset() still succeeds (partial
+	// data) so the asset stays usable; the editor surfaces these on the inspector pane so a bad
+	// save doesn't silently drop or corrupt data. Empty when the last load was clean.
+	const std::vector<std::string>& get_load_warnings() const { return load_warnings; }
+
 	// Reads just the "__classname" key out of a .sobj file without allocating anything.
 	// Returns nullptr if the file can't be read/parsed or the classname isn't registered.
 	static const ClassTypeInfo* peek_concrete_type(const std::string& path);
@@ -66,4 +75,5 @@ public:
 private:
 	std::unique_ptr<uint8_t[]> lua_field_shadow;
 	const LuaClassTypeInfo* lua_owner_type = nullptr;
+	std::vector<std::string> load_warnings;
 };
