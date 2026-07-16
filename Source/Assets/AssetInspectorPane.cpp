@@ -853,6 +853,7 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Auto-LOD level (1-4) at which meshopt may drop disconnected mesh islands. 0 disables island pruning entirely.");
     }
+    changed |= ImGui::Checkbox("Uses Lightmap UV2", &mis->withLightmap);
     changed |= ImGui::Checkbox("Disable Prune Unused Bones", &mis->disablePruneUnusedBones);
     changed |= ImGui::Checkbox("Export Embedded Textures", &mis->exportEmbeddedTextures);
     if (ImGui::IsItemHovered())
