@@ -393,6 +393,40 @@ public:
 	int setTo = 0;
 };
 
+// Sets hidden-in-editor state on a batch of entities, undoable. Used by the H (hide selected)
+// and Alt+H (unhide all) shortcuts.
+class SetHiddenInEditorCommand : public Command
+{
+public:
+	EditorDoc& ed_doc;
+	SetHiddenInEditorCommand(EditorDoc& ed_doc, std::vector<EntityPtr> ptrs, bool hide)
+		: ed_doc(ed_doc), ptrs(std::move(ptrs)), hide(hide) {}
+	bool is_valid() final { return !ptrs.empty(); }
+	void execute() final {
+		prev.clear();
+		prev.resize(ptrs.size());
+		for (size_t i = 0; i < ptrs.size(); i++) {
+			auto ent = ptrs[i].get();
+			if (ent) {
+				prev[i] = ent->get_hidden_in_editor();
+				ent->set_hidden_in_editor(hide);
+			}
+		}
+	}
+	void undo() final {
+		for (size_t i = 0; i < ptrs.size(); i++) {
+			auto ent = ptrs[i].get();
+			if (ent) {
+				ent->set_hidden_in_editor(prev[i]);
+			}
+		}
+	}
+	std::string to_string() final { return hide ? "Hide Selected" : "Unhide All"; }
+	std::vector<EntityPtr> ptrs;
+	std::vector<bool> prev;
+	bool hide = false;
+};
+
 class InstantiatePrefabCommand : public Command
 {
 public:

@@ -208,26 +208,25 @@ void EditorDoc::add_editor_commands() {
 	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) { set_camera_target_to_sel(); });
 	cmds->add("ed.HideSelected", [this](const Cmd_Args&) {
 		eng->log_to_fullscreen_gui(Info, "Hide selected");
-		auto& selection = selection_state->get_selection();
-		for (auto s : selection) {
-			EntityPtr handle(s);
-			if (handle) {
-				handle->set_hidden_in_editor(true);
-			}
-		}
+		std::vector<EntityPtr> ptrs;
+		for (auto s : selection_state->get_selection())
+			ptrs.push_back(EntityPtr(s));
+		command_mgr->add_command(new SetHiddenInEditorCommand(*this, std::move(ptrs), true));
 	});
 	cmds->add("ed.UnHideAll", [this](const Cmd_Args&) {
 		eng->log_to_fullscreen_gui(Info, "Unhide all");
+		std::vector<EntityPtr> ptrs;
 		auto level = eng->get_level();
 		if (level) {
 			for (auto e : level->get_all_objects()) {
 				if (e->is_a<Entity>()) {
 					auto ent = e->cast_to<Entity>();
 					if (ent->get_hidden_in_editor())
-						ent->set_hidden_in_editor(false);
+						ptrs.push_back(EntityPtr(ent));
 				}
 			}
 		}
+		command_mgr->add_command(new SetHiddenInEditorCommand(*this, std::move(ptrs), false));
 	});
 	cmds->add("make-prefab-and-replace", [this](const Cmd_Args& args) {
 		if (args.size() < 2) {
