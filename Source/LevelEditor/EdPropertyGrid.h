@@ -58,4 +58,7 @@ private:
 	// instead of pushing a command per-frame. See draw().
 	bool property_edit_session_active = false;
 	std::shared_ptr<SerializedSceneFile> session_before_snapshot;
+	// Entity session_before_snapshot was captured against, so a selection change is detected
+	// even though `ent` itself is a fresh local each frame. See draw() for the refresh triggers.
+	Entity* snapshot_owner = nullptr;
 };

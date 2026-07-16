@@ -129,9 +129,23 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 					what_i_want.push_back(selected);
 
 				EntityPtr entPtr = ent->get_self_ptr();
-				if (!property_edit_session_active)
+
+				// Re-snapshot "before" only on the frames it can actually go stale, not every
+				// frame: when the selection changes, when the user clicks into the panel to
+				// start a new interaction, or the first time we've never captured one. (Session-
+				// end below also refreshes it, covering back-to-back edits with no click between
+				// them, e.g. Tab-navigating between fields.) A click still catches edits that
+				// start via keyboard once focus is already in the window, and guards against
+				// something external mutating the entity while the panel sat idle.
+				const bool selection_changed = snapshot_owner != ent;
+				const bool just_clicked = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) &&
+										  ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+				if (!property_edit_session_active &&
+					(selection_changed || just_clicked || !session_before_snapshot)) {
 					session_before_snapshot = std::shared_ptr<SerializedSceneFile>(
 						CommandSerializeUtil::serialize_entities_text(ed_doc, {entPtr}));
+					snapshot_owner = ent;
+				}
 
 				const bool changed = grid_cache.set_what_i_want_and_draw(what_i_want);
 
@@ -160,6 +174,10 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 					ed_doc.command_mgr->add_command(
 						new SetEntityStateCommand(ed_doc, entPtr, session_before_snapshot, after_snapshot));
 					property_edit_session_active = false;
+					// Reuse this session's end state as the next session's "before" so
+					// back-to-back edits with no click in between (e.g. Tab to the next
+					// field) still get a correct, un-stale starting snapshot.
+					session_before_snapshot = after_snapshot;
 				}
 
 				if (selected) {
