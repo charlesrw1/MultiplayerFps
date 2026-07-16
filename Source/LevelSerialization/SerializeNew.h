@@ -107,4 +107,10 @@ public:
 												 bool serialize_hierarchy = false);
 	static UnserializedSceneFile unserialize_from_text(const char* debug_tag, const std::string& text, bool keepid);
 	static UnserializedSceneFile unserialize_from_json(const char* debug_tag, SerializedForDiffing& json, bool keepid);
+
+	// Strips the leading "!json" marker (see serialize_to_text) and parses the remainder.
+	// Throws SerializeInputError on a missing marker or malformed JSON. Shared by
+	// unserialize_from_text and any caller (e.g. SetEntityStateCommand) that needs the raw
+	// per-object JSON without going through the full scene unserialize/instantiate path.
+	static nlohmann::json parse_scene_json(const char* debug_tag, const std::string& text);
 };

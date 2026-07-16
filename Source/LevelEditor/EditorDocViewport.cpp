@@ -34,6 +34,7 @@
 #include "Debug.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
+#include <ctime>
 
 extern void export_level_scene();
 extern void start_play_process(const std::string& play_map_path, bool lua_debug, bool cpp_debug);
@@ -68,6 +69,13 @@ void EditorDoc::tick(float dt) {
 	ASSERT(dt >= 0.f);
 	// ed_cam.tick(dt);
 	vs_setup = ed_cam.make_view();
+
+	time_since_last_backup += dt;
+	if (time_since_last_backup >= BACKUP_INTERVAL_SECONDS) {
+		time_since_last_backup = 0.f;
+		if (get_has_editor_changes())
+			write_backup();
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +103,7 @@ void EditorDoc::imgui_draw() {
 	active_mode->tick(inputs); // selection,foliage, or decal
 	check_inputs();
 	draw_recent_switcher_popup();
+	draw_backup_browser_window();
 	draw_handles->tick();
 	vis_filter.tick();
 
@@ -1028,6 +1037,9 @@ void EditorDoc::hook_menu_bar() {
 }
 
 void EditorDoc::hook_menu_bar_file_menu() {
+	if (ImGui::MenuItem("Restore Backup..."))
+		show_backup_browser_window = true;
+
 	if (ImGui::BeginMenu("Open Recent")) {
 		const int count = g_editor_recents.size();
 		if (count == 0) {
@@ -1047,6 +1059,43 @@ void EditorDoc::hook_menu_bar_file_menu() {
 		}
 		ImGui::EndMenu();
 	}
+}
+
+void EditorDoc::draw_backup_browser_window() {
+	if (!show_backup_browser_window)
+		return;
+
+	if (ImGui::Begin("Restore Backup", &show_backup_browser_window)) {
+		auto backups = list_backups_for_current_asset();
+		if (backups.empty()) {
+			ImGui::TextDisabled("No backups yet for this asset.");
+		} else {
+			// Newest first.
+			for (auto it = backups.rbegin(); it != backups.rend(); ++it) {
+				const string& relpath = *it;
+				const size_t slash = relpath.find_last_of('/');
+				const string filename = slash == string::npos ? relpath : relpath.substr(slash + 1);
+				const time_t timestamp = (time_t)std::atoll(filename.c_str());
+				char buf[64] = {};
+				struct tm tmv;
+				localtime_s(&tmv, &timestamp);
+				strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tmv);
+
+				if (ImGui::Selectable(buf)) {
+					auto file = FileSys::open_read_game(relpath);
+					if (file) {
+						string text(file->size(), ' ');
+						file->read((void*)text.data(), text.size());
+						command_mgr->add_command(new RestoreBackupCommand(*this, std::move(text)));
+					} else {
+						sys_print(Warning, "draw_backup_browser_window: couldn't open backup %s\n", relpath.c_str());
+					}
+					show_backup_browser_window = false;
+				}
+			}
+		}
+	}
+	ImGui::End();
 }
 
 #endif // EDITOR_BUILD

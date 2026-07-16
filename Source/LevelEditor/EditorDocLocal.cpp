@@ -170,7 +170,7 @@ void EditorDoc::init_new() {
 	editor_api2 = std::make_unique<EditorApi2Impl>(cam_api_impl.get(), sel_api_impl.get(), doc_api_impl.get());
 
 	gui = std::make_unique<EditorUILayout>(*editor_api2);
-	prop_editor = std::make_unique<EdPropertyGrid>(grid_factory);
+	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
 
 	// Connect EdPropertyGrid callbacks to EditorDoc events
 	selection_state->on_selection_changed.add(prop_editor.get(),
@@ -229,6 +229,13 @@ void EditorDoc::set_document_path(string newAssetName) {
 	this->assetName = newAssetName;
 }
 
+void EditorDoc::notify_entity_edited(Entity* e) {
+	if (!e)
+		return;
+	e->editor_on_change_properties();
+	e->post_change_transform_R();
+}
+
 string EditorDoc::get_name() {
 	ASSERT(true); // always valid
 	string name = get_doc_name();
@@ -240,6 +247,21 @@ string EditorDoc::get_name() {
 // ---------------------------------------------------------------------------
 // Save
 // ---------------------------------------------------------------------------
+
+SerializedSceneFile EditorDoc::serialize_current_state_to_text(const char* debug_tag_prefix) {
+	ASSERT(eng->get_level());
+	auto& all_objs = eng->get_level()->get_all_objects();
+	validate_fileids_before_serialize();
+	std::vector<Entity*> all_ents;
+	for (auto o : all_objs)
+		if (auto e = o->cast_to<Entity>())
+			all_ents.push_back(e);
+	string debug_tag = string(debug_tag_prefix) + assetName.value_or("<new>");
+	// Prefabs persist parent/child links; level (.tmap) saves stay flat (see serialize_to_text).
+	return NewSerialization::serialize_to_text(debug_tag.c_str(), all_ents, false, nullptr,
+											   &eng->get_level()->preserved_unknown_objs,
+											   /*serialize_hierarchy*/ is_editing_prefab());
+}
 
 bool EditorDoc::save_document_internal() {
 	ASSERT(eng->get_level());
@@ -263,17 +285,7 @@ bool EditorDoc::save_document_internal() {
 	assert(eng->get_level());
 	eng->log_to_fullscreen_gui(Info, "Saving");
 	sys_print(Info, "Saving Scene/Prefab (%s)...\n", assetName.value_or("<new>").c_str());
-	auto& all_objs = eng->get_level()->get_all_objects();
-	validate_fileids_before_serialize();
-	std::vector<Entity*> all_ents;
-	for (auto o : all_objs)
-		if (auto e = o->cast_to<Entity>())
-			all_ents.push_back(e);
-	string debug_tag = "saving:" + assetName.value_or("<new>");
-	// Prefabs persist parent/child links; level (.tmap) saves stay flat (see serialize_to_text).
-	auto serialized = NewSerialization::serialize_to_text(debug_tag.c_str(), all_ents, false, nullptr,
-														  &eng->get_level()->preserved_unknown_objs,
-														  /*serialize_hierarchy*/ is_editing_prefab());
+	auto serialized = serialize_current_state_to_text("saving:");
 	assert(assetName.has_value());
 	const string path = assetName.value();
 
@@ -300,9 +312,74 @@ bool EditorDoc::save_document_internal() {
 	return true;
 }
 
+string EditorDoc::backup_dir_for_current_asset() const {
+	return "backups/" + StringUtils::alphanumeric_hash(assetName.value());
+}
+
+void EditorDoc::write_backup() {
+	if (!assetName.has_value() || assetName.value().empty())
+		return; // nothing saved yet to associate backups with
+
+	const string dir = backup_dir_for_current_asset();
+	FileSys::create_directory(dir, FileSys::GAME_DIR);
+
+	auto serialized = serialize_current_state_to_text("backup:");
+	// Fixed-width epoch seconds so filenames sort lexically the same as chronologically.
+	char timestamp[32];
+	snprintf(timestamp, sizeof(timestamp), "%010lld", (long long)time(nullptr));
+	const string path = dir + "/" + timestamp + "." + get_save_file_extension();
+
+	auto outfile = FileSys::open_write_game(path);
+	if (!outfile) {
+		sys_print(Warning, "EditorDoc::write_backup: couldn't write backup file %s\n", path.c_str());
+		return;
+	}
+	outfile->write(serialized.text.c_str(), serialized.text.size());
+	outfile->close();
+	sys_print(Info, "Wrote backup: %s\n", path.c_str());
+
+	// Prune oldest backups beyond the retention cap.
+	std::vector<string> existing;
+	for (const auto& file : FileSys::find_game_files_path(dir))
+		existing.push_back(file);
+	std::sort(existing.begin(), existing.end());
+	while ((int)existing.size() > BACKUP_RETENTION_COUNT) {
+		FileSys::delete_game_file(FileSys::get_game_path_from_full_path(existing.front()));
+		existing.erase(existing.begin());
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Eyedropper
 // ---------------------------------------------------------------------------
+
+std::vector<string> EditorDoc::list_backups_for_current_asset() const {
+	std::vector<string> out;
+	if (!assetName.has_value() || assetName.value().empty())
+		return out;
+	for (const auto& file : FileSys::find_game_files_path(backup_dir_for_current_asset()))
+		out.push_back(FileSys::get_game_path_from_full_path(file));
+	std::sort(out.begin(), out.end()); // fixed-width epoch-second filenames sort chronologically
+	return out;
+}
+
+void EditorDoc::replace_level_content_from_text(const std::string& text) {
+	ASSERT(eng->get_level());
+	std::vector<Entity*> to_remove;
+	for (auto o : eng->get_level()->get_all_objects())
+		if (auto e = o->cast_to<Entity>())
+			if (this_is_a_serializeable_object(e))
+				to_remove.push_back(e);
+	for (auto e : to_remove)
+		e->destroy();
+
+	auto unserialized = NewSerialization::unserialize_from_text("restore_backup", text, /*keepid*/ false);
+	insert_unserialized_into_scene(unserialized);
+
+	selection_state->clear_all_selected();
+	set_has_editor_changes();
+	post_node_changes.invoke();
+}
 
 void EditorDoc::enable_entity_eyedropper_mode(void* id) {
 	ASSERT(id);

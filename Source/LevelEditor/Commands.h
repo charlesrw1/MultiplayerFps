@@ -71,6 +71,46 @@ public:
 																		std::vector<EntityPtr> handles);
 };
 
+// Restores a single entity + its one component to a previously captured snapshot, in place
+// (no destroy/recreate). Used to make property-grid edits undoable: EdPropertyGrid snapshots
+// before/after an edit session and pushes one of these per session (see EdPropertyGrid.cpp).
+class SetEntityStateCommand : public Command
+{
+public:
+	SetEntityStateCommand(EditorDoc& ed_doc, EntityPtr ent, std::shared_ptr<SerializedSceneFile> before,
+						  std::shared_ptr<SerializedSceneFile> after)
+		: ed_doc(ed_doc), ent(ent), before(std::move(before)), after(std::move(after)) {}
+	void execute() final { apply(after); }
+	void undo() final { apply(before); }
+	std::string to_string() final { return "Edit Properties"; }
+
+private:
+	void apply(const std::shared_ptr<SerializedSceneFile>& snap);
+
+	EditorDoc& ed_doc;
+	EntityPtr ent;
+	std::shared_ptr<SerializedSceneFile> before;
+	std::shared_ptr<SerializedSceneFile> after;
+};
+
+// Replaces the whole level's editable content with a backup snapshot (see EditorDoc::write_backup).
+// Undoable: captures the level's current state the first time it executes, same lazy-snapshot
+// idea as other commands here.
+class RestoreBackupCommand : public Command
+{
+public:
+	RestoreBackupCommand(EditorDoc& ed_doc, std::string backup_text) : ed_doc(ed_doc), after_text(std::move(backup_text)) {}
+	void execute() final;
+	void undo() final;
+	std::string to_string() final { return "Restore Backup"; }
+
+private:
+	EditorDoc& ed_doc;
+	std::string before_text;
+	std::string after_text;
+	bool captured_before = false;
+};
+
 class EditorDoc;
 struct SavedCreateObj
 {

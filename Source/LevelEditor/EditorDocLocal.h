@@ -220,6 +220,18 @@ public:
 	void set_document_path(string newAssetName);
 	void check_inputs();
 	bool save_document_internal() final;
+	// Gathers current level entities and serializes them the same way save_document_internal
+	// does, without writing to disk. Shared by save and the periodic backup writer.
+	SerializedSceneFile serialize_current_state_to_text(const char* debug_tag_prefix);
+	// Silent periodic snapshot of the current asset (unrelated to save/clear_editor_changes).
+	// See backup_dir_for_current_asset() for where these land on disk.
+	void write_backup();
+	string backup_dir_for_current_asset() const;
+	std::vector<string> list_backups_for_current_asset() const;
+	// Destroys the current editable entities and replaces them with the ones described by
+	// `text` (same schema as save/backup files), keeping assetName unchanged. Used by
+	// RestoreBackupCommand (Commands.h) — does NOT mark clean/save over the canonical path.
+	void replace_level_content_from_text(const std::string& text);
 	void hook_menu_bar() final;
 	void hook_menu_bar_file_menu() final;
 	void hook_imgui_newframe() final { ImGuizmo::BeginFrame(); }
@@ -229,6 +241,7 @@ public:
 
 	void tick(float dt) final;
 	void imgui_draw() final;
+	void draw_backup_browser_window();
 	const View_Setup* get_vs() final { return &vs_setup; }
 
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
@@ -270,6 +283,10 @@ public:
 	void remove_scene_object(BaseUpdater* u);
 	void insert_unserialized_into_scene(UnserializedSceneFile& file);
 	void instantiate_into_scene(BaseUpdater* u);
+	// Re-runs the same post-edit sync hooks a live property-grid edit triggers (Entity is a friend
+	// of these private hooks; this lets non-friend callers like SetEntityStateCommand reuse them
+	// after restoring a snapshot).
+	void notify_entity_edited(Entity* e);
 	bool get_using_ortho() const { return ed_cam.get_is_using_ortho(); }
 	void validate_fileids_before_serialize();
 	void set_camera_target_to_sel();
@@ -325,6 +342,12 @@ private:
 	bool eye_dropper_active = false;
 	void* active_eyedropper_user_id = nullptr; // for id purposes only
 	bool editing_prefab = false;
+
+	// Periodic auto-backup (see write_backup()). Silent snapshot only, unrelated to save.
+	static constexpr float BACKUP_INTERVAL_SECONDS = 5.f * 60.f;
+	static constexpr int BACKUP_RETENTION_COUNT = 8;
+	float time_since_last_backup = 0.f;
+	bool show_backup_browser_window = false;
 	// Set by check_inputs() on Ctrl+P / Alt+P; consumed in the viewport menu-bar draw where the
 	// parenting popups live (must OpenPopup in the same imgui window as their BeginPopup).
 	bool want_open_parent_menu = false;

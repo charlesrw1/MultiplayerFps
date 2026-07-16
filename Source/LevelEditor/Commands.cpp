@@ -8,6 +8,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "Framework/Log.h"
 #include "LevelSerialization/SerializeNew.h"
+#include "Framework/SerializerJson2.h"
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -524,5 +525,60 @@ std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_te
 	return std::make_unique<SerializedSceneFile>(NewSerialization::serialize_to_text(
 		"Command::serialize_entities_text", ents, true, nullptr, nullptr,
 		/*serialize_hierarchy*/ ed_doc.is_editing_prefab()));
+}
+
+// ---------------------------------------------------------------------------
+// SetEntityStateCommand
+// ---------------------------------------------------------------------------
+
+void SetEntityStateCommand::apply(const std::shared_ptr<SerializedSceneFile>& snap) {
+	Entity* e = ent.get();
+	if (!e || !snap)
+		return;
+	try {
+		auto j = NewSerialization::parse_scene_json("property_undo", snap->text);
+		auto& obj_json = j.at("objs").at(0); // snapshot always covers exactly one entity
+
+		// Saved snapshots are diffed against each class's default-constructed state (see
+		// WriteSerializerBackendJson2's constructor) — a field equal to its default is omitted
+		// entirely, not written as its default value. That's correct when reading into a freshly
+		// constructed object (already at defaults), but restoring in place onto the *existing*
+		// live entity/component means a field the snapshot omits must still be reset to its
+		// class default, not left at whatever the live object currently holds. Merge each
+		// class's cached default json underneath the snapshot before applying it.
+		nlohmann::json merged = e->get_type().diff_data ? e->get_type().diff_data->jsonObj : nlohmann::json::object();
+		auto& comps = e->get_components();
+		Component* c = comps.empty() ? nullptr : comps[0];
+		if (c && c->get_type().diff_data)
+			merged.merge_patch(c->get_type().diff_data->jsonObj);
+		merged.merge_patch(obj_json);
+
+		ReadSerializerBackendJson2 ereader("property_undo", merged, *e);
+		if (c) {
+			ReadSerializerBackendJson2 creader("property_undo", merged, *c);
+			c->editor_on_change_property();
+		}
+	}
+	catch (const std::exception& ex) {
+		sys_print(Error, "SetEntityStateCommand::apply: failed to restore snapshot: %s\n", ex.what());
+		return;
+	}
+	ed_doc.notify_entity_edited(e);
+}
+
+// ---------------------------------------------------------------------------
+// RestoreBackupCommand
+// ---------------------------------------------------------------------------
+
+void RestoreBackupCommand::execute() {
+	if (!captured_before) {
+		before_text = ed_doc.serialize_current_state_to_text("restore_backup_before:").text;
+		captured_before = true;
+	}
+	ed_doc.replace_level_content_from_text(after_text);
+}
+
+void RestoreBackupCommand::undo() {
+	ed_doc.replace_level_content_from_text(before_text);
 }
 #endif

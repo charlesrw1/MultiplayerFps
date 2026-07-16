@@ -3,10 +3,12 @@
 #include "Framework/PropertyEd.h"
 #include "Game/EntityComponent.h"
 class ISelectionApi;
+class EditorDoc;
+class SerializedSceneFile;
 class EdPropertyGrid
 {
 public:
-	EdPropertyGrid(const FnFactory<IPropertyEditor>& factory);
+	EdPropertyGrid(EditorDoc& ed_doc, const FnFactory<IPropertyEditor>& factory);
 	void draw(const ISelectionApi& api);
 
 	viewMulticastDelegate<> get_on_property_changed() { return on_property_change_internal; }
@@ -50,4 +52,10 @@ private:
 
 	std::unique_ptr<IComponentEditorUi> editor_ui;
 	Component* editor_ui_component = nullptr;
+
+	EditorDoc& ed_doc;
+	// Coalesces a whole edit "session" (e.g. an entire slider drag) into one undoable command
+	// instead of pushing a command per-frame. See draw().
+	bool property_edit_session_active = false;
+	std::shared_ptr<SerializedSceneFile> session_before_snapshot;
 };

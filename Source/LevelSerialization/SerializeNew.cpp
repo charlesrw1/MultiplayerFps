@@ -175,8 +175,7 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 	return outfile;
 }
 
-UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_tag, const std::string& text,
-															  bool keepid) {
+nlohmann::json NewSerialization::parse_scene_json(const char* debug_tag, const std::string& text) {
 	// Tolerate any newline style after the "!json" marker (\n, \r\n, \r) — files
 	// authored on Windows or round-tripped through git's autocrlf land as \r\n,
 	// and a strict "!json\n" match silently rejects them as "unsupported scene
@@ -190,12 +189,17 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_
 		++bodyStart;
 	if (bodyStart == kMarkerLen)
 		throw SerializeInputError(std::string(debug_tag) + ": unsupported scene format prefix");
-	SerializedForDiffing sfd;
 	try {
-		sfd.jsonObj = nlohmann::json::parse(text.begin() + bodyStart, text.end());
+		return nlohmann::json::parse(text.begin() + bodyStart, text.end());
 	} catch (const nlohmann::json::exception& e) {
 		throw SerializeInputError(std::string(debug_tag) + ": malformed JSON: " + e.what());
 	}
+}
+
+UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_tag, const std::string& text,
+															  bool keepid) {
+	SerializedForDiffing sfd;
+	sfd.jsonObj = parse_scene_json(debug_tag, text);
 	return unserialize_from_json(debug_tag, sfd, keepid);
 }
 

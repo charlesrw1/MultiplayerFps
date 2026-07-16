@@ -105,6 +105,7 @@
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />
     <ClCompile Include="Tests\Editor\test_prefabs.cpp" />
     <ClCompile Include="Tests\Editor\test_parenting.cpp" />
+    <ClCompile Include="Tests\Editor\test_property_undo.cpp" />
     <ClCompile Include="Tests\Editor\test_ragdoll_joint_gizmo.cpp" />
     <ClCompile Include="Tests\Editor\test_lua_component.cpp" />
     <ClCompile Include="Tests\Editor\test_lua_scriptable_object.cpp" />

@@ -128,10 +128,17 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 				if(selected)
 					what_i_want.push_back(selected);
 
+				EntityPtr entPtr = ent->get_self_ptr();
+				if (!property_edit_session_active)
+					session_before_snapshot = std::shared_ptr<SerializedSceneFile>(
+						CommandSerializeUtil::serialize_entities_text(ed_doc, {entPtr}));
 
 				const bool changed = grid_cache.set_what_i_want_and_draw(what_i_want);
 
 				if (changed) {
+					property_edit_session_active = true;
+					ed_doc.set_has_editor_changes();
+
 					Entity* e = selected_vec.at(0).get();
 					ASSERT(e);
 					e->editor_on_change_properties();
@@ -142,6 +149,17 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 						ec->editor_on_change_property();
 
 					on_property_change_internal.invoke();
+				}
+
+				// A whole edit "session" (e.g. an entire slider drag) ends once ImGui reports
+				// nothing is being interacted with; coalesce it into a single undoable command
+				// instead of one per changed-frame.
+				if (property_edit_session_active && !ImGui::IsAnyItemActive()) {
+					std::shared_ptr<SerializedSceneFile> after_snapshot(
+						CommandSerializeUtil::serialize_entities_text(ed_doc, {entPtr}));
+					ed_doc.command_mgr->add_command(
+						new SetEntityStateCommand(ed_doc, entPtr, session_before_snapshot, after_snapshot));
+					property_edit_session_active = false;
 				}
 
 				if (selected) {
@@ -273,7 +291,8 @@ void EdPropertyGrid::refresh_grid(const ISelectionApi& api) {
 	
 }
 
-EdPropertyGrid::EdPropertyGrid(const FnFactory<IPropertyEditor>& factory) : grid_cache(factory) {}
+EdPropertyGrid::EdPropertyGrid(EditorDoc& ed_doc, const FnFactory<IPropertyEditor>& factory)
+	: grid_cache(factory), ed_doc(ed_doc) {}
 
 bool EdPropertyGrid::GridWithClasses::set_what_i_want_and_draw(std::vector<obj<BaseUpdater>> objs)
 {
