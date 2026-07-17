@@ -92,13 +92,15 @@ void BuildSceneData_CpuFast::upload_gpu_cmds(int sum_count) {
 }
 
 void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op,
-				  bool force_backface, Model* m, bool overdraw_vis, float poly_offset_factor = 0.f,
+				  bool force_backface, Model* m, bool overdraw_vis, bool is_compact, float poly_offset_factor = 0.f,
 				  bool wireframe_overlay = false) {
 	ASSERT(mat != nullptr);
 	ASSERT(m != nullptr);
 
 	auto flags = (is_depth) ? MSF_DEPTH_ONLY : 0;
 	flags |= MSF_MATERIAL_IN_INSTANCE;
+	if (is_compact) // must match the batch's make_key flags (see rebuild_mod_data)
+		flags |= MSF_COMPACT_INST;
 
 	if (is_depth)
 		flags |= MSF_NO_TAA;
@@ -181,6 +183,9 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 		gfx().bind_storage_buffer_base(3, scene.gpu_skinned_mats_buffer);
 		gfx().bind_storage_buffer_base(4, material_buffer);
 		gfx().bind_storage_buffer_base(5, gpu.glinst_to_inst);
+		// Compact instance transforms, read by the COMPACT_INST master permutation
+		// (binding 8). Harmless for classic batches, which never declare it.
+		gfx().bind_storage_buffer_base(8, gpu.compact_inst_buf);
 
 		const int command_size = (int)out_cmds.size() * sizeof(gpu::DrawElementsIndirectCommand);
 
@@ -193,9 +198,12 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 			const int incr = count;
 			if (count != 0) {
 
+				// The whole batch shares one mod_data slot; is_compact selects the
+				// COMPACT_INST shader permutation (must match make_key's batch key).
+				const bool batch_is_compact = mod_data_ptrs.at(cmd_to_mod_data_ptr.at(mat_ofs))->is_compact;
 				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface,
-							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS, effective_poly_offset,
-							 flags & WIREFRAME_OVERLAY);
+							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS, batch_is_compact,
+							 effective_poly_offset, flags & WIREFRAME_OVERLAY);
 
 				const int indirect_byte_offset = offset_buffer_start + offset * DEIcmdSz;
 				if (r_indirect_loop.get_bool()) {
@@ -294,7 +302,7 @@ void BuildSceneData_CpuFast::rebuild_mod_data() {
 	gbuffer_pass.batches.clear();
 	shadow_pass.batches.clear();
 
-	auto make_key = [&](MaterialInstance* this_mat, Model* this_model) -> draw_call_key {
+	auto make_key = [&](MaterialInstance* this_mat, Model* this_model, bool is_compact) -> draw_call_key {
 		draw_call_key k{};
 		if (!this_mat)
 			return k;
@@ -309,6 +317,10 @@ void BuildSceneData_CpuFast::rebuild_mod_data() {
 		int flags = 0;
 		if (this_model->has_bones())
 			flags |= MSF_ANIMATED;
+		// Compact-sourced commands need a distinct shader (transform reconstructed
+		// from CompactInstance), which also keeps them in their own Multidraw_Batch.
+		if (is_compact)
+			flags |= MSF_COMPACT_INST;
 		k.shader = matman.get_mat_shader(nullptr, this_mat, flags);
 		return k;
 	};
@@ -352,7 +364,7 @@ void BuildSceneData_CpuFast::rebuild_mod_data() {
 			cmd.baseInstance = 0;
 			out_cmds.push_back(cmd);
 			cmd_to_mod_data_ptr.push_back(md.ptr_ofs);
-			cmd_to_extra.push_back({m, mati, parti, make_key(mati, m)});
+			cmd_to_extra.push_back({m, mati, parti, make_key(mati, m, md.is_compact)});
 
 			const int cmd_index = (int)out_cmds.size() - 1;
 			const int data = (mati->impl->gpu_buffer_offset);

@@ -236,6 +236,7 @@ enum master_shader_flags
 	MSF_IS_FORCED_FORWARD = 64,
 	MSF_NO_TAA = 128,
 	MSF_MATERIAL_IN_INSTANCE = 256,
+	MSF_COMPACT_INST = 512, // compact instance path: reconstruct transform from CompactInstance
 };
 
 struct shader_key
@@ -246,8 +247,8 @@ struct shader_key
 	}
 	bool has_flag(master_shader_flags f) { return (int(msf_flags) & f); }
 
-	uint32_t material_id : 23;
-	uint32_t msf_flags : 9;
+	uint32_t material_id : 22;
+	uint32_t msf_flags : 10; // must hold all MSF_* bits (now up to MSF_COMPACT_INST=512)
 
 	uint32_t as_uint32() const { return *((uint32_t*)this); }
 };

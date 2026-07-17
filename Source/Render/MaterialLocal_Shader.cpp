@@ -71,6 +71,8 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 		params += "NO_TAA,";
 	if (key.has_flag(MSF_MATERIAL_IN_INSTANCE))
 		params += "MAT_WITH_INST,";
+	if (key.has_flag(MSF_COMPACT_INST))
+		params += "COMPACT_INST,";
 	if (!params.empty())
 		params.pop_back();
 
