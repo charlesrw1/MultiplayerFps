@@ -260,6 +260,12 @@ public:
 		return handle;
 	}
 	void update_obj(handle<Render_Object> handle, const Render_Object& proxy) override;
+
+	// Compact instance path -- forwards to BuildSceneData_CpuFast::inst (see RenderScene.cpp).
+	uint16_t register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic) override;
+	void set_compact_instance_count(uint16_t batch_id, int live_count) override;
+	void set_compact_instances(uint16_t batch_id, int dst_offset, const gpu::CompactInstance* src, int count) override;
+
 	void remove_obj(handle<Render_Object>& handle) override {
 		if (eng->get_is_in_overlapped_period()) {
 			add_to_queued_deletes(handle.id, RenderObjectTypes::Object);

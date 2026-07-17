@@ -34,12 +34,25 @@ class MeshBuilder;
 class IEditorTool;
 class UIControl;
 class GraphicsCommandList;
+class Model;
+class MaterialInstance;
+namespace gpu { struct CompactInstance; }
 class RenderScenePublic
 {
 public:
 	virtual handle<Render_Object> register_obj() = 0;
 	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) = 0;
 	virtual void remove_obj(handle<Render_Object>& handle) = 0;
+
+	// Compact instance path: opt-in, GPU-driven high-count batches (foliage/debris/
+	// stress grids) where the caller already knows what it's instancing. Instances
+	// are 24B PODs uploaded via memcpy and culled/LOD'd entirely on the GPU. The
+	// caller owns counts/capacity. batch_id (== returned value) must be packed into
+	// each CompactInstance's packed_batch_seed. Call outside the renderer's
+	// overlapped period, same rule as update_obj. See BuildSceneData_CpuFast.
+	virtual uint16_t register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic) = 0;
+	virtual void set_compact_instance_count(uint16_t batch_id, int live_count) = 0;
+	virtual void set_compact_instances(uint16_t batch_id, int dst_offset, const gpu::CompactInstance* src, int count) = 0;
 	// returns null on a bad handle
 	// DONT cache this! just use for quick reads of an existing object
 	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) = 0;

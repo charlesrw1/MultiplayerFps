@@ -100,6 +100,7 @@
     <ClCompile Include="Tests\Renderer\test_rmlui_texture.cpp" />
     <ClCompile Include="Tests\Renderer\test_rmlui_filters.cpp" />
     <ClCompile Include="Tests\Renderer\test_demo_level_shots.cpp" />
+    <ClCompile Include="Tests\Renderer\test_compact_instances.cpp" />
     <ClCompile Include="Tests\Renderer\test_shader_reflection.cpp" />
     <ClCompile Include="Tests\Renderer\test_spirv_pipeline.cpp" />
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />

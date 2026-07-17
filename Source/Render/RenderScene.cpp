@@ -359,6 +359,20 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 		in.bounding_sphere_and_radius = glm::vec4(glm::vec3(center), radius);
 	}
 }
+uint16_t Render_Scene::register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic) {
+	ASSERT(!eng->get_is_in_overlapped_period());
+	return (uint16_t)BuildSceneData_CpuFast::inst->register_compact_batch(m, mat, capacity, is_dynamic);
+}
+void Render_Scene::set_compact_instance_count(uint16_t batch_id, int live_count) {
+	ASSERT(!eng->get_is_in_overlapped_period());
+	BuildSceneData_CpuFast::inst->set_instance_count((int16_t)batch_id, live_count);
+}
+void Render_Scene::set_compact_instances(uint16_t batch_id, int dst_offset, const gpu::CompactInstance* src, int count) {
+	ASSERT(!eng->get_is_in_overlapped_period());
+	BuildSceneData_CpuFast::inst->set_instances((int16_t)batch_id, dst_offset,
+												std::span<const gpu::CompactInstance>(src, (size_t)count));
+}
+
 ConfigVar r_spot_near("r_spot_near", "0.1", CVAR_FLOAT, "", 0, 2);
 void Render_Scene::update_light(handle<Render_Light> handle, const Render_Light& proxy) {
 	ASSERT(!eng->get_is_in_overlapped_period());

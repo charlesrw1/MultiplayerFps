@@ -13,10 +13,14 @@ struct Render_Object;
 // Disabled: no render objects registered.
 // EnabledAnimated: registered and re-positioned every frame by the wave function.
 // EnabledStatic: registered once with the wave function evaluated at t=0, then left alone.
+// EnabledCompactStatic: same static grid, but through the GPU-driven compact instance
+//   path (register_compact_batch + set_compact_instances) instead of per-instance
+//   Render_Objects -- the validation testbed for that path.
 NEWENUM(RenderStressTestState, uint8_t){
 	Disabled,
 	EnabledAnimated,
 	EnabledStatic,
+	EnabledCompactStatic,
 };
 
 // Debug/perf tool: spawns an NxN grid of a single Model as raw Render_Objects (not
@@ -56,9 +60,15 @@ private:
 	// the editor callbacks only ever set needs_rebuild and call sync_render_data() to schedule it.
 	void rebuild_grid();
 	void clear_grid();
+	// Compact instance path testbed: (re)registers the batch and pushes the static
+	// grid through set_compact_instances. Mutually exclusive with the classic grid.
+	void on_sync_compact();
 
 	std::vector<handle<Render_Object>> instances;
 	// per-instance world-space (x,z) grid offset from the owner, y is filled in by the wave
 	std::vector<glm::vec2> grid_offsets;
 	bool needs_rebuild = false;
+
+	static constexpr uint16_t kInvalidBatch = 0xFFFF;
+	uint16_t compact_batch_id = kInvalidBatch;
 };
