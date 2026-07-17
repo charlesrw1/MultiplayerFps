@@ -237,6 +237,9 @@ enum master_shader_flags
 	MSF_NO_TAA = 128,
 	MSF_MATERIAL_IN_INSTANCE = 256,
 	MSF_COMPACT_INST = 512, // compact instance path: reconstruct transform from CompactInstance
+	// NB: static vs dynamic compact is a runtime branch on a push constant
+	// (pcv.compact_is_dynamic), NOT a shader permutation -- a define here would
+	// multiply against every other MSF_* flag.
 };
 
 struct shader_key

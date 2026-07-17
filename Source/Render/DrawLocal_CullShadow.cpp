@@ -47,6 +47,7 @@ BuildSceneData_CpuFast::BuildSceneData_CpuFast() {
 	// Compact instance path buffers: read by the CullComputeCompact dispatch AND
 	// (via glinst indirection) the COMPACT_INST master-shader permutation.
 	gpu.compact_inst_buf = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
+	gpu.compact_prev_buf = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 	gpu.compact_desc_buf = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 }
 
@@ -169,13 +170,42 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 void BuildSceneData_CpuFast::build_compact_data() {
 	CPU_SCOPE("build_compact_data");
 
-	compact_instances_dense.clear();
-
 	// Descriptor table is indexed by batch_id == mod_data slot index (ptr_ofs), so
 	// it is sized to mod_data_ptrs; non-compact slots stay zeroed (never read).
 	// One entry per unique (model,material) combo -- tiny, so a plain vector.
 	std::vector<gpu::CompactBatchDesc> descs(mod_data_ptrs.size());
 
+	// Pass 1: live counts per region. Static-first ordering keeps the dynamic region's
+	// base (== static_count) stable across frames where only dynamic live counts vary.
+	int static_count = 0, dyn_count = 0;
+	for (auto* ptr : mod_data_ptrs) {
+		if (!ptr->is_compact)
+			continue;
+		(ptr->compact_is_dynamic ? dyn_count : static_count) += ptr->instance_count;
+	}
+	const int total = static_count + dyn_count;
+	num_compact_live = total;
+	compact_static_count = static_count;
+
+	const int elem = (int)sizeof(gpu::CompactInstance);
+
+	// Grow-only allocation (high-water) so fluctuating live counts don't reallocate
+	// the buffer -- and losing contents -- every frame. A realloc drops the static
+	// contents, so re-send them this frame.
+	const bool grew = total > compact_inst_capacity;
+	if (grew) {
+		compact_inst_capacity = next_pow2((uint32_t)total);
+		gpu.compact_inst_buf->upload(nullptr, compact_inst_capacity * elem);
+		compact_static_dirty = true;
+	}
+
+	const bool rebuild_static = compact_static_dirty && static_count > 0;
+	if (rebuild_static)
+		compact_static_dense.clear();
+	compact_dyn_dense.clear();
+
+	// Pass 2: descriptors + dense region fills. Static memcpy is skipped entirely
+	// when the static region is clean (the compact path's per-frame CPU win).
 	for (int i = 0; i < (int)mod_data_ptrs.size(); i++) {
 		ModelAndMatTData* ptr = mod_data_ptrs[i];
 		if (!ptr->is_compact)
@@ -187,21 +217,46 @@ void BuildSceneData_CpuFast::build_compact_data() {
 		d.mat_ofs = -1; // per-part material already baked into model_info for this slot
 		descs[i] = d;
 
-		// Concatenate this batch's live instances into the dense array. Each record
-		// already carries its batch_id (packed by the caller), so ordering is free.
-		ptr->compact_gpu_offset = (int)compact_instances_dense.size();
 		const int live = ptr->instance_count;
 		ASSERT(live <= (int)ptr->compact_staging.size());
-		if (live > 0)
-			compact_instances_dense.insert(compact_instances_dense.end(),
-										   ptr->compact_staging.begin(), ptr->compact_staging.begin() + live);
+		auto begin = ptr->compact_staging.begin();
+		if (ptr->compact_is_dynamic) {
+			ptr->compact_gpu_offset = static_count + (int)compact_dyn_dense.size();
+			if (live > 0)
+				compact_dyn_dense.insert(compact_dyn_dense.end(), begin, begin + live);
+		} else {
+			ptr->compact_gpu_offset = (int)(rebuild_static ? compact_static_dense.size() : 0);
+			if (rebuild_static && live > 0)
+				compact_static_dense.insert(compact_static_dense.end(), begin, begin + live);
+		}
 	}
 
-	num_compact_live = (int)compact_instances_dense.size();
-	if (num_compact_live > 0) {
-		gpu.compact_inst_buf->upload(compact_instances_dense.data(),
-									 num_compact_live * (int)sizeof(gpu::CompactInstance));
-		gpu.compact_desc_buf->upload(descs.data(), (int)descs.size() * (int)sizeof(gpu::CompactBatchDesc));
+	if (total == 0)
+		return;
+
+	gpu.compact_desc_buf->upload(descs.data(), (int)descs.size() * (int)sizeof(gpu::CompactBatchDesc));
+
+	// Static region: sub-upload only when it actually changed.
+	if (rebuild_static) {
+		gpu.compact_inst_buf->sub_upload(compact_static_dense.data(), static_count * elem, 0);
+		compact_static_dirty = false;
+	}
+
+	// Dynamic region: current frame into the unified buffer at the static_count base;
+	// previous frame into the dyn-sized prev buffer (indexed by dyn-local ==
+	// obj_index - static_count) for motion vectors. CPU arrays are swapped so this
+	// frame's current becomes next frame's previous -- no copy, no double upload.
+	if (dyn_count > 0) {
+		gpu.compact_inst_buf->sub_upload(compact_dyn_dense.data(), dyn_count * elem, static_count * elem);
+
+		if ((int)compact_dyn_dense_prev.size() != dyn_count)
+			compact_dyn_dense_prev = compact_dyn_dense; // first frame / count change: prev = current
+		if (dyn_count > compact_prev_capacity) {
+			compact_prev_capacity = next_pow2((uint32_t)dyn_count);
+			gpu.compact_prev_buf->upload(nullptr, compact_prev_capacity * elem);
+		}
+		gpu.compact_prev_buf->sub_upload(compact_dyn_dense_prev.data(), dyn_count * elem, 0);
+		std::swap(compact_dyn_dense, compact_dyn_dense_prev);
 	}
 }
 
@@ -238,6 +293,10 @@ int16_t BuildSceneData_CpuFast::register_compact_batch(Model* m, MaterialInstanc
 	// commands get correct baseInstance ranges. Same path the classic scan would
 	// eventually trigger; invoked directly instead of waiting for mmt_counts.
 	force_rebuild = true;
+	// Registration can add/remove a batch to/from the static set (including a
+	// static<->dynamic switch on re-register), which shifts the static region -- so
+	// always re-send it once. Cheap: registration is rare.
+	compact_static_dirty = true;
 	return id;
 }
 
@@ -250,12 +309,17 @@ void BuildSceneData_CpuFast::resize_compact_batch(int16_t batch_id, int new_capa
 	if (ptr->instance_count > new_capacity)
 		ptr->instance_count = new_capacity;
 	force_rebuild = true;
+	compact_static_dirty = true; // may shift the static region layout
 }
 
 void BuildSceneData_CpuFast::set_instance_count(int16_t batch_id, int live_count) {
 	ASSERT(is_compact_batch(batch_id));
 	ModelAndMatTData* ptr = mod_data_ptrs.at(batch_id);
 	ASSERT(live_count >= 0 && live_count <= ptr->instance_alloced);
+	// A static live-count change shifts the dynamic region's base, so the static
+	// region must be re-sent (only for static batches; dynamic re-uploads anyway).
+	if (!ptr->compact_is_dynamic && ptr->instance_count != live_count)
+		compact_static_dirty = true;
 	ptr->instance_count = live_count;
 }
 
@@ -265,6 +329,8 @@ void BuildSceneData_CpuFast::set_instances(int16_t batch_id, int dst_offset, std
 	ASSERT(dst_offset >= 0 && dst_offset + (int)src.size() <= (int)ptr->compact_staging.size());
 	if (!src.empty())
 		memcpy(ptr->compact_staging.data() + dst_offset, src.data(), src.size() * sizeof(gpu::CompactInstance));
+	if (!ptr->compact_is_dynamic)
+		compact_static_dirty = true;
 }
 
 void BuildSceneData_CpuFast::set_instance(int16_t batch_id, int index, const gpu::CompactInstance& v) {

@@ -370,8 +370,8 @@ struct PrefilterSpecularFragPushConsts {
 // push_fragment_constants get the same blob per draw).
 struct MasterDeferredPushConsts {
     uint indirect_material_offset; //   0 ..   4   (struct size 16, padded)
-    uint _pad0;
-    uint _pad1;
+    uint compact_is_dynamic;       //   4 ..   8   (COMPACT_INST: 1 => read prev transform from compact_prev_m)
+    uint compact_static_count;     //   8 ..  12   (COMPACT_INST dynamic: prev index == obj_index - this)
     uint _pad2;
 };
 

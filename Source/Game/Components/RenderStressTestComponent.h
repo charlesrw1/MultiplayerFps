@@ -16,11 +16,14 @@ struct Render_Object;
 // EnabledCompactStatic: same static grid, but through the GPU-driven compact instance
 //   path (register_compact_batch + set_compact_instances) instead of per-instance
 //   Render_Objects -- the validation testbed for that path.
+// EnabledCompactDynamic: compact path with is_dynamic=true, re-uploaded every frame by
+//   the wave function -- validates the ping-pong prev buffer / motion vectors.
 NEWENUM(RenderStressTestState, uint8_t){
 	Disabled,
 	EnabledAnimated,
 	EnabledStatic,
 	EnabledCompactStatic,
+	EnabledCompactDynamic,
 };
 
 // Debug/perf tool: spawns an NxN grid of a single Model as raw Render_Objects (not

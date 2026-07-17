@@ -235,12 +235,23 @@ private:
 	void rebuild_batches();
 	void upload_gpu_cmds(int sum_count);
 
-	// Rebuild the dense compact-instance array + per-batch descriptor table from
-	// the compact slots in mod_data_ptrs, and upload both to the GPU. Cheap: a
-	// concatenating copy of each batch's live staging range, no per-instance work.
+	// Rebuild the dense compact-instance regions + per-batch descriptor table from
+	// the compact slots in mod_data_ptrs and upload them. Layout is static-first
+	// [static | dynamic] in one unified current buffer: the static region is only
+	// re-uploaded when it changes (compact_static_dirty), the dynamic region every
+	// frame. The previous-frame dynamic transforms go to a separate dyn-sized prev
+	// buffer (for motion vectors); static instances never double-buffer.
 	void build_compact_data();
-	std::vector<gpu::CompactInstance> compact_instances_dense; // scratch, reused each frame
-	int num_compact_live = 0;
+	void mark_compact_static_dirty() { compact_static_dirty = true; }
+
+	std::vector<gpu::CompactInstance> compact_static_dense;    // [0, static_count), rebuilt only when dirty
+	std::vector<gpu::CompactInstance> compact_dyn_dense;       // this frame's dynamic instances
+	std::vector<gpu::CompactInstance> compact_dyn_dense_prev;  // last frame's (swapped, no copy)
+	int num_compact_live = 0;      // static_count + dyn_count (bounds the cull dispatch)
+	int compact_static_count = 0;  // # live static instances == dynamic region's base index
+	int compact_inst_capacity = 0; // allocated CompactInstance slots in compact_inst_buf (grow-only)
+	int compact_prev_capacity = 0; // allocated slots in compact_prev_buf (grow-only)
+	bool compact_static_dirty = false;
 
 	// sorted specially for shadows
 	Render_Pass_CpuFast shadow_pass;
@@ -270,7 +281,8 @@ private:
 		IGraphicsBuffer* cullobj_buf = nullptr;
 		int num_cullobjs = 0;
 
-		IGraphicsBuffer* compact_inst_buf = nullptr; // CompactInstance[] dense live array
+		IGraphicsBuffer* compact_inst_buf = nullptr; // CompactInstance[] current, [static | dynamic]
+		IGraphicsBuffer* compact_prev_buf = nullptr; // CompactInstance[] prev-frame dynamic transforms
 		IGraphicsBuffer* compact_desc_buf = nullptr; // CompactBatchDesc[] indexed by batch_id
 	} gpu;
 

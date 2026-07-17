@@ -31,7 +31,8 @@ void RenderStressTestComponent::stop() {
 		idraw->get_scene()->set_compact_instance_count(compact_batch_id, 0);
 }
 void RenderStressTestComponent::update() {
-	if (needs_rebuild || state == RenderStressTestState::EnabledAnimated)
+	if (needs_rebuild || state == RenderStressTestState::EnabledAnimated ||
+		state == RenderStressTestState::EnabledCompactDynamic)
 		sync_render_data();
 }
 
@@ -62,11 +63,14 @@ void RenderStressTestComponent::rebuild_grid() {
 	}
 }
 
-// Push the static grid through the compact instance path. Registers/resizes the
-// batch on rebuild, then uploads all instances (identity rotation, unit scale,
-// wave evaluated at t=0) and sets the live count.
+// Push the grid through the compact instance path. Registers/resizes the batch on
+// rebuild, then uploads all instances (identity rotation, unit scale) and sets the
+// live count. Static uses the wave at t=0; dynamic re-evaluates the wave each frame
+// (register with is_dynamic=true) to exercise the prev-transform / motion-vector path.
 void RenderStressTestComponent::on_sync_compact() {
 	clear_grid(); // compact and classic grids are mutually exclusive
+
+	const bool is_dynamic = (state == RenderStressTestState::EnabledCompactDynamic);
 
 	Model* m = model.get();
 	if (!m || grid_length <= 0) {
@@ -79,9 +83,10 @@ void RenderStressTestComponent::on_sync_compact() {
 	const int count = n * n;
 	const float half = (n - 1) * 0.5f * spacing;
 	const glm::vec3 center = get_ws_position();
+	const float t = is_dynamic ? (float)GetTime() * wave_speed : 0.f;
 
 	if (needs_rebuild || compact_batch_id == kInvalidBatch)
-		compact_batch_id = idraw->get_scene()->register_compact_batch(m, nullptr, count, /*is_dynamic*/ false);
+		compact_batch_id = idraw->get_scene()->register_compact_batch(m, nullptr, count, is_dynamic);
 
 	const uint32_t packed_rot = pack_quat_snorm8(glm::quat(1.f, 0.f, 0.f, 0.f)); // identity
 	std::vector<gpu::CompactInstance> insts;
@@ -90,7 +95,7 @@ void RenderStressTestComponent::on_sync_compact() {
 		for (int j = 0; j < n; j++) {
 			const float x = i * spacing - half;
 			const float z = j * spacing - half;
-			const float y = wave_height * sinf(wave_frequency * x) * cosf(wave_frequency * z);
+			const float y = wave_height * sinf(wave_frequency * x + t) * cosf(wave_frequency * z + t);
 			gpu::CompactInstance ci{};
 			ci.pos_x = center.x + x;
 			ci.pos_y = center.y + y;
@@ -116,7 +121,8 @@ void RenderStressTestComponent::on_sync_render_data() {
 		return;
 	}
 
-	if (state == RenderStressTestState::EnabledCompactStatic) {
+	if (state == RenderStressTestState::EnabledCompactStatic ||
+		state == RenderStressTestState::EnabledCompactDynamic) {
 		on_sync_compact();
 		needs_rebuild = false;
 		return;
@@ -177,6 +183,12 @@ void RenderStressTestComponent::on_inspector_imgui() {
 		ImGui::SameLine();
 		if (ImGui::Button("Enable (Compact Static)")) {
 			state = RenderStressTestState::EnabledCompactStatic;
+			needs_rebuild = true;
+			sync_render_data();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Enable (Compact Dynamic)")) {
+			state = RenderStressTestState::EnabledCompactDynamic;
 			needs_rebuild = true;
 			sync_render_data();
 		}

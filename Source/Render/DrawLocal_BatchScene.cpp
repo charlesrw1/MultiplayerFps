@@ -92,8 +92,8 @@ void BuildSceneData_CpuFast::upload_gpu_cmds(int sum_count) {
 }
 
 void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op,
-				  bool force_backface, Model* m, bool overdraw_vis, bool is_compact, float poly_offset_factor = 0.f,
-				  bool wireframe_overlay = false) {
+				  bool force_backface, Model* m, bool overdraw_vis, bool is_compact, bool is_compact_dynamic,
+				  int compact_static_count, float poly_offset_factor = 0.f, bool wireframe_overlay = false) {
 	ASSERT(mat != nullptr);
 	ASSERT(m != nullptr);
 
@@ -152,6 +152,18 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 
 	gfx().set_pipeline(state);
 
+	// Compact batches carry their static/dynamic disposition and the prev-buffer
+	// index base as a per-draw push constant (runtime branch in the COMPACT_INST
+	// master shader -- see MasterDeferredShader.txt). indirect_material_offset is
+	// unused on this path (material id comes from the MAT_WITH_INST glinst layout).
+	if (is_compact) {
+		gpu::MasterDeferredPushConsts pc{};
+		pc.compact_is_dynamic = is_compact_dynamic ? 1u : 0u;
+		pc.compact_static_count = (uint32_t)compact_static_count;
+		gfx().push_vertex_constants(0, &pc, sizeof(pc));
+		gfx().push_fragment_constants(0, &pc, sizeof(pc));
+	}
+
 	auto& textures = mat->impl->get_textures();
 
 	for (int i = 0; i < (int)textures.size(); i++) {
@@ -183,9 +195,11 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 		gfx().bind_storage_buffer_base(3, scene.gpu_skinned_mats_buffer);
 		gfx().bind_storage_buffer_base(4, material_buffer);
 		gfx().bind_storage_buffer_base(5, gpu.glinst_to_inst);
-		// Compact instance transforms, read by the COMPACT_INST master permutation
-		// (binding 8). Harmless for classic batches, which never declare it.
+		// Compact instance transforms, read by the COMPACT_INST master permutation:
+		// binding 8 = current, binding 9 = previous-frame dynamic (motion vectors).
+		// Harmless for classic batches, which never declare them.
 		gfx().bind_storage_buffer_base(8, gpu.compact_inst_buf);
+		gfx().bind_storage_buffer_base(9, gpu.compact_prev_buf);
 
 		const int command_size = (int)out_cmds.size() * sizeof(gpu::DrawElementsIndirectCommand);
 
@@ -199,11 +213,14 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 			if (count != 0) {
 
 				// The whole batch shares one mod_data slot; is_compact selects the
-				// COMPACT_INST shader permutation (must match make_key's batch key).
-				const bool batch_is_compact = mod_data_ptrs.at(cmd_to_mod_data_ptr.at(mat_ofs))->is_compact;
+				// COMPACT_INST shader permutation (must match make_key's batch key),
+				// is_dynamic drives the runtime prev-transform branch via push const.
+				const ModelAndMatTData* slot = mod_data_ptrs.at(cmd_to_mod_data_ptr.at(mat_ofs));
+				const bool batch_is_compact = slot->is_compact;
+				const bool batch_is_dynamic = batch_is_compact && slot->compact_is_dynamic;
 				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface,
 							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS, batch_is_compact,
-							 effective_poly_offset, flags & WIREFRAME_OVERLAY);
+							 batch_is_dynamic, compact_static_count, effective_poly_offset, flags & WIREFRAME_OVERLAY);
 
 				const int indirect_byte_offset = offset_buffer_start + offset * DEIcmdSz;
 				if (r_indirect_loop.get_bool()) {

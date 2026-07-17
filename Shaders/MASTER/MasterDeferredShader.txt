@@ -77,8 +77,7 @@ layout (binding = 4, std430) readonly buffer GlobalMaterialBuffer {
 layout (binding = 8, std430) readonly buffer CompactInstanceBuffer_Master {
 	CompactInstance compact_instances_m[];
 };
-mat4 compact_model_matrix(uint idx) {
-	CompactInstance ci = compact_instances_m[idx];
+mat4 compact_instance_to_matrix(CompactInstance ci) {
 	mat3 rot = quat_to_mat3(unpack_quat_snorm8(ci.packed_quat)) * ci.scale; // uniform scale
 	return mat4(
 		vec4(rot[0], 0.0),
@@ -86,6 +85,13 @@ mat4 compact_model_matrix(uint idx) {
 		vec4(rot[2], 0.0),
 		vec4(ci.pos_x, ci.pos_y, ci.pos_z, 1.0));
 }
+mat4 compact_model_matrix(uint idx) { return compact_instance_to_matrix(compact_instances_m[idx]); }
+// Previous-frame dynamic transforms live in a separate dyn-sized buffer, indexed by
+// dyn-local = obj_index - compact_static_count (see build_compact_data). Static vs
+// dynamic is a runtime branch on pcv.compact_is_dynamic, not a shader permutation.
+layout (binding = 9, std430) readonly buffer CompactPrevBuffer_Master {
+	CompactInstance compact_prev_m[];
+};
 #endif
 
 #ifdef _VERTEX_SHADER
@@ -293,9 +299,12 @@ void main()
 		vec3 prev_local_pos = local_pos;
 	#endif
 	#ifdef COMPACT_INST
-		// Static compact batches have no previous transform -> zero velocity.
-		// (Dynamic-batch prev-transform reads are step 4.)
+		// Dynamic compact batches read the previous-frame transform from the prev
+		// buffer (dyn-local index = obj_index - static_count); static batches have
+		// zero velocity (prev == current). Runtime branch, not a permutation.
 		mat4 PrevModelMatrix = ObjModelMatrix;
+		if (pcv.compact_is_dynamic != 0u)
+			PrevModelMatrix = compact_instance_to_matrix(compact_prev_m[obj_index - pcv.compact_static_count]);
 	#else
 		mat4 PrevModelMatrix = load_prev_object_transform(obj_index);
 	#endif

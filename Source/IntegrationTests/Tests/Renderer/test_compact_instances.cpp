@@ -63,6 +63,12 @@ static TestTask test_compact_instances_smoke(TestContext& t) {
 	stress->sync_render_data();
 	co_await t.wait_ticks(5);
 
-	t.require(true, "classic->compact switch on the same model rendered without crashing");
+	// Now the dynamic compact path: re-uploaded every frame, prev buffer ping-ponged
+	// for motion vectors. Several ticks so the prev/current swap runs repeatedly.
+	stress->state = RenderStressTestState::EnabledCompactDynamic;
+	stress->sync_render_data();
+	co_await t.wait_ticks(8);
+
+	t.require(true, "compact static + dynamic paths rendered without crashing");
 }
 GAME_TEST("renderer/compact_instances_smoke", 60.f, test_compact_instances_smoke);
