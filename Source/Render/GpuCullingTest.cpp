@@ -114,6 +114,8 @@ void GpuCullingTest::do_cull_for_scene(const GpuCullInput& input, Phase pass) {
 }
 extern ConfigVar r_force_lod;
 void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_shadow, Frustum frustum) {
+	GPU_FUNCTION();
+
 	if (cull.num_objects <= 0)
 		return;
 
