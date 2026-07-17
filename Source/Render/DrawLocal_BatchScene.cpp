@@ -252,6 +252,9 @@ GpuCullInput BuildSceneData_CpuFast::get_cull_input() const {
 	input.num_cmds = out_cmds.size();
 	input.obj_data_buf = gpu.cullobj_buf;
 	input.num_objs = gpu.num_cullobjs;
+	input.compact_inst_buf = gpu.compact_inst_buf;
+	input.compact_desc_buf = gpu.compact_desc_buf;
+	input.num_compact = num_compact_live;
 	return input;
 }
 
@@ -262,6 +265,7 @@ GpuCullInput BuildSceneData_CpuFast::get_cull_input_shadow() const {
 	input.batches_buf = gpu.shadow_batches;
 	input.draw_to_batch = gpu.shadow_draw_to_batch;
 	input.num_batches = shadow_pass.batches.size();
+	input.num_compact = 0; // compact shadow culling is step 5; disabled here
 
 	return input;
 }

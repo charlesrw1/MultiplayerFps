@@ -7,11 +7,13 @@ GpuCullingTest::GpuCullingTest() {
 	cull_compute = draw.get_prog_man().create_compute("CullCompute.txt", "MAINVIEW");
 	cull_compute_cascade = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_CASCADE");
 	cull_compute_spot = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_SPOT");
+	cull_compute_compact = draw.get_prog_man().create_compute("CullCompute.txt", "MAINVIEW,COMPACT_INST");
 
 	build_pyramid = draw.get_prog_man().create_compute("DepthPyramidC.txt");
 	debug_overlays = draw.get_prog_man().create_raster("fullscreenquad.txt", "debugCull.txt");
 	// Needs a UAV (clear_buffer_uint32 + compute shader read/write).
 	vis_bitarray = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
+	compact_vis_bitarray = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 	zero_instances_mdi = draw.get_prog_man().create_compute("zero_instances_mdi.txt");
 	compaction = draw.get_prog_man().create_compute("compact_mdi.txt");
 
@@ -195,6 +197,7 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 		cp.lod_bias = lod_bias;
 		cp.force_lod = r_force_lod.get_integer();
 		cp.radius_bias = radius_bias;
+		cp.compact_count = input.num_compact; // bounds the COMPACT_INST dispatch
 		draw.ubo.cull_params->upload(&cp, sizeof(cp));
 		gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
 	}
@@ -207,6 +210,33 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 	gfx().bind_storage_buffer_base(7, vis_bitarray);
 
 	gfx().dispatch_compute(groups, 1, 1);
+
+	// Compact instance path: a second dispatch over the compact-instance array,
+	// accumulating into the SAME (already-zeroed) cmd_buf/glinst_to_inst as the
+	// classic pass. Main view only for now (shadows are step 5). Shares the same
+	// cull_data frustum/pyramid; uses its own compact_vis_bitarray for two-pass
+	// occlusion so its dense indices don't collide with the classic vis set.
+	if (!is_for_shadow && input.num_compact > 0) {
+		RenderPipelineState ps;
+		ps.program = draw.get_prog_man().get_obj(cull_compute_compact);
+		gfx().set_pipeline(ps);
+
+		device.bind_texture(0, depth_pyramid);
+		gfx().bind_sampler(0, hiZSampler);
+		gfx().bind_storage_buffer_base(2, input.cmd_buf);
+		gfx().bind_storage_buffer_base(3, input.glinst_to_inst);
+		gfx().bind_storage_buffer_base(6, input.mod_data);
+		gfx().bind_uniform_buffer_base(5, cull_data);
+		gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
+		gfx().bind_storage_buffer_base(7, compact_vis_bitarray);
+		gfx().bind_storage_buffer_base(8, input.compact_inst_buf);
+		gfx().bind_storage_buffer_base(9, input.compact_desc_buf);
+
+		const int cgroups = glm::ceil(input.num_compact / 256.f);
+		gfx().dispatch_compute(cgroups, 1, 1);
+
+		gfx().bind_sampler(0, nullptr);
+	}
 
 	gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_COMMAND);
 
@@ -229,6 +259,14 @@ void GpuCullingTest::build_data(const GpuCullInput& input) {
 	const int words_needed = glm::ceil(cull.num_objects / 32.f);
 	vis_bitarray->upload(nullptr, words_needed * 4);
 	gfx().clear_buffer_uint32(vis_bitarray, 0);
+
+	// Compact path has its own two-pass vis set; clear it once at pass-1 entry
+	// (build_data_2/Pass2 must NOT re-clear -- the bits carry pass1->pass2).
+	if (input.num_compact > 0) {
+		const int cwords = glm::ceil(input.num_compact / 32.f);
+		compact_vis_bitarray->upload(nullptr, cwords * 4);
+		gfx().clear_buffer_uint32(compact_vis_bitarray, 0);
+	}
 
 	do_cull_for_scene(input, Phase::Pass1);
 }

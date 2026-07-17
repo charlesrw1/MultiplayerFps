@@ -102,9 +102,14 @@ struct GpuCullInput
 	IGraphicsBuffer* cmd_buf{};		   // drawelementsindirectcommands[]
 	IGraphicsBuffer* draw_to_batch{};  // int[] mapping from cmd_buf to batches_buf
 
+	// compact instance path (GPU-driven); num_compact==0 => path is a no-op
+	IGraphicsBuffer* compact_inst_buf{}; // CompactInstance[] dense live array
+	IGraphicsBuffer* compact_desc_buf{}; // CompactBatchDesc[] indexed by batch_id (mod_data slot)
+
 	int num_batches = 0;
 	int num_cmds = 0;
 	int num_objs = 0;
+	int num_compact = 0; // total live compact instances across all compact batches
 };
 
 // ---------------------------------------------------------------------------
@@ -223,6 +228,13 @@ private:
 	void rebuild_batches();
 	void upload_gpu_cmds(int sum_count);
 
+	// Rebuild the dense compact-instance array + per-batch descriptor table from
+	// the compact slots in mod_data_ptrs, and upload both to the GPU. Cheap: a
+	// concatenating copy of each batch's live staging range, no per-instance work.
+	void build_compact_data();
+	std::vector<gpu::CompactInstance> compact_instances_dense; // scratch, reused each frame
+	int num_compact_live = 0;
+
 	// sorted specially for shadows
 	Render_Pass_CpuFast shadow_pass;
 	// sorted for opaques
@@ -250,6 +262,9 @@ private:
 
 		IGraphicsBuffer* cullobj_buf = nullptr;
 		int num_cullobjs = 0;
+
+		IGraphicsBuffer* compact_inst_buf = nullptr; // CompactInstance[] dense live array
+		IGraphicsBuffer* compact_desc_buf = nullptr; // CompactBatchDesc[] indexed by batch_id
 	} gpu;
 
 	// sorted draw cmds, indexed into by M&MTS

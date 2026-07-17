@@ -30,6 +30,18 @@ layout(binding =7, std430)  buffer VisBuffer {
 	uint visbits[];
 };
 
+#ifdef COMPACT_INST
+// Compact instance path: per-thread reads a CompactInstance directly (no
+// CullObject) and looks up its batch descriptor for the model_info offset +
+// model-space bounding sphere, reconstructing the world sphere on the fly.
+layout(binding = 8, std430) readonly buffer CompactInstanceBuffer {
+	CompactInstance compact_instances[];
+};
+layout(binding = 9, std430) readonly buffer CompactBatchDescBuffer {
+	CompactBatchDesc compact_descs[];
+};
+#endif
+
 struct CullData {
 	vec4 frustum_up;
 	vec4 frustum_down;
@@ -101,11 +113,24 @@ void main()
 {
 	uint gID = gl_GlobalInvocationID.x;
 	// cull object id
+#ifdef COMPACT_INST
+	if(gID>=uint(params.compact_count))
+		return;
+	// Reconstruct this instance's world bounding sphere from its packed transform
+	// and the batch's model-space sphere: center = pos + rot*(local_center*scale).
+	CompactInstance ci = compact_instances[gID];
+	CompactBatchDesc desc = compact_descs[int(ci.packed_batch_seed & 0xFFFFu)];
+	mat3 ci_rot = quat_to_mat3(unpack_quat_snorm8(ci.packed_quat));
+	vec3 ci_world_center = vec3(ci.pos_x, ci.pos_y, ci.pos_z) + ci_rot * (desc.local_sphere.xyz * ci.scale);
+	vec4 compact_bounds = vec4(ci_world_center, desc.local_sphere.w * ci.scale);
+	const int obj_flags = 1; // main view only; shadow-caster bit unused here
+#else
 	if(gID>=cull.num_objects)
 		return;
-		
+
 	const int obj_flags = CullObjects.data[gID].misc.w;
-	
+#endif
+
 	#ifndef MAINVIEW
 	if(!bool(obj_flags&1)) {
 		return;	// not shadow caster
@@ -125,7 +150,11 @@ void main()
 	}
 	#endif
 
+#ifdef COMPACT_INST
+	vec4 bounding_sphere = compact_bounds;
+#else
 	vec4 bounding_sphere = CullObjects.data[gID].bounds_sphere;
+#endif
 
 	// frustum cull (just do again on 2nd pass)
 	vec3 center = bounding_sphere.xyz;
@@ -178,7 +207,11 @@ void main()
 	atomicOr(visbits[dword_index],1<<visword_shift); 	
 #endif
 	
+#ifdef COMPACT_INST
+	int model_ofs = desc.model_ofs;
+#else
 	int model_ofs = CullObjects.data[gID].misc.x;
+#endif
 
 	int num_lods = int(model_info[model_ofs]);
 
@@ -204,7 +237,11 @@ void main()
 	int part_ofs = int(model_info[model_ofs+1+(lod_wanted*3)]);
 	int part_count = int(model_info[model_ofs+1+(lod_wanted*3)+1]);
 	
+#ifdef COMPACT_INST
+	int mat_override = desc.mat_ofs;
+#else
 	int mat_override = CullObjects.data[gID].misc.z;
+#endif
 	for(int i=0;i<part_count;i++) {
 		int command_index = int(model_info[model_ofs+1+num_lods*3 + (part_ofs + i)*2]);
 		int mat_offset = int(model_info[model_ofs+1+num_lods*3 + (part_ofs + i)*2 + 1]);
@@ -214,7 +251,11 @@ void main()
 	
 		uint count_index = atomicAdd(draw_cmd_out[command_index].primCount,1);
 		uint instanceIndex = draw_cmd_out[command_index].baseInstance + count_index;
+#ifdef COMPACT_INST
+		object_inst_indirect[instanceIndex*2] = gID;	// compact instance's own dense index
+#else
 		object_inst_indirect[instanceIndex*2] = CullObjects.data[gID].misc.y;	// the index of object
+#endif
 		
 		mat_offset = (mat_override>0)?mat_override:mat_offset;
 		

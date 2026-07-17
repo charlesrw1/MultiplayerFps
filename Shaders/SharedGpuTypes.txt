@@ -34,6 +34,44 @@ struct CompactInstance
 	uint  packed_batch_seed; // batch_id : bits 0-15, seed : bits 16-23, pad : bits 24-31
 };
 
+// Per-batch descriptor for the compact instance path. One entry per unique
+// (model, material) compact batch, indexed by CompactInstance's batch_id. Carries
+// the model_info[] offset (for LOD/part/command-index resolution -- same data the
+// classic CullObject.misc.x points at) and the model-space bounding sphere the GPU
+// uses to build each instance's world sphere on the fly.
+struct CompactBatchDesc
+{
+	vec4 local_sphere; // xyz = model-space center, w = radius
+	int  model_ofs;    // offset into model_info[] (== ModelAndMatTData::gpu_buf_ofs)
+	int  mat_ofs;      // material override gpu offset, or -1 to use the per-part material
+	int  _pad0;
+	int  _pad1;
+};
+
+#ifndef __cplusplus
+// GPU-side unpack of the compact rotation quat (4x snorm8, must mirror
+// pack_quat_snorm8 in CompactInstancePack.h) and its column-major rotation matrix
+// (matches glm::mat3_cast for the column-vector convention ObjModelMatrix uses).
+vec4 unpack_quat_snorm8(uint p) {
+	vec4 q;
+	q.x = float(bitfieldExtract(int(p),  0, 8)) / 127.0;
+	q.y = float(bitfieldExtract(int(p),  8, 8)) / 127.0;
+	q.z = float(bitfieldExtract(int(p), 16, 8)) / 127.0;
+	q.w = float(bitfieldExtract(int(p), 24, 8)) / 127.0;
+	return normalize(clamp(q, -1.0, 1.0));
+}
+mat3 quat_to_mat3(vec4 q) { // q = (x, y, z, w)
+	float x = q.x, y = q.y, z = q.z, w = q.w;
+	float xx = x*x, yy = y*y, zz = z*z;
+	float xy = x*y, xz = x*z, yz = y*z;
+	float wx = w*x, wy = w*y, wz = w*z;
+	return mat3(
+		1.0 - 2.0*(yy+zz), 2.0*(xy+wz),       2.0*(xz-wy),
+		2.0*(xy-wz),       1.0 - 2.0*(xx+zz), 2.0*(yz+wx),
+		2.0*(xz+wy),       2.0*(yz-wx),       1.0 - 2.0*(xx+yy));
+}
+#endif
+
 // flags for 'bitmask_flags'
 const uint MATFLAG_BILLBOARD_ROTATE_AXIS  = 1;
 

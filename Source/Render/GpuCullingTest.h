@@ -105,6 +105,7 @@ public:
 	program_handle cull_compute{};
 	program_handle cull_compute_cascade{};
 	program_handle cull_compute_spot{};
+	program_handle cull_compute_compact{}; // MAINVIEW + COMPACT_INST variant
 
 	program_handle compaction{};
 	program_handle debug_overlays{};
@@ -113,6 +114,9 @@ public:
 
 	// used for both cpu and gpu objs. big buffers
 	IGraphicsBuffer* vis_bitarray = nullptr;
+	// separate vis buffer for the compact path so its dense instance indices never
+	// collide with the classic path's object indices in the two-pass occlusion set
+	IGraphicsBuffer* compact_vis_bitarray = nullptr;
 	IGraphicsBuffer* cull_data = nullptr;
 
 	CullData cull{};

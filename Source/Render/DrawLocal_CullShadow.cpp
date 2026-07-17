@@ -43,6 +43,11 @@ BuildSceneData_CpuFast::BuildSceneData_CpuFast() {
 	gpu.shadows_count = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 	gpu.shadow_batches = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 	gpu.shadow_draw_to_batch = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
+
+	// Compact instance path buffers: read by the CullComputeCompact dispatch AND
+	// (via glinst indirection) the COMPACT_INST master-shader permutation.
+	gpu.compact_inst_buf = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
+	gpu.compact_desc_buf = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 }
 
 void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_only) {
@@ -152,12 +157,53 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 		gpu.num_cullobjs = (int)cull_obj_gpu_buf.size();
 	}
 
+	build_compact_data();
+
 	GpuCullingTest::inst->build_data(get_cull_input());
 }
 
 // ---------------------------------------------------------------------------
 // Compact instance path (opt-in, GPU-driven)
 // ---------------------------------------------------------------------------
+
+void BuildSceneData_CpuFast::build_compact_data() {
+	CPU_SCOPE("build_compact_data");
+
+	compact_instances_dense.clear();
+
+	// Descriptor table is indexed by batch_id == mod_data slot index (ptr_ofs), so
+	// it is sized to mod_data_ptrs; non-compact slots stay zeroed (never read).
+	// One entry per unique (model,material) combo -- tiny, so a plain vector.
+	std::vector<gpu::CompactBatchDesc> descs(mod_data_ptrs.size());
+
+	for (int i = 0; i < (int)mod_data_ptrs.size(); i++) {
+		ModelAndMatTData* ptr = mod_data_ptrs[i];
+		if (!ptr->is_compact)
+			continue;
+
+		gpu::CompactBatchDesc d{};
+		d.local_sphere = glm::vec4(ptr->local_bounds_center, ptr->local_bounds_radius);
+		d.model_ofs = ptr->gpu_buf_ofs;
+		d.mat_ofs = -1; // per-part material already baked into model_info for this slot
+		descs[i] = d;
+
+		// Concatenate this batch's live instances into the dense array. Each record
+		// already carries its batch_id (packed by the caller), so ordering is free.
+		ptr->compact_gpu_offset = (int)compact_instances_dense.size();
+		const int live = ptr->instance_count;
+		ASSERT(live <= (int)ptr->compact_staging.size());
+		if (live > 0)
+			compact_instances_dense.insert(compact_instances_dense.end(),
+										   ptr->compact_staging.begin(), ptr->compact_staging.begin() + live);
+	}
+
+	num_compact_live = (int)compact_instances_dense.size();
+	if (num_compact_live > 0) {
+		gpu.compact_inst_buf->upload(compact_instances_dense.data(),
+									 num_compact_live * (int)sizeof(gpu::CompactInstance));
+		gpu.compact_desc_buf->upload(descs.data(), (int)descs.size() * (int)sizeof(gpu::CompactBatchDesc));
+	}
+}
 
 int16_t BuildSceneData_CpuFast::register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic) {
 	if (!m)
