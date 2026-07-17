@@ -8,6 +8,8 @@ GpuCullingTest::GpuCullingTest() {
 	cull_compute_cascade = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_CASCADE");
 	cull_compute_spot = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_SPOT");
 	cull_compute_compact = draw.get_prog_man().create_compute("CullCompute.txt", "MAINVIEW,COMPACT_INST");
+	cull_compute_compact_cascade = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_CASCADE,COMPACT_INST");
+	cull_compute_compact_spot = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_SPOT,COMPACT_INST");
 
 	build_pyramid = draw.get_prog_man().create_compute("DepthPyramidC.txt");
 	debug_overlays = draw.get_prog_man().create_raster("fullscreenquad.txt", "debugCull.txt");
@@ -213,12 +215,16 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 
 	// Compact instance path: a second dispatch over the compact-instance array,
 	// accumulating into the SAME (already-zeroed) cmd_buf/glinst_to_inst as the
-	// classic pass. Main view only for now (shadows are step 5). Shares the same
-	// cull_data frustum/pyramid; uses its own compact_vis_bitarray for two-pass
-	// occlusion so its dense indices don't collide with the classic vis set.
-	if (!is_for_shadow && input.num_compact > 0) {
+	// classic pass. Runs for the main view AND shadow passes (cascade/spot pick the
+	// matching COMPACT_INST variant). Shares the same cull_data frustum; the main
+	// view uses its own compact_vis_bitarray for two-pass occlusion (shadow variants
+	// have no MAINVIEW block, so they never touch it).
+	if (input.num_compact > 0) {
+		const program_handle ch = is_for_shadow
+			? (frustum.is_ortho ? cull_compute_compact_cascade : cull_compute_compact_spot)
+			: cull_compute_compact;
 		RenderPipelineState ps;
-		ps.program = draw.get_prog_man().get_obj(cull_compute_compact);
+		ps.program = draw.get_prog_man().get_obj(ch);
 		gfx().set_pipeline(ps);
 
 		device.bind_texture(0, depth_pyramid);

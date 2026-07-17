@@ -105,7 +105,9 @@ public:
 	program_handle cull_compute{};
 	program_handle cull_compute_cascade{};
 	program_handle cull_compute_spot{};
-	program_handle cull_compute_compact{}; // MAINVIEW + COMPACT_INST variant
+	program_handle cull_compute_compact{};         // MAINVIEW + COMPACT_INST
+	program_handle cull_compute_compact_cascade{}; // SHADOW_CASCADE + COMPACT_INST
+	program_handle cull_compute_compact_spot{};    // SHADOW_SPOT + COMPACT_INST
 
 	program_handle compaction{};
 	program_handle debug_overlays{};

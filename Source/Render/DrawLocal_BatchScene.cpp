@@ -290,7 +290,8 @@ GpuCullInput BuildSceneData_CpuFast::get_cull_input_shadow() const {
 	input.batches_buf = gpu.shadow_batches;
 	input.draw_to_batch = gpu.shadow_draw_to_batch;
 	input.num_batches = shadow_pass.batches.size();
-	input.num_compact = 0; // compact shadow culling is step 5; disabled here
+	// num_compact carried over from get_cull_input(): compact instances cast shadows
+	// via the SHADOW_CASCADE/SHADOW_SPOT COMPACT_INST cull variants.
 
 	return input;
 }
