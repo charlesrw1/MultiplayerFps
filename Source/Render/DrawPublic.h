@@ -84,6 +84,12 @@ public:
 
 class Model;
 class MaterialInstance;
+// One placed model within a multi-mesh thumbnail scene (see
+// RenderScenePublic::editor_render_thumbnail_for_scene). Editor-only.
+struct ThumbnailRenderItem {
+	Model* model = nullptr;
+	glm::mat4 transform = glm::mat4(1.f);
+};
 
 class GuiSystemPublic;
 class RendererPublic
@@ -114,6 +120,10 @@ public:
 	// hm.
 	virtual void editor_render_thumbnail_for(Model* model, MaterialInstance* override_mat, int w, int h,
 											 std::string disk_path) = 0;
+	// Renders every item together (e.g. all MeshComponents in a prefab, each at its own
+	// world transform) into one thumbnail image, framing the camera around their combined bounds.
+	virtual void editor_render_thumbnail_for_scene(const std::vector<ThumbnailRenderItem>& items, int w, int h,
+													std::string disk_path) = 0;
 
 	struct EditorDebugOverlayState {
 		const char* active_tex = nullptr; // null = disabled; points into the Texture asset's name

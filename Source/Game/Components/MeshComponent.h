@@ -55,6 +55,13 @@ public:
 	REF AnimatorObject* create_animator(agBuilder* data);
 	void release_animator();
 
+
+	void set_invisible_to_bakes() {
+		nav_static=false;
+		ignore_in_baking = true;
+		ignore_in_cubemap = true;
+		add_collision_if_available = false;
+	}
 	bool get_is_visible() const { return is_visible; }
 	REF bool get_nav_static() const { return nav_static; }
 	bool get_casts_shadows() const { return cast_shadows; }

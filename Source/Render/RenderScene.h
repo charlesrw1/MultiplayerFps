@@ -545,6 +545,15 @@ public:
 	void build_scene_data(bool skybox_only, bool is_for_editor, bool cubemap_view);
 	void update_spotlight_data();
 
+	// Rebuilds and re-uploads gpu_instance_buffer (every proxy's current/previous transform
+	// and bone offset) from the current proxy_list state, without touching the gbuffer/shadow/
+	// transparent passes. build_scene_data() already does this once per real frame as part of
+	// its normal work; callers that mutate proxy_list transforms out-of-band (editor thumbnail
+	// rendering, which reuses this scene's proxy_list for a side render) must call this
+	// explicitly afterward, since otherwise their new/changed transforms wouldn't reach the GPU
+	// until next frame's build_scene_data() happens to run.
+	void sync_gpu_object_transforms();
+
 	void refresh_static_mesh_data(bool is_for_editor);
 	RSunInternal* get_main_directional_light();
 

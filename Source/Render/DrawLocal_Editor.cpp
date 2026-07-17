@@ -66,6 +66,7 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	const int pend = pstart + lod.part_count;
 	auto& proxy = scene.proxy_list.get(object.id);
 	proxy.proxy.model = model;
+	proxy.proxy.transform = glm::mat4(1.f); // always centered at the origin for this path
 	for (int j = pstart; j < pend; j++) {
 		auto& part = model->get_part(j);
 
@@ -81,10 +82,118 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	pass.make_batches(scene);
 	build_standard_cpu(list, pass, scene.proxy_list);
 
+	// Compute view target and effective radius.
+	// Models: use AABB center + half-diagonal — tighter and better-centered than bounding sphere
+	//         for asymmetric meshes (characters, props with uneven extents).
+	// Materials: use AABB min half-extent as the visual sphere radius.
+	//   get_bounding_sphere() uses bounds_to_sphere() which sets radius = length(half_extents),
+	//   the AABB half-diagonal. For sphere.cmdl that's R*sqrt(3) — camera ends up ~1.73x too
+	//   far, filling only ~58% of the image. Min half-extent = actual sphere mesh radius.
+	glm::vec3 center;
+	float radius;
+	bool tight_margin;
+	if (override_mat) {
+		const auto& aabb = model->get_bounds();
+		center = (aabb.bmin + aabb.bmax) * 0.5f;
+		glm::vec3 half_ext = (aabb.bmax - aabb.bmin) * 0.5f;
+		radius = glm::min(half_ext.x, glm::min(half_ext.y, half_ext.z));
+		if (radius < 1e-3f) {
+			glm::vec4 sphere = model->get_bounding_sphere();
+			center = glm::vec3(sphere);
+			radius = sphere.w;
+		}
+		tight_margin = true;
+	} else {
+		const auto& aabb = model->get_bounds();
+		center = (aabb.bmin + aabb.bmax) * 0.5f;
+		glm::vec3 half_ext = (aabb.bmax - aabb.bmin) * 0.5f;
+		radius = glm::length(half_ext);
+		if (radius < 1e-3f) {
+			// Degenerate AABB — fall back to bounding sphere
+			glm::vec4 sphere = model->get_bounding_sphere();
+			center = glm::vec3(sphere);
+			radius = sphere.w;
+		}
+		tight_margin = false;
+	}
+
+	draw_and_output(center, radius, tight_margin);
+}
+
+void ThumbnailRenderer::render_multi(const std::vector<ThumbnailRenderItem>& items) {
+	ASSERT(!eng->get_is_in_overlapped_period());
+	pass.clear();
+	auto& scene = draw.scene;
+
+	// Grow the proxy pool to cover this many items, permanently — the extra slots are
+	// cheap and get reused by later, smaller thumbnails. New proxies default to
+	// visible=true (Render_Object's default), which would otherwise leak them into the
+	// real scene's gbuffer/shadow/transparent passes (Render_Scene::build_scene_data
+	// iterates every registered proxy in this shared draw.scene, filtering only on
+	// proxy.visible) — force them invisible immediately, same as the ctor does for `object`.
+	while (multi_objects.size() < items.size()) {
+		auto h = scene.register_obj();
+		Render_Object o;
+		o.visible = false;
+		scene.update_obj(h, o);
+		multi_objects.push_back(h);
+	}
+
+	Bounds combined;
+	size_t used = 0;
+	for (const auto& item : items) {
+		if (!item.model || item.model->get_num_lods() == 0)
+			continue;
+		const auto& lod = item.model->get_lod(0);
+		const int pstart = lod.part_ofs;
+		const int pend = pstart + lod.part_count;
+
+		auto object_handle = multi_objects[used++];
+		auto& proxy = scene.proxy_list.get(object_handle.id);
+		proxy.proxy.model = item.model;
+		proxy.proxy.transform = item.transform;
+		for (int j = pstart; j < pend; j++) {
+			auto& part = item.model->get_part(j);
+			const MaterialInstance* mat = item.model->get_material_for_part(part);
+			if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
+				mat = matman.get_fallback();
+			pass.add_object(proxy.proxy, object_handle, mat, 0, j, 0, 0, false);
+		}
+		combined = bounds_union(combined, transform_bounds(item.transform, item.model->get_bounds()));
+	}
+	// Hide any pool slots beyond what this render needs — leftovers from a previous,
+	// larger thumbnail.
+	for (size_t i = used; i < multi_objects.size(); i++) {
+		auto& proxy = scene.proxy_list.get(multi_objects[i].id);
+		proxy.proxy.model = nullptr;
+	}
+
+	// The transforms just written above only exist in proxy_list's CPU-side struct so far.
+	// The actual draw call reads per-object transforms from scene.gpu_instance_buffer, which
+	// is normally refreshed once per real frame by Render_Scene::build_scene_data() — that
+	// happens earlier in the frame (main scene draw), before this thumbnail code runs (editor
+	// UI draw), so without an explicit sync here the GPU would still see last frame's stale
+	// transform/model count for these proxies (wrong positions, or missing entries entirely
+	// for pool slots grown just now) until the next real frame's build_scene_data() catches up.
+	scene.sync_gpu_object_transforms();
+
+	pass.make_batches(scene);
+	build_standard_cpu(list, pass, scene.proxy_list);
+
+	glm::vec3 center = (combined.bmin + combined.bmax) * 0.5f;
+	glm::vec3 half_ext = (combined.bmax - combined.bmin) * 0.5f;
+	float radius = glm::length(half_ext);
+	if (!(radius > 1e-3f)) {
+		center = glm::vec3(0.f);
+		radius = 1.f;
+	}
+
+	draw_and_output(center, radius, false);
+}
+
+void ThumbnailRenderer::draw_and_output(const glm::vec3& center, float radius, bool tight_margin) {
 	const int w = size;
 	const int h = size;
-	// RenderPassSetup setup("thumbnail", this->fbo, true, true, 0, 0, w, h);
-	// auto scope = draw.get_device().start_render_pass(setup);
 	auto set_pass = [&]() {
 		RenderPassState passState;
 		ColorTargetInfo color_target(color);
@@ -99,44 +208,13 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 
 	const float fov_rad = glm::radians(thumbnail_fov.get_float());
 
-	// Compute view target and effective radius.
-	// Models: use AABB center + half-diagonal — tighter and better-centered than bounding sphere
-	//         for asymmetric meshes (characters, props with uneven extents).
-	// Materials: use AABB min half-extent as the visual sphere radius.
-	//   get_bounding_sphere() uses bounds_to_sphere() which sets radius = length(half_extents),
-	//   the AABB half-diagonal. For sphere.cmdl that's R*sqrt(3) — camera ends up ~1.73x too
-	//   far, filling only ~58% of the image. Min half-extent = actual sphere mesh radius.
-	glm::vec3 center;
-	float radius;
-	if (override_mat) {
-		const auto& aabb = model->get_bounds();
-		center = (aabb.bmin + aabb.bmax) * 0.5f;
-		glm::vec3 half_ext = (aabb.bmax - aabb.bmin) * 0.5f;
-		radius = glm::min(half_ext.x, glm::min(half_ext.y, half_ext.z));
-		if (radius < 1e-3f) {
-			glm::vec4 sphere = model->get_bounding_sphere();
-			center = glm::vec3(sphere);
-			radius = sphere.w;
-		}
-	} else {
-		const auto& aabb = model->get_bounds();
-		center = (aabb.bmin + aabb.bmax) * 0.5f;
-		glm::vec3 half_ext = (aabb.bmax - aabb.bmin) * 0.5f;
-		radius = glm::length(half_ext);
-		if (radius < 1e-3f) {
-			// Degenerate AABB — fall back to bounding sphere
-			glm::vec4 sphere = model->get_bounding_sphere();
-			center = glm::vec3(sphere);
-			radius = sphere.w;
-		}
-	}
-
 	// Camera: 45° horizontal + ~40° elevation, close to Unreal's thumbnail angle.
-	// sin(fov/2) is the correct inscribed-sphere formula. margin=1.0 for materials makes the
+	// sin(fov/2) is the correct inscribed-sphere formula. margin=1.0 makes the bounding
 	// sphere silhouette exactly tangent to the frustum edges (fills frame edge-to-edge).
-	// Models get a small 5% margin since their AABB half-diagonal is an irregular shape.
+	// Non-tight subjects get a small 5% margin since their AABB half-diagonal is an
+	// irregular shape (an actual sphere silhouette, e.g. materials, can use margin=1.0).
 	const glm::vec3 cam_dir = glm::normalize(glm::vec3(1.0f, 0.85f, 1.0f));
-	const float margin = override_mat ? 1.0f : 1.05f;
+	const float margin = tight_margin ? 1.0f : 1.05f;
 	const float dist = radius / glm::sin(fov_rad * 0.5f) * margin;
 	const glm::vec3 cam_pos = center + cam_dir * dist;
 	const float far_plane = glm::max(100.0f, dist + radius * 2.0f);

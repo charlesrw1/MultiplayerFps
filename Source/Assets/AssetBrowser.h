@@ -13,7 +13,7 @@ class AssetInspectorPane;
 class ThumbnailManager
 {
 public:
-	// Returns true if this asset type can have a rendered thumbnail (model/material).
+	// Returns true if this asset type can have a rendered thumbnail (model/material/prefab).
 	static bool supports_thumbnail(const AssetOnDisk& asset);
 	// Returns true if this asset type has an image thumbnail loaded directly from disk (Texture).
 	static bool supports_image_thumb(const AssetOnDisk& asset);
@@ -24,6 +24,11 @@ public:
 	// Returns the cached Texture* if ready, nullptr if still loading.
 	// Calling this marks the asset as visible this frame (raises priority).
 	Texture* get_thumbnail(const AssetOnDisk& asset);
+
+	// True once this asset has been attempted and permanently has nothing to render (e.g. a
+	// Prefab with no MeshComponent anywhere in it). Callers should fall back to the generic
+	// tinted document icon instead of the "still loading" placeholder for these.
+	bool thumbnail_failed(const AssetOnDisk& asset) const;
 
 	// Advance the queue: renders up to 1 thumbnail to disk, loads up to 2 from disk.
 	// Must be called once per frame AFTER all get_thumbnail calls for that frame.

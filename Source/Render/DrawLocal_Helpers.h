@@ -69,6 +69,9 @@ class ThumbnailRenderer
 public:
 	ThumbnailRenderer(int size);
 	void render(Model* m, MaterialInstance* override_mat);
+	// Renders multiple placed models (e.g. every MeshComponent in a prefab) into one
+	// thumbnail, framing the camera around their combined world-space bounds.
+	void render_multi(const std::vector<ThumbnailRenderItem>& items);
 	void output_to_path(std::string path);
 
 private:
@@ -76,10 +79,17 @@ private:
 	IGraphicsTexture* depth{};
 
 	Texture* vts_handle = nullptr;
-	handle<Render_Object> object;
+	// Pool of persistent scene proxies used only by render_multi(), grown on demand to cover
+	// the largest prefab thumbnailed so far and reused (not freed) by later, smaller ones.
+	// Kept entirely separate from `object` below -- render() assumes its slot's transform is
+	// always identity, so it must never be reused as one of render_multi()'s placed items.
+	std::vector<handle<Render_Object>> multi_objects;
+	handle<Render_Object> object; // used by the single-model render()
 	Render_Pass pass;
 	Render_Lists list;
 	int size = 0;
+
+	void draw_and_output(const glm::vec3& center, float radius, bool tight_margin);
 };
 #endif
 

@@ -408,6 +408,9 @@
     <ClCompile Include="Game\Components\ParticleComponent.cpp">
       <Filter>Game\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Components\RenderStressTestComponent.cpp">
+      <Filter>Game\Components</Filter>
+    </ClCompile>
     <ClCompile Include="Game\Components\ParticleSystemComponent.cpp">
       <Filter>Game\Components</Filter>
     </ClCompile>
@@ -1311,6 +1314,9 @@
       <Filter>Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Game\Components\MeshComponent.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\RenderStressTestComponent.h">
       <Filter>Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Game\Components\NavComps.h">

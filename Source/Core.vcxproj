@@ -161,6 +161,7 @@
     <ClCompile Include="Game\Components\MeshbuilderComponent.cpp" />
     <ClCompile Include="Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Game\Components\ParticleComponent.cpp" />
+    <ClCompile Include="Game\Components\RenderStressTestComponent.cpp" />
     <ClCompile Include="Game\Components\ParticleSystemComponent.cpp" />
     <ClCompile Include="Game\Particles\ParticleTypes.cpp" />
     <ClCompile Include="Game\Particles\ParticleModules.cpp" />
@@ -485,6 +486,7 @@
     <ClInclude Include="Game\Components\PostProcessEditorUI.h" />
     <ClInclude Include="Game\Components\MeshbuilderComponent.h" />
     <ClInclude Include="Game\Components\MeshComponent.h" />
+    <ClInclude Include="Game\Components\RenderStressTestComponent.h" />
     <ClInclude Include="Game\Components\RoadNetworkComponent.h" />
     <ClInclude Include="LevelEditor\RoadBuilderTool.h" />
     <ClInclude Include="Game\Components\PhysicsComponents.h" />

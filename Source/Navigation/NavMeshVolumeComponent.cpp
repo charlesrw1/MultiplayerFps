@@ -11,8 +11,8 @@ void NavMeshVolumeComponent::start() {
 #ifdef EDITOR_BUILD
 	if (eng->is_editor_level()) {
 		editor_mesh = get_owner()->create_component<MeshComponent>();
-		editor_mesh->set_ignore_baking(true);
-		editor_mesh->set_ignore_cubemap_view(true);
+		editor_mesh->set_invisible_to_bakes();
+		
 		editor_mesh->dont_serialize_or_edit = true;
 		editor_mesh->set_model(Model::load("cube1m.cmdl"));
 		editor_mesh->set_material_override(MaterialInstance::load("giprobe_zone.mi"));

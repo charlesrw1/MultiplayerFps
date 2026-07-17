@@ -52,6 +52,9 @@ public:
 	// node (e.g. a RagdollSetupComponent) off a prefab in order to call a REF'd function on it,
 	// such as RagdollSetupComponent::create_ragdoll_entity().
 	REF Component* find_component_by_type(const ClassTypeInfo* type) const;
+	// Same as find_component_by_type but collects every match instead of just the first
+	// (e.g. to gather every MeshComponent in the prefab for thumbnail rendering).
+	std::vector<Component*> find_all_components_by_type(const ClassTypeInfo* type) const;
 	REF Entity* find_entity_by_name(const std::string& name) const;
 
 	// Loads (or returns the already-loaded) PrefabAsset for `name`, mirroring the

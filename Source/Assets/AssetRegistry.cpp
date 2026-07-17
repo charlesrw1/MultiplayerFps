@@ -321,6 +321,10 @@ void AssetRegistrySystem::update() {
 			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
 				auto asset = g_assets.find<PrefabAsset>(rel_path);
 				g_assets.reload<PrefabAsset>(asset);
+#ifdef EDITOR_BUILD
+				if (AssetBrowser::inst)
+					AssetBrowser::inst->thumbnails.invalidate_thumbnail(rel_path);
+#endif
 			}
 		} else if (ext == "sobj") {
 			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {

@@ -16,6 +16,7 @@
 
 #include "AssetDatabase.h"
 #include "Assets/ScriptableObject.h"
+#include "Game/Prefab.h"
 
 // Case-insensitive substring search without allocations
 static inline bool contains_case_insensitive(std::string_view haystack, std::string_view needle) {
@@ -661,7 +662,8 @@ static void draw_folder_tree(AssetBrowser* b) {
 // flip_v: rendered asset thumbnails (Model/MaterialInstance thumbnails, DDS texture mips) come out
 // upside-down relative to normal UI icons, so callers with real thumbnails need the V-flip (the
 // default, matching every existing call site) while regular UI icon PNGs (folder, document) need it off.
-bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* label, ImU32 tint_col = IM_COL32_WHITE, bool flip_v = true) {
+bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* label, ImU32 tint_col = IM_COL32_WHITE,
+								bool flip_v = true, ImU32 text_col = IM_COL32_WHITE) {
 	ImVec2 pos = ImGui::GetCursorScreenPos();
 	ImVec2 label_pos = pos;
 
@@ -689,13 +691,24 @@ bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* la
 	auto shadow_pos = text_pos + ImVec2(1, 1);
 	draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), shadow_pos, IM_COL32(0, 0, 0, 255), label, nullptr,
 					   wrap_width);
-	draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), text_pos, IM_COL32(255, 255, 255, 255), label, nullptr,
-					   wrap_width);
+	draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), text_pos, text_col, label, nullptr, wrap_width);
 
 	ImGui::PopTextWrapPos();
 	ImGui::PopClipRect();
 
 	return pressed;
+}
+
+// Blends an asset type's browser color lightly into white -- used for the grid view's filename
+// label so a Prefab's tile reads as subtly warm-tinted without going fully saturated (that's
+// reserved for the tinted document-icon fallback used by types with no rendered thumbnail).
+static ImU32 grid_label_tint_for(const AssetMetadata* type) {
+	if (!type || type->get_asset_class_type() != &PrefabAsset::StaticType)
+		return IM_COL32_WHITE;
+	const Color32 c = type->get_browser_color();
+	constexpr float MIX = 0.35f;
+	auto blend = [&](uint8_t channel) { return (uint8_t)(255.f * (1.f - MIX) + channel * MIX); };
+	return IM_COL32(blend(c.r), blend(c.g), blend(c.b), 255);
 }
 
 void AssetBrowser::draw_browser_grid() {
@@ -792,10 +805,14 @@ void AssetBrowser::draw_browser_grid() {
 			return;
 		}
 
-		// Assets with no real thumbnail (anything but Model/MaterialInstance/Texture)
+		// Assets with no real thumbnail (anything but Model/MaterialInstance/Texture/Prefab)
 		// fall back to the generic document icon, tinted by the asset type's browser color.
+		// Same fallback for an asset that DOES support thumbnails in general but permanently
+		// has nothing to render (e.g. a Prefab with no MeshComponent anywhere in it) --
+		// otherwise it would show the "still loading" placeholder forever.
 		const bool has_real_thumb = ThumbnailManager::supports_any_thumb(c->asset);
 		Texture* t = has_real_thumb ? thumbnails.get_thumbnail(c->asset) : nullptr; // marks as visible; may be null (loading)
+		const bool thumb_failed = has_real_thumb && !t && thumbnails.thumbnail_failed(c->asset);
 		string only_filename = c->asset.filename;
 		StringUtils::get_filename(only_filename);
 
@@ -809,9 +826,10 @@ void AssetBrowser::draw_browser_grid() {
 		if (t) {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 			item_pressed = ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())),
-													  thumb_size, only_filename.c_str());
+													  thumb_size, only_filename.c_str(), IM_COL32_WHITE, true,
+													  grid_label_tint_for(c->asset.type));
 			ImGui::PopStyleColor();
-		} else if (has_real_thumb) {
+		} else if (has_real_thumb && !thumb_failed) {
 			// Placeholder while streaming in
 			ImGui::InvisibleButton("##thumb", thumb_size);
 			item_pressed = ImGui::IsItemDeactivated() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left);
@@ -889,6 +907,10 @@ void AssetBrowser::draw_browser_grid() {
 			}
 			if (ImGui::MenuItem("Show in Explorer")) {
 				ShowInExplorer(selected_resource.filename);
+				ImGui::CloseCurrentPopup();
+			}
+			if (ThumbnailManager::supports_any_thumb(selected_resource) && ImGui::MenuItem("Refresh Thumbnail")) {
+				thumbnails.invalidate_thumbnail(selected_resource.filename);
 				ImGui::CloseCurrentPopup();
 			}
 			if (selected_resource.type) {
@@ -1379,6 +1401,7 @@ void AssetBrowser::imgui_draw_inspector() {
 #include "Framework/MapUtil.h"
 #include "Render/MaterialPublic.h"
 #include "Render/MaterialLocal.h"
+#include "Game/Components/MeshComponent.h"
 
 // ---------------------------------------------------------------------------
 // ThumbnailManager — streaming thumbnail loader
@@ -1404,7 +1427,7 @@ struct ThumbDdsHdr {
 static constexpr uint32_t kDDSF_FOURCC      = 0x00000004u;
 static constexpr uint32_t kDDSF_MIPMAPCOUNT = 0x00020000u;
 
-static Texture* load_dds_mip_for_thumb(const AssetOnDisk& asset) {
+static IGraphicsTexture* create_dds_mip_gpu_for_thumb(const AssetOnDisk& asset) {
 	auto f = FileSys::open_read_game(asset.filename);
 	if (!f) return nullptr;
 	int len = f->size();
@@ -1489,7 +1512,12 @@ static Texture* load_dds_mip_for_thumb(const AssetOnDisk& asset) {
 	args.sampler_type = GraphicsSamplerType::NearestDefault;
 	IGraphicsTexture* gpu = gfx().create_texture(args);
 	gpu->sub_image_upload(0, 0, 0, mip_w, mip_h, upload_size, upload_data);
+	return gpu;
+}
 
+static Texture* load_dds_mip_for_thumb(const AssetOnDisk& asset) {
+	IGraphicsTexture* gpu = create_dds_mip_gpu_for_thumb(asset);
+	if (!gpu) return nullptr;
 	Texture* t = Texture::install_system("__dds_thumb/" + asset.filename);
 	t->update_specs_ptr(gpu);
 	return t;
@@ -1500,7 +1528,7 @@ static Texture* load_dds_mip_for_thumb(const AssetOnDisk& asset) {
 bool ThumbnailManager::supports_thumbnail(const AssetOnDisk& asset) {
 	if (!asset.type) return false;
 	auto* cls = asset.type->get_asset_class_type();
-	return cls == &Model::StaticType || cls == &MaterialInstance::StaticType;
+	return cls == &Model::StaticType || cls == &MaterialInstance::StaticType || cls == &PrefabAsset::StaticType;
 }
 
 bool ThumbnailManager::supports_image_thumb(const AssetOnDisk& asset) {
@@ -1530,6 +1558,11 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
 	return (e.state == EntryState::Loaded) ? e.tex : nullptr;
 }
 
+bool ThumbnailManager::thumbnail_failed(const AssetOnDisk& asset) const {
+	auto it = entries.find(asset.filename);
+	return it != entries.end() && it->second.state == EntryState::Failed;
+}
+
 void ThumbnailManager::process_render(Entry& e) {
 	ASSERT(e.state == EntryState::Queued);
 
@@ -1550,7 +1583,33 @@ void ThumbnailManager::process_render(Entry& e) {
 	thumbnail_file.reset();
 	model_file.reset();
 
-	if (needs_render) {
+	if (needs_render && asset_class == &PrefabAsset::StaticType) {
+		// Render every MeshComponent found anywhere in the prefab's static entity tree,
+		// each at its own world transform relative to the prefab root — prefabs have no
+		// single "model" of their own, and may place several meshes (e.g. a furniture set).
+		std::vector<ThumbnailRenderItem> items;
+		auto prefab = PrefabAsset::load(e.asset.filename);
+		if (prefab) {
+			for (Component* c : prefab->find_all_components_by_type(&MeshComponent::StaticType)) {
+				auto* mesh_comp = static_cast<MeshComponent*>(c);
+				Model* model = const_cast<Model*>(mesh_comp->get_model());
+				if (!model)
+					continue;
+				ThumbnailRenderItem item;
+				item.model = model;
+				item.transform = mesh_comp->get_owner()->get_ws_transform();
+				items.push_back(item);
+			}
+		}
+
+		if (items.empty()) {
+			e.state = EntryState::Failed;
+			return;
+		}
+
+		idraw->editor_render_thumbnail_for_scene(items, 128, 128,
+		                                         FileSys::get_full_path_from_game_path(e.thumb_path));
+	} else if (needs_render) {
 		Model* the_model = nullptr;
 		MaterialInstance* override_mat = nullptr;
 
@@ -1581,9 +1640,21 @@ void ThumbnailManager::process_load(Entry& e) {
 	ASSERT(e.state == EntryState::NeedLoad);
 
 	if (e.is_tex_entry) {
-		if (e.tex) {
+		if (e.tex && !e.force_rerender) {
 			// Already loaded on a previous tick — nothing to do.
 			e.state = EntryState::Loaded;
+		} else if (e.tex) {
+			// Refresh in-place: reload the DDS mip and swap the GPU texture, keeping
+			// the Texture* address stable (mirrors the non-tex reload path below).
+			e.force_rerender = false;
+			IGraphicsTexture* gpu = create_dds_mip_gpu_for_thumb(e.asset);
+			if (gpu) {
+				e.tex->uninstall();
+				e.tex->update_specs_ptr(gpu);
+				e.state = EntryState::Loaded;
+			} else {
+				e.state = EntryState::Failed;
+			}
 		} else {
 			Texture* t = load_dds_mip_for_thumb(e.asset);
 			if (t && t->gpu_ptr) {

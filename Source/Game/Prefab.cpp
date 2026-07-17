@@ -123,6 +123,17 @@ Component* PrefabAsset::find_component_by_type(const ClassTypeInfo* type) const 
 	return nullptr;
 }
 
+std::vector<Component*> PrefabAsset::find_all_components_by_type(const ClassTypeInfo* type) const {
+	ASSERT(type);
+	ASSERT(type->is_a(Component::StaticType));
+	std::vector<Component*> out;
+	for (BaseUpdater* bu : static_data.all_obj_vec) {
+		if (bu->get_type().is_a(*type))
+			out.push_back(static_cast<Component*>(bu));
+	}
+	return out;
+}
+
 Entity* PrefabAsset::find_entity_by_name(const std::string& name) const {
 	for (BaseUpdater* bu : static_data.all_obj_vec) {
 		if (auto* e = bu->cast_to<Entity>()) {

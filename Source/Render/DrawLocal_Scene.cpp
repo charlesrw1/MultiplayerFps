@@ -222,6 +222,17 @@ void Render_Scene::update_spotlight_data() {
 	}
 }
 
+void Render_Scene::sync_gpu_object_transforms() {
+	CPU_SCOPE("sync_gpu_object_transforms");
+	auto& memArena = draw.get_arena();
+	ArenaScope scope(memArena);
+	const size_t num_ren_objs = proxy_list.objects.size();
+	uint8* gpu_objects = memArena.alloc_bottom_type<uint8>(num_ren_objs * GPU_OBJECT_STRIDE);
+	ASSERT(gpu_objects);
+	set_gpu_objects_data_job(uintptr_t(gpu_objects));
+	gpu_instance_buffer->upload(gpu_objects, num_ren_objs * GPU_OBJECT_STRIDE);
+}
+
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, bool cubemap_view) {
 	RENDER_SCOPE("build_scene_data");
 

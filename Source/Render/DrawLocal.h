@@ -102,6 +102,12 @@ public:
 		thumbnailRenderer->render(model, override_mat);
 		thumbnailRenderer->output_to_path(path);
 	}
+	void editor_render_thumbnail_for_scene(const std::vector<ThumbnailRenderItem>& items, int w, int h,
+											std::string path) final {
+		matman.pre_render_update(); // hack fixme
+		thumbnailRenderer->render_multi(items);
+		thumbnailRenderer->output_to_path(path);
+	}
 	void editor_set_debug_overlay(const char* tex_name, float scale, float alpha, float mip) final;
 	void editor_clear_debug_overlay() final;
 	EditorDebugOverlayState editor_get_debug_overlay_state() const final;

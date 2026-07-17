@@ -104,6 +104,7 @@
     <ClCompile Include="Tests\Renderer\test_spirv_pipeline.cpp" />
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />
     <ClCompile Include="Tests\Editor\test_prefabs.cpp" />
+    <ClCompile Include="Tests\Editor\test_prefab_thumbnail.cpp" />
     <ClCompile Include="Tests\Editor\test_parenting.cpp" />
     <ClCompile Include="Tests\Editor\test_property_undo.cpp" />
     <ClCompile Include="Tests\Editor\test_ragdoll_joint_gizmo.cpp" />

@@ -84,16 +84,14 @@ void CubemapComponent::start() {
 		editor_meshbuilder->use_transform = true;
 		{
 			auto mesh = get_owner()->create_component<MeshComponent>();
-			mesh->set_ignore_baking(true);
-			mesh->set_ignore_cubemap_view(true);
+			mesh->set_invisible_to_bakes();
 			mesh->dont_serialize_or_edit = true;
 			mesh->set_model(Model::load("cube1m.cmdl"));
 			mesh->set_material_override(MaterialInstance::load("cubemap_zone.mi"));
 		}
 		auto meshEntity = eng->get_level()->spawn_entity();
 		auto mesh = meshEntity->create_component<MeshComponent>();
-		mesh->set_ignore_baking(true);
-		mesh->set_ignore_cubemap_view(true);
+		mesh->set_invisible_to_bakes();
 		mesh->set_model(Model::load("eng/LIGHT_SPHERE.cmdl"));
 		mesh->set_material_override(MaterialInstance::load("top_down/gray_metal.mi"));
 		meshEntity->dont_serialize_or_edit = true;
@@ -156,8 +154,8 @@ void GiVolumeComponent::start() {
 	ASSERT(get_owner() != nullptr);
 	if (eng->is_editor_level()) {
 		auto mesh = get_owner()->create_component<MeshComponent>();
-		mesh->set_ignore_baking(true);
-		mesh->set_ignore_cubemap_view(true);
+		mesh->set_invisible_to_bakes();
+
 		mesh->set_model(Model::load("cube1m.cmdl"));
 		mesh->set_material_override(MaterialInstance::load("giprobe_zone.mi"));
 		mesh->dont_serialize_or_edit = true;

@@ -11,6 +11,8 @@
 #include "Game/Components/DecalComponent.h"
 #include "Game/Components/SpawnerComponenth.h"
 #include "Game/Components/MeshComponent.h"
+#include "Game/Components/PostProcessComponent.h"
+#include "Navigation/NavMeshVolumeComponent.h"
 #include "Debug.h"
 #include "Commands.h"
 #include "Assets/AssetDatabase.h"
@@ -242,11 +244,14 @@ void EntityVisiblityFilter::tick() {
 	}
 
 	// not a pretty way
-	auto draw_item = [&](const string& s) -> int {
+	// prefix only changes the displayed label (tree indentation); "status" is always keyed by
+	// the plain name "s" so callers don't need to know about the tree glyph.
+	auto draw_item = [&](const string& s, const char* prefix = "") -> int {
 		if (!MapUtil::contains(status, s))
 			status[s] = true;
 		bool b = status[s];
-		if (ImGui::Selectable(s.c_str(), false, 0, ImVec2(200, 0)))
+		string label = string(prefix) + s;
+		if (ImGui::Selectable(label.c_str(), false, 0, ImVec2(200, 0)))
 			return 1;
 		ImGui::SameLine();
 		ImGui::PushID(s.c_str());
@@ -291,10 +296,20 @@ void EntityVisiblityFilter::tick() {
 	int res = draw_item("Lights");
 	do_stuff(PointLightComponent::StaticType, res);
 	do_stuff(SpotLightComponent::StaticType, res);
-	res = draw_item("GiVols");
+
+	// "Volumes" is a tree parent: its checkbox toggles all three child volume types at once,
+	// it's not a collapsible header. Children are indented below it for readability only.
+	res = draw_item("Volumes");
 	do_stuff(GiVolumeComponent::StaticType, res);
-	res = draw_item("CubemapVols");
 	do_stuff(CubemapComponent::StaticType, res);
+	do_stuff(NavMeshVolumeComponent::StaticType, res);
+	res = draw_item("GiVols", "   |- ");
+	do_stuff(GiVolumeComponent::StaticType, res);
+	res = draw_item("CubemapVols", "   |- ");
+	do_stuff(CubemapComponent::StaticType, res);
+	res = draw_item("NavVols", "   `- ");
+	do_stuff(NavMeshVolumeComponent::StaticType, res);
+
 	res = draw_item("Decals");
 	do_stuff(DecalComponent::StaticType, res);
 	res = draw_item("Sun");
@@ -303,6 +318,8 @@ void EntityVisiblityFilter::tick() {
 	do_stuff(SkylightComponent::StaticType, res);
 	res = draw_item("Spawners");
 	do_stuff(SpawnerComponent::StaticType, res);
+	res = draw_item("Post Process");
+	do_stuff(PostProcessComponent::StaticType, res);
 
 	ImGui::Separator();
 	ImGui::Text("Show only...");
