@@ -39,9 +39,15 @@ struct ModelAndMatTextureSet
 	MasterMaterialImpl* parent{};
 	MaterialInstance* has_textures{};
 	uint32_t texture_hash{};
+	// Compact batches live in a separate slot namespace from classic proxies: a slot
+	// is driven either by the per-frame mmt_counts scan (classic) or by the caller
+	// (compact), never both. Keying on this keeps the same (model,material) used by
+	// both paths in two distinct slots so their instance_count/alloced never collide.
+	bool is_compact{};
 
 	bool operator==(const ModelAndMatTextureSet& other) const {
-		return m == other.m && parent == other.parent && texture_hash == other.texture_hash;
+		return m == other.m && parent == other.parent && texture_hash == other.texture_hash &&
+			   is_compact == other.is_compact;
 	}
 };
 struct ModelAndMatTextureSetHasher
@@ -49,7 +55,7 @@ struct ModelAndMatTextureSetHasher
 	size_t operator()(const ModelAndMatTextureSet& k) const noexcept {
 		size_t h1 = std::hash<Model*>{}(k.m);
 		size_t h2 = std::hash<MasterMaterialImpl*>{}(k.parent);
-		size_t h3 = k.texture_hash;
+		size_t h3 = k.texture_hash ^ (k.is_compact ? 0x9e3779b9u : 0u);
 		return hash_combine(hash_combine(h2, h3), h1);
 	}
 };
@@ -141,11 +147,12 @@ public:
 		force_rebuild = true;
 	}
 
-	int16_t get_index(Model* m, MaterialInstance* mat) {
+	int16_t get_index(Model* m, MaterialInstance* mat, bool is_compact = false) {
 		if (!m)
 			return -1;
 		ModelAndMatTextureSet search;
 		search.m = m;
+		search.is_compact = is_compact;
 		if (mat && mat->impl) {
 			search.parent = mat->impl->get_master_impl();
 			auto parent_texhash = search.parent->self->impl->get_texture_id_hash();

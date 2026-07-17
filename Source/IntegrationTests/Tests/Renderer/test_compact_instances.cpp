@@ -50,11 +50,19 @@ static TestTask test_compact_instances_smoke(TestContext& t) {
 	stress->model = g_assets.find<Model>("arrowModel.cmdl");
 	stress->grid_length = 8;
 	stress->spacing = 2.f;
+
+	// First drive the CLASSIC path so the shared (model,material) slot grows its
+	// instance_alloced, then switch the SAME component/model to the compact path.
+	// This reproduces the slot-namespace collision that used to assert in
+	// register_compact_batch; with compact slots namespaced it must render cleanly.
+	stress->state = RenderStressTestState::EnabledStatic;
+	stress->sync_render_data();
+	co_await t.wait_ticks(3);
+
 	stress->state = RenderStressTestState::EnabledCompactStatic;
 	stress->sync_render_data();
-
 	co_await t.wait_ticks(5);
 
-	t.require(true, "compact instance path rendered without crashing");
+	t.require(true, "classic->compact switch on the same model rendered without crashing");
 }
 GAME_TEST("renderer/compact_instances_smoke", 60.f, test_compact_instances_smoke);

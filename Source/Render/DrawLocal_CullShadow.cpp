@@ -210,15 +210,16 @@ int16_t BuildSceneData_CpuFast::register_compact_batch(Model* m, MaterialInstanc
 		return -1;
 	ASSERT(capacity > 0);
 
-	// Reuse the existing model/material -> LOD/part/command-index slot resolution.
-	const int16_t id = get_index(m, mat);
+	// Reuse the existing model/material -> LOD/part/command-index slot resolution,
+	// but in the compact slot namespace (is_compact=true) so it can never alias a
+	// classic slot for the same (model,material) -- see ModelAndMatTextureSet.
+	const int16_t id = get_index(m, mat, /*is_compact*/ true);
 	ASSERT(id >= 0);
 	ModelAndMatTData* ptr = mod_data_ptrs.at(id);
 
-	// A slot may not be shared between the classic proxy-scan path and the compact
-	// path -- the mmt_counts scan would fight the caller over instance_count. A
-	// freshly-created slot has instance_alloced==0; anything else must already be
-	// a compact slot (idempotent re-register).
+	// Compact slots are only ever touched here, so a fresh one has instance_alloced==0
+	// and a re-registered one is already compact. (No classic proxy can reach this
+	// slot now that the key is namespaced.)
 	ASSERT(ptr->instance_alloced == 0 || ptr->is_compact);
 
 	ptr->is_compact = true;
