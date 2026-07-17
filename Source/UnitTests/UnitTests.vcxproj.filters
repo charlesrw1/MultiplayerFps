@@ -29,6 +29,7 @@
     <ClCompile Include="scripting_lua_component_reflection_test.cpp" />
     <ClCompile Include="crash_dump_smoke_test.cpp" />
     <ClCompile Include="legacy_gl_calls_test.cpp" />
+    <ClCompile Include="compact_instance_pack_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h" />

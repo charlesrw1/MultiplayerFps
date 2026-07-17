@@ -15,6 +15,7 @@
 #include "IGraphicsDevice.h"
 #include "GpuCullingTest.h"
 #include <bit>
+#include <cstring>
 // -----------------------------------------------------------------------
 // BuildSceneData_CpuFast – LOD helpers, constructor, build_scene_data,
 // shadow culling, and object-removal callbacks.
@@ -152,6 +153,75 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 	}
 
 	GpuCullingTest::inst->build_data(get_cull_input());
+}
+
+// ---------------------------------------------------------------------------
+// Compact instance path (opt-in, GPU-driven)
+// ---------------------------------------------------------------------------
+
+int16_t BuildSceneData_CpuFast::register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic) {
+	if (!m)
+		return -1;
+	ASSERT(capacity > 0);
+
+	// Reuse the existing model/material -> LOD/part/command-index slot resolution.
+	const int16_t id = get_index(m, mat);
+	ASSERT(id >= 0);
+	ModelAndMatTData* ptr = mod_data_ptrs.at(id);
+
+	// A slot may not be shared between the classic proxy-scan path and the compact
+	// path -- the mmt_counts scan would fight the caller over instance_count. A
+	// freshly-created slot has instance_alloced==0; anything else must already be
+	// a compact slot (idempotent re-register).
+	ASSERT(ptr->instance_alloced == 0 || ptr->is_compact);
+
+	ptr->is_compact = true;
+	ptr->compact_is_dynamic = is_dynamic;
+	ptr->instance_alloced = capacity;
+	ptr->instance_count = 0;
+	ptr->compact_staging.assign((size_t)capacity, gpu::CompactInstance{});
+
+	// Cache the model-space bounding sphere directly (NOT derived from a per-frame
+	// scan) -- the GPU cull uses it to build each instance's world sphere on the fly.
+	const glm::vec4 sphere = m->get_bounding_sphere();
+	ptr->local_bounds_center = glm::vec3(sphere);
+	ptr->local_bounds_radius = sphere.w;
+
+	// Trigger the baseInstance-layout + mod_data rebuild so this slot's draw
+	// commands get correct baseInstance ranges. Same path the classic scan would
+	// eventually trigger; invoked directly instead of waiting for mmt_counts.
+	force_rebuild = true;
+	return id;
+}
+
+void BuildSceneData_CpuFast::resize_compact_batch(int16_t batch_id, int new_capacity) {
+	ASSERT(is_compact_batch(batch_id));
+	ASSERT(new_capacity > 0);
+	ModelAndMatTData* ptr = mod_data_ptrs.at(batch_id);
+	ptr->instance_alloced = new_capacity;
+	ptr->compact_staging.resize((size_t)new_capacity);
+	if (ptr->instance_count > new_capacity)
+		ptr->instance_count = new_capacity;
+	force_rebuild = true;
+}
+
+void BuildSceneData_CpuFast::set_instance_count(int16_t batch_id, int live_count) {
+	ASSERT(is_compact_batch(batch_id));
+	ModelAndMatTData* ptr = mod_data_ptrs.at(batch_id);
+	ASSERT(live_count >= 0 && live_count <= ptr->instance_alloced);
+	ptr->instance_count = live_count;
+}
+
+void BuildSceneData_CpuFast::set_instances(int16_t batch_id, int dst_offset, std::span<const gpu::CompactInstance> src) {
+	ASSERT(is_compact_batch(batch_id));
+	ModelAndMatTData* ptr = mod_data_ptrs.at(batch_id);
+	ASSERT(dst_offset >= 0 && dst_offset + (int)src.size() <= (int)ptr->compact_staging.size());
+	if (!src.empty())
+		memcpy(ptr->compact_staging.data() + dst_offset, src.data(), src.size() * sizeof(gpu::CompactInstance));
+}
+
+void BuildSceneData_CpuFast::set_instance(int16_t batch_id, int index, const gpu::CompactInstance& v) {
+	set_instances(batch_id, index, std::span<const gpu::CompactInstance>(&v, 1));
 }
 
 // Free function wrappers used by the shadow system.

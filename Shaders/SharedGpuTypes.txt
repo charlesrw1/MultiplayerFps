@@ -18,6 +18,22 @@ struct Object_Instance
 	uint prev_anim_mat_offset;
 };
 
+// Compact per-instance record for the GPU-driven "compact instance" fast path
+// (foliage/debris/stress-grid). POD, uploaded via plain memcpy. Deliberately laid
+// out with scalar floats/uints (no vec3) so the std430 array stride is a tight 24
+// bytes and matches the CPU struct byte-for-byte -- a vec3 would force 16-byte
+// alignment and a 32-byte stride. The GPU reconstructs the world transform on the
+// fly (pos + packed_quat*local_center*scale); nothing is precomputed on the CPU.
+struct CompactInstance
+{
+	float pos_x;
+	float pos_y;
+	float pos_z;
+	float scale;             // uniform scale only
+	uint  packed_quat;       // rotation packed (4x snorm8), unit quat
+	uint  packed_batch_seed; // batch_id : bits 0-15, seed : bits 16-23, pad : bits 24-31
+};
+
 // flags for 'bitmask_flags'
 const uint MATFLAG_BILLBOARD_ROTATE_AXIS  = 1;
 

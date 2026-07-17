@@ -8,10 +8,15 @@
 // shared GPU types
 #include "../Shaders/SharedGpuTypes.txt"
 
+// The compact record is memcpy'd straight to a std430 SSBO; its CPU size must
+// match the shader-side (scalar-float) layout's 24-byte array stride exactly.
+static_assert(sizeof(gpu::CompactInstance) == 24, "CompactInstance must be a tight 24 bytes");
+
 #include <vector>
 #include <unordered_map>
 #include <span>
 #include <cstdint>
+#include "glm/vec3.hpp"
 
 class Model;
 class MaterialInstance;
@@ -53,10 +58,21 @@ struct ModelAndMatTData
 {
 	Model* m{};
 	std::vector<int> part_to_draw_cmd; // total num_parts (inc lods etc)
-	int instance_count = 0;
-	int instance_alloced = 0;
+	int instance_count = 0;            // live instances (compact: caller-driven, replaces mmt_counts scan)
+	int instance_alloced = 0;          // capacity, drives baseInstance layout (must be pow2 for classic)
 	int16_t ptr_ofs = 0;
 	int gpu_buf_ofs = 0;
+
+	// --- Compact instance path (opt-in, GPU-driven) ---------------------------
+	// When is_compact, this slot's instances are NOT discovered by the per-frame
+	// proxy scan (mmt_counts stays 0 for it). The caller owns instance_count /
+	// instance_alloced directly via register_compact_batch / set_instance_count.
+	bool is_compact = false;
+	bool compact_is_dynamic = false;   // dynamic => ping-pong buffer w/ prev transform
+	glm::vec3 local_bounds_center{};   // model-space bounding sphere, cached at register (no per-frame scan)
+	float local_bounds_radius = 0.f;
+	int compact_gpu_offset = 0;        // base offset (in instances) into the compact SSBO region
+	std::vector<gpu::CompactInstance> compact_staging; // CPU-side records, memcpy'd to GPU
 };
 
 struct MaterialAndShader_CpuFast
@@ -156,6 +172,26 @@ public:
 		if (fast_index < 0)
 			return false;
 		return mod_data_ptrs[fast_index]->instance_alloced > 0;
+	}
+
+	// --- Compact instance path (opt-in, GPU-driven) --------------------------
+	// register_compact_batch: get/create the mod_data_ptrs slot for (m,mat) via
+	// get_index(), mark it compact, size it to `capacity`, cache the model-space
+	// bounding sphere, and schedule the baseInstance-layout rebuild. Returns the
+	// batch_id (== mod_data_ptrs slot index, i.e. ModelAndMatTData::ptr_ofs), or
+	// -1 if m is null. The caller owns the instance data lifetime from here on.
+	int16_t register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic);
+	// Grow/shrink capacity (rare). Reschedules the layout rebuild.
+	void resize_compact_batch(int16_t batch_id, int new_capacity);
+	// Set the live instance count (<= capacity). Cheap; no scan.
+	void set_instance_count(int16_t batch_id, int live_count);
+	// memcpy `src` into the batch's staging buffer at [dst_offset, dst_offset+src.size()).
+	void set_instances(int16_t batch_id, int dst_offset, std::span<const gpu::CompactInstance> src);
+	// Thin single-element wrapper over set_instances.
+	void set_instance(int16_t batch_id, int index, const gpu::CompactInstance& v);
+
+	bool is_compact_batch(int16_t batch_id) const {
+		return batch_id >= 0 && batch_id < (int)mod_data_ptrs.size() && mod_data_ptrs[batch_id]->is_compact;
 	}
 
 	GpuCullInput get_cull_input() const;

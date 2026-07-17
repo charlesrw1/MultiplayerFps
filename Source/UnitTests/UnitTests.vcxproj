@@ -202,6 +202,7 @@
     <ClCompile Include="blend_space_math_test.cpp" />
     <ClCompile Include="stringname_test.cpp" />
     <ClCompile Include="ragdoll_util_test.cpp" />
+    <ClCompile Include="compact_instance_pack_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h" />
