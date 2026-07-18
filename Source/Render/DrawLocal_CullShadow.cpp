@@ -179,7 +179,7 @@ void BuildSceneData_CpuFast::build_compact_data() {
 	// base (== static_count) stable across frames where only dynamic live counts vary.
 	int static_count = 0, dyn_count = 0;
 	for (auto* ptr : mod_data_ptrs) {
-		if (!ptr->is_compact)
+		if (!ptr || !ptr->is_compact)
 			continue;
 		(ptr->compact_is_dynamic ? dyn_count : static_count) += ptr->instance_count;
 	}
@@ -208,7 +208,7 @@ void BuildSceneData_CpuFast::build_compact_data() {
 	// when the static region is clean (the compact path's per-frame CPU win).
 	for (int i = 0; i < (int)mod_data_ptrs.size(); i++) {
 		ModelAndMatTData* ptr = mod_data_ptrs[i];
-		if (!ptr->is_compact)
+		if (!ptr || !ptr->is_compact)
 			continue;
 
 		gpu::CompactBatchDesc d{};
