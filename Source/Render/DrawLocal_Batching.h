@@ -75,6 +75,7 @@ struct ModelAndMatTData
 	// instance_alloced directly via register_compact_batch / set_instance_count.
 	bool is_compact = false;
 	bool compact_is_dynamic = false;   // dynamic => ping-pong buffer w/ prev transform
+	bool compact_casts_shadow = true;  // false => COMPACT_FLAG_SHADOW_CASTER left unset in CompactBatchDesc
 	glm::vec3 local_bounds_center{};   // model-space bounding sphere, cached at register (no per-frame scan)
 	float local_bounds_radius = 0.f;
 	int compact_gpu_offset = 0;        // base offset (in instances) into the compact SSBO region
@@ -192,9 +193,12 @@ public:
 	// bounding sphere, and schedule the baseInstance-layout rebuild. Returns the
 	// batch_id (== mod_data_ptrs slot index, i.e. ModelAndMatTData::ptr_ofs), or
 	// -1 if m is null. The caller owns the instance data lifetime from here on.
-	int16_t register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic);
+	int16_t register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic,
+									bool casts_shadow = true);
 	// Grow/shrink capacity (rare). Reschedules the layout rebuild.
 	void resize_compact_batch(int16_t batch_id, int new_capacity);
+	// Toggle shadow casting for an already-registered batch (rare; e.g. a quality setting).
+	void set_compact_casts_shadow(int16_t batch_id, bool casts_shadow);
 	// Set the live instance count (<= capacity). Cheap; no scan.
 	void set_instance_count(int16_t batch_id, int live_count);
 	// memcpy `src` into the batch's staging buffer at [dst_offset, dst_offset+src.size()).

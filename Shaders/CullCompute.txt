@@ -123,7 +123,7 @@ void main()
 	mat3 ci_rot = quat_to_mat3(unpack_quat_snorm8(ci.packed_quat));
 	vec3 ci_world_center = vec3(ci.pos_x, ci.pos_y, ci.pos_z) + ci_rot * (desc.local_sphere.xyz * ci.scale);
 	vec4 compact_bounds = vec4(ci_world_center, desc.local_sphere.w * ci.scale);
-	const int obj_flags = 1; // main view only; shadow-caster bit unused here
+	const int obj_flags = desc.flags;
 #else
 	if(gID>=cull.num_objects)
 		return;

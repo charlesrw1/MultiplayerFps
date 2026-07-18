@@ -215,6 +215,7 @@ void BuildSceneData_CpuFast::build_compact_data() {
 		d.local_sphere = glm::vec4(ptr->local_bounds_center, ptr->local_bounds_radius);
 		d.model_ofs = ptr->gpu_buf_ofs;
 		d.mat_ofs = -1; // per-part material already baked into model_info for this slot
+		d.flags = ptr->compact_casts_shadow ? COMPACT_FLAG_SHADOW_CASTER : 0;
 		descs[i] = d;
 
 		const int live = ptr->instance_count;
@@ -260,7 +261,8 @@ void BuildSceneData_CpuFast::build_compact_data() {
 	}
 }
 
-int16_t BuildSceneData_CpuFast::register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic) {
+int16_t BuildSceneData_CpuFast::register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic,
+														 bool casts_shadow) {
 	if (!m)
 		return -1;
 	ASSERT(capacity > 0);
@@ -279,6 +281,7 @@ int16_t BuildSceneData_CpuFast::register_compact_batch(Model* m, MaterialInstanc
 
 	ptr->is_compact = true;
 	ptr->compact_is_dynamic = is_dynamic;
+	ptr->compact_casts_shadow = casts_shadow;
 	ptr->instance_alloced = capacity;
 	ptr->instance_count = 0;
 	ptr->compact_staging.assign((size_t)capacity, gpu::CompactInstance{});
@@ -313,6 +316,16 @@ void BuildSceneData_CpuFast::resize_compact_batch(int16_t batch_id, int new_capa
 		ptr->instance_count = new_capacity;
 	force_rebuild = true;
 	compact_static_dirty = true; // may shift the static region layout
+}
+
+void BuildSceneData_CpuFast::set_compact_casts_shadow(int16_t batch_id, bool casts_shadow) {
+	// See resize_compact_batch: a stale (reload-invalidated) batch_id is a legitimate
+	// runtime state, not a caller bug -- no-op rather than assert/crash.
+	if (!is_compact_batch(batch_id))
+		return;
+	// CompactBatchDesc.flags is rebuilt from this every frame in build_compact_data,
+	// so no dirty flag to set here -- next frame's descriptor upload picks it up.
+	mod_data_ptrs.at(batch_id)->compact_casts_shadow = casts_shadow;
 }
 
 void BuildSceneData_CpuFast::set_instance_count(int16_t batch_id, int live_count) {

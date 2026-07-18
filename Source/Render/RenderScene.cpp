@@ -359,9 +359,10 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 		in.bounding_sphere_and_radius = glm::vec4(glm::vec3(center), radius);
 	}
 }
-uint16_t Render_Scene::register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic) {
+uint16_t Render_Scene::register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic,
+											   bool casts_shadow) {
 	ASSERT(!eng->get_is_in_overlapped_period());
-	return (uint16_t)BuildSceneData_CpuFast::inst->register_compact_batch(m, mat, capacity, is_dynamic);
+	return (uint16_t)BuildSceneData_CpuFast::inst->register_compact_batch(m, mat, capacity, is_dynamic, casts_shadow);
 }
 void Render_Scene::set_compact_instance_count(uint16_t batch_id, int live_count) {
 	ASSERT(!eng->get_is_in_overlapped_period());
@@ -371,6 +372,10 @@ void Render_Scene::set_compact_instances(uint16_t batch_id, int dst_offset, cons
 	ASSERT(!eng->get_is_in_overlapped_period());
 	BuildSceneData_CpuFast::inst->set_instances((int16_t)batch_id, dst_offset,
 												std::span<const gpu::CompactInstance>(src, (size_t)count));
+}
+void Render_Scene::set_compact_casts_shadow(uint16_t batch_id, bool casts_shadow) {
+	ASSERT(!eng->get_is_in_overlapped_period());
+	BuildSceneData_CpuFast::inst->set_compact_casts_shadow((int16_t)batch_id, casts_shadow);
 }
 
 ConfigVar r_spot_near("r_spot_near", "0.1", CVAR_FLOAT, "", 0, 2);

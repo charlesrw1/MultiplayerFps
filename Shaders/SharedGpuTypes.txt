@@ -39,12 +39,15 @@ struct CompactInstance
 // the model_info[] offset (for LOD/part/command-index resolution -- same data the
 // classic CullObject.misc.x points at) and the model-space bounding sphere the GPU
 // uses to build each instance's world sphere on the fly.
+// Bit 0: batch casts shadows (matches CullObject.misc.w's shadow-caster bit for the classic path).
+#define COMPACT_FLAG_SHADOW_CASTER 1
+
 struct CompactBatchDesc
 {
 	vec4 local_sphere; // xyz = model-space center, w = radius
 	int  model_ofs;    // offset into model_info[] (== ModelAndMatTData::gpu_buf_ofs)
 	int  mat_ofs;      // material override gpu offset, or -1 to use the per-part material
-	int  _pad0;
+	int  flags;        // COMPACT_FLAG_x
 	int  _pad1;
 };
 

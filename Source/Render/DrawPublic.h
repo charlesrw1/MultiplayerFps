@@ -50,9 +50,12 @@ public:
 	// caller owns counts/capacity. batch_id (== returned value) must be packed into
 	// each CompactInstance's packed_batch_seed. Call outside the renderer's
 	// overlapped period, same rule as update_obj. See BuildSceneData_CpuFast.
-	virtual uint16_t register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic) = 0;
+	virtual uint16_t register_compact_batch(Model* m, MaterialInstance* mat, int capacity, bool is_dynamic,
+											 bool casts_shadow = true) = 0;
 	virtual void set_compact_instance_count(uint16_t batch_id, int live_count) = 0;
 	virtual void set_compact_instances(uint16_t batch_id, int dst_offset, const gpu::CompactInstance* src, int count) = 0;
+	// Toggle shadow casting for an already-registered batch (rare; e.g. a quality setting).
+	virtual void set_compact_casts_shadow(uint16_t batch_id, bool casts_shadow) = 0;
 	// returns null on a bad handle
 	// DONT cache this! just use for quick reads of an existing object
 	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) = 0;
