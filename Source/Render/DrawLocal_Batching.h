@@ -202,8 +202,14 @@ public:
 	// Thin single-element wrapper over set_instances.
 	void set_instance(int16_t batch_id, int index, const gpu::CompactInstance& v);
 
+	// A previously-valid batch_id can go stale if the backing model is hot-reloaded:
+	// on_model_removed() nulls the slot regardless of whether it was a compact batch,
+	// since callers only find out via needs_rebuild-driven re-registration, not
+	// synchronously. Null-check here so a stale handle degrades to "not a batch"
+	// instead of crashing every accessor below.
 	bool is_compact_batch(int16_t batch_id) const {
-		return batch_id >= 0 && batch_id < (int)mod_data_ptrs.size() && mod_data_ptrs[batch_id]->is_compact;
+		return batch_id >= 0 && batch_id < (int)mod_data_ptrs.size() && mod_data_ptrs[batch_id] &&
+			   mod_data_ptrs[batch_id]->is_compact;
 	}
 
 	GpuCullInput get_cull_input() const;

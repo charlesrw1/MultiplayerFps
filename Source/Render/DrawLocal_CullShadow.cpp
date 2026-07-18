@@ -301,7 +301,10 @@ int16_t BuildSceneData_CpuFast::register_compact_batch(Model* m, MaterialInstanc
 }
 
 void BuildSceneData_CpuFast::resize_compact_batch(int16_t batch_id, int new_capacity) {
-	ASSERT(is_compact_batch(batch_id));
+	// batch_id goes stale if the owning model was hot-reloaded since registration;
+	// caller re-registers (see register_compact_batch) once it notices, so just no-op.
+	if (!is_compact_batch(batch_id))
+		return;
 	ASSERT(new_capacity > 0);
 	ModelAndMatTData* ptr = mod_data_ptrs.at(batch_id);
 	ptr->instance_alloced = new_capacity;
@@ -313,7 +316,10 @@ void BuildSceneData_CpuFast::resize_compact_batch(int16_t batch_id, int new_capa
 }
 
 void BuildSceneData_CpuFast::set_instance_count(int16_t batch_id, int live_count) {
-	ASSERT(is_compact_batch(batch_id));
+	// See resize_compact_batch: a stale (reload-invalidated) batch_id is a legitimate
+	// runtime state, not a caller bug -- no-op rather than assert/crash.
+	if (!is_compact_batch(batch_id))
+		return;
 	ModelAndMatTData* ptr = mod_data_ptrs.at(batch_id);
 	ASSERT(live_count >= 0 && live_count <= ptr->instance_alloced);
 	// A static live-count change shifts the dynamic region's base, so the static
@@ -324,7 +330,10 @@ void BuildSceneData_CpuFast::set_instance_count(int16_t batch_id, int live_count
 }
 
 void BuildSceneData_CpuFast::set_instances(int16_t batch_id, int dst_offset, std::span<const gpu::CompactInstance> src) {
-	ASSERT(is_compact_batch(batch_id));
+	// See resize_compact_batch: a stale (reload-invalidated) batch_id is a legitimate
+	// runtime state, not a caller bug -- no-op rather than assert/crash.
+	if (!is_compact_batch(batch_id))
+		return;
 	ModelAndMatTData* ptr = mod_data_ptrs.at(batch_id);
 	ASSERT(dst_offset >= 0 && dst_offset + (int)src.size() <= (int)ptr->compact_staging.size());
 	if (!src.empty())
