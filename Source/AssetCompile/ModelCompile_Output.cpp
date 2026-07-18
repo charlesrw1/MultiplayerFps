@@ -475,6 +475,7 @@ static FinalModelData create_final_model_data(const FinalSkeletonOutput* skel, c
 	}
 
 	final_mod.AABB = total_bounds;
+	final_mod.cullScreenSize = def.cullScreenSize;
 
 	return final_mod;
 }
@@ -499,6 +500,7 @@ static bool write_out_compilied_model(const std::string& gamepath, const FinalMo
 	out.write_int32(model->lods.size());
 	for (int i = 0; i < model->lods.size(); i++)
 		out.write_struct(&model->lods[i]);
+	out.write_float(model->cullScreenSize);
 	out.write_int32(model->submeshes.size());
 	for (int i = 0; i < model->submeshes.size(); i++)
 		out.write_struct(&model->submeshes[i]);

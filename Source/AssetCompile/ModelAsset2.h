@@ -70,6 +70,7 @@ public:
 	REF std::string srcGlbFile; // what .glb file did this come from
 	// Mesh data
 	REF std::vector<float> lodScreenSpaceSizes; // array of lod sizes
+	REF float cullScreenSize = 0.0f; // screen-space percentage below which the model stops rendering entirely; 0 = never cull
 	REF std::vector<AssetPtr<MaterialInstance>> myMaterials;
 
 	// Skeleton data

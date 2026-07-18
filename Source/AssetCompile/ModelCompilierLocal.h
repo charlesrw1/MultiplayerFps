@@ -112,6 +112,7 @@ public:
 	const int num_lods() const { return loddefs.size(); }
 	bool generate_auto_lods = false;
 	int prune_disconnected_islands_min_lod = 1;
+	float cullScreenSize = 0.0f; // screen-space percentage below which the model stops rendering entirely; 0 = never cull
 
 	// SKELETON
 	bool merge_meshes_into_skeleton = false;
@@ -328,6 +329,7 @@ struct FinalModelData
 	std::vector<std::string> material_names;
 	Bounds AABB;
 	std::vector<ModelTag> tags;
+	float cullScreenSize = 0.0f; // screen-space percentage below which the model stops rendering entirely; 0 = never cull
 
 	bool get_is_lightmapped_bool() const { return isLightmapped != Model::LightmapType::None; }
 	Model::LightmapType isLightmapped = Model::LightmapType::None;
@@ -341,7 +343,7 @@ struct ProcessNodesAndMeshOutput
 	ProcessMeshOutput meshout;
 };
 
-constexpr int MODEL_VERSION = 18;
+constexpr int MODEL_VERSION = 19;
 
 struct cgltf_and_binary
 {

@@ -170,6 +170,7 @@ public:
 
 	int get_num_lods() const { return lods.size(); }
 	const MeshLod& get_lod(int index) const { return lods[index]; }
+	float get_cull_screen_size() const { return cull_screen_size; }
 	const MaterialInstance* get_material(int index) const { return materials[index].get(); }
 	const MaterialInstance* get_material_for_part(const Submesh& mesh) const {
 		return get_material(mesh.get_material_idx_to_use());
@@ -217,6 +218,7 @@ private:
 
 	int uid = 0;
 	InlineVec<MeshLod, 2> lods;
+	float cull_screen_size = 0.0f; // screen-space percentage below which the model stops rendering entirely; 0 = never cull
 	vector<Submesh> parts;
 	Bounds aabb;
 	glm::vec4 bounding_sphere = glm::vec4(0.f);

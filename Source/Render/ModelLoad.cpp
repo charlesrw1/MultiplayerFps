@@ -41,7 +41,7 @@
 #include "GameEnginePublic.h"
 #include "AssetCompile/ModelCompilierLocal.h"
 
-static const int MODEL_FORMAT_VERSION = 18;
+static const int MODEL_FORMAT_VERSION = 19;
 
 extern ConfigVar developer_mode;
 
@@ -172,6 +172,7 @@ bool Model::load_internal() {
 		read.read_struct(&mlod);
 		lods.push_back(mlod);
 	}
+	cull_screen_size = read.read_float();
 	int num_parts = read.read_int32();
 	parts.reserve(num_parts);
 	for (int i = 0; i < num_parts; i++) {

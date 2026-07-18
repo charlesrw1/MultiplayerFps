@@ -353,6 +353,10 @@ void BuildSceneData_CpuFast::rebuild_mod_data() {
 		md.gpu_buf_ofs = bufstart;
 
 		mod_data_gpu_buf.push_back(m->get_num_lods());
+		{
+			const float cull_f = m->get_cull_screen_size();
+			mod_data_gpu_buf.push_back(*((int*)&cull_f));
+		}
 		for (int lodi = 0; lodi < m->get_num_lods(); lodi++) {
 			auto& lod = m->get_lod(lodi);
 			mod_data_gpu_buf.push_back(lod.part_ofs);
@@ -446,7 +450,7 @@ void BuildSceneData_CpuFast::rebuild_mod_data() {
 				md.part_to_draw_cmd.at(index) = remapped;
 			}
 			{
-				const int index = md.gpu_buf_ofs + 1 + 3 * md.m->get_num_lods() + parti * 2;
+				const int index = md.gpu_buf_ofs + 2 + 3 * md.m->get_num_lods() + parti * 2;
 				const int cmd_ofs_prev = mod_data_gpu_buf.at(index);
 				const int remapped = inv_sorted.at(cmd_ofs_prev);
 				mod_data_gpu_buf.at(index) = remapped;

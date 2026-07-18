@@ -24,6 +24,8 @@
 #include "Assets/AssetBrowser.h"
 #include "Assets/AssetRegistryLocal.h"
 #include "Assets/ScriptableObject.h"
+#include "UI/GUISystemPublic.h"
+#include "Render/RenderWindow.h"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <vector>
@@ -789,6 +791,22 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
     }
 }
 
+// Draws a square centered in the level editor's 3D viewport, sized to the given
+// screen-space percentage (fraction of viewport height) -- lets a LOD/cull threshold
+// slider show what that percentage actually looks like on screen while it's being dragged.
+static void draw_screenspace_size_preview(float percentage) {
+    if (!UiSystem::inst) return;
+    const Rect2d vp = UiSystem::inst->get_vp_rect();
+    const int side = (int)std::round(std::clamp(percentage, 0.0f, 1.0f) * vp.h);
+    RectangleShape s;
+    s.rect = Rect2d((vp.w - side) / 2, (vp.h - side) / 2, side, side);
+    s.color = {80, 200, 255, 60};
+    s.with_outline = true;
+    s.outline_color = {80, 200, 255, 220};
+    s.outline_width = 2;
+    UiSystem::inst->window.draw(s);
+}
+
 void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
     if (!cache_ || !cache_->obj) { ImGui::TextDisabled("(parse error)"); return; }
     auto* mis = cache_->obj->cast_to<ModelImportSettings>();
@@ -812,6 +830,8 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
         ImGui::SetNextItemWidth(90.f);
         if (ImGui::DragFloat("##lv", &lods[i], 0.001f, 0.0f, 1.0f, "%.4f"))
             changed = true;
+        if (ImGui::IsItemActive())
+            draw_screenspace_size_preview(lods[i]);
         ImGui::SameLine();
         char overlay[16];
         snprintf(overlay, sizeof(overlay), "%.2f%%", lods[i] * 100.f);
@@ -830,6 +850,24 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
         float v = lods.empty() ? 0.1f : lods.back() * 0.5f;
         lods.push_back(std::max(0.0001f, v));
         changed = true;
+    }
+
+    ImGui::Separator();
+
+    // --- Distance/screen-size cull ---
+    ImGui::Text("Cull Screen-Space Size");
+    ImGui::SameLine();
+    ImGui::TextDisabled("(0 = never cull)");
+    ImGui::SetNextItemWidth(90.f);
+    if (ImGui::DragFloat("##cullss", &mis->cullScreenSize, 0.0005f, 0.0f, 1.0f, "%.4f"))
+        changed = true;
+    if (ImGui::IsItemActive())
+        draw_screenspace_size_preview(mis->cullScreenSize);
+    if (mis->cullScreenSize > 0.0f) {
+        ImGui::SameLine();
+        char overlay[16];
+        snprintf(overlay, sizeof(overlay), "%.2f%%", mis->cullScreenSize * 100.f);
+        ImGui::ProgressBar(std::min(mis->cullScreenSize, 1.0f), ImVec2(80.f, 0.f), overlay);
     }
 
     ImGui::Separator();
