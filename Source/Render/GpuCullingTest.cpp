@@ -143,6 +143,8 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 		cull.inv_two_times_tanfov_2 = inv_two_times_tanfov_2;
 		auto& vs = draw.current_frame_view;
 		cull.camera_origin = glm::vec4(origin, 1);
+		// Real camera position regardless of pass -- see CullData::main_view_origin.
+		cull.main_view_origin = glm::vec4(draw.current_frame_view.origin, 1);
 
 		cull.frustum_up = frustum.top_plane;
 		cull.frustum_down = frustum.bot_plane;

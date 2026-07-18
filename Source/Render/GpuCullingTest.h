@@ -72,6 +72,9 @@ struct CullData
 	int padding[3];
 
 	vec4 backplane;
+
+	// Always the real camera position, even in shadow passes -- see CullCompute.txt.
+	vec4 main_view_origin;
 };
 
 class GpuCullingTest

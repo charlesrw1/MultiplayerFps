@@ -66,9 +66,16 @@ struct CullData {
 	int padding1;
 	int padding3;
 	int padding4;
-	
+
 	vec4 backplane;
-};	
+
+	// Always the real camera position, even in shadow passes (unlike camera_origin,
+	// which is the shadow frustum's own origin -- meaningless as a distance reference
+	// for a directional light, which has no position). Used for the cull_distance check
+	// so sun-cascade shadow casters get thinned by the same camera-relative distance as
+	// the main view, instead of either not culling at all or culling by a nonsense origin.
+	vec4 main_view_origin;
+};
 layout(binding = 5) uniform CullDataBuffer {
 	CullData cull;
 };
@@ -216,19 +223,25 @@ void main()
 	int num_lods = int(model_info[model_ofs]);
 	float cull_distance = uintBitsToFloat(model_info[model_ofs+1]);
 
-	// Distance from the main camera (not the light), so an object culls at the same
-	// real-world distance whether it's being drawn for the main view or a shadow pass.
-	vec3 to_main_camera = bounding_sphere.xyz - cull.camera_origin.xyz;
-	const float dist_to_camera_2 = dot(to_main_camera, to_main_camera);
-
+#if defined(MAINVIEW) || defined(SHADOW_CASCADE)
+	// Real camera distance (never the light's), so sun-cascade shadow casters get
+	// thinned by the same camera-relative cull distance as the main view -- otherwise
+	// foliage/debris well outside render range still costs full shadow-cull work in
+	// every cascade. Spot lights already cull correctly via their own frustum/backplane
+	// (radius) test above, so this doesn't apply there -- see CullData::main_view_origin.
+	vec3 to_main_camera = bounding_sphere.xyz - cull.main_view_origin.xyz;
+	const float dist_to_main_camera_2 = dot(to_main_camera, to_main_camera);
 	// 0 = never cull; otherwise drop instances beyond the asset's cull distance (meters)
-	if(cull_distance>0.0 && dist_to_camera_2>=cull_distance*cull_distance)
+	if(cull_distance>0.0 && dist_to_main_camera_2>=cull_distance*cull_distance)
 		return;
+#endif
 
 	// get lod to render
 #ifdef SHADOW_CASCADE
 	const float percentage_2 = get_shadow_cascade_percentage_2(bounding_sphere, cull.cascade_extent);
 #else
+	vec3 to_camera = bounding_sphere.xyz - cull.camera_origin.xyz;
+	const float dist_to_camera_2 = dot(to_camera, to_camera);
 	const float percentage_2 = get_screen_percentage_2(bounding_sphere, cull.inv_two_times_tanfov_2, dist_to_camera_2);
 #endif
 
