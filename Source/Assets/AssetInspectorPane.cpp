@@ -854,21 +854,13 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
 
     ImGui::Separator();
 
-    // --- Distance/screen-size cull ---
-    ImGui::Text("Cull Screen-Space Size");
+    // --- Distance cull ---
+    ImGui::Text("Cull Distance");
     ImGui::SameLine();
-    ImGui::TextDisabled("(0 = never cull)");
+    ImGui::TextDisabled("(meters, 0 = never cull)");
     ImGui::SetNextItemWidth(90.f);
-    if (ImGui::DragFloat("##cullss", &mis->cullScreenSize, 0.0005f, 0.0f, 1.0f, "%.4f"))
+    if (ImGui::DragFloat("##culldist", &mis->cullDistance, 0.5f, 0.0f, 100000.0f, "%.1f m"))
         changed = true;
-    if (ImGui::IsItemActive())
-        draw_screenspace_size_preview(mis->cullScreenSize);
-    if (mis->cullScreenSize > 0.0f) {
-        ImGui::SameLine();
-        char overlay[16];
-        snprintf(overlay, sizeof(overlay), "%.2f%%", mis->cullScreenSize * 100.f);
-        ImGui::ProgressBar(std::min(mis->cullScreenSize, 1.0f), ImVec2(80.f, 0.f), overlay);
-    }
 
     ImGui::Separator();
 

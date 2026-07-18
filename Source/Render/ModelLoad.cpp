@@ -172,7 +172,7 @@ bool Model::load_internal() {
 		read.read_struct(&mlod);
 		lods.push_back(mlod);
 	}
-	cull_screen_size = read.read_float();
+	cull_distance = read.read_float();
 	int num_parts = read.read_int32();
 	parts.reserve(num_parts);
 	for (int i = 0; i < num_parts; i++) {

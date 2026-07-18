@@ -54,7 +54,7 @@ ModelDefData new_import_settings_to_modeldef_data(const std::string& gamepath, M
 		mdd.isLightmapped = true;
 	mdd.generate_auto_lods = is->generate_auto_lods;
 	mdd.prune_disconnected_islands_min_lod = is->prune_disconnected_islands_min_lod;
-	mdd.cullScreenSize = is->cullScreenSize;
+	mdd.cullDistance = is->cullDistance;
 	if (mdd.generate_auto_lods && is->lodScreenSpaceSizes.empty()) {
 		is->lodScreenSpaceSizes = {0.1, 0.01, 0.005};
 	}

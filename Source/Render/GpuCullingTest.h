@@ -15,7 +15,7 @@ CullObject object_buffer[]
 int8 model_data_buffer[]
 format:
 	int num_lods
-	float cull_screen_size	// below this screen-space percentage, instance is culled entirely; 0 = never cull
+	float cull_distance	// beyond this distance (meters) from the camera, instance is culled entirely; 0 = never cull
 	lods[]
 		int part_ofs, int part_count, float screen_size
 	parts[]

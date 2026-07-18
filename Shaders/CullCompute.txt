@@ -214,20 +214,23 @@ void main()
 #endif
 
 	int num_lods = int(model_info[model_ofs]);
-	float cull_screen_size = uintBitsToFloat(model_info[model_ofs+1]);
+	float cull_distance = uintBitsToFloat(model_info[model_ofs+1]);
+
+	// Distance from the main camera (not the light), so an object culls at the same
+	// real-world distance whether it's being drawn for the main view or a shadow pass.
+	vec3 to_main_camera = bounding_sphere.xyz - cull.camera_origin.xyz;
+	const float dist_to_camera_2 = dot(to_main_camera, to_main_camera);
+
+	// 0 = never cull; otherwise drop instances beyond the asset's cull distance (meters)
+	if(cull_distance>0.0 && dist_to_camera_2>=cull_distance*cull_distance)
+		return;
 
 	// get lod to render
 #ifdef SHADOW_CASCADE
 	const float percentage_2 = get_shadow_cascade_percentage_2(bounding_sphere, cull.cascade_extent);
 #else
-	vec3 to_camera = bounding_sphere.xyz - cull.camera_origin.xyz;
-	const float dist_to_camera_2 = dot(to_camera, to_camera);
 	const float percentage_2 = get_screen_percentage_2(bounding_sphere, cull.inv_two_times_tanfov_2, dist_to_camera_2);
 #endif
-
-	// 0 = never cull; otherwise drop instances that have shrunk below the asset's cull threshold
-	if(cull_screen_size>0.0 && percentage_2<=cull_screen_size)
-		return;
 
 	int lod_wanted = 0;
 	for(int i=num_lods-1;i>0;i--) {

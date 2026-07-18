@@ -354,7 +354,7 @@ void BuildSceneData_CpuFast::rebuild_mod_data() {
 
 		mod_data_gpu_buf.push_back(m->get_num_lods());
 		{
-			const float cull_f = m->get_cull_screen_size();
+			const float cull_f = m->get_cull_distance();
 			mod_data_gpu_buf.push_back(*((int*)&cull_f));
 		}
 		for (int lodi = 0; lodi < m->get_num_lods(); lodi++) {
