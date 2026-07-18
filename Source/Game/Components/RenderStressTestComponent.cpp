@@ -13,6 +13,14 @@
 #include "imgui.h"
 #endif
 
+// Rotating-wave yaw: turn each instance about its Y axis proportional to its wave height,
+// so cubes spin up as they rise. Returns identity when wave_rotation is off.
+inline glm::quat wave_yaw(bool enabled, float height, float rotation_scale) {
+	if (!enabled)
+		return glm::quat(1.f, 0.f, 0.f, 0.f); // identity (w,x,y,z)
+	return glm::angleAxis(height * rotation_scale, glm::vec3(0.f, 1.f, 0.f));
+}
+
 void RenderStressTestComponent::start() {
 	needs_rebuild = true;
 	set_ticking(true);
@@ -88,9 +96,9 @@ void RenderStressTestComponent::on_sync_compact() {
 	if (needs_rebuild || compact_batch_id == kInvalidBatch)
 		compact_batch_id = idraw->get_scene()->register_compact_batch(m, nullptr, count, is_dynamic);
 
-	const uint32_t packed_rot = pack_quat_snorm8(glm::quat(1.f, 0.f, 0.f, 0.f)); // identity
 	std::vector<gpu::CompactInstance> insts;
 	insts.reserve((size_t)count);
+	const auto identity_rot = pack_quat_snorm8(glm::quat());
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
 			const float x = i * spacing - half;
@@ -101,7 +109,7 @@ void RenderStressTestComponent::on_sync_compact() {
 			ci.pos_y = center.y + y;
 			ci.pos_z = center.z + z;
 			ci.scale = 1.f;
-			ci.packed_quat = packed_rot;
+			ci.packed_quat = identity_rot;
 			ci.packed_batch_seed = pack_batch_seed(compact_batch_id, 0);
 			insts.push_back(ci);
 		}
@@ -154,7 +162,8 @@ void RenderStressTestComponent::on_sync_render_data() {
 	for (size_t idx = 0; idx < instances.size(); idx++) {
 		const glm::vec2& offset = grid_offsets[idx];
 		const float y = wave_height * sinf(wave_frequency * offset.x + t) * cosf(wave_frequency * offset.y + t);
-		obj.transform = glm::translate(glm::mat4(1.f), center + glm::vec3(offset.x, y, offset.y));
+		obj.transform = glm::translate(glm::mat4(1.f), center + glm::vec3(offset.x, y, offset.y)) *
+			glm::mat4_cast(wave_yaw(wave_rotation, y, rotation_scale));
 		idraw->get_scene()->update_obj(instances[idx], obj);
 	}
 }

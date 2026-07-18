@@ -54,6 +54,10 @@ public:
 	REF float wave_height = 1.f;
 	REF float wave_frequency = 0.5f;
 	REF float wave_speed = 2.f;
+	// When set, each cube yaws about its own Y axis by (wave height * rotation_scale)
+	// radians, so instances turn as they rise and unwind as they fall -- a rotating wave.
+	REF bool wave_rotation = false;
+	REF float rotation_scale = 1.f;
 	REF RenderStressTestState state = RenderStressTestState::Disabled;
 
 private:
