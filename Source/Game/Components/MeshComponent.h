@@ -54,6 +54,7 @@ public:
 	REF AnimatorObject* get_animator() const { return animator.get(); }
 	REF AnimatorObject* create_animator(agBuilder* data);
 	void release_animator();
+	const std::vector<AssetPtr<MaterialInstance>>& get_material_overrides() const { return eMaterialOverride; }
 
 
 	void set_invisible_to_bakes() {

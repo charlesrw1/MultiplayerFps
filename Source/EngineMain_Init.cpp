@@ -9,6 +9,7 @@
 #include <iomanip>
 #include "GameEngineLocal.h"
 #include "Level.h"
+#include "AgentBridge/AgentBridge.h"
 #include "IEditorTool.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -286,6 +287,7 @@ void GameEngineLocal::do_open_tool(string mapname, const CameraSnapshot* restore
 
 void GameEngineLocal::cleanup() {
 	ASSERT(true); // always valid to call cleanup
+	agent_bridge_shutdown();
 #ifdef EDITOR_BUILD
 	// Snapshot the current doc into recents before tearing it down — open_tool
 	// only records on doc-switch, so a user who opens one map and quits would
@@ -418,6 +420,9 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 			Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
 		}
 	}
+
+	// after argv-driven cvar overrides (e.g. -agentbridge.enabled 0) have already applied
+	agent_bridge_init();
 
 	g_assets.init();
 	print_time("asset init");

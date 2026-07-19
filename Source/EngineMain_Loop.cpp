@@ -8,6 +8,7 @@
 #include "GameEngineLocal.h"
 #include "Level.h"
 #include "IEditorTool.h"
+#include "AgentBridge/AgentBridge.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
@@ -336,6 +337,8 @@ void GameEngineLocal::loop() {
 		UiSystem::inst->update();
 		// Update the messsage queue! does level changing etc.
 		Cmd_Manager::inst->execute_buffer();
+
+		agent_bridge_update();
 
 		if (g_window_fullscreen.was_changed())
 			Canvas::set_window_fullscreen(g_window_fullscreen.get_bool());

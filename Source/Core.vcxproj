@@ -27,6 +27,16 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AgentBridge\AgentBridge.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="AgentBridge\AgentBridgeCommands.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Animation\AnimationSeqAsset.cpp" />
     <ClCompile Include="Animation\AnimationTypes.cpp" />
     <ClCompile Include="Animation\AnimationUtil.cpp" />
@@ -355,6 +365,7 @@
     <ClInclude Include="Animation\AnimationSeqAsset.h" />
     <ClInclude Include="AssetCompile\Compiliers.h" />
     <ClInclude Include="AssetCompile\GltfExport.h" />
+    <ClInclude Include="AgentBridge\AgentBridge.h" />
     <ClInclude Include="AssetCompile\ModelAsset2.h" />
     <ClInclude Include="AssetCompile\ModelCompilierLocal.h" />
     <ClInclude Include="AssetCompile\SkeletonAsset.h" />

@@ -8,7 +8,7 @@
 #include "Framework/StringUtils.h"
 
 bool export_to_gltf(const std::vector<Part>& parts, const std::vector<ExportVertex>& vertices,
-					const std::vector<uint32_t>& indices, const char* output_path) {
+					const std::vector<uint32_t>& indices, const char* output_path, bool separate_nodes) {
 	cgltf_data data = {};
 	data.file_type = cgltf_file_type_gltf;
 	data.asset.version = const_cast<char*>("2.0");
@@ -158,26 +158,82 @@ bool export_to_gltf(const std::vector<Part>& parts, const std::vector<ExportVert
 		primitive->type = cgltf_primitive_type_triangles;
 	}
 
-	// Create mesh
-	cgltf_mesh mesh = {};
-	mesh.name = const_cast<char*>("Mesh");
-	mesh.primitives = primitives;
-	mesh.primitives_count = parts.size();
+	std::vector<std::string> node_names;
+	std::vector<cgltf_mesh> meshes;
+	std::vector<cgltf_node> nodes;
+	std::vector<cgltf_node*> scene_node_ptrs;
 
-	data.meshes = &mesh;
-	data.meshes_count = 1;
+	// Single shared node/mesh (original behavior; every existing caller relies on this).
+	cgltf_mesh single_mesh = {};
+	cgltf_node single_node = {};
 
-	// Create node
-	cgltf_node node = {};
-	node.mesh = &mesh;
+	if (!separate_nodes) {
+		single_mesh.name = const_cast<char*>("Mesh");
+		single_mesh.primitives = primitives;
+		single_mesh.primitives_count = parts.size();
 
-	data.nodes = &node;
-	data.nodes_count = 1;
+		data.meshes = &single_mesh;
+		data.meshes_count = 1;
+
+		single_node.mesh = &single_mesh;
+
+		data.nodes = &single_node;
+		data.nodes_count = 1;
+	} else {
+		// One node per *contiguous run* of parts sharing the same node_name, so a multi-material
+		// MeshComponent (several Parts, one per submesh) collapses into a single node with
+		// multiple primitives, while distinct MeshComponents (different node_name) each get their
+		// own node. Callers must emit a given entity's parts consecutively for this to group them.
+		size_t i = 0;
+		while (i < parts.size()) {
+			size_t run_end = i + 1;
+			while (run_end < parts.size() && parts[run_end].node_name == parts[i].node_name)
+				run_end++;
+			node_names.push_back(parts[i].node_name.empty() ? ("part_" + std::to_string(i)) : parts[i].node_name);
+			i = run_end;
+		}
+
+		meshes.resize(node_names.size());
+		nodes.resize(node_names.size());
+		i = 0;
+		for (size_t g = 0; g < node_names.size(); g++) {
+			size_t run_start = i;
+			size_t run_end = i + 1;
+			while (run_end < parts.size() && parts[run_end].node_name == parts[run_start].node_name)
+				run_end++;
+
+			meshes[g] = {};
+			meshes[g].name = const_cast<char*>(node_names[g].c_str());
+			meshes[g].primitives = &primitives[run_start];
+			meshes[g].primitives_count = run_end - run_start;
+
+			nodes[g] = {};
+			nodes[g].name = const_cast<char*>(node_names[g].c_str());
+			nodes[g].mesh = &meshes[g];
+
+			i = run_end;
+		}
+
+		data.meshes = meshes.data();
+		data.meshes_count = meshes.size();
+
+		data.nodes = nodes.data();
+		data.nodes_count = nodes.size();
+
+		scene_node_ptrs.reserve(nodes.size());
+		for (auto& n : nodes)
+			scene_node_ptrs.push_back(&n);
+	}
 
 	// Create scene
 	cgltf_scene scene = {};
-	scene.nodes = &data.nodes;
-	scene.nodes_count = 1;
+	if (!separate_nodes) {
+		scene.nodes = &data.nodes;
+		scene.nodes_count = 1;
+	} else {
+		scene.nodes = scene_node_ptrs.data();
+		scene.nodes_count = scene_node_ptrs.size();
+	}
 
 	data.scene = &scene;
 	data.scenes = &scene;

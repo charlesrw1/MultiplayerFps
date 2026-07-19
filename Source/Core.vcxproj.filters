@@ -7,6 +7,9 @@
     <Filter Include=".generated">
       <UniqueIdentifier>{f80bc66f-9c4f-57c9-8c43-4582bfcbc3e1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="AgentBridge">
+      <UniqueIdentifier>{c1f5a8b3-2e6d-4a1f-9d3c-7e2b1a4f6c9d}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Animation">
       <UniqueIdentifier>{d7951c78-4f4d-546a-a8d9-1e335bb578ed}</UniqueIdentifier>
     </Filter>
@@ -116,6 +119,12 @@
   <ItemGroup>
     <ClCompile Include=".generated\MEGA.gen.cpp">
       <Filter>.generated</Filter>
+    </ClCompile>
+    <ClCompile Include="AgentBridge\AgentBridge.cpp">
+      <Filter>AgentBridge</Filter>
+    </ClCompile>
+    <ClCompile Include="AgentBridge\AgentBridgeCommands.cpp">
+      <Filter>AgentBridge</Filter>
     </ClCompile>
     <ClCompile Include="Animation\AnimationSeqAsset.cpp">
       <Filter>Animation</Filter>
@@ -959,6 +968,9 @@
     </ClInclude>
     <ClInclude Include="Animation\SkeletonEditor.h">
       <Filter>Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="AgentBridge\AgentBridge.h">
+      <Filter>AgentBridge</Filter>
     </ClInclude>
     <ClInclude Include="AssetCompile\Compiliers.h">
       <Filter>AssetCompile</Filter>
