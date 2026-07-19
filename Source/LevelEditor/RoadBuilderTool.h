@@ -5,7 +5,7 @@
 #include "Render/DrawPublic.h"
 #include "Render/RenderObj.h"
 #include "Framework/Handle.h"
-#include "Game/BikeDemo/BikeCourse.h"
+#include "MyGame/bike/BikeCourse.h"
 
 class RoadNetworkComponent;
 

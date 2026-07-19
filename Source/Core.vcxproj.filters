@@ -40,9 +40,6 @@
     <Filter Include="Game">
       <UniqueIdentifier>{fedfb30c-fd4f-51c6-8287-26028fb8ffec}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Game\BikeDemo">
-      <UniqueIdentifier>{9532285d-9461-5ead-9242-3093009e9381}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Game\CarGame">
       <UniqueIdentifier>{b5af0a6a-442a-5603-b1b5-395076c0c48a}</UniqueIdentifier>
     </Filter>
@@ -314,66 +311,6 @@
     </ClCompile>
     <ClCompile Include="Game\BaseUpdater.cpp">
       <Filter>Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeAI.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeApplication.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeApplication_AIDebug.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeApplication_Debug.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeApplication_Pack.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeApplication_PackAI.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeApplication_PackAvoid.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeApplication_PackDebug.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeApplication_Player.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeCamera.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeCourse.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeCourseDebug.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeCourseRacingLine.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeCourseRoadNetwork.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeObject.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeObject_Physics.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeObject_Stamina.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeObject_Steer.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeUI.cpp">
-      <Filter>Game\BikeDemo</Filter>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeWind.cpp">
-      <Filter>Game\BikeDemo</Filter>
     </ClCompile>
     <ClCompile Include="Game\CarGame\CarGame.cpp">
       <Filter>Game\CarGame</Filter>
@@ -1273,9 +1210,6 @@
     </ClInclude>
     <ClInclude Include="Game\BaseUpdater.h">
       <Filter>Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Game\BikeDemo\BikeHeaders.h">
-      <Filter>Game\BikeDemo</Filter>
     </ClInclude>
     <ClInclude Include="Game\CarGame\CarGame.h">
       <Filter>Game\CarGame</Filter>

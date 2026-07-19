@@ -121,38 +121,6 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Game\BaseUpdater.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeAI.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeApplication.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeApplication_AIDebug.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeApplication_Debug.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeApplication_Pack.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeApplication_PackAI.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeApplication_PackAvoid.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeApplication_PackDebug.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeApplication_Player.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeCourse.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeCourseDebug.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeCourseRacingLine.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeCourseRoadNetwork.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Game\BikeDemo\BikeCamera.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeObject.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeObject_Physics.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeObject_Stamina.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeObject_Steer.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeUI.cpp" />
-    <ClCompile Include="Game\BikeDemo\BikeWind.cpp" />
     <ClCompile Include="Game\ObsGame\ObsGameApplication.cpp" />
     <ClCompile Include="Game\ObsGame\ObsPlayer.cpp" />
     <ClCompile Include="Game\ObsGame\ObsHand.cpp" />
@@ -410,7 +378,6 @@
     <ClInclude Include="Framework\SysPrint.h" />
     <ClInclude Include="Framework\Jobs.h" />
     <ClInclude Include="Framework\VectorReflect2.h" />
-    <ClInclude Include="Game\BikeDemo\BikeHeaders.h" />
     <ClInclude Include="Game\ObsGame\ObsGameHeaders.h" />
     <ClInclude Include="Game\CarGame\CarGame.h" />
     <ClInclude Include="Game\CarGame\CarGui.h" />

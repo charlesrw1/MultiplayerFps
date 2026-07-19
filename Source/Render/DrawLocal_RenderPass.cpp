@@ -508,7 +508,7 @@ void Renderer::render_particles() {
 
 #include <algorithm>
 
-static void build_standard_cpu(Render_Lists& list, Render_Pass& src, Free_List<ROP_Internal>& proxy_list) {
+void build_standard_cpu(Render_Lists& list, Render_Pass& src, Free_List<ROP_Internal>& proxy_list) {
 	CPU_SCOPE("build_standard_cpu");
 
 	auto& memArena = draw.get_arena();
@@ -552,7 +552,7 @@ void Render_Lists_Gpu_Culled::init(uint32_t drawidsz, uint32_t instbufsz) {
 }
 
 ConfigVar collapse_draw_calls("collapse_draw_calls", "1", CVAR_BOOL | CVAR_DEV, "");
-static void build_cascade_cpu(Render_Lists& shadowlist, Render_Pass& shadowpass, Free_List<ROP_Internal>& proxy_list,
+void build_cascade_cpu(Render_Lists& shadowlist, Render_Pass& shadowpass, Free_List<ROP_Internal>& proxy_list,
 							  uint8_t* visiblity) {
 	Memory_Arena& memArena = draw.get_arena();
 	ArenaScope memScope(memArena);

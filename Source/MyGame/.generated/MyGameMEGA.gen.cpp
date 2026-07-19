@@ -1,4 +1,4 @@
-// **** GENERATED SOURCE FILE version:1 2026-07-19 11:52:06 ****
+// **** GENERATED SOURCE FILE version:1 2026-07-19 13:17:27 ****
 #include "Framework/ReflectionProp.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/VectorReflect2.h"
@@ -6,6 +6,7 @@
 #include "Framework/InterfaceTypeInfo.h"
 #include "Scripting/ScriptFunctionCodegen.h"
 #include "Scripting/ScriptManager.h"
+#include "./MyGame\bike/BikeHeaders.h"
 #include "./MyGame\fps/AnimGraphTester.h"
 #include "./MyGame\fps/fpsApp.h"
 #include "./MyGame\fps/fpsObjects.h"
@@ -22,6 +23,28 @@ int lua_binding_fpsIDamageable_deal_damage(lua_State* L)
 	return 0;
 }
 InterfaceTypeInfo fpsIDamageable::StaticInterfaceType("fpsIDamageable");
+ClassTypeInfo BikeObject::StaticType = ClassTypeInfo(
+                     "BikeObject",
+                     &Component::StaticType,
+                     BikeObject::get_props,
+                     default_class_create<BikeObject>(),
+                     BikeObject::CreateDefaultObject,nullptr,0,nullptr,false,false);
+const PropertyInfoList* BikeObject::get_props()
+{
+	return nullptr;
+}
+
+ClassTypeInfo BikeGameApplication::StaticType = ClassTypeInfo(
+                     "BikeGameApplication",
+                     &Application::StaticType,
+                     BikeGameApplication::get_props,
+                     default_class_create<BikeGameApplication>(),
+                     BikeGameApplication::CreateDefaultObject,nullptr,0,nullptr,false,false);
+const PropertyInfoList* BikeGameApplication::get_props()
+{
+	return nullptr;
+}
+
 static EnumIntPair enumstrsAnimGraphTestMode[] = {
 	EnumIntPair("BasicIK","",(int64_t)AnimGraphTestMode::BasicIK),
 	EnumIntPair("LookAt","",(int64_t)AnimGraphTestMode::LookAt),

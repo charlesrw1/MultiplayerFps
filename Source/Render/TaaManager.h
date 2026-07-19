@@ -11,6 +11,7 @@ public:
 	TaaManager() { generateHaltonSequence(MAX_TAA_SAMPLES, jitters); }
 
 	void start_frame() { index = (index + 1) % r_taa_samples.get_integer(); }
+	int get_frame_index() const { return index; }
 	glm::vec2 get_last_frame_jitter(int w, int h) const {
 		int previndex = index - 1;
 		if (previndex < 0)

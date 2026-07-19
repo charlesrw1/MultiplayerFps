@@ -25,6 +25,7 @@
 #include "Render/RenderExtra.h"
 #include "Render/MaterialLocal.h"
 #include "Render/RenderScene.h"
+#include "Render/DrawLocalConfigVars.h"
 #include "RT/RaytraceTest.h"
 
 #include "Framework/ConsoleCmdGroup.h"

@@ -1,7 +1,7 @@
 // Unit tests for BikeCourse::compute_racing_line
 // Pure math — no game engine dependency.
 #include <gtest/gtest.h>
-#include "Game/BikeDemo/BikeCourse.h"
+#include "MyGame/bike/BikeCourse.h"
 #include <glm/glm.hpp>
 #include <cmath>
 #include <vector>

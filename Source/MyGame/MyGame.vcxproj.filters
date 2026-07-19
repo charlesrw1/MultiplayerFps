@@ -4,6 +4,9 @@
     <Filter Include="fps">
       <UniqueIdentifier>{b00e5779-12a4-57be-9227-82a4fa56643a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="bike">
+      <UniqueIdentifier>{c11f6880-23b5-68cf-a338-93b5fb67754b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fps\fpsApp.cpp">
@@ -24,6 +27,66 @@
     <ClCompile Include="fps\fpsTestObjects.cpp">
       <Filter>fps</Filter>
     </ClCompile>
+    <ClCompile Include="bike\BikeAI.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeApplication.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeApplication_AIDebug.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeApplication_Debug.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeApplication_Pack.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeApplication_PackAI.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeApplication_PackAvoid.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeApplication_PackDebug.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeApplication_Player.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeCamera.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeCourse.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeCourseDebug.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeCourseRacingLine.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeCourseRoadNetwork.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeObject.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeObject_Physics.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeObject_Stamina.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeObject_Steer.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeUI.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeWind.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="fps\fpsApp.h">
@@ -43,6 +106,15 @@
     </ClInclude>
     <ClInclude Include="fps\fpsTestObjects.h">
       <Filter>fps</Filter>
+    </ClInclude>
+    <ClInclude Include="bike\BikeCourse.h">
+      <Filter>bike</Filter>
+    </ClInclude>
+    <ClInclude Include="bike\BikeHeaders.h">
+      <Filter>bike</Filter>
+    </ClInclude>
+    <ClInclude Include="bike\BikeObject_Local.h">
+      <Filter>bike</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

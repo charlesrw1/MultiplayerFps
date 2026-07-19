@@ -25,7 +25,7 @@
 // Wind state is accessed via the global WindSystem: g_wind.wind_speed, etc.
 
 // Debug pointers (set each frame in evaluate; bp_for_debug is non-static so BikeCamera.cpp can extern it)
-static BikeObject* bo_for_debug = nullptr;
+BikeObject* bo_for_debug = nullptr;
 BikePlayer*        bp_for_debug = nullptr;
 BikeGameApplication* g_bike_app = nullptr;
 BikeAIParams g_ai_params;

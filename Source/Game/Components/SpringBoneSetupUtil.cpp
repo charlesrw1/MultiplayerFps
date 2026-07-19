@@ -4,6 +4,7 @@
 #include "MeshComponent.h"
 #include "Game/Entity.h"
 #include "GameEnginePublic.h"
+#include "Level.h"
 
 namespace {
 void visit(Entity* parent, Entity* source_root, SpringBoneManagerComponent* manager) {

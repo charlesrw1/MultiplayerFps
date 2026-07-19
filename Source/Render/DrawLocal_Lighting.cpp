@@ -103,9 +103,6 @@ void update_debug_grid() {
 	idraw->get_scene()->update_meshbuilder(debug_grid_handle, mbo);
 }
 
-const static int light_frustum_size_x = 8;
-const static int light_frustum_size_y = 6;
-
 struct FrustumPlane
 {
 	glm::vec3 normal;

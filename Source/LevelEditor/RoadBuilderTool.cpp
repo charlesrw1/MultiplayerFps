@@ -6,7 +6,7 @@
 #include "GameEnginePublic.h"
 #include "Game/Entity.h"
 #include "Level.h"
-#include "Game/BikeDemo/BikeCourse.h"
+#include "MyGame/bike/BikeCourse.h"
 #include <string>
 #include <vector>
 
