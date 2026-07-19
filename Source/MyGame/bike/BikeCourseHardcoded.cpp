@@ -54,7 +54,7 @@ struct Turtle {
 
 void build_hardcoded_circuit(BikeCourse& course)
 {
-	static constexpr float ROAD_HALF_WIDTH = 4.f;
+	static constexpr float ROAD_HALF_WIDTH = 4.f * (2.f / 3.f);
 	static constexpr float Y_EPS           = 0.02f;   // small epsilon above ground 0
 	static constexpr float LEG_NS          = 22.f;    // north/south straight length (m)
 	static constexpr float LEG_EW          = 14.f;    // east/west straight length (m)

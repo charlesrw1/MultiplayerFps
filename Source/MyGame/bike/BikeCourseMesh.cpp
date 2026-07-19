@@ -20,11 +20,13 @@ std::shared_ptr<MaterialInstance> get_road_material() {
 }
 }
 
-BikeGameApplication::~BikeGameApplication()
-{
-	if (road_mesh_entity)
-		road_mesh_entity->destroy();
-}
+// Note: road_mesh_entity is intentionally NOT destroyed here. By the time
+// Application destructors run, GameEngineLocal::cleanup has already called
+// stop_game(), which tears down the Level (and every entity in it, including
+// this one) -- eng->get_level() is null/stale at this point, so Entity::destroy()
+// would dereference it. road_mesh (the GPU model) still frees itself safely via
+// its own destructor, since the renderer isn't torn down until after Application.
+BikeGameApplication::~BikeGameApplication() = default;
 
 void BikeGameApplication::build_road_mesh()
 {
@@ -35,26 +37,38 @@ void BikeGameApplication::build_road_mesh()
 		return;
 	}
 
+	// Waypoint height is a gameplay reference (rider projection/physics), not a render
+	// height -- lift the visible mesh a bit further above it so it doesn't z-fight with
+	// or sink below the terrain. Mirrors RoadNetworkComponent's ROAD_GROUND_OFFSET.
+	static constexpr float ROAD_MESH_Y_OFFSET = 0.04f;
+	// Divides the tile length so the asphalt texture repeats more densely across
+	// the road surface instead of stretching one tile over the full width/length.
+	static constexpr float UV_TILE_SCALE = 1.8f;
+
 	ModelBuilder builder;
 	builder.begin_submesh(get_road_material());
 	const glm::vec3 up(0.f, 1.f, 0.f);
+	const glm::vec3 y_offset(0.f, ROAD_MESH_Y_OFFSET, 0.f);
 
 	const int n = (int)course.waypoints.size();
 	std::vector<uint16_t> left(n), right(n);
 	for (int i = 0; i < n; ++i) {
 		const BikeWaypoint& wp = course.waypoints[i];
 		const float tile_len = wp.road_half_width * 2.f > 0.001f ? wp.road_half_width * 2.f : 1.f;
-		const float v = wp.dist_from_start / tile_len;
-		const glm::vec3 l = wp.position - wp.right * wp.road_half_width;
-		const glm::vec3 r = wp.position + wp.right * wp.road_half_width;
+		const float v = wp.dist_from_start / tile_len * UV_TILE_SCALE;
+		const glm::vec3 l = wp.position - wp.right * wp.road_half_width + y_offset;
+		const glm::vec3 r = wp.position + wp.right * wp.road_half_width + y_offset;
 		left[i]  = builder.add_vertex(l, { 0.f, v }, up);
-		right[i] = builder.add_vertex(r, { 1.f, v }, up);
+		right[i] = builder.add_vertex(r, { UV_TILE_SCALE, v }, up);
 	}
 
 	const int num_segs = course.is_loop ? n : n - 1;
 	for (int i = 0; i < num_segs; ++i) {
 		const int j = (i + 1) % n;
-		builder.add_quad(left[i], right[i], right[j], left[j]);
+		// wp.right (cross(WORLD_UP, fwd)) is the opposite handedness from the
+		// cross(dir, up) convention RoadNetworkComponent::push_road_strip uses, so
+		// left/right must be swapped here to keep the strip's front face up.
+		builder.add_quad(right[i], left[i], left[j], right[j]);
 	}
 
 	if (!road_mesh)
