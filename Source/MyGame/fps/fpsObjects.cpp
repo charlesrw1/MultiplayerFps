@@ -26,7 +26,7 @@ static float ground_friction = 8.f;
 static float max_ground_speed = 6.f;
 static float max_sprint_speed = 9.f;
 static float max_air_speed = 2.f;
-static float jump_impulse = 5.f;
+static float jump_impulse = 7.f;
 static float gravity = 18.f;
 static float mouse_sens = 0.15f;
 

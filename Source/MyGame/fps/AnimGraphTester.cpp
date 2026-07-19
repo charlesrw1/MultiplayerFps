@@ -22,7 +22,7 @@ static const StringName default_slot = StringName("MySlot");
 static const StringName default_slot_2 = StringName("MySlot2");
 
 static const uint32_t TERRAIN_MASK =
-    (1u << (int)PL::Default) | (1u << (int)PL::StaticObject);
+    (1u << 0) | (1u << 1);
 
 // Shortest-arc rotation taking unit vector `from` onto unit vector `to`. Robust at the
 // antiparallel (180 deg) singularity, which glm::rotation handles poorly.

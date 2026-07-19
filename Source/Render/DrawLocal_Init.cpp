@@ -122,6 +122,7 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphic
 
 	constants.forcecubemap = -1.0;
 
+
 	auto cur_jit = r_taa_manager.calc_frame_jitter(cur_w, cur_h);
 	auto prev_jit = r_taa_manager.get_last_frame_jitter(cur_w, cur_h);
 	if (r_taa_jitter_test.get_integer() == 1) {
@@ -166,8 +167,8 @@ void imgui_stat_hook() {
 	ImGui::Text("Vao binds: %d", stats.vertex_array_changes);
 	ImGui::Text("Blend changes: %d", stats.blend_changes);
 	ImGui::Separator();
-	ImGui::Text("shadow objs: %d", stats.shadow_objs);
-	ImGui::Text("shadow lights: %d", stats.shadow_lights);
+	ImGui::Text("Shadow objs: %d", stats.shadow_objs);
+	ImGui::Text("Shadow lights: %d", stats.shadow_lights);
 	ImGui::Separator();
 	auto& scene = draw.scene;
 	auto cf = BuildSceneData_CpuFast::inst;
