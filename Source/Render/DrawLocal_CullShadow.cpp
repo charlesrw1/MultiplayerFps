@@ -474,6 +474,10 @@ void BuildSceneData_CpuFast::on_fastpath_material_removed(MaterialInstance* mat)
 		mod_data_ptrs.at(fast_index) = nullptr;
 		mod_data.erase(found_key.value());
 		invalidate_these(fast_index);
+		// Stale out_cmds/batches built before this removal still reference the
+		// now-null slot; force rebuild_mod_data() before the next draw or
+		// do_draw_shared derefs the null ModelAndMatTData*.
+		force_rebuild = true;
 	} else {
 		sys_print(Warning, "on_fastpath_material_removed: couldn't find material???\n");
 	}
@@ -501,6 +505,10 @@ void BuildSceneData_CpuFast::on_model_removed(Model* m) {
 		mod_data_ptrs.at(idx) = nullptr;
 	for (const auto& key : keys_to_erase)
 		mod_data.erase(key);
+	// Stale out_cmds/batches built before this removal still reference the
+	// now-null slot(s); force rebuild_mod_data() before the next draw or
+	// do_draw_shared derefs a null ModelAndMatTData*.
+	force_rebuild = true;
 
 	// Invalidate all proxy objects that referenced this model.
 	// Set fastcpu_index to -1 (not in fast path) and clear proxy.model rather
