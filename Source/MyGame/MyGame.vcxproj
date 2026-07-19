@@ -55,6 +55,7 @@
     <ClCompile Include="bike\BikeCourse.cpp" />
     <ClCompile Include="bike\BikeCourseDebug.cpp" />
     <ClCompile Include="bike\BikeCourseHardcoded.cpp" />
+    <ClCompile Include="bike\BikeCourseMesh.cpp" />
     <ClCompile Include="bike\BikeCourseRacingLine.cpp" />
     <ClCompile Include="bike\BikeCourseRoadNetwork.cpp" />
     <ClCompile Include="bike\BikeDebugger.cpp" />

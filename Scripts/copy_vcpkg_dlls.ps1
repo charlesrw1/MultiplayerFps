@@ -54,7 +54,12 @@ $dlls = @(
     "libpng16d.dll",
     "brotlicommon.dll",
     "brotlidec.dll",
-    "brotlienc.dll"
+    "brotlienc.dll",
+    # SDL3_mixer's OGG/Vorbis decoding backend.
+    "ogg.dll",
+    "vorbis.dll",
+    "vorbisenc.dll",
+    "vorbisfile.dll"
 )
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null

@@ -8,9 +8,11 @@
 #include "Framework/MeshBuilder.h"
 #include "Sound/SoundPublic.h"
 #include "Render/MaterialPublic.h"
+#include "Render/DynamicModelPtr.h"
 
 class CharacterController;
 class Texture;
+class MeshComponent;
 
 // ============================================================
 // Rider stats — fixed per-archetype attributes
@@ -536,6 +538,8 @@ class BikeGameApplication : public Application {
 public:
 	CLASS_BODY(BikeGameApplication);
 
+	~BikeGameApplication() override;
+
 	void start() final;
 	void update() final;
 	void on_imgui() final;
@@ -545,6 +549,11 @@ public:
 
 	BikeCourse    course;
 	BikeDebugger  debugger;
+
+	// Build/refresh the visible road mesh (a flat ribbon strip along course.waypoints,
+	// road_half_width wide) and display it via a MeshComponent on a dedicated entity.
+	// Call after any full course rebuild (build_hardcoded_circuit/build_from_spawners).
+	void build_road_mesh();
 
 	// All riders (player + AI), populated by create_player / create_ai
 	std::vector<BikeObject*> all_riders;
@@ -578,6 +587,10 @@ private:
 	void update_gap_regulation();
 	void update_crack_triggers();
 	void debug_draw_course() const;
+
+	DynamicModelUniquePtr road_mesh;
+	Entity*        road_mesh_entity    = nullptr;
+	MeshComponent* road_mesh_component = nullptr;
 };
 
 // Shared per-rider stats text + gizmo overlay — defined in BikeApplication_Debug.cpp.

@@ -66,6 +66,9 @@
     <ClCompile Include="bike\BikeCourseHardcoded.cpp">
       <Filter>bike</Filter>
     </ClCompile>
+    <ClCompile Include="bike\BikeCourseMesh.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
     <ClCompile Include="bike\BikeCourseRacingLine.cpp">
       <Filter>bike</Filter>
     </ClCompile>
