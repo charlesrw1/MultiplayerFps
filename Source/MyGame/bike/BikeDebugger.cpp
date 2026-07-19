@@ -10,6 +10,8 @@
 #include "imgui.h"
 #include <glm/gtc/matrix_transform.hpp>
 
+extern BikeGameApplication* g_bike_app;
+
 void BikeDebugger::init()
 {
 	debug_cam_ent = GameplayStatic::spawn_entity();
@@ -151,6 +153,22 @@ void BikeDebugger::on_imgui()
 		}
 	} else {
 		ImGui::TextDisabled("No rider selected — click one to orbit and inspect it.");
+	}
+
+	if (g_bike_app) {
+		ImGui::SeparatorText("Course");
+		bool draw_racing_line = g_bike_app->draw_racing_line_debug;
+		if (ImGui::Checkbox("Draw racing spline", &draw_racing_line))
+			g_bike_app->set_draw_racing_line(draw_racing_line);
+
+		// Padding fraction of road_half_width the racing line stays within, so it doesn't ride
+		// right against the track edge. Rebuilding the road re-runs the racing-line simulation
+		// with the new margin and refreshes the road/racing-line meshes to match.
+		float margin = g_bike_app->course.rl_margin;
+		if (ImGui::SliderFloat("Racing line margin", &margin, 0.5f, 1.0f, "%.2f")) {
+			g_bike_app->course.rl_margin = margin;
+			g_bike_app->rebuild_course();
+		}
 	}
 
 	ImGui::SeparatorText("Time Control");

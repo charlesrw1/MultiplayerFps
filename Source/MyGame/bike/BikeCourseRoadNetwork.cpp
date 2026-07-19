@@ -641,5 +641,5 @@ void BikeCourse::build_from_road_network(
 
 	// Compute racing line offsets now that waypoints are built
 	if (is_built)
-		BikeCourse::compute_racing_line(waypoints, is_loop, rl_k, rl_mass, rl_dt, rl_num_iters, rl_smooth_passes, rl_smooth_w);
+		BikeCourse::compute_racing_line(waypoints, is_loop, rl_k, rl_mass, rl_dt, rl_num_iters, rl_smooth_passes, rl_smooth_w, rl_margin);
 }

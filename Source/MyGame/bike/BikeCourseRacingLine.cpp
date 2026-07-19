@@ -36,7 +36,7 @@ ADD_TO_DEBUG_MENU(raceline_debug);
 
 void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
                                      float k, float mass, float dt, int num_iters,
-                                     int smooth_passes, float smooth_w)
+                                     int smooth_passes, float smooth_w, float margin)
 {
 	const int n = (int)wps.size();
 	if (n < 3) return;
@@ -112,9 +112,9 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 		for (int i = first; i < last; ++i) {
 			vel[i] += (force[i] / mass - vel[i]) * lerp;
 			const float d_alpha = glm::dot(vel[i], wps[i].right);
-			// 0.9 keeps the racing line off the road edge — full-edge positions
+			// margin keeps the racing line off the road edge — full-edge positions
 			// cause AI crashes and produce hard-to-recover training episodes.
-			const float hw      = wps[i].road_half_width * 0.9f;
+			const float hw      = wps[i].road_half_width * margin;
 			alpha[i] = glm::clamp(alpha[i] + d_alpha, -hw, hw);
 		}
 	}
@@ -129,7 +129,7 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 			for (int i = 0; i < n; ++i) {
 				const int im = loop ? (i - 1 + n) % n : glm::max(i - 1, 0);
 				const int ip = loop ? (i + 1) % n     : glm::min(i + 1, n - 1);
-				const float hw = wps[i].road_half_width * 0.9f;
+				const float hw = wps[i].road_half_width * margin;
 				a2[i] = glm::clamp(
 					alpha[i] + smooth_w * (0.5f * (alpha[im] + alpha[ip]) - alpha[i]),
 					-hw, hw);
@@ -139,22 +139,57 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 	}
 
 	// Stage 2: targeted seam stitching for loop circuits.
-	// The Jacobi sim converges slowest at the loop boundary; 30 passes at w=0.3
-	// over a ±sw window reduce any residual jump by 0.7^30 ≈ 2e-5 (essentially zero).
-	if (loop) {
-		const int sw = std::min(n / 4, 12);
-		for (int pass = 0; pass < 30; ++pass) {
-			std::vector<float> a2 = alpha;
-			for (int k = -sw; k <= sw; ++k) {
-				const int i  = ((k % n) + n) % n;
-				const int im = (i - 1 + n) % n;
-				const int ip = (i + 1) % n;
-				const float hw = wps[i].road_half_width * 0.9f;
-				a2[i] = glm::clamp(
-					alpha[i] + 0.3f * (0.5f * (alpha[im] + alpha[ip]) - alpha[i]),
-					-hw, hw);
+	// The Jacobi sim can converge slowest at the array's index-0/n-1 boundary (real road-network
+	// courses often have an irregularly-spaced closing edge there), leaving a residual kink. But
+	// index 0 isn't inherently special -- for a uniformly-sampled course (e.g. the hardcoded test
+	// circuit) there's no reason the seam should differ from any other point, and a corner apex
+	// can legitimately land there. So rather than unconditionally flattening a fixed window around
+	// the seam (which would erase a real apex, not just a convergence artifact), only correct it
+	// if the seam's curvature is actually anomalous compared to the sharpest curvature seen
+	// anywhere else in the course: a genuine convergence kink exceeds what even the tightest
+	// legitimate corner apex produces, whereas a corner apex landing on the seam won't.
+	if (loop && n >= 8) {
+		auto local_curvature = [&](int i) {
+			const int im = (i - 1 + n) % n;
+			const int ip = (i + 1) % n;
+			return alpha[i] - 0.5f * (alpha[im] + alpha[ip]);
+		};
+
+		const float seam_curv = local_curvature(0);
+
+		// Baseline: the single largest |curvature| found anywhere else in the loop (i.e. the
+		// sharpest legitimate corner apex), excluding a window around the seam itself so the
+		// seam can't set its own baseline.
+		const int exclude = std::min(n / 2 - 1, 3);
+		float max_other_curv = 0.f;
+		for (int i = 0; i < n; ++i) {
+			const int dist_to_seam = std::min(i, n - i);
+			if (dist_to_seam <= exclude) continue;
+			max_other_curv = glm::max(max_other_curv, glm::abs(local_curvature(i)));
+		}
+
+		// Require the seam to clearly exceed the sharpest legitimate corner (not just tie it)
+		// before treating it as a defect, so borderline cases favour keeping the raw apex.
+		const bool triggered = glm::abs(seam_curv) > max_other_curv * 1.5f;
+
+		if (triggered) {
+			const int sw = std::min(n / 4, 12);
+			for (int pass = 0; pass < 30; ++pass) {
+				std::vector<float> a2 = alpha;
+				for (int k = -sw; k <= sw; ++k) {
+					const int i  = ((k % n) + n) % n;
+					const int im = (i - 1 + n) % n;
+					const int ip = (i + 1) % n;
+					// Taper to zero at the window edges so correction is concentrated at the
+					// seam itself rather than uniformly overwriting the whole window.
+					const float taper = 1.f - glm::abs((float)k) / (float)(sw + 1);
+					const float hw = wps[i].road_half_width * margin;
+					a2[i] = glm::clamp(
+						alpha[i] + 0.3f * taper * (0.5f * (alpha[im] + alpha[ip]) - alpha[i]),
+						-hw, hw);
+				}
+				alpha = std::move(a2);
 			}
-			alpha = std::move(a2);
 		}
 	}
 

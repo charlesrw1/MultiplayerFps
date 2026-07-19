@@ -53,6 +53,9 @@ public:
 	// Applied to all courses before seam stitching.
 	int   rl_smooth_passes = 0;    // laplacian passes after simulation
 	float rl_smooth_w      = 0.25f; // blend weight per pass (0=off, 1=full laplacian)
+	// Padding fraction of road_half_width the racing line is clamped within, so it doesn't
+	// ride right against the track edge (1.0 = full edge, lower = more margin).
+	float rl_margin        = 0.9f;
 
 	// Re-run the racing line simulation on the current waypoints using the stored rl_* params.
 	void rebuild_racing_line();
@@ -107,6 +110,9 @@ public:
 	// Draw the spline in the debug overlay (gradient-coloured, with road-width tick marks).
 	void debug_draw() const;
 
+	// Draw just the ideal racing line (orange), no centerline/tick marks.
+	void debug_draw_racing_line() const;
+
 	// Dump every waypoint to CSV with source tag (edge/arc), heading/curvature deltas,
 	// racing-line saturation flag, and lateral/world jumps from the previous waypoint.
 	// Use this to localise raceline/fillet glitches: large d_heading or d_rl_world rows
@@ -123,13 +129,15 @@ public:
 	// mass:      mass of each waypoint
 	// dt:        time step per iteration (lerp factor = dt/100)
 	// num_iters: simulation steps — more = better convergence
+	// margin:    fraction of road_half_width the line is clamped within (1.0 = full edge)
 	static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 	                                float k            = 2.0f,
 	                                float mass         = 0.50f,
 	                                float dt           = 1.0f/60.f,
 	                                int   num_iters    = 5000,
 	                                int   smooth_passes = 20,
-	                                float smooth_w      = 0.25f);
+	                                float smooth_w      = 0.25f,
+	                                float margin        = 0.9f);
 
 };
 

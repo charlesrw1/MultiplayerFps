@@ -138,6 +138,8 @@ void BikeGameApplication::rebuild_course()
 {
 	build_hardcoded_circuit(course);
 	build_road_mesh();
+	if (draw_racing_line_debug)
+		set_draw_racing_line(true);
 }
 
 void BikeGameApplication::respawn_ai()

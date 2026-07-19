@@ -40,6 +40,21 @@ void BikeCourse::debug_draw() const
 	}
 }
 
+void BikeCourse::debug_draw_racing_line() const
+{
+	if (!is_built || (int)waypoints.size() < 2) return;
+
+	const int n        = (int)waypoints.size();
+	const int num_segs = is_loop ? n : n - 1;
+
+	for (int i = 0; i < num_segs; ++i) {
+		const BikeWaypoint& wp   = waypoints[i];
+		const BikeWaypoint& next = waypoints[(i + 1) % n];
+		Debug::add_line(wp.racing_line_pos, next.racing_line_pos,
+		                Color32(0xff, 0x99, 0x00, 0xff), -1.f);
+	}
+}
+
 void BikeCourse::debug_draw_fillets() const
 {
 	for (const auto& f : debug_fillets) {

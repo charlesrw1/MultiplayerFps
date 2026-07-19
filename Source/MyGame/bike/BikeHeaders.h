@@ -13,6 +13,7 @@
 class CharacterController;
 class Texture;
 class MeshComponent;
+class MeshBuilderComponent;
 
 // ============================================================
 // Rider stats — fixed per-archetype attributes
@@ -555,6 +556,11 @@ public:
 	// Call after any full course rebuild (build_hardcoded_circuit/build_from_spawners).
 	void build_road_mesh();
 
+	// Show/hide the ideal racing line as a MeshBuilder line strip (orange), rebuilt
+	// from course.waypoints[*].racing_line_pos. Bound to BikeDebugger's checkbox.
+	void set_draw_racing_line(bool show);
+	bool draw_racing_line_debug = false;
+
 	// All riders (player + AI), populated by create_player / create_ai
 	std::vector<BikeObject*> all_riders;
 	// Sorted front-to-back by course_dist_m each frame (index 0 = race leader)
@@ -591,6 +597,9 @@ private:
 	DynamicModelUniquePtr road_mesh;
 	Entity*        road_mesh_entity    = nullptr;
 	MeshComponent* road_mesh_component = nullptr;
+
+	Entity*               racing_line_entity = nullptr;
+	MeshBuilderComponent* racing_line_mb     = nullptr;
 };
 
 // Shared per-rider stats text + gizmo overlay — defined in BikeApplication_Debug.cpp.

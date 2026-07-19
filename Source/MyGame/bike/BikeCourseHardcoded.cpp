@@ -56,10 +56,12 @@ void build_hardcoded_circuit(BikeCourse& course)
 {
 	static constexpr float ROAD_HALF_WIDTH = 4.f * (2.f / 3.f);
 	static constexpr float Y_EPS           = 0.02f;   // small epsilon above ground 0
-	static constexpr float LEG_NS          = 22.f;    // north/south straight length (m)
-	static constexpr float LEG_EW          = 14.f;    // east/west straight length (m)
+	// Legs sized so the bbox (leg + wide radius + tight radius, per axis) fills the
+	// full -30m..+30m square on both x and z.
 	static constexpr float RADIUS_WIDE     = 12.f;    // fast sweeper corners (NE, SW)
 	static constexpr float RADIUS_TIGHT    = 5.f;      // hairpin-like corners (SE, NW)
+	static constexpr float LEG_NS          = 60.f - RADIUS_WIDE - RADIUS_TIGHT;  // north/south straight length (m)
+	static constexpr float LEG_EW          = 60.f - RADIUS_WIDE - RADIUS_TIGHT;  // east/west straight length (m)
 
 	// Opposite corners must share a radius for the turtle path to close exactly
 	// in position (each cardinal-direction leg's net displacement only cancels
@@ -138,5 +140,6 @@ void build_hardcoded_circuit(BikeCourse& course)
 
 	BikeCourse::compute_racing_line(course.waypoints, course.is_loop,
 	                                 course.rl_k, course.rl_mass, course.rl_dt,
-	                                 course.rl_num_iters, course.rl_smooth_passes, course.rl_smooth_w);
+	                                 course.rl_num_iters, course.rl_smooth_passes, course.rl_smooth_w,
+	                                 course.rl_margin);
 }
