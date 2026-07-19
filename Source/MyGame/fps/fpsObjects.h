@@ -103,6 +103,8 @@ public:
 class fpsPlayer : public Component {
 public:
 	CLASS_BODY(fpsPlayer);
+	fpsPlayer();
+	~fpsPlayer() override;
 	void start() override;
 	void stop() override;
 

@@ -194,7 +194,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -214,7 +214,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
@@ -234,7 +234,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>

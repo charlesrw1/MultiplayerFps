@@ -244,12 +244,6 @@
     <ClCompile Include="LevelEditor\ViewportHandles.cpp" />
     <ClCompile Include="LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Logging.cpp" />
-    <ClCompile Include="MyGame\fps\fpsApp.cpp" />
-    <ClCompile Include="MyGame\fps\fpsDebugCamera.cpp" />
-    <ClCompile Include="MyGame\fps\AnimGraphTester.cpp" />
-    <ClCompile Include="MyGame\fps\AnimGraphTesterEditorUI.cpp" />
-    <ClCompile Include="MyGame\fps\fpsObjects.cpp" />
-    <ClCompile Include="MyGame\fps\fpsTestObjects.cpp" />
     <ClCompile Include="Render\DdsExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -461,12 +455,6 @@
     <ClInclude Include="LevelEditor\ViewportHandles.h" />
     <ClInclude Include="LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Logging.h" />
-    <ClInclude Include="MyGame\fps\fpsApp.h" />
-    <ClInclude Include="MyGame\fps\fpsDebugCamera.h" />
-    <ClInclude Include="MyGame\fps\AnimGraphTester.h" />
-    <ClInclude Include="MyGame\fps\AnimGraphTesterEditorUI.h" />
-    <ClInclude Include="MyGame\fps\fpsObjects.h" />
-    <ClInclude Include="MyGame\fps\fpsTestObjects.h" />
     <ClInclude Include="Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Render\Dx11\Dx11Local.h" />
     <ClInclude Include="Render\GpuAllocator.h" />
@@ -877,12 +865,8 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-  <ItemGroup>
-    <_CodegenInputHeader Include="$(ProjectDir)**\*.h" Exclude="$(ProjectDir).generated\**;$(ProjectDir)External\**" />
-    <_CodegenScript Include="$(SolutionDir)Scripts\codegen.py;$(SolutionDir)Scripts\codegen_run.py;$(SolutionDir)Scripts\codegen_lib.py;$(SolutionDir)Scripts\codegen_generate.py" />
-  </ItemGroup>
-  <Target Name="GenerateMEGA" BeforeTargets="ClCompile" Inputs="@(_CodegenInputHeader);@(_CodegenScript)" Outputs="$(ProjectDir).generated\MEGA.gen.cpp">
-    <Message Text="Running codegen (inputs changed)..." Importance="high" />
-    <Exec Command="py &quot;$(SolutionDir)Scripts\codegen.py&quot;" WorkingDirectory="$(SolutionDir)" />
-  </Target>
+  <PropertyGroup>
+    <CodegenExcludeExtra>$(ProjectDir)MyGame\**</CodegenExcludeExtra>
+  </PropertyGroup>
+  <Import Project="$(SolutionDir)Scripts\GameProjectCodegen.targets" />
 </Project>

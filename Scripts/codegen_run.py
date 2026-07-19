@@ -2,7 +2,9 @@ from codegen_lib import *
 import codegen_generate as generate
 import time
 PRINT_SOURCE_FILES = True
-def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuild:bool):
+def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuild:bool,
+                generated_root:str = "./.generated/", mega_name:str = "MEGA",
+                lua_stub_filename:str = "lua_stubs.lua"):
 
     print(f"Starting codegen script... fullrebuild={full_rebuild}")
     start_time = time.perf_counter()
@@ -15,10 +17,10 @@ def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuil
     elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
     print(f"read enums and structs in {elapsed_time:.2f} ms")
 
-    GENERATED_ROOT = "./.generated/"
+    GENERATED_ROOT = generated_root
     mega_file_time = 0.0
     try:
-        mega_file_time = os.path.getmtime(GENERATED_ROOT+"MEGA.gen.cpp")
+        mega_file_time = os.path.getmtime(GENERATED_ROOT+mega_name+".gen.cpp")
     except:
         pass
     print(f"mega file time {mega_file_time}")
@@ -51,7 +53,7 @@ def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuil
 
     #for o in output_files:
     #   generate.write_output_file(GENERATED_ROOT,o.filename,o.root,o.classes,o.additional_includes, typenames)
-    generate.write_output_file(lua_output_path, GENERATED_ROOT,"MEGA.h",".",mega_output.classes,mega_output.additional_includes,typenames)
+    generate.write_output_file(lua_output_path, GENERATED_ROOT,mega_name+".h",".",mega_output.classes,mega_output.additional_includes,typenames,lua_stub_filename)
 
     end_time = time.perf_counter()
     elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds

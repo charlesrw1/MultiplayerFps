@@ -860,7 +860,7 @@ def write_lua_class(newclass:ClassDef) -> str:
     return output
   
 
-def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef]):
+def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef], lua_stub_filename:str = "lua_stubs.lua"):
     generated_path = root + "/" + os.path.splitext(filename)[0]
     if generated_path[0]=='.':
         generated_path=generated_path[2:]
@@ -887,7 +887,7 @@ def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,
                 file.write(write_class_old(typenames,c))
 
 
-    lua_stub_path = LUA_GEN_DIR + "/lua_stubs.lua"
+    lua_stub_path = LUA_GEN_DIR + "/" + lua_stub_filename
     with open(lua_stub_path,"w") as luaFile:
         print(f"Writing lua stubs {lua_stub_path}")
 

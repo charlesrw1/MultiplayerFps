@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Shared codegen hookup for ClassBase-scanning projects. Import this from a vcxproj to get a
+  GenerateMEGA target that runs Scripts/codegen.py before ClCompile. Each importing vcxproj gets
+  its own copy of the target (targets are scoped per-project), so the shared name is fine.
+
+  Set these MSBuild properties before the Import to customize (both optional, default to Core's
+  original behavior):
+    CodegenSubdir   - project-relative subdir (from Source/) to scan/generate for, e.g. "./MyGame".
+                      Defaults to "." (the whole Source tree - this is Core's own pass).
+    CodegenMegaName - base name of the generated mega file, e.g. "MyGameMEGA".
+                      Defaults to "MEGA".
+    CodegenExcludeExtra - additional ';'-separated glob(s) to exclude from this project's own
+                      header scan, e.g. a sibling project dir that has split itself out and
+                      generates its own mega file. Defaults to empty.
+
+  To add a new split-out project: create its vcxproj, set the two properties above, Import this
+  file, add its dir to SPLIT_PROJECT_DIRS in Scripts/codegen.py, and set CodegenExcludeExtra on
+  Core's vcxproj (before Core's own Import of this file) to exclude the new project's dir.
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <CodegenSubdir Condition="'$(CodegenSubdir)'==''">.</CodegenSubdir>
+    <CodegenMegaName Condition="'$(CodegenMegaName)'==''">MEGA</CodegenMegaName>
+    <CodegenExcludeExtra Condition="'$(CodegenExcludeExtra)'==''"></CodegenExcludeExtra>
+  </PropertyGroup>
+  <ItemGroup>
+    <_CodegenInputHeader Include="$(ProjectDir)**\*.h" Exclude="$(ProjectDir).generated\**;$(ProjectDir)External\**;$(CodegenExcludeExtra)" />
+    <_CodegenScript Include="$(SolutionDir)Scripts\codegen.py;$(SolutionDir)Scripts\codegen_run.py;$(SolutionDir)Scripts\codegen_lib.py;$(SolutionDir)Scripts\codegen_generate.py" />
+  </ItemGroup>
+  <Target Name="GenerateMEGA" BeforeTargets="ClCompile" Inputs="@(_CodegenInputHeader);@(_CodegenScript)" Outputs="$(ProjectDir).generated\$(CodegenMegaName).gen.cpp">
+    <Message Text="Running codegen for $(MSBuildProjectName) (inputs changed)..." Importance="high" />
+    <Exec Command="py &quot;$(SolutionDir)Scripts\codegen.py&quot; &quot;$(CodegenSubdir)&quot; &quot;$(CodegenMegaName)&quot;" WorkingDirectory="$(SolutionDir)" />
+  </Target>
+</Project>

@@ -76,12 +76,6 @@
     <Filter Include="LevelSerialization">
       <UniqueIdentifier>{c38509c2-f9be-5936-91ec-4a675db83563}</UniqueIdentifier>
     </Filter>
-    <Filter Include="MyGame">
-      <UniqueIdentifier>{e0a22cdd-94ba-53df-9c56-d41e15e0a2cd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="MyGame\fps">
-      <UniqueIdentifier>{b00e5779-12a4-57be-9227-82a4fa56643a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Navigation">
       <UniqueIdentifier>{9ccd8f75-7613-51da-b1fb-1fc848e9c9bc}</UniqueIdentifier>
     </Filter>
@@ -660,24 +654,6 @@
       <Filter>LevelSerialization</Filter>
     </ClCompile>
     <ClCompile Include="Logging.cpp" />
-    <ClCompile Include="MyGame\fps\AnimGraphTester.cpp">
-      <Filter>MyGame\fps</Filter>
-    </ClCompile>
-    <ClCompile Include="MyGame\fps\AnimGraphTesterEditorUI.cpp">
-      <Filter>MyGame\fps</Filter>
-    </ClCompile>
-    <ClCompile Include="MyGame\fps\fpsApp.cpp">
-      <Filter>MyGame\fps</Filter>
-    </ClCompile>
-    <ClCompile Include="MyGame\fps\fpsDebugCamera.cpp">
-      <Filter>MyGame\fps</Filter>
-    </ClCompile>
-    <ClCompile Include="MyGame\fps\fpsObjects.cpp">
-      <Filter>MyGame\fps</Filter>
-    </ClCompile>
-    <ClCompile Include="MyGame\fps\fpsTestObjects.cpp">
-      <Filter>MyGame\fps</Filter>
-    </ClCompile>
     <ClCompile Include="Navigation\LevelNavUtil.cpp">
       <Filter>Navigation</Filter>
     </ClCompile>
@@ -1544,24 +1520,6 @@
       <Filter>LevelSerialization</Filter>
     </ClInclude>
     <ClInclude Include="Logging.h" />
-    <ClInclude Include="MyGame\fps\AnimGraphTester.h">
-      <Filter>MyGame\fps</Filter>
-    </ClInclude>
-    <ClInclude Include="MyGame\fps\AnimGraphTesterEditorUI.h">
-      <Filter>MyGame\fps</Filter>
-    </ClInclude>
-    <ClInclude Include="MyGame\fps\fpsApp.h">
-      <Filter>MyGame\fps</Filter>
-    </ClInclude>
-    <ClInclude Include="MyGame\fps\fpsDebugCamera.h">
-      <Filter>MyGame\fps</Filter>
-    </ClInclude>
-    <ClInclude Include="MyGame\fps\fpsObjects.h">
-      <Filter>MyGame\fps</Filter>
-    </ClInclude>
-    <ClInclude Include="MyGame\fps\fpsTestObjects.h">
-      <Filter>MyGame\fps</Filter>
-    </ClInclude>
     <ClInclude Include="Navigation\LevelNavUtil.h">
       <Filter>Navigation</Filter>
     </ClInclude>

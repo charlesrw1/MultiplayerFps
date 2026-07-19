@@ -48,6 +48,11 @@ static void fps_move_vars_menu() {
 }
 ADD_TO_DEBUG_MENU(fps_move_vars_menu);
 
+fpsPlayer::fpsPlayer() = default;
+// Out-of-line so CharacterController (forward-declared in fpsObjects.h) is a complete type
+// wherever this destructor gets instantiated, including from the codegen'd MEGA translation unit.
+fpsPlayer::~fpsPlayer() = default;
+
 void fpsPlayer::start() {
 	auto* capsule = get_owner()->get_component<CapsuleComponent>();
 	ASSERT(capsule);

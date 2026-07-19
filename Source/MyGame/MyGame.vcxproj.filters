@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="fps">
+      <UniqueIdentifier>{b00e5779-12a4-57be-9227-82a4fa56643a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="fps\fpsApp.cpp">
+      <Filter>fps</Filter>
+    </ClCompile>
+    <ClCompile Include="fps\fpsDebugCamera.cpp">
+      <Filter>fps</Filter>
+    </ClCompile>
+    <ClCompile Include="fps\AnimGraphTester.cpp">
+      <Filter>fps</Filter>
+    </ClCompile>
+    <ClCompile Include="fps\AnimGraphTesterEditorUI.cpp">
+      <Filter>fps</Filter>
+    </ClCompile>
+    <ClCompile Include="fps\fpsObjects.cpp">
+      <Filter>fps</Filter>
+    </ClCompile>
+    <ClCompile Include="fps\fpsTestObjects.cpp">
+      <Filter>fps</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="fps\fpsApp.h">
+      <Filter>fps</Filter>
+    </ClInclude>
+    <ClInclude Include="fps\fpsDebugCamera.h">
+      <Filter>fps</Filter>
+    </ClInclude>
+    <ClInclude Include="fps\AnimGraphTester.h">
+      <Filter>fps</Filter>
+    </ClInclude>
+    <ClInclude Include="fps\AnimGraphTesterEditorUI.h">
+      <Filter>fps</Filter>
+    </ClInclude>
+    <ClInclude Include="fps\fpsObjects.h">
+      <Filter>fps</Filter>
+    </ClInclude>
+    <ClInclude Include="fps\fpsTestObjects.h">
+      <Filter>fps</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

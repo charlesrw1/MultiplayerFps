@@ -11,7 +11,7 @@ extern ConfigVar loglevel;
 #include "DebugConsole.h"
 #include <iomanip>
 #include <mutex>
-#include <varargs.h>
+#include <cstdarg>
 Color32 get_color_of_print(LogType type) {
 
 	const Color32 err = { 255, 105, 105 };
