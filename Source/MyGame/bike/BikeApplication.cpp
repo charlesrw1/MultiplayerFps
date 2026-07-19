@@ -93,11 +93,12 @@ void BikeGameApplication::collect_crack_decals()
 
 void BikeGameApplication::start()
 {
-	GameplayStatic::change_level("maps/bike_test_map.tmap");
+	GameplayStatic::change_level("bike/bike_test_map.tmap");
 
-	course.build_from_spawners();
+	build_hardcoded_circuit(course);
 
 	collect_crack_decals();
+	debugger.init();
 
 	// Spawn finish line prop at the course start/finish position
 	if (course.is_built) {
@@ -110,17 +111,16 @@ void BikeGameApplication::start()
 			Model::load("props/race_props/finish_line.cmdl"));
 	}
 
-	// Spawn player at the course start
+	// AI-only: spawn num_ai riders staggered behind the course start. Player
+	// support is re-added later by calling create_player() here too.
 	const glm::vec3 start_pos = course.is_built
 		? course.sample(0.f).position
 		: glm::vec3(0.f);
-	create_player(start_pos);
 
-	// Spawn AI riders staggered 5 m apart behind the player
 	static constexpr float AI_GAP_M      = 5.f;   // spacing along course (m)
 	static constexpr float AI_LAT_SPREAD = 1.2f;  // lateral spread so they don't all overlap
 	for (int i = 0; i < num_ai; ++i) {
-		const float dist   = -(i + 1) * AI_GAP_M;  // behind player
+		const float dist   = -(i + 1) * AI_GAP_M;  // behind the start line
 		glm::vec3   pos    = start_pos;
 		if (course.is_built) {
 			const BikeWaypoint wp = course.sample(
@@ -135,7 +135,7 @@ void BikeGameApplication::start()
 
 void BikeGameApplication::rebuild_course()
 {
-	course.build_from_spawners();
+	build_hardcoded_circuit(course);
 }
 
 void BikeGameApplication::respawn_ai()
@@ -198,8 +198,14 @@ void BikeGameApplication::update()
 	}
 	update_crack_triggers();
 	apply_debug_follow_camera();
+	debugger.update(all_riders);
 
 	ai_debug_update(this, eng->get_dt());
+}
+
+void BikeGameApplication::on_imgui()
+{
+	debugger.on_imgui();
 }
 
 void BikeGameApplication::update_course_positions()

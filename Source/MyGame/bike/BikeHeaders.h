@@ -2,10 +2,12 @@
 #include "Game/EntityPtr.h"
 #include "Game/Entity.h"
 #include "BikeCourse.h"
+#include "BikeDebugger.h"
 #include <array>
 #include "Framework/MulticastDelegate.h"
 #include "Framework/MeshBuilder.h"
 #include "Sound/SoundPublic.h"
+#include "Render/MaterialPublic.h"
 
 class CharacterController;
 class Texture;
@@ -519,6 +521,10 @@ public:
 
 	EntityPtr fork_entity;
 
+	// Jersey color material — owns the dynamic material applied to the prefab's
+	// "rider_body" mesh in start(); must outlive that mesh's material_override.
+	DynamicMatUniquePtr jersey_mat;
+
 	glm::vec3 prev_front_wheel_pos{};
 	glm::vec3 prev_rear_wheel_pos{};
 	bool wheel_history_initialized = false;
@@ -532,11 +538,13 @@ public:
 
 	void start() final;
 	void update() final;
+	void on_imgui() final;
 
 	BikeObject* create_player(glm::vec3 pos);
 	BikeObject* create_ai(glm::vec3 pos);
 
-	BikeCourse course;
+	BikeCourse    course;
+	BikeDebugger  debugger;
 
 	// All riders (player + AI), populated by create_player / create_ai
 	std::vector<BikeObject*> all_riders;
@@ -571,3 +579,7 @@ private:
 	void update_crack_triggers();
 	void debug_draw_course() const;
 };
+
+// Shared per-rider stats text + gizmo overlay — defined in BikeApplication_Debug.cpp.
+// Used by the index-based follow camera and BikeDebugger's click-to-select orbit camera.
+void draw_rider_debug_info(BikeObject* bo);

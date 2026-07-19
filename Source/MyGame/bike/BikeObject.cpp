@@ -6,7 +6,10 @@
 
 // Wind state accessed via g_wind (defined in BikeWind.cpp)
 #include "Game/Components/MeshComponent.h"
+#include "Game/Components/PhysicsComponents.h"
+#include "Game/Prefab.h"
 #include "Render/Model.h"
+#include "Render/MaterialPublic.h"
 #include "Framework/MathLib.h"
 #include "Framework/Config.h"
 #include "Physics/Physics2.h"
@@ -31,23 +34,89 @@ static BikeObject* s_bike_debug = nullptr;  // set each tick for debug menu
 // BikeObject
 // ============================================================
 
+// Small palette of saturated jersey colors — avoids random RGB occasionally
+// landing on a muddy brown/grey, keeps riders visually distinct.
+static const Color32 s_jersey_palette[] = {
+	{ 220, 30,  30,  255 },  // red
+	{ 30,  80,  220, 255 },  // blue
+	{ 40,  180, 60,  255 },  // green
+	{ 230, 200, 20,  255 },  // yellow
+	{ 230, 120, 20,  255 },  // orange
+	{ 150, 40,  200, 255 },  // purple
+	{ 30,  190, 200, 255 },  // cyan
+	{ 230, 40,  150, 255 },  // pink
+	{ 20,  20,  20,  255 },  // black
+	{ 240, 240, 240, 255 },  // white
+};
+
+// Strips any auto-generated collision off a spawned cosmetic mesh (recursing
+// into children, e.g. "fork" under "frame") — MeshComponent::add_collision_if_available
+// defaults to true, and the prefab's primitive shapes (capsule/sphere/cube) all
+// carry baked-in collision, which was self-hitting the terrain-follow raycast.
+static void strip_cosmetic_collision(Entity* e)
+{
+	if (!e) return;
+	if (auto* mesh = e->get_component<MeshComponent>())
+		mesh->set_add_collision(false);
+	if (auto* collider = e->get_component<MeshColliderComponent>())
+		collider->destroy();
+	for (Entity* child : e->get_children())
+		strip_cosmetic_collision(child);
+}
+
 void BikeObject::start()
 {
 	ASSERT(get_owner() != nullptr);
 	set_ticking(true);
-	auto* model = get_owner()->create_component<MeshComponent>();
-	model->set_model(Model::load("props/road_bike/road_bike.cmdl"));
 	bike_direction = glm::vec3(0.f, 0.f, 1.f);
 
-	auto* fork_ent = GameplayStatic::spawn_entity()->create_component<MeshComponent>();
-	fork_ent->set_model(Model::load("props/road_bike/road_bike_fork.cmdl"));
-	fork_ent->get_owner()->parent_to(get_owner());
-	fork_ent->get_owner()->set_ls_position_rotation(
-		glm::vec3(0.f, 0.747, -0.349),
-		glm::quat(glm::vec3(glm::radians(17.77f), 0.f, 0.f))
-	);
+	// Assign palette colors by spawn order, not randomly, so concurrently-alive
+	// riders never duplicate a jersey color (as long as rider count <= palette size).
+	static constexpr int NUM_JERSEY_COLORS = (int)(sizeof(s_jersey_palette) / sizeof(s_jersey_palette[0]));
+	static int s_next_jersey_index = 0;
+	const Color32 jersey_color = s_jersey_palette[s_next_jersey_index % NUM_JERSEY_COLORS];
+	++s_next_jersey_index;
 
-	this->fork_entity = fork_ent->get_owner();
+	// Cosmetics-only: bike_rider.tprefab has no logic components, just the
+	// frame/fork/rider meshes, parented onto this (logic) entity.
+	// `transform` must be the bike's current world transform, not identity:
+	// PrefabAsset::spawn places roots at transform * authored_local_offset, then
+	// bakes THAT world position into the parent-relative offset. Passing identity
+	// placed the mesh near world origin and baked in a bogus local offset that
+	// then swung wildly as the bike rotated (steering lean / terrain roll).
+	auto roots = PrefabAsset::spawn("bike/bike_rider.tprefab", get_owner()->get_ws_transform(), get_owner());
+	for (const EntityPtr& root : roots) {
+		if (!root) continue;
+		strip_cosmetic_collision(root.get());
+
+		if (root->get_editor_name() == "rider_body") {
+			if (auto* mesh = root->get_component<MeshComponent>()) {
+				jersey_mat = imaterials->create_dynmaic_material(MaterialInstance::load("defaultPBR.mm"));
+				// colorMult is declared "VAR vec4" in defaultPBR.mm, which the material
+				// parser treats as MatParamType::Vector (a packed Color32), not FloatVec —
+				// set_floatvec_parameter silently no-ops against it (param-type mismatch).
+				jersey_mat->set_u8vec_parameter("colorMult", jersey_color);
+				mesh->set_material_override(jersey_mat.get());
+			}
+		} else if (root->get_editor_name() == "frame") {
+			for (Entity* child : root->get_children()) {
+				if (child->get_editor_name() == "fork")
+					fork_entity = child;
+			}
+		}
+	}
+
+	// Click-to-select target for BikeDebugger: a kinematic sphere on the
+	// Character layer (never touched by the terrain-follow raycast above, which
+	// explicitly excludes that layer). Must NOT be a trigger — PhysicsBody::
+	// set_shape_flags() only sets PxShapeFlag::eSCENE_QUERY_SHAPE on non-trigger
+	// shapes, so a trigger shape is invisible to raycasts entirely (this is what
+	// broke click-to-select the first time). Kinematic means it never moves
+	// under simulation, so it's safe to leave as a normal (blocking) shape.
+	auto* pick = get_owner()->create_component<SphereComponent>();
+	pick->set_radius(1.1f);
+	pick->set_body_type(BodyType::Kinematic);
+	pick->set_physics_layer(PL::Character);
 }
 
 void BikeObject::update()
@@ -133,9 +202,12 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	const glm::vec3 rear_org  = pos + bike_direction * BIKE_REAR_Z  + glm::vec3(0, ray_up, 0);
 	const glm::vec3 down      = glm::vec3(0, -(ray_up + ray_reach), 0);
 
+	// Excludes PL::Character so this never hits a rider's own pick-sphere (or any
+	// other rider) instead of the ground — was causing riders to bounce vertically.
+	const uint32_t terrain_mask = ~(uint32_t)(1 << (int)PL::Character);
 	world_query_result front_res, rear_res;
-	const bool front_hit = g_physics.trace_ray(front_res, front_org, front_org + down, nullptr, UINT32_MAX);
-	const bool rear_hit  = g_physics.trace_ray(rear_res,  rear_org,  rear_org  + down, nullptr, UINT32_MAX);
+	const bool front_hit = g_physics.trace_ray(front_res, front_org, front_org + down, nullptr, terrain_mask);
+	const bool rear_hit  = g_physics.trace_ray(rear_res,  rear_org,  rear_org  + down, nullptr, terrain_mask);
 
 	// When steered, the front contact is laterally displaced from bike_direction.
 	// slope_vec (front - rear) therefore has a lateral component that would corrupt:

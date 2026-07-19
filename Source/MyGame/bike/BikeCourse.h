@@ -132,3 +132,11 @@ public:
 	                                float smooth_w      = 0.25f);
 
 };
+
+// Builds a flat, closed-loop test circuit entirely in code (no level spawners,
+// no road network). Rounded rectangle with two wide sweeping corners and two
+// tight hairpin-like corners (opposite corners share a radius so the turtle
+// path closes exactly), all at y = 0 + small epsilon. Fills waypoints,
+// dist_from_start, total_length_m, is_loop/is_built, and runs
+// BikeCourse::compute_racing_line on the result.
+void build_hardcoded_circuit(BikeCourse& course);

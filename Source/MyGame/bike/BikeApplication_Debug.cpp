@@ -100,38 +100,11 @@ float g_follow_dist   = 3.4f;
 float g_follow_height = 1.55f;
 float g_follow_pitch  = -20.f;
 
-// Called by BikeGameApplication::update() after all rider updates
-void apply_debug_follow_camera()
+// Shared per-rider stats text + gizmo overlay — used by both the index-based
+// follow camera below and BikeDebugger's click-to-select orbit camera.
+void draw_rider_debug_info(BikeObject* bo)
 {
-	if (!g_follow_rider || !g_bike_app) return;
-	const auto& all = g_bike_app->all_riders;
-	if (all.empty()) return;
-	const int idx = glm::clamp(g_follow_idx, 0, (int)all.size() - 1);
-	BikeObject* bo = all[idx];
-
-	CameraComponent* cc = CameraComponent::get_scene_camera();
-	if (!cc) return;
-
-	const glm::vec3 fwd      = glm::normalize(bo->bike_direction);
-	const glm::vec3 world_up = glm::vec3(0, 1, 0);
-	const glm::vec3 pivot    = bo->get_ws_position() + world_up * g_follow_height;
-	const glm::vec3 right    = glm::normalize(glm::cross(fwd, world_up));
-
-	const glm::quat pitch_rot = glm::angleAxis(glm::radians(g_follow_pitch), right);
-	const glm::vec3 orbit_dir = glm::normalize(pitch_rot * (-fwd));
-	const glm::vec3 cam_pos   = pivot + orbit_dir * g_follow_dist;
-
-	const glm::vec3 look_at   = pivot + fwd * 3.f;
-	const glm::vec3 cam_fwd   = glm::normalize(look_at - cam_pos);
-	const glm::vec3 cam_right = glm::normalize(glm::cross(cam_fwd, world_up));
-	const glm::vec3 cam_up    = glm::normalize(glm::cross(cam_right, cam_fwd));
-
-	cc->get_owner()->set_ws_transform(glm::mat4(
-		glm::vec4(cam_right, 0.f),
-		glm::vec4(cam_up,    0.f),
-		glm::vec4(-cam_fwd,  0.f),
-		glm::vec4(cam_pos,   1.f)));
-
+	if (!bo) return;
 	BikePlayer* bp = dynamic_cast<BikePlayer*>(bo->input.get());
 	BikeAI*     ai = dynamic_cast<BikeAI*>(bo->input.get());
 	if (bp) {
@@ -175,6 +148,41 @@ void apply_debug_follow_camera()
 			Debug::add_line(bike_on_road, rl_ref, Color32(0xff, 0x33, 0x33, 0xff), -1.f);
 		}
 	}
+}
+
+// Called by BikeGameApplication::update() after all rider updates
+void apply_debug_follow_camera()
+{
+	if (!g_follow_rider || !g_bike_app) return;
+	const auto& all = g_bike_app->all_riders;
+	if (all.empty()) return;
+	const int idx = glm::clamp(g_follow_idx, 0, (int)all.size() - 1);
+	BikeObject* bo = all[idx];
+
+	CameraComponent* cc = CameraComponent::get_scene_camera();
+	if (!cc) return;
+
+	const glm::vec3 fwd      = glm::normalize(bo->bike_direction);
+	const glm::vec3 world_up = glm::vec3(0, 1, 0);
+	const glm::vec3 pivot    = bo->get_ws_position() + world_up * g_follow_height;
+	const glm::vec3 right    = glm::normalize(glm::cross(fwd, world_up));
+
+	const glm::quat pitch_rot = glm::angleAxis(glm::radians(g_follow_pitch), right);
+	const glm::vec3 orbit_dir = glm::normalize(pitch_rot * (-fwd));
+	const glm::vec3 cam_pos   = pivot + orbit_dir * g_follow_dist;
+
+	const glm::vec3 look_at   = pivot + fwd * 3.f;
+	const glm::vec3 cam_fwd   = glm::normalize(look_at - cam_pos);
+	const glm::vec3 cam_right = glm::normalize(glm::cross(cam_fwd, world_up));
+	const glm::vec3 cam_up    = glm::normalize(glm::cross(cam_right, cam_fwd));
+
+	cc->get_owner()->set_ws_transform(glm::mat4(
+		glm::vec4(cam_right, 0.f),
+		glm::vec4(cam_up,    0.f),
+		glm::vec4(-cam_fwd,  0.f),
+		glm::vec4(cam_pos,   1.f)));
+
+	draw_rider_debug_info(bo);
 }
 
 // ============================================================

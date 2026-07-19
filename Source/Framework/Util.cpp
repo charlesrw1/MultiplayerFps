@@ -236,14 +236,11 @@ static LONG WINAPI app_unhandled_exception_filter(EXCEPTION_POINTERS* ep) {
 	}
 
 	// Capture raw addresses FIRST — CaptureStackBackTrace is the only
-	// dbghelp-free call here and never allocates. Print addresses immediately
-	// so even if symbolisation later deadlocks/crashes (dbghelp is fragile
-	// inside an unhandled-exception filter), the agent still has frame PCs.
+	// dbghelp-free call here and never allocates. Not printed unless
+	// symbolisation below is unavailable — function names are all a reader
+	// needs; the minidump has full addresses for cdb if ever needed.
 	void* frames[64];
 	const USHORT n = CaptureStackBackTrace(0, 64, frames, nullptr);
-	crash_write(log, "[CRASH] stack (%u frames, raw addresses):", (unsigned)n);
-	for (USHORT i = 0; i < n; ++i)
-		crash_write(log, "[CRASH] [%02u] 0x%p", (unsigned)i, frames[i]);
 
 	// Write the minidump BEFORE symbolisation: dbghelp's Sym* calls have been
 	// observed to deadlock inside the unhandled-exception filter on some
@@ -258,11 +255,13 @@ static LONG WINAPI app_unhandled_exception_filter(EXCEPTION_POINTERS* ep) {
 	HANDLE proc = GetCurrentProcess();
 	SymSetOptions(SymGetOptions() | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
 	if (!SymInitialize(proc, nullptr, TRUE)) {
-		crash_write(log, "[CRASH] SymInitialize failed (err=%lu) — no symbols", GetLastError());
+		crash_write(log, "[CRASH] SymInitialize failed (err=%lu) — no symbols, raw addresses:", GetLastError());
+		for (USHORT i = 0; i < n; ++i)
+			crash_write(log, "[CRASH] [%02u] 0x%p", (unsigned)i, frames[i]);
 		if (log) std::fclose(log);
 		return EXCEPTION_EXECUTE_HANDLER;
 	}
-	crash_write(log, "[CRASH] stack (symbolised):");
+	crash_write(log, "[CRASH] stack:");
 
 	alignas(SYMBOL_INFO) char symbuf[sizeof(SYMBOL_INFO) + 512] = {};
 	auto* sym = reinterpret_cast<SYMBOL_INFO*>(symbuf);

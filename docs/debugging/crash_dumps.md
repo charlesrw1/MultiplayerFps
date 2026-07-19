@@ -6,9 +6,9 @@ Post-mortem variable inspection for SEH crashes. Goal: an AI agent reading test 
 
 1. `install_crash_handler()` (`Source/Framework/Util.cpp`) registers an SEH filter via `SetUnhandledExceptionFilter`. Called from `Source/App/main.cpp` and `Source/UnitTests/main.cpp`.
 2. On an unhandled exception (access violation, divide-by-zero, etc.) the filter:
-   - logs `[CRASH] code=... addr=...` + raw stack PCs to stderr + the engine log,
+   - logs `[CRASH] code=... addr=...` to stderr + the engine log,
    - writes a minidump via `MiniDumpWriteDump` **before** symbolisation (dbghelp can deadlock inside the filter on some toolchains),
-   - then attempts symbolised stack frames.
+   - then logs the symbolised stack (function name + file:line, no raw addresses). Raw PCs are only printed as a fallback if `SymInitialize` fails — the minidump always has full addresses for `dbg.ps1`/cdb regardless.
 3. Dump flags: `WithDataSegs | WithHandleData | WithThreadInfo | WithProcessThreadData | WithIndirectlyReferencedMemory | WithUnloadedModules`. The indirect-referenced flag is what makes pointer-from-locals dereferenceable in cdb.
 4. Dump path derives from `set_assert_log_path()`: e.g. `test_game_output.log` → `test_game_output.dmp`. If unset, falls back to `crash_<pid>_<ticks>.dmp` in CWD.
 

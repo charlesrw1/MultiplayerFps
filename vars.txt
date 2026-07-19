@@ -31,7 +31,7 @@ dt 1
 view.sens 0.005
 
 # the main entry point into the game
-g_entry_level "mainMenuMap.tmap"
+g_entry_level "bike/bike_test_map.tmap"
 ed_default_sky_material "indoorHdriSky"
 g_project_name DevEngine
 
@@ -41,8 +41,8 @@ godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
 g_project_base "D:/Data"
 
 #g_application_class "EngineTesterAppImpl"
-#g_application_class "BikeGameApplication"
-g_application_class "fpsApp"
+g_application_class "BikeGameApplication"
+#g_application_class "fpsApp"
 #g_application_class "ObsGameApplication"
 
 g_draw_grid 0

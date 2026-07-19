@@ -63,10 +63,16 @@
     <ClCompile Include="bike\BikeCourseDebug.cpp">
       <Filter>bike</Filter>
     </ClCompile>
+    <ClCompile Include="bike\BikeCourseHardcoded.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
     <ClCompile Include="bike\BikeCourseRacingLine.cpp">
       <Filter>bike</Filter>
     </ClCompile>
     <ClCompile Include="bike\BikeCourseRoadNetwork.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeDebugger.cpp">
       <Filter>bike</Filter>
     </ClCompile>
     <ClCompile Include="bike\BikeObject.cpp">
@@ -108,6 +114,9 @@
       <Filter>fps</Filter>
     </ClInclude>
     <ClInclude Include="bike\BikeCourse.h">
+      <Filter>bike</Filter>
+    </ClInclude>
+    <ClInclude Include="bike\BikeDebugger.h">
       <Filter>bike</Filter>
     </ClInclude>
     <ClInclude Include="bike\BikeHeaders.h">

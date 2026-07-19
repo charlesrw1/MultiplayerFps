@@ -54,8 +54,10 @@
     <ClCompile Include="bike\BikeCamera.cpp" />
     <ClCompile Include="bike\BikeCourse.cpp" />
     <ClCompile Include="bike\BikeCourseDebug.cpp" />
+    <ClCompile Include="bike\BikeCourseHardcoded.cpp" />
     <ClCompile Include="bike\BikeCourseRacingLine.cpp" />
     <ClCompile Include="bike\BikeCourseRoadNetwork.cpp" />
+    <ClCompile Include="bike\BikeDebugger.cpp" />
     <ClCompile Include="bike\BikeObject.cpp" />
     <ClCompile Include="bike\BikeObject_Physics.cpp" />
     <ClCompile Include="bike\BikeObject_Stamina.cpp" />
@@ -72,6 +74,7 @@
     <ClInclude Include="fps\fpsObjects.h" />
     <ClInclude Include="fps\fpsTestObjects.h" />
     <ClInclude Include="bike\BikeCourse.h" />
+    <ClInclude Include="bike\BikeDebugger.h" />
     <ClInclude Include="bike\BikeHeaders.h" />
     <ClInclude Include="bike\BikeObject_Local.h" />
   </ItemGroup>
