@@ -338,6 +338,9 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 		options.pending_test_runnner = std::move(runner);
 	}
 
+	developer_mode
+		.set_bool(true);
+
 	eng_local.init(options, argc, argv);
 	eng_local.loop();
 	eng_local.cleanup();

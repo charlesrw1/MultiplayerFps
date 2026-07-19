@@ -80,10 +80,12 @@ void RenderStressTestComponent::on_sync_compact() {
 
 	const bool is_dynamic = (state == RenderStressTestState::EnabledCompactDynamic);
 
+	auto* scene = idraw->get_scene();
+
 	Model* m = model.get();
 	if (!m || grid_length <= 0) {
 		if (compact_batch_id != kInvalidBatch)
-			idraw->get_scene()->set_compact_instance_count(compact_batch_id, 0);
+			scene->set_compact_instance_count(compact_batch_id, 0);
 		return;
 	}
 
@@ -94,7 +96,7 @@ void RenderStressTestComponent::on_sync_compact() {
 	const float t = is_dynamic ? (float)GetTime() * wave_speed : 0.f;
 
 	if (needs_rebuild || compact_batch_id == kInvalidBatch)
-		compact_batch_id = idraw->get_scene()->register_compact_batch(m, nullptr, count, is_dynamic);
+		compact_batch_id = scene->register_compact_batch(m, nullptr, count, is_dynamic);
 
 	std::vector<gpu::CompactInstance> insts;
 	insts.reserve((size_t)count);
@@ -114,8 +116,8 @@ void RenderStressTestComponent::on_sync_compact() {
 			insts.push_back(ci);
 		}
 	}
-	idraw->get_scene()->set_compact_instances(compact_batch_id, 0, insts.data(), (int)insts.size());
-	idraw->get_scene()->set_compact_instance_count(compact_batch_id, count);
+	scene->set_compact_instances(compact_batch_id, 0, insts.data(), (int)insts.size());
+	scene->set_compact_instance_count(compact_batch_id, count);
 }
 
 void RenderStressTestComponent::on_sync_render_data() {
