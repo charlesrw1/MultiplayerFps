@@ -188,6 +188,9 @@
     <ClCompile Include="Game\Components\RagdollPhysicsBodyComponent.cpp" />
     <ClCompile Include="Game\Components\RagdollJointComponent.cpp" />
     <ClCompile Include="Game\Components\RagdollSetupComponent.cpp" />
+    <ClCompile Include="Game\Components\SpringBoneSetupComponent.cpp" />
+    <ClCompile Include="Game\Components\SpringBoneSetupUtil.cpp" />
+    <ClCompile Include="Game\Components\SpringBonePreviewComponent.cpp" />
     <ClCompile Include="Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Game\Entities\CharacterController.cpp" />
@@ -429,6 +432,9 @@
     <ClInclude Include="Game\Components\RagdollPhysicsBodyComponent.h" />
     <ClInclude Include="Game\Components\RagdollJointComponent.h" />
     <ClInclude Include="Game\Components\RagdollSetupComponent.h" />
+    <ClInclude Include="Game\Components\SpringBoneSetupComponent.h" />
+    <ClInclude Include="Game\Components\SpringBoneSetupUtil.h" />
+    <ClInclude Include="Game\Components\SpringBonePreviewComponent.h" />
     <ClInclude Include="Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Game\EntityPtr.h" />
     <ClInclude Include="Game\GameplayStatic.h" />

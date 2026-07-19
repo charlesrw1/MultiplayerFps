@@ -1,6 +1,7 @@
 #include "RagdollConfigComponent.h"
 #include "RagdollComponent.h"
 #include "Game/Entity.h"
+#include "Level.h"
 #include "Game/Components/MeshComponent.h"
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Components/MeshbuilderComponent.h"

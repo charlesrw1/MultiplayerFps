@@ -459,6 +459,15 @@
     <ClCompile Include="Game\Components\RagdollSetupComponent.cpp">
       <Filter>Game\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Components\SpringBoneSetupComponent.cpp">
+      <Filter>Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Components\SpringBoneSetupUtil.cpp">
+      <Filter>Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Components\SpringBonePreviewComponent.cpp">
+      <Filter>Game\Components</Filter>
+    </ClCompile>
     <ClCompile Include="Game\Components\RoadNetworkComponent.cpp">
       <Filter>Game\Components</Filter>
     </ClCompile>
@@ -1374,6 +1383,15 @@
       <Filter>Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Game\Components\RagdollSetupComponent.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\SpringBoneSetupComponent.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\SpringBoneSetupUtil.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\SpringBonePreviewComponent.h">
       <Filter>Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Game\Components\RoadNetworkComponent.h">
