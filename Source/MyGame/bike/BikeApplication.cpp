@@ -95,7 +95,7 @@ void BikeGameApplication::start()
 {
 	GameplayStatic::change_level("bike/bike_test_map.tmap");
 
-	build_hardcoded_circuit(course);
+	build_hardcoded_circuit(course, course_variant);
 	build_road_mesh();
 
 	collect_crack_decals();
@@ -136,7 +136,7 @@ void BikeGameApplication::start()
 
 void BikeGameApplication::rebuild_course()
 {
-	build_hardcoded_circuit(course);
+	build_hardcoded_circuit(course, course_variant);
 	build_road_mesh();
 	if (draw_racing_line_debug)
 		set_draw_racing_line(true);

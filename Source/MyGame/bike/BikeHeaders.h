@@ -397,6 +397,10 @@ public:
 	BikeCourse    course;
 	BikeDebugger  debugger;
 
+	// Which code-generated circuit rebuild_course()/start() build. Set from the
+	// debug menu's course dropdown, applied on the next rebuild_course() call.
+	BikeHardcodedCourseKind course_variant = BikeHardcodedCourseKind::ClassicLoop;
+
 	// Build/refresh the visible road mesh (a flat ribbon strip along course.waypoints,
 	// road_half_width wide) and display it via a MeshComponent on a dedicated entity.
 	// Call after any full course rebuild (build_hardcoded_circuit/build_from_spawners).

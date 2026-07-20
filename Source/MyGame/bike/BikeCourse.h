@@ -145,10 +145,27 @@ public:
 
 };
 
+// Selects which code-generated test circuit build_hardcoded_circuit() builds.
+enum class BikeHardcodedCourseKind {
+	ClassicLoop = 0,  // rounded rectangle: two wide sweepers + two tight hairpins
+	Twisty      = 1,  // chicanes and alternating-direction bends throughout
+	SharpAngles = 2,  // tight-radius corners at distinct angles (90/45/60 deg), city-block feel
+	Count       = 3,
+};
+inline const char* bike_hardcoded_course_name(BikeHardcodedCourseKind kind) {
+	switch (kind) {
+		case BikeHardcodedCourseKind::ClassicLoop: return "Classic Loop";
+		case BikeHardcodedCourseKind::Twisty:      return "Twisty";
+		case BikeHardcodedCourseKind::SharpAngles: return "Sharp Angles";
+		default:                                   return "?";
+	}
+}
+
 // Builds a flat, closed-loop test circuit entirely in code (no level spawners,
-// no road network). Rounded rectangle with two wide sweeping corners and two
-// tight hairpin-like corners (opposite corners share a radius so the turtle
-// path closes exactly), all at y = 0 + small epsilon. Fills waypoints,
-// dist_from_start, total_length_m, is_loop/is_built, and runs
+// no road network), all at y = 0 + small epsilon. Every turtle path is built
+// as a half-lap (net turning = 180 deg) executed twice — repeating identical
+// relative turtle commands under an exact 180 deg net turn is what makes the
+// loop close on itself to the metre regardless of how the half-lap wiggles.
+// Fills waypoints, dist_from_start, total_length_m, is_loop/is_built, and runs
 // BikeCourse::compute_racing_line on the result.
-void build_hardcoded_circuit(BikeCourse& course);
+void build_hardcoded_circuit(BikeCourse& course, BikeHardcodedCourseKind kind = BikeHardcodedCourseKind::ClassicLoop);

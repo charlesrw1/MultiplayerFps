@@ -269,6 +269,24 @@ static void bike_course_debug()
 			r->race_position, r->course_dist_m, r->lateral_pos, r->draft_factor, mode);
 	}
 
+	ImGui::SeparatorText("Hardcoded Course");
+	{
+		int kind_idx = (int)g_bike_app->course_variant;
+		const char* preview = bike_hardcoded_course_name(g_bike_app->course_variant);
+		if (ImGui::BeginCombo("Course", preview)) {
+			for (int i = 0; i < (int)BikeHardcodedCourseKind::Count; ++i) {
+				const auto kind = (BikeHardcodedCourseKind)i;
+				const bool selected = (kind_idx == i);
+				if (ImGui::Selectable(bike_hardcoded_course_name(kind), selected)) {
+					g_bike_app->course_variant = kind;
+					g_bike_app->rebuild_course();
+				}
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+	}
+
 	ImGui::SeparatorText("Road Network");
 	BikeCourse& course_rw = g_bike_app->course;
 	ImGui::SliderFloat("Sample step (m)", &course_rw.sample_step_m, 0.2f, 5.f, "%.2f");

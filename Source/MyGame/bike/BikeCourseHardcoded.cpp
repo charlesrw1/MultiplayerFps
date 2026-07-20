@@ -1,6 +1,6 @@
 // BikeCourseHardcoded.cpp
-// Fully code-generated test circuit — no level spawners, no road network,
-// flat ground. See build_hardcoded_circuit() in BikeCourse.h for the shape.
+// Fully code-generated test circuits — no level spawners, no road network,
+// flat ground. See build_hardcoded_circuit() in BikeCourse.h for the shapes.
 #include "BikeCourse.h"
 #include "Debug.h"
 #include <glm/glm.hpp>
@@ -50,37 +50,66 @@ struct Turtle {
 	}
 };
 
-} // namespace
+// ============================================================
+// Half-lap path definitions. Each must net exactly 180 deg of turning
+// (sum of arc() turn_deg args) — see the "repeat identical relative turtle
+// commands" note in BikeCourse.h. Called twice by finalize_hardcoded_course's
+// caller to produce the full closed loop.
+// ============================================================
 
-void build_hardcoded_circuit(BikeCourse& course)
-{
+// Rounded rectangle: two wide sweepers + two tight hairpins. Opposite corners
+// share a radius so the turtle path closes exactly (each cardinal-direction
+// leg's net displacement only cancels against its opposite leg if the corner
+// radii match) — legs sized so the full loop's bbox fills -30..+30m on both
+// axes.
+void half_lap_classic(Turtle& t) {
+	static constexpr float RADIUS_WIDE  = 12.f;  // fast sweeper corners
+	static constexpr float RADIUS_TIGHT = 5.f;   // hairpin-like corners
+	static constexpr float LEG          = 60.f - RADIUS_WIDE - RADIUS_TIGHT;
+	t.straight(LEG);
+	t.arc(RADIUS_WIDE, 90.f);
+	t.straight(LEG);
+	t.arc(RADIUS_TIGHT, 90.f);
+}
+
+// Chicanes and alternating-direction bends — tighter radii (6-10m) and
+// several sign reversals per half-lap, so the direction keeps changing
+// instead of settling into long straights between a few big corners.
+// Turn sum: 30 - 20 + 45 - 15 + 50 + 90 = 180.
+void half_lap_twisty(Turtle& t) {
+	t.straight(10.f);
+	t.arc(10.f,  30.f);
+	t.straight(6.f);
+	t.arc(6.f,  -20.f);  // chicane kick, opposite direction
+	t.straight(8.f);
+	t.arc(8.f,   45.f);
+	t.straight(6.f);
+	t.arc(6.f,  -15.f);  // small wiggle
+	t.straight(10.f);
+	t.arc(9.f,   50.f);
+	t.straight(8.f);
+	t.arc(6.f,   90.f);  // sharper corner heading back toward the return leg
+}
+
+// Distinct sharp-angle corners (90/45/60 deg) on tight radii, long straights
+// between — reads as intersections/city-block corners rather than swept
+// racetrack curves. Turn sum: 90 + 45 - 15 + 60 = 180.
+void half_lap_sharp_angles(Turtle& t) {
+	t.straight(14.f);
+	t.arc(3.f,   90.f);  // sharp near-square corner
+	t.straight(12.f);
+	t.arc(4.f,   45.f);  // medium corner
+	t.straight(10.f);
+	t.arc(4.f,  -15.f);  // slight bend the other way
+	t.straight(12.f);
+	t.arc(3.5f,  60.f);  // medium-sharp corner
+}
+
+// Converts a completed turtle path into course.waypoints (forward/right/
+// dist_from_start), centers it on the origin, and runs the racing line sim.
+// Shared tail end of every build_hardcoded_circuit() variant.
+void finalize_hardcoded_course(BikeCourse& course, Turtle& t, const char* label) {
 	static constexpr float ROAD_HALF_WIDTH = 4.f * (2.f / 3.f);
-	static constexpr float Y_EPS           = 0.02f;   // small epsilon above ground 0
-	// Legs sized so the bbox (leg + wide radius + tight radius, per axis) fills the
-	// full -30m..+30m square on both x and z.
-	static constexpr float RADIUS_WIDE     = 12.f;    // fast sweeper corners (NE, SW)
-	static constexpr float RADIUS_TIGHT    = 5.f;      // hairpin-like corners (SE, NW)
-	static constexpr float LEG_NS          = 60.f - RADIUS_WIDE - RADIUS_TIGHT;  // north/south straight length (m)
-	static constexpr float LEG_EW          = 60.f - RADIUS_WIDE - RADIUS_TIGHT;  // east/west straight length (m)
-
-	// Opposite corners must share a radius for the turtle path to close exactly
-	// in position (each cardinal-direction leg's net displacement only cancels
-	// against its opposite leg if the corner radii match). Still gives two
-	// tight and two wide corners for cornering variety.
-	Turtle t;
-	t.pos     = glm::vec3(0.f, Y_EPS, 0.f);
-	t.theta   = 0.f;
-	t.step_m  = glm::max(0.5f, course.sample_step_m);
-	t.positions.push_back(t.pos);
-
-	t.straight(LEG_NS);
-	t.arc(RADIUS_WIDE, 90.f);   // NE
-	t.straight(LEG_EW);
-	t.arc(RADIUS_TIGHT, 90.f);  // SE
-	t.straight(LEG_NS);
-	t.arc(RADIUS_WIDE, 90.f);   // SW
-	t.straight(LEG_EW);
-	t.arc(RADIUS_TIGHT, 90.f);  // NW — closes back onto the start point/heading
 
 	// The last generated sample coincides with the start (loop wrap handles the
 	// closing segment) — drop it so waypoints aren't duplicated at the seam.
@@ -89,9 +118,8 @@ void build_hardcoded_circuit(BikeCourse& course)
 		t.positions.pop_back();
 	}
 
-	// Center the circuit on the origin (requested: fit in an 80x80m box around
-	// origin) — computed from the actual generated bbox rather than assumed from
-	// the leg/radius constants, so this stays correct if those are ever tuned.
+	// Center the circuit on the origin — computed from the actual generated
+	// bbox rather than assumed from any leg/radius constants.
 	{
 		glm::vec3 lo(FLT_MAX), hi(-FLT_MAX);
 		for (const glm::vec3& p : t.positions) {
@@ -101,7 +129,7 @@ void build_hardcoded_circuit(BikeCourse& course)
 		const glm::vec3 center = glm::vec3((lo.x + hi.x) * 0.5f, 0.f, (lo.z + hi.z) * 0.5f);
 		for (glm::vec3& p : t.positions)
 			p -= center;
-		sys_print(Info, "BikeCourse (hardcoded): bbox %.0f x %.0f m\n", hi.x - lo.x, hi.z - lo.z);
+		sys_print(Info, "BikeCourse (hardcoded, %s): bbox %.0f x %.0f m\n", label, hi.x - lo.x, hi.z - lo.z);
 	}
 
 	const int n = (int)t.positions.size();
@@ -128,18 +156,47 @@ void build_hardcoded_circuit(BikeCourse& course)
 		    : course.waypoints[i - 1].dist_from_start + glm::distance(t.positions[i], t.positions[i - 1]);
 	}
 
-	course.is_loop       = true;
+	course.is_loop        = true;
 	course.total_length_m = course.waypoints.back().dist_from_start
 	                       + glm::distance(t.positions.back(), t.positions.front());
-	course.is_built       = true;
+	course.is_built        = true;
 	course.debug_fillets.clear();
 	course.arc_ranges.clear();
 
-	sys_print(Info, "BikeCourse (hardcoded): %d waypoints, %.0f m circuit\n",
-	          n, course.total_length_m);
+	sys_print(Info, "BikeCourse (hardcoded, %s): %d waypoints, %.0f m circuit\n",
+	          label, n, course.total_length_m);
 
 	BikeCourse::compute_racing_line(course.waypoints, course.is_loop,
 	                                 course.rl_k, course.rl_mass, course.rl_dt,
 	                                 course.rl_num_iters, course.rl_smooth_passes, course.rl_smooth_w,
 	                                 course.rl_margin);
+}
+
+} // namespace
+
+void build_hardcoded_circuit(BikeCourse& course, BikeHardcodedCourseKind kind)
+{
+	Turtle t;
+	t.pos     = glm::vec3(0.f, 0.02f, 0.f);  // small epsilon above ground 0
+	t.theta   = 0.f;
+	t.step_m  = glm::max(0.5f, course.sample_step_m);
+	t.positions.push_back(t.pos);
+
+	switch (kind) {
+		case BikeHardcodedCourseKind::Twisty:
+			half_lap_twisty(t);
+			half_lap_twisty(t);
+			break;
+		case BikeHardcodedCourseKind::SharpAngles:
+			half_lap_sharp_angles(t);
+			half_lap_sharp_angles(t);
+			break;
+		case BikeHardcodedCourseKind::ClassicLoop:
+		default:
+			half_lap_classic(t);
+			half_lap_classic(t);
+			break;
+	}
+
+	finalize_hardcoded_course(course, t, bike_hardcoded_course_name(kind));
 }
