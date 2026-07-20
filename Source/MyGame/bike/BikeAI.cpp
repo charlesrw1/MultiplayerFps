@@ -5,6 +5,7 @@
 #include <glm/gtx/vector_angle.hpp>
 #include <vector>
 #include <cfloat>
+#include <cmath>
 
 // BikeGameApplication::all_riders is the sense source for the hemisphere scan
 // below. It is NOT sorted-order-relative — every neighbor relationship here
@@ -169,7 +170,26 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// real feedback control (and its damping) lives now. See BikeAIParams::
 	// lateral_shift_kp / BikeObject_Local.h.
 	const float lat_error = target_lat - my_bike->lateral_pos;
-	const float lateral_shift = glm::clamp(p.lateral_shift_kp * lat_error, -1.f, 1.f);
+
+	// Heading error: lat_error alone only ever aims at the ROAD's own tangent
+	// (wp_here.forward in tick_transform) offset by an angle — it has no idea
+	// the racing line itself is turning faster/slower than the road through a
+	// corner (that divergence IS the apex line). Finite-difference the racing
+	// line's own tangent near the lookahead point and steer toward matching
+	// it too, weighted in only as curvature ramps up (corner_weight — full
+	// strength mid-corner, ~0 on a straight where the two tangents already
+	// agree, using the same min_r-derived blend as the manual offset above).
+	const float corner_weight = 1.f - offset_blend;
+	const glm::vec3 rl_pos_a = wp_ahead.racing_line_pos;
+	const glm::vec3 rl_pos_b = course->sample(my_bike->course_dist_m + steer_lookahead_m + 2.f).racing_line_pos;
+	const glm::vec3 rl_tangent = (glm::distance(rl_pos_a, rl_pos_b) > 1e-4f)
+	    ? glm::normalize(rl_pos_b - rl_pos_a) : wp_ahead.forward;
+	const float heading_error = std::atan2(glm::dot(glm::vec3(0, 1, 0), glm::cross(my_bike->bike_direction, rl_tangent)),
+	                                        glm::dot(my_bike->bike_direction, rl_tangent));
+	dbg_heading_error = heading_error;
+
+	const float lateral_shift = glm::clamp(
+		p.lateral_shift_kp * lat_error + p.heading_shift_kp * heading_error * corner_weight, -1.f, 1.f);
 	dbg_lateral_shift = lateral_shift;
 
 	// ci.steer doesn't command heading either — it only drives cosmetic

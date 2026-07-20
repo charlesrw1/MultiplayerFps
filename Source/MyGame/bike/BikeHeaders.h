@@ -204,6 +204,21 @@ struct BikeAIParams {
 	// (bike_heading_max_offset_deg) from the track tangent.
 	float lateral_shift_kp = 1.5f;  // shift command (pre-clamp) per metre of offset error
 
+	// ---- Heading guidance — lateral_shift_kp alone only ever points the bike
+	// at the ROAD's own tangent (wp.forward), offset by a lateral-error angle;
+	// it never accounts for the racing line's own heading, which diverges from
+	// the road tangent through a corner (that's the whole point of an apex
+	// line — it cuts across the road at an angle). Without this, the bike
+	// tracks lateral position correctly but can still enter/exit a corner
+	// pointing the wrong way relative to the line. heading_shift_kp adds a
+	// term proportional to the angle between bike_direction and the racing
+	// line's own tangent (finite-differenced from racing_line_pos near the
+	// lookahead point), gated by the same corner-detection blend as the
+	// manual offset above but inverted — negligible on a straight (where the
+	// road tangent and racing line tangent are ~identical anyway), full
+	// strength mid-corner. ----
+	float heading_shift_kp = 1.2f;  // shift command (pre-clamp) per radian of heading error, at full corner weight
+
 	// ---- Manual lateral offset blend — how much of BikeObject::manual_lateral_offset
 	// (debug-set per rider, see BikeDebugger) actually reaches the steering
 	// target. Full weight on straights; blended out toward the racing line as
@@ -258,6 +273,7 @@ public:
 	float dbg_target_lat_offset  = 0.f;
 	bool  dbg_clamped            = false;
 	float dbg_lateral_shift      = 0.f;
+	float dbg_heading_error      = 0.f;  // rad, signed angle from bike_direction to the racing line's own tangent
 };
 
 class BikePlayer : public IBikeInput {

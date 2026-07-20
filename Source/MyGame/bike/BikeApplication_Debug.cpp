@@ -139,7 +139,8 @@ void draw_rider_debug_info(BikeObject* bo)
 
 		// --- Steering breakdown ---
 		GameplayStatic::debug_text(string_format("[Steer] cur_lat=%+.2fm  lat_target=%+.2fm", bo->lateral_pos, ai->dbg_target_lat_offset));
-		GameplayStatic::debug_text(string_format("[Steer] lat_err=%+.2fm  cmd=%+.2f", ai->dbg_target_lat_offset - bo->lateral_pos, bo->dbg_steer_cmd));
+		GameplayStatic::debug_text(string_format("[Steer] lat_err=%+.2fm  rl_heading_err=%+.1fdeg", ai->dbg_target_lat_offset - bo->lateral_pos, glm::degrees(ai->dbg_heading_error)));
+		GameplayStatic::debug_text(string_format("[Steer] cmd=%+.2f", bo->dbg_steer_cmd));
 		GameplayStatic::debug_text(string_format("[Steer] heading target=%+.1fdeg  actual=%+.1fdeg", bo->dbg_desired_heading_offset_deg, bo->dbg_heading_offset_deg));
 		GameplayStatic::debug_text(string_format("[Steer] turn_rate=%+.0fdeg/s", bo->dbg_turn_rate_dps));
 
@@ -241,6 +242,7 @@ static void bike_course_debug()
 		ImGui::DragFloat("steer_lookahead_m",       &p.steer_lookahead_m,       0.2f,  0.f, 20.f, "%.1f");
 		ImGui::DragFloat("steer_lookahead_time_s",  &p.steer_lookahead_time_s,  0.02f, 0.f, 2.f,  "%.2f");
 		ImGui::DragFloat("lateral_shift_kp",        &p.lateral_shift_kp,        0.05f, 0.f, 5.f,  "%.2f");
+		ImGui::DragFloat("heading_shift_kp",        &p.heading_shift_kp,        0.05f, 0.f, 5.f,  "%.2f");
 		ImGui::TextDisabled("(the steering PID itself lives in Worldspace Steering below)");
 		ImGui::DragFloat("offset_straight_r_m",     &p.offset_straight_r_m,     1.f,   5.f, 200.f, "%.0f");
 		ImGui::DragFloat("offset_corner_r_m",       &p.offset_corner_r_m,       1.f,   3.f, 100.f, "%.0f");
