@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <vector>
 #include <string>
+#include <algorithm>
 #include "GameEngineLocal.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -20,6 +21,7 @@
 #include "imgui_impl_sdl3.h"
 #include "UI/GUISystemPublic.h"
 #include "UI/UILoader.h"
+#include "UI/UIBuilder.h"
 #include "DebugConsole.h"
 #include "EditorPopups.h"
 #include "Framework/Util.h"
@@ -85,6 +87,8 @@ struct Debug_Text
 	std::string text;
 	Color32 color;
 	float lifetime = 0.0;
+	bool center_horizontal = false;
+	bool anchor_bottom = false;
 };
 // Projects world-space debug text to screen every frame and draws it through the same
 // immediate-mode UI window regular HUD text uses (RenderWindow), so it's automatically
@@ -143,6 +147,11 @@ void DebugTextCtx::draw_and_tick(float dt) {
 		int16_t y = (int16_t)((1.f - (ndc.y * 0.5f + 0.5f)) * vp.h);
 		const int line_height = mono_font ? mono_font->lineHeight : 12;
 
+		if (t.anchor_bottom) {
+			const int num_lines = 1 + (int)std::count(t.text.begin(), t.text.end(), '\n');
+			y -= (int16_t)(line_height * (num_lines - 1));
+		}
+
 		// draw_text_to_meshbuilder treats '\n' as an unknown glyph rather than a line
 		// break, so split multi-line text into one TextShape per line here.
 		size_t start = 0;
@@ -151,6 +160,8 @@ void DebugTextCtx::draw_and_tick(float dt) {
 			size_t end = (nl == std::string::npos) ? t.text.size() : nl;
 			shape.text = std::string_view(t.text).substr(start, end - start);
 			shape.rect.x = x;
+			if (t.center_horizontal)
+				shape.rect.x -= (int16_t)(GuiHelpers::calc_text_size_no_wrap(shape.text, mono_font).w / 2);
 			shape.rect.y = y;
 			UiSystem::inst->window.draw(shape);
 			y += (int16_t)line_height;
@@ -223,6 +234,17 @@ void Debug::add_text(glm::vec3 pos, std::string text, Color32 color, float durat
 	t.text = std::move(text);
 	t.color = color;
 	t.lifetime = duration;
+	DebugTextCtx::get().add(std::move(t), fixedupdate);
+}
+void Debug::add_text_ex(glm::vec3 pos, std::string text, Color32 color, float duration,
+						bool center_horizontal, bool anchor_bottom, bool fixedupdate) {
+	Debug_Text t;
+	t.pos = pos;
+	t.text = std::move(text);
+	t.color = color;
+	t.lifetime = duration;
+	t.center_horizontal = center_horizontal;
+	t.anchor_bottom = anchor_bottom;
 	DebugTextCtx::get().add(std::move(t), fixedupdate);
 }
 
