@@ -93,13 +93,16 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	}
 
 	float separation_term = 0.f;
-	float draft_term      = 0.f;
 	float lineform_term   = 0.f;
 	float cohesion_term   = 0.f;
+	float draft_blend     = 0.f;  // 0..1 — see draft note below
+	float avoidance_brake = 0.f;  // combined into brake_amount in section 3
 
 	if (p.enable_magnetism) {
 		// Separation: push away from any neighbor closer than separation_dist_m
-		// (real 3D distance), weighted by inverse falloff.
+		// (real 3D distance), weighted by inverse falloff. Soft/continuous —
+		// not decisive enough on its own to stop an actual overlap when someone
+		// cuts across laterally; see the collision-avoidance block below for that.
 		for (const Neighbor& n : neighbors) {
 			if (n.dist >= p.separation_dist_m) continue;
 			const float weight = 1.f - n.dist / p.separation_dist_m;
@@ -107,11 +110,13 @@ void BikeAI::evaluate(BikeObject* my_bike)
 		}
 		target_offset_delta += separation_term;
 
-		if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m) {
-			// Pull toward zero lateral offset from the neighbor's line (tuck in behind).
-			draft_term = -nearest_ahead->lat_gap * p.draft_k;
-		}
-		target_offset_delta += draft_term;
+		// Draft: blend fraction toward the leader's own lateral_pos, applied
+		// further down once the racing-line target is known — see
+		// BikeAIParams::draft_follow_k. Computed here (not as a target_offset_delta
+		// term) because "adopt their line" and "nudge toward their line" are
+		// different operations; strengthens as the gap closes.
+		if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m)
+			draft_blend = glm::clamp(1.f - nearest_ahead->long_gap / p.draft_dist_m, 0.f, 1.f) * p.draft_follow_k;
 
 		// Line formation: smaller, always-on pull toward alignment with the nearest
 		// forward neighbor (any range within the sense hemisphere), so riders settle
@@ -135,10 +140,57 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			}
 		}
 		target_offset_delta += cohesion_term;
+
+		// ---- Collision avoidance ----
+		// Find the most severe active conflict among ALL sensed neighbors (not
+		// just nearest_ahead — someone beside or cutting in matters just as
+		// much as someone directly ahead). "Active" = inside BOTH the
+		// longitudinal and lateral collision thresholds at once; severity is
+		// how deep into both zones (0..1 each), multiplied, so being close on
+		// only one axis is never treated as urgent as being close on both.
+		const Neighbor* conflict = nullptr;
+		float conflict_severity  = 0.f;
+		for (const Neighbor& n : neighbors) {
+			if (glm::abs(n.long_gap) >= p.collision_long_m) continue;
+			if (glm::abs(n.lat_gap)  >= p.collision_lat_m)  continue;
+			const float long_severity = 1.f - glm::abs(n.long_gap) / p.collision_long_m;
+			const float lat_severity  = 1.f - glm::abs(n.lat_gap)  / p.collision_lat_m;
+			const float severity = long_severity * lat_severity;
+			if (severity > conflict_severity) { conflict_severity = severity; conflict = &n; }
+		}
+		float avoidance_lat_term = 0.f;
+		if (conflict) {
+			// Prefer yielding sideways, away from the conflicting neighbor.
+			// Room check: the resulting lateral position must stay on the
+			// road, and no OTHER sensed neighbor at a similar longitudinal
+			// offset can already be sitting where this move would put me —
+			// otherwise I'd just trade one overlap for another.
+			const float avoid_dir     = (conflict->lat_gap >= 0.f) ? -1.f : 1.f;  // move away from them
+			const float candidate_lat = my_bike->lateral_pos + avoid_dir * p.collision_lat_m;
+			const BikeWaypoint wp_now = course->sample(my_bike->course_dist_m);
+			const float road_limit    = glm::max(wp_now.road_half_width - p.edge_safety_m, 0.1f);
+			bool room_available = glm::abs(candidate_lat) <= road_limit;
+			if (room_available) {
+				for (const Neighbor& n : neighbors) {
+					if (&n == conflict) continue;
+					if (glm::abs(n.long_gap) >= p.collision_long_m) continue;
+					const float n_gap_after_move = n.lat_gap - avoid_dir * p.collision_lat_m;
+					if (glm::abs(n_gap_after_move) < p.collision_lat_m) { room_available = false; break; }
+				}
+			}
+			if (room_available)
+				avoidance_lat_term = avoid_dir * p.avoidance_lateral_k * conflict_severity;
+			else
+				avoidance_brake = p.avoidance_brake_k * conflict_severity;
+		}
+		target_offset_delta += avoidance_lat_term;
+		dbg_avoidance_active   = (conflict != nullptr);
+		dbg_avoidance_lat_term = avoidance_lat_term;
+		dbg_avoidance_brake    = avoidance_brake;
 	}
 
 	dbg_separation_offset = separation_term;
-	dbg_draft_offset      = draft_term;
+	dbg_draft_blend       = draft_blend;
 	dbg_lineform_offset   = lineform_term;
 	dbg_cohesion_offset   = cohesion_term;
 
@@ -158,9 +210,16 @@ void BikeAI::evaluate(BikeObject* my_bike)
 
 	const float manual_offset_term = my_bike->manual_lateral_offset * offset_blend;
 
-	const float lat_limit      = glm::max(wp_ahead.road_half_width - p.edge_safety_m, 0.1f);
-	const float target_lat_raw = wp_ahead.racing_line_lateral + target_offset_delta + manual_offset_term;
-	const float target_lat     = glm::clamp(target_lat_raw, -lat_limit, lat_limit);
+	const float lat_limit = glm::max(wp_ahead.road_half_width - p.edge_safety_m, 0.1f);
+	const float racing_line_target_raw = wp_ahead.racing_line_lateral + target_offset_delta + manual_offset_term;
+	// Draft blend applied last, on top of everything else: at draft_blend=1
+	// (locked onto the leader's wheel) this fully overrides the racing-line
+	// target with their actual lateral_pos — that's the point of drafting,
+	// sitting where they are rather than where the ideal line says to be.
+	const float target_lat_raw = (nearest_ahead)
+	    ? glm::mix(racing_line_target_raw, nearest_ahead->rider->lateral_pos, draft_blend)
+	    : racing_line_target_raw;
+	const float target_lat = glm::clamp(target_lat_raw, -lat_limit, lat_limit);
 	dbg_clamped           = (target_lat != target_lat_raw);
 	dbg_target_lat_offset = target_lat;
 	dbg_lookahead_pt      = wp_ahead.position + wp_ahead.right * target_lat;  // world-space target point
@@ -225,6 +284,10 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			}
 		}
 	}
+
+	// Collision-avoidance braking (computed in section 2, applies regardless
+	// of whether a corner is also demanding it — take whichever is stronger).
+	brake_amount = glm::clamp(glm::max(brake_amount, avoidance_brake), 0.f, 1.f);
 	dbg_brake_amount = brake_amount;
 
 	// ============================================================

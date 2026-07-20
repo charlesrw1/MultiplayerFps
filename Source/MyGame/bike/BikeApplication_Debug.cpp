@@ -127,7 +127,9 @@ void draw_rider_debug_info(BikeObject* bo)
 		GameplayStatic::debug_text(string_format("[AI] spd=%.1fm/s  neighbors=%d  min_r=%.1fm%s",
 			bo->speed, ai->dbg_num_neighbors, ai->dbg_min_r, ai->dbg_clamped ? "  CLAMPED" : ""));
 		GameplayStatic::debug_text(string_format("[AI] cohesion=%+.2f  separation=%+.2f", ai->dbg_cohesion_offset, ai->dbg_separation_offset));
-		GameplayStatic::debug_text(string_format("[AI] draft=%+.2f  lineform=%+.2f", ai->dbg_draft_offset, ai->dbg_lineform_offset));
+		GameplayStatic::debug_text(string_format("[AI] draft_blend=%.0f%%  lineform=%+.2f", ai->dbg_draft_blend * 100.f, ai->dbg_lineform_offset));
+		if (ai->dbg_avoidance_active)
+			GameplayStatic::debug_text(string_format("[AI] AVOIDANCE lat=%+.2f brake=%.2f", ai->dbg_avoidance_lat_term, ai->dbg_avoidance_brake));
 		// Upcoming corner: distance, radius, safe speed, brake demand
 		if (ai->dbg_brake_dist_m > 0.f)
 			GameplayStatic::debug_text(string_format("[AI] corner in %.0fm  r=%.1fm  v_max=%.1fm/s  brake=%.2f",
@@ -257,10 +259,16 @@ static void bike_course_debug()
 		ImGui::DragFloat("cohesion_trigger_dist_m", &p.cohesion_trigger_dist_m, 0.2f,  0.f, 30.f, "%.1f");
 		ImGui::DragFloat("separation_k",            &p.separation_k,            0.05f, 0.f, 5.f,  "%.2f");
 		ImGui::DragFloat("separation_dist_m",       &p.separation_dist_m,       0.05f, 0.1f, 5.f, "%.2f");
-		ImGui::DragFloat("draft_k",                 &p.draft_k,                 0.05f, 0.f, 3.f,  "%.2f");
+		ImGui::DragFloat("draft_follow_k",          &p.draft_follow_k,          0.02f, 0.f, 1.f,  "%.2f");
 		ImGui::DragFloat("draft_dist_m",             &p.draft_dist_m,           0.5f,  0.f, 30.f, "%.1f");
 		ImGui::DragFloat("lineformation_k",         &p.lineformation_k,         0.02f, 0.f, 2.f,  "%.2f");
 		ImGui::DragFloat("edge_safety_m",           &p.edge_safety_m,           0.05f, 0.f, 3.f,  "%.2f");
+
+		ImGui::SeparatorText("Collision avoidance");
+		ImGui::DragFloat("collision_long_m",    &p.collision_long_m,    0.1f,  0.2f, 10.f, "%.2f");
+		ImGui::DragFloat("collision_lat_m",     &p.collision_lat_m,     0.05f, 0.2f, 3.f,  "%.2f");
+		ImGui::DragFloat("avoidance_lateral_k", &p.avoidance_lateral_k, 0.1f,  0.f,  10.f, "%.2f");
+		ImGui::DragFloat("avoidance_brake_k",   &p.avoidance_brake_k,   0.02f, 0.f,  1.f,  "%.2f");
 	}
 
 	ImGui::SeparatorText("Riders");

@@ -41,7 +41,7 @@ struct AIDebugFrame {
     int   num_neighbors;
     float cohesion_offset;
     float separation_offset;
-    float draft_offset;
+    float draft_blend;  // 0..1, see BikeAI::dbg_draft_blend
     float lineform_offset;
     float target_lat_offset;
     int   clamped;
@@ -128,7 +128,7 @@ static void ai_debug_record(BikeGameApplication* app)
             fr.num_neighbors     = ai->dbg_num_neighbors;
             fr.cohesion_offset   = ai->dbg_cohesion_offset;
             fr.separation_offset = ai->dbg_separation_offset;
-            fr.draft_offset      = ai->dbg_draft_offset;
+            fr.draft_blend       = ai->dbg_draft_blend;
             fr.lineform_offset   = ai->dbg_lineform_offset;
             fr.target_lat_offset = ai->dbg_target_lat_offset;
             fr.clamped           = ai->dbg_clamped ? 1 : 0;
@@ -160,7 +160,7 @@ static void ai_debug_dump(BikeGameApplication* app)
         f << "time_s,rider_idx,is_ai,is_off_track,is_colliding,"
              "course_dist_m,lateral_pos,lateral_vel,speed_ms,heading_deg,"
              "road_half_width,rl_lateral,lat_err,"
-             "steer_final,num_neighbors,cohesion_offset,separation_offset,draft_offset,lineform_offset,"
+             "steer_final,num_neighbors,cohesion_offset,separation_offset,draft_blend,lineform_offset,"
              "target_lat_offset,clamped,lateral_shift,"
              "brake_amount,brake_dist_m,v_max_corner,brake_corner_r,min_r,"
              "power_final,target_speed,"
@@ -174,7 +174,7 @@ static void ai_debug_dump(BikeGameApplication* app)
               << fr.speed_ms            << ',' << fr.heading_deg        << ','
               << fr.road_half_width     << ',' << fr.rl_lateral         << ',' << fr.lat_err           << ','
               << fr.steer_final         << ',' << fr.num_neighbors      << ','
-              << fr.cohesion_offset     << ',' << fr.separation_offset  << ',' << fr.draft_offset      << ','
+              << fr.cohesion_offset     << ',' << fr.separation_offset  << ',' << fr.draft_blend       << ','
               << fr.lineform_offset     << ',' << fr.target_lat_offset  << ',' << fr.clamped           << ','
               << fr.lateral_shift       << ','
               << fr.brake_amount        << ',' << fr.brake_dist_m       << ','

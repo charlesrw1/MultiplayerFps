@@ -81,14 +81,22 @@ TEST(BikeAISeparation, CloserIsStrongerPush)
 }
 
 // ---------------------------------------------------------------------------
-// Draft + line formation — pull toward zero lateral offset from the nearest
-// forward neighbor's line. Draft only within draft_dist_m; line-formation is
-// smaller and always-on for any sensed forward neighbor.
+// Draft — ADOPTS the leader's own lateral_pos (not a proportional nudge
+// toward it): draft_blend is a 0..1 blend fraction (strengthens as the gap
+// closes, scaled by draft_follow_k), then the racing-line target is lerped
+// toward the leader's actual lateral_pos by that fraction. Line-formation is
+// still a smaller, always-on, lat_gap-proportional nudge (not range-gated).
 // ---------------------------------------------------------------------------
-static float draft_term(float nearest_lat_gap, float nearest_long_gap, float draft_dist_m, float draft_k)
+static float draft_blend(float nearest_long_gap, float draft_dist_m, float draft_follow_k)
 {
     if (nearest_long_gap >= draft_dist_m) return 0.f;
-    return -nearest_lat_gap * draft_k;
+    const float raw = 1.f - nearest_long_gap / draft_dist_m;
+    return std::max(0.f, std::min(1.f, raw)) * draft_follow_k;
+}
+
+static float apply_draft_blend(float racing_line_target, float leader_lateral_pos, float blend)
+{
+    return racing_line_target + (leader_lateral_pos - racing_line_target) * blend;  // lerp
 }
 
 static float lineform_term(float nearest_lat_gap, float lineformation_k)
@@ -96,28 +104,44 @@ static float lineform_term(float nearest_lat_gap, float lineformation_k)
     return -nearest_lat_gap * lineformation_k;
 }
 
-TEST(BikeAIDraft, NeighborAheadAndRight_PullsRight)
+TEST(BikeAIDraft, CloseGap_FullBlend)
 {
-    // nearest_lat_gap > 0 -> neighbor is road-right -> pull me road-right (negative-of-negative = positive... )
-    // target_offset_delta += -lat_gap * k; lat_gap>0 -> delta negative -> pulls toward road-LEFT is wrong sign check:
-    // -lat_gap*k with lat_gap=0.5,k=1 => -0.5: this moves target_lat toward negative (road-left) which REDUCES
-    // separation from a neighbor that is to my right -- i.e. it pulls me toward their (more road-right) line.
-    // Concretely: my new target = my_lat + delta = my_lat - 0.5, which is LESS road-right than before,
-    // moving me toward centre relative to a neighbor further right; the intent is "align with their line",
-    // i.e. move toward nearest_lat_gap's sign being reduced toward 0. Assert delta has opposite sign to gap.
-    float delta = draft_term(0.5f, 3.f, 8.f, 1.0f);
-    EXPECT_LT(delta, 0.f);
-    EXPECT_LT(std::abs(delta), 0.5f + 1e-4f);
+    EXPECT_NEAR(draft_blend(0.f, 8.f, 1.f), 1.f, 1e-6f);
 }
 
-TEST(BikeAIDraft, OutsideDraftRange_NoTerm)
+TEST(BikeAIDraft, HalfwayGap_HalfBlend)
 {
-    EXPECT_EQ(draft_term(0.5f, 20.f, 8.f, 1.0f), 0.f);
+    EXPECT_NEAR(draft_blend(4.f, 8.f, 1.f), 0.5f, 1e-6f);
 }
 
-TEST(BikeAIDraft, ZeroOffsetFromLine_NoTerm)
+TEST(BikeAIDraft, AtDraftDistEdge_NoBlend)
 {
-    EXPECT_NEAR(draft_term(0.f, 3.f, 8.f, 1.0f), 0.f, 1e-6f);
+    EXPECT_EQ(draft_blend(8.f, 8.f, 1.f), 0.f);
+}
+
+TEST(BikeAIDraft, OutsideDraftRange_NoBlend)
+{
+    EXPECT_EQ(draft_blend(20.f, 8.f, 1.f), 0.f);
+}
+
+TEST(BikeAIDraft, FollowKScalesBlend)
+{
+    EXPECT_NEAR(draft_blend(0.f, 8.f, 0.5f), 0.5f, 1e-6f);
+}
+
+TEST(BikeAIDraft, AdoptLeaderLateral_FullBlend_MatchesLeader)
+{
+    EXPECT_NEAR(apply_draft_blend(2.f, 5.f, 1.f), 5.f, 1e-6f);
+}
+
+TEST(BikeAIDraft, AdoptLeaderLateral_ZeroBlend_KeepsRacingLineTarget)
+{
+    EXPECT_NEAR(apply_draft_blend(2.f, 5.f, 0.f), 2.f, 1e-6f);
+}
+
+TEST(BikeAIDraft, AdoptLeaderLateral_PartialBlend_Interpolates)
+{
+    EXPECT_NEAR(apply_draft_blend(0.f, 4.f, 0.25f), 1.f, 1e-6f);
 }
 
 TEST(BikeAILineFormation, AlwaysOn_EvenBeyondDraftRange)
@@ -128,11 +152,79 @@ TEST(BikeAILineFormation, AlwaysOn_EvenBeyondDraftRange)
     EXPECT_NE(lineform_term(0.8f, 0.35f), 0.f);
 }
 
-TEST(BikeAILineFormation, WeakerThanDraft_SameGap)
+// ---------------------------------------------------------------------------
+// Collision avoidance — decentralized overlap resolution. severity is how
+// deep into BOTH the longitudinal and lateral collision zones a neighbor is
+// (0 outside either zone, 1 at the same point in space); avoid_direction picks
+// which way to yield (away from the conflicting neighbor); room_available
+// checks the resulting position doesn't leave the road.
+// ---------------------------------------------------------------------------
+static float conflict_severity(float long_gap, float lat_gap, float collision_long_m, float collision_lat_m)
 {
-    const float lf = std::abs(lineform_term(0.8f, 0.35f));
-    const float dr = std::abs(draft_term(0.8f, 3.f, 8.f, 1.0f));
-    EXPECT_LT(lf, dr) << "line-formation is a smaller always-on bias, draft dominates in range";
+    if (std::abs(long_gap) >= collision_long_m) return 0.f;
+    if (std::abs(lat_gap)  >= collision_lat_m)  return 0.f;
+    const float long_severity = 1.f - std::abs(long_gap) / collision_long_m;
+    const float lat_severity  = 1.f - std::abs(lat_gap)  / collision_lat_m;
+    return long_severity * lat_severity;
+}
+
+static float avoid_direction(float conflict_lat_gap)
+{
+    return (conflict_lat_gap >= 0.f) ? -1.f : 1.f;
+}
+
+static bool room_available(float candidate_lat, float road_limit)
+{
+    return std::abs(candidate_lat) <= road_limit;
+}
+
+TEST(BikeAICollisionAvoidance, FarLongitudinally_NoConflict)
+{
+    EXPECT_EQ(conflict_severity(5.f, 0.f, 2.f, 0.9f), 0.f);
+}
+
+TEST(BikeAICollisionAvoidance, FarLaterally_NoConflict)
+{
+    // Close longitudinally but well clear laterally — not a conflict, separation handles this.
+    EXPECT_EQ(conflict_severity(0.5f, 2.f, 2.f, 0.9f), 0.f);
+}
+
+TEST(BikeAICollisionAvoidance, SamePoint_MaxSeverity)
+{
+    EXPECT_NEAR(conflict_severity(0.f, 0.f, 2.f, 0.9f), 1.f, 1e-6f);
+}
+
+TEST(BikeAICollisionAvoidance, HalfwayIntoBothZones_QuarterSeverity)
+{
+    // Half depth on each axis multiply, not add: 0.5 * 0.5 = 0.25.
+    EXPECT_NEAR(conflict_severity(1.f, 0.45f, 2.f, 0.9f), 0.25f, 1e-6f);
+}
+
+TEST(BikeAICollisionAvoidance, CloseOnOneAxisOnly_NeverAsUrgentAsBoth)
+{
+    const float both  = conflict_severity(0.2f, 0.1f, 2.f, 0.9f);
+    const float one_axis_only = conflict_severity(0.2f, 0.8f, 2.f, 0.9f);
+    EXPECT_GT(both, one_axis_only);
+}
+
+TEST(BikeAICollisionAvoidance, NeighborToRight_AvoidLeft)
+{
+    EXPECT_LT(avoid_direction(0.5f), 0.f);
+}
+
+TEST(BikeAICollisionAvoidance, NeighborToLeft_AvoidRight)
+{
+    EXPECT_GT(avoid_direction(-0.5f), 0.f);
+}
+
+TEST(BikeAICollisionAvoidance, WithinRoad_RoomAvailable)
+{
+    EXPECT_TRUE(room_available(1.5f, 3.2f));
+}
+
+TEST(BikeAICollisionAvoidance, PastEdge_NoRoom)
+{
+    EXPECT_FALSE(room_available(3.5f, 3.2f));
 }
 
 // ---------------------------------------------------------------------------

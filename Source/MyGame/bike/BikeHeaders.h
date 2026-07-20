@@ -173,14 +173,34 @@ struct BikeAIParams {
 	float sense_half_angle_deg = 100.f; // deg — forward cone half-angle
 
 	// ---- Magnetism: desired lateral offset (m, road/wheel frame) ----
-	bool  enable_magnetism         = false; // off while worldspace steering is being tuned — AI just tracks the racing line
+	bool  enable_magnetism         = true;  // if false, AI just tracks the racing line — no pack behavior at all
 	float cohesion_k               = 0.5f;  // pull toward neighbor centroid beyond this range
 	float cohesion_trigger_dist_m  = 6.f;   // only cohere if nearest neighbor farther than this
 	float separation_k             = 1.2f;  // push away from neighbors closer than separation_dist_m
 	float separation_dist_m        = 1.0f;  // m — full-strength push starts inside this radius
-	float draft_k                  = 1.0f;  // pull toward the slot directly behind the nearest forward neighbor
+	// Draft: ADOPTS the leader's actual lateral_pos (not a proportional nudge
+	// toward it) — real drafting means sitting on the wheel directly ahead,
+	// sacrificing the racing line if the leader isn't on it. draft_follow_k is
+	// a blend fraction (0=ignore leader's line, 1=fully lock onto it), scaled
+	// by how close the gap is (glm::clamp(1 - long_gap/draft_dist_m, 0, 1)) so
+	// the pull strengthens as you close in rather than snapping on at range.
+	float draft_follow_k           = 0.7f;
 	float draft_dist_m             = 8.0f;  // m — only draft-pull within this longitudinal range
 	float lineformation_k          = 0.35f; // always-on bias toward zero lateral offset from neighbors' track
+
+	// ---- Collision avoidance: decentralized — each rider independently
+	// detects an imminent overlap with ANY sensed neighbor (not just
+	// nearest_ahead) and resolves it by yielding sideways if there's room, or
+	// braking to fall back if there isn't. Both riders in a conflict run this
+	// same logic, so whichever has less room/more urgency ends up yielding —
+	// no central coordinator, same hemisphere-scan/no-array-index rule as the
+	// rest of this file. Separate from (and stacks on top of) the softer
+	// always-on separation term above, which alone isn't decisive enough to
+	// prevent an actual overlap when someone cuts across laterally. ----
+	float collision_long_m    = 2.0f;  // longitudinal gap inside this = an active conflict
+	float collision_lat_m     = 0.9f;  // lateral gap inside this = an active conflict (roughly bike width + margin)
+	float avoidance_lateral_k = 3.0f;  // strong lateral push when yielding, scaled by conflict severity (0..1)
+	float avoidance_brake_k   = 0.7f;  // brake_amount applied when there's no room to yield, scaled by severity
 
 	// ---- Steer target lookahead — where along the course the target lateral
 	// offset is sampled from (pure-pursuit style preview, not the bike's own
@@ -268,12 +288,15 @@ public:
 	int   dbg_num_neighbors      = 0;
 	float dbg_cohesion_offset    = 0.f;
 	float dbg_separation_offset  = 0.f;
-	float dbg_draft_offset       = 0.f;
+	float dbg_draft_blend        = 0.f;  // 0..1, how strongly locked onto the draft leader's own lateral_pos
 	float dbg_lineform_offset    = 0.f;
 	float dbg_target_lat_offset  = 0.f;
 	bool  dbg_clamped            = false;
 	float dbg_lateral_shift      = 0.f;
 	float dbg_heading_error      = 0.f;  // rad, signed angle from bike_direction to the racing line's own tangent
+	bool  dbg_avoidance_active   = false;
+	float dbg_avoidance_lat_term = 0.f;  // extra target-offset delta from yielding sideways (m)
+	float dbg_avoidance_brake    = 0.f;  // extra brake_amount from an unavoidable conflict (0..1)
 };
 
 class BikePlayer : public IBikeInput {
