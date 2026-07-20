@@ -9,12 +9,13 @@ inline constexpr float BIKE_FRONT_Z     =  0.5394f;
 inline constexpr float BIKE_WHEELBASE   = BIKE_FRONT_Z - BIKE_REAR_Z;
 // ci.lateral_shift no longer translates a rail lateral_pos — it bends
 // bike_direction away from the track tangent (see BikeObject::tick_transform).
-// Tunable in the Transform debug menu (BikeObject.cpp).
+// Tunable in the Transform debug menu (BikeObject.cpp). None of these are
+// control gains — they're physical limits (max angle/rate/accel/curvature).
+// The only tunable feedback loop (PID) left in steering is BikeAI's lateral
+// one (BikeAIParams::lateral_shift_kp/ki/kd).
 extern float bike_heading_max_offset_deg;   // max heading deviation from track tangent, at |ci.lateral_shift|=1
 extern float bike_heading_turn_rate_dps;    // max angular velocity (deg/s) the heading can turn at, independent of speed
 extern float bike_heading_turn_accel_dps2;  // max angular acceleration (deg/s^2) — caps how fast turn rate can build/decay; the "momentum" knob
-extern float bike_heading_rate_kp;          // spring stiffness (rad/s^2 per rad of angle error) — see tick_transform's damped spring
-extern float bike_heading_damping_ratio;    // 1 = critically damped, <1 = wobbles before settling, >1 = sluggish
 extern float bike_min_turn_radius_m;        // physical curvature limit — max achievable turn rate is speed/this, same as a real bike can't out-turn its geometry
 
 // Steering/visual tuning vars — defined in BikeObject_Steer.cpp.
