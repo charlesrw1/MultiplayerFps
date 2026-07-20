@@ -220,35 +220,6 @@ TEST(BikeAIGapPD, ClampedAtMaxPush)
 }
 
 // ---------------------------------------------------------------------------
-// Peel direction
-// When a puller finishes their pull they peel to the side.
-// Rule: peel AWAY from road centre (or to the RIGHT if exactly centred).
-//   lateral_pos < 0 (left of centre) → peel left  → peel_dir = -1
-//   lateral_pos >= 0 (right or at centre) → peel right → peel_dir = +1
-// ---------------------------------------------------------------------------
-static float peel_dir(float lateral_pos)
-{
-    // FIXED: was (<= 0) which gave -1 at centre; should be (< 0)
-    return (lateral_pos < 0.f) ? -1.f : 1.f;
-}
-
-TEST(BikeAIPaceline, PeelDir_LeftOfCentre_PeelsLeft)
-{
-    EXPECT_LT(peel_dir(-0.5f), 0.f);
-}
-
-TEST(BikeAIPaceline, PeelDir_RightOfCentre_PeelsRight)
-{
-    EXPECT_GT(peel_dir(0.5f), 0.f);
-}
-
-TEST(BikeAIPaceline, PeelDir_AtCentre_PeelsRight)
-{
-    // At exactly 0 the comment says "to the right if centred"
-    EXPECT_GT(peel_dir(0.f), 0.f) << "Centred rider should peel right per comment";
-}
-
-// ---------------------------------------------------------------------------
 // Overshoot grace timer logic
 // When locked_gap <= 0 (I'm ahead of my locked target), don't drop immediately.
 // Only drop if: gap is very negative (> ABS_DROP threshold) OR timer expires.
@@ -318,14 +289,20 @@ TEST(BikeAIGrace, FarAhead_OutOfRange_Dropped)
 // every Following rider eventually sees "nobody within Nm ahead" and
 // self-promotes to Pulling, causing the whole chain to pull simultaneously.
 //
+// A rider that just finished pulling isn't a scripted Peeling/DriftingBack
+// state anymore — it's just Following with recovering_s > 0 (reduced power,
+// not a valid wheel). is_at_front() skips those the same way it used to skip
+// the old transient states.
+//
 // We model is_at_front() as a pure function for testability.
 // ---------------------------------------------------------------------------
-enum class TestPaceState { Following, Pulling, Peeling, DriftingBack };
+enum class TestPaceState { Following, Pulling };
 
 struct TestRider {
     float course_dist;
     TestPaceState state;
-    bool is_player = false;  // players are ignored by is_at_front
+    bool recovering = false; // true = just finished a pull, not a valid wheel
+    bool is_player  = false; // players are ignored by is_at_front
 };
 
 // Returns true if rider[me_idx] is at the virtual front.
@@ -334,8 +311,7 @@ static bool is_at_front(const std::vector<TestRider>& riders, int me_idx)
 {
     for (int j = me_idx - 1; j >= 0; --j) {
         if (riders[j].is_player) continue;
-        if (riders[j].state == TestPaceState::Peeling ||
-            riders[j].state == TestPaceState::DriftingBack) continue;
+        if (riders[j].recovering) continue;
         return false;
     }
     return true;
@@ -370,13 +346,13 @@ TEST(BikeAIPaceline, IsAtFront_PullerFarAhead_StillFalse)
         << "Follower must not become Puller just because gap to leader exceeds 10m";
 }
 
-TEST(BikeAIPaceline, IsAtFront_LeadPeeling_SecondIsAtFront)
+TEST(BikeAIPaceline, IsAtFront_LeadRecovering_SecondIsAtFront)
 {
-    // Lead peels off → second rider is now effectively at front
+    // Lead just finished its pull → second rider is now effectively at front
     std::vector<TestRider> r = {
-        { 100.f, TestPaceState::Peeling   },
-        { 98.f,  TestPaceState::Following },
-        { 90.f,  TestPaceState::Following },
+        { 100.f, TestPaceState::Following, true  },  // recovering
+        { 98.f,  TestPaceState::Following, false },
+        { 90.f,  TestPaceState::Following, false },
     };
     EXPECT_TRUE(is_at_front(r, 1))  << "2nd rider should become new puller";
     EXPECT_FALSE(is_at_front(r, 2)) << "3rd rider should still be following";
@@ -385,59 +361,49 @@ TEST(BikeAIPaceline, IsAtFront_LeadPeeling_SecondIsAtFront)
 // ---------------------------------------------------------------------------
 // Pulling → Following when a wheel appears ahead
 // A rider in Pulling state should immediately revert to Following if a stable
-// rider (Following or Pulling) appears ahead — always prefer catching a wheel.
+// rider (Following or Pulling, not recovering) appears ahead — always prefer
+// catching a wheel.
 // ---------------------------------------------------------------------------
 static bool pulling_should_revert_to_following(bool has_rider_ahead,
-                                                TestPaceState ahead_state,
+                                                bool ahead_recovering,
                                                 bool ahead_is_player)
 {
-    if (!has_rider_ahead) return false;
-    if (ahead_is_player)  return true;   // player counts as stable
-    return ahead_state == TestPaceState::Following ||
-           ahead_state == TestPaceState::Pulling;
+    if (!has_rider_ahead)  return false;
+    if (ahead_is_player)   return true;   // player counts as stable
+    return !ahead_recovering;
 }
 
 TEST(BikeAIPaceline, Pulling_NoRiderAhead_StaysPulling)
 {
-    EXPECT_FALSE(pulling_should_revert_to_following(false, TestPaceState::Following, false));
+    EXPECT_FALSE(pulling_should_revert_to_following(false, false, false));
 }
 
 TEST(BikeAIPaceline, Pulling_StableFollowerAhead_RevertsToFollowing)
 {
-    EXPECT_TRUE(pulling_should_revert_to_following(true, TestPaceState::Following, false));
+    EXPECT_TRUE(pulling_should_revert_to_following(true, false, false));
 }
 
-TEST(BikeAIPaceline, Pulling_StablePullerAhead_RevertsToFollowing)
+TEST(BikeAIPaceline, Pulling_RecoveringRiderAhead_StaysPulling)
 {
-    EXPECT_TRUE(pulling_should_revert_to_following(true, TestPaceState::Pulling, false));
-}
-
-TEST(BikeAIPaceline, Pulling_PeelingAhead_StaysPulling)
-{
-    // Peeling rider is exiting — don't follow them
-    EXPECT_FALSE(pulling_should_revert_to_following(true, TestPaceState::Peeling, false));
-}
-
-TEST(BikeAIPaceline, Pulling_DriftingBackAhead_StaysPulling)
-{
-    EXPECT_FALSE(pulling_should_revert_to_following(true, TestPaceState::DriftingBack, false));
+    // Recovering rider is falling off the back of the pull — don't follow them
+    EXPECT_FALSE(pulling_should_revert_to_following(true, true, false));
 }
 
 TEST(BikeAIPaceline, Pulling_PlayerAhead_RevertsToFollowing)
 {
-    EXPECT_TRUE(pulling_should_revert_to_following(true, TestPaceState::Following, true));
+    EXPECT_TRUE(pulling_should_revert_to_following(true, false, true));
 }
 
 TEST(BikeAIPaceline, IsAtFront_CascadeRegression)
 {
-    // Regression: when lead peels, only the 2nd rider becomes Puller.
+    // Regression: when lead ends its pull, only the 2nd rider becomes Puller.
     // Once 2nd is Pulling and has accelerated >10m away, 3rd must NOT self-promote.
     // This is the core cascade bug — the fixed is_at_front() must catch it.
     std::vector<TestRider> r = {
-        { 105.f, TestPaceState::Peeling   },  // lead peeling
-        { 100.f, TestPaceState::Pulling   },  // 2nd, now pulling, 15m ahead of 3rd
-        { 85.f,  TestPaceState::Following },  // 3rd — must NOT become Pulling
-        { 80.f,  TestPaceState::Following },  // 4th — must NOT become Pulling
+        { 105.f, TestPaceState::Following, true  },  // lead, now recovering
+        { 100.f, TestPaceState::Pulling,   false },  // 2nd, now pulling, 15m ahead of 3rd
+        { 85.f,  TestPaceState::Following, false },  // 3rd — must NOT become Pulling
+        { 80.f,  TestPaceState::Following, false },  // 4th — must NOT become Pulling
     };
     EXPECT_FALSE(is_at_front(r, 2)) << "3rd rider must not cascade to Pulling";
     EXPECT_FALSE(is_at_front(r, 3)) << "4th rider must not cascade to Pulling";

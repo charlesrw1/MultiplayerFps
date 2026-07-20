@@ -252,14 +252,19 @@ static void bike_course_debug()
 	ImGui::SeparatorText("Paceline FSM");
 	{
 		BikeAIParams& p = g_ai_params;
-		ImGui::DragFloat("pull_cooldown_s",    &p.pull_cooldown_s,    0.5f,  0.f, 60.f, "%.1f");
-		ImGui::DragFloat("pull_duration_s",    &p.pull_duration_s,    1.f,   1.f,120.f, "%.0f");
-		ImGui::DragFloat("peel_duration_s",    &p.peel_duration_s,    0.1f,  0.5f, 8.f, "%.1f");
-		ImGui::DragFloat("drift_duration_s",   &p.drift_duration_s,   0.5f,  1.f, 30.f, "%.1f");
-		ImGui::DragFloat("peel_offset_m",      &p.peel_offset_m,      0.05f, 0.1f, 3.f, "%.2f");
-		ImGui::DragFloat("peel_power_delta_w", &p.peel_power_delta_w, 5.f, -200.f, 0.f, "%.0f");
-		ImGui::DragFloat("drift_power_frac",   &p.drift_power_frac,   0.02f, 0.3f, 1.f, "%.2f");
-		ImGui::DragFloat("pull_power_frac",    &p.pull_power_frac,    0.02f, 0.5f, 1.5f,"%.2f");
+		ImGui::DragFloat("pull_cooldown_s",     &p.pull_cooldown_s,     0.5f, 0.f,  60.f, "%.1f");
+		ImGui::DragFloat("pull_duration_min_s", &p.pull_duration_min_s, 1.f,  1.f, 120.f, "%.0f");
+		ImGui::DragFloat("pull_duration_max_s", &p.pull_duration_max_s, 1.f,  1.f, 120.f, "%.0f");
+		ImGui::DragFloat("pull_power_frac",     &p.pull_power_frac,     0.02f,0.5f,  1.5f, "%.2f");
+		ImGui::DragFloat("recovery_duration_s", &p.recovery_duration_s,0.5f,  0.5f, 30.f, "%.1f");
+		ImGui::DragFloat("recovery_power_frac", &p.recovery_power_frac,0.02f, 0.3f,  1.f, "%.2f");
+	}
+	ImGui::SeparatorText("Gap Cohesion (off-wheel-range pull-back)");
+	{
+		BikeAIParams& p = g_ai_params;
+		ImGui::DragFloat("cohesion_gap_power_k",     &p.cohesion_gap_power_k,     1.f, 0.f, 100.f, "%.0f");
+		ImGui::DragFloat("cohesion_gap_max_delta_w", &p.cohesion_gap_max_delta_w, 5.f, 0.f, 400.f, "%.0f");
+		ImGui::DragFloat("cohesion_gap_range_m",     &p.cohesion_gap_range_m,     1.f, 0.f, 200.f, "%.0f");
 	}
 
 	ImGui::SeparatorText("Riders");

@@ -76,7 +76,7 @@ struct AIDebugFrame {
     float lookahead_dist;     // distance from rider to lookahead pt
     int   has_wheel;          // 1 = follower (wheel-anchored target), 0 = leader (racing-line)
     int   wheel_idx;          // index of wheel rider, or -1 if none
-    int   paceline_state;     // 0=Following 1=Pulling 2=Peeling 3=DriftingBack
+    int   paceline_state;     // 0=Following 1=Pulling
     float paceline_timer_s;
     float lat_offset;         // smoothed
     float lat_offset_target;  // resolver pick this frame

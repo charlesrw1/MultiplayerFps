@@ -172,40 +172,54 @@ float YIELD_BRAKE_K      = 0.55f;  // brake fraction when fully squeezed
 
 // ============================================================
 // Gap regulation — match the explicit wheel rider's power, with P-control on
-// gap error. wheel == null  →  leader, holds tactical free power.
-// See [[bike/bikeai#Power]].
+// gap error. wheel == null  →  leader or off-the-front-of-range: pulls toward
+// the nearest rider ahead (magnetism cohesion) instead of a flat free power,
+// so gaps beyond wheel range don't just balloon forever. See [[bike/bikeai#Power]].
 // ============================================================
 
 float GAP_POWER_K         = 50.f;   // W correction per metre of gap error
 float GAP_POWER_MAX_DELTA = 250.f;  // max ±W applied on top of wheel rider's power
-float GAP_FREE_POWER_W    = 250.f;  // power when leader (no wheel)
+float GAP_FREE_POWER_W    = 250.f;  // power when leader (no wheel, nobody ahead in range)
 
 void BikeGameApplication::update_gap_regulation()
 {
 	ASSERT(!all_riders.empty() || true);  // empty pack is valid
 	const BikeAIParams& p = g_ai_params;
-	for (BikeObject* me : all_riders) {
+	const int n = (int)riders_sorted.size();
+	for (int i = 0; i < n; ++i) {
+		BikeObject* me = riders_sorted[i];
 		BikeAI* ai = dynamic_cast<BikeAI*>(me->input.get());
 		if (!ai) continue;
 
-		// Base target: match wheel power + P on gap, or free power if leader.
 		float base = GAP_FREE_POWER_W;
 		if (ai->wheel) {
+			// Base target: match wheel power + P on gap.
 			const glm::vec3 to_wheel = ai->wheel->get_ws_position() - me->get_ws_position();
 			const float gap_m      = glm::dot(to_wheel, me->bike_direction);
 			const float gap_err    = gap_m - ai->long_gap;  // +ve = too far back
 			const float correction = glm::clamp(gap_err * GAP_POWER_K,
 			                                    -GAP_POWER_MAX_DELTA, GAP_POWER_MAX_DELTA);
 			base = ai->wheel->stamina.actual_power + correction;
+		} else if (i > 0) {
+			// No wheel but not the race leader — gap to whoever's ahead exceeds wheel
+			// range (chasing a break, or trailing a group). Magnetism cohesion: pull
+			// toward them proportional to gap, weaker and longer-range than in-line
+			// gap regulation, tapering to nothing past cohesion_gap_range_m so a real
+			// breakaway can still stick.
+			const BikeObject* ahead = riders_sorted[i - 1];
+			const float gap_m = ahead->course_dist_m - me->course_dist_m;
+			if (gap_m < p.cohesion_gap_range_m) {
+				const float correction = glm::clamp(gap_m * p.cohesion_gap_power_k,
+				                                    0.f, p.cohesion_gap_max_delta_w);
+				base = GAP_FREE_POWER_W + correction;
+			}
 		}
 
 		// Tactical FSM modifies the base.
-		switch (ai->paceline_state) {
-		case PacelineState::Pulling:      base *= p.pull_power_frac;          break;
-		case PacelineState::Peeling:      base += p.peel_power_delta_w;       break;
-		case PacelineState::DriftingBack: base *= p.drift_power_frac;         break;
-		case PacelineState::Following:    /* unchanged */                     break;
-		}
+		if (ai->paceline_state == PacelineState::Pulling)
+			base *= p.pull_power_frac;
+		if (ai->recovering_s > 0.f)
+			base *= p.recovery_power_frac;
 
 		ai->target_power_watts = glm::clamp(base, 50.f, 1000.f);
 	}

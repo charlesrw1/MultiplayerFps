@@ -1,6 +1,9 @@
 // BikeApplication_PackAI.cpp
-// Tactical AI decisions: wheel-picking and paceline FSM
-// (Following / Pulling / Peeling / DriftingBack).
+// Tactical AI decisions: wheel-picking and paceline FSM (Following / Pulling).
+// Peeling off and drifting back are not scripted states here — they're an emergent
+// result of the magnetism layer (update_wheel_picking skipping recovering riders as
+// wheel candidates, update_clear_air/update_avoidance treating them as a normal
+// obstacle once demoted). See [[bike/bikeai#Magnetism]].
 // All functions are methods of BikeGameApplication (declared in BikeHeaders.h).
 
 #include "BikeHeaders.h"
@@ -50,12 +53,12 @@ void BikeGameApplication::update_wheel_picking()
 			BikeObject* other = riders_sorted[j];
 			if (other->group_id != me->group_id) continue;
 
-			// Skip riders in transient states — Peeling drifts sideways, DriftingBack
-			// is a slow rider exiting the rotation. Following them just yanks the chain
-			// off the line until they re-enter Following.
+			// Skip riders still recovering from a pull — they're actively shedding pace,
+			// so following them just yanks the chain off the line. Once recovering_s
+			// hits 0 they're a normal candidate again (by which point they've usually
+			// fallen back in the order naturally).
 			if (BikeAI* oai = dynamic_cast<BikeAI*>(other->input.get())) {
-				if (oai->paceline_state == PacelineState::Peeling ||
-				    oai->paceline_state == PacelineState::DriftingBack) continue;
+				if (oai->recovering_s > 0.f) continue;
 			}
 
 			const float signed_long = other->course_dist_m - me->course_dist_m;
@@ -89,17 +92,22 @@ void BikeGameApplication::update_wheel_picking()
 }
 
 // ============================================================
-// Paceline tactical FSM — Following / Pulling / Peeling / DriftingBack.
+// Paceline tactical FSM — Following / Pulling.
 //
 // Wheel-picker is the "what wheel am I on" decision. This is "what am I doing
-// strategically" — it modifies the wheel result (forces a peel-side lat_offset,
-// scales target_power) and gates pull re-entry.
+// strategically" — it decides when to take a pull and for how long, and starts
+// the recovery window when a pull ends. It does NOT script the peel/drift-back
+// motion: once a rider is recovering, update_wheel_picking refuses to let anyone
+// draft them and update_clear_air/update_avoidance treat them as a normal
+// obstacle, so the fall-back and the following riders flicking around them
+// happen as an emergent result of the magnetism layer, not a forced lat_offset
+// or timer-driven drift. See [[bike/bikeai#Magnetism]].
 //
 // Cascade-safe promotion: Pulling riders accelerate, so the gap to the next
 // rider can exceed wheel_long_max within seconds. is_at_front() walks ALL
-// riders ahead in the same group with no distance cutoff; only Peeling and
-// DriftingBack are skipped (transient sideways/slow states). Without this,
-// every following rider eventually self-promotes when its puller pulls away.
+// riders ahead in the same group with no distance cutoff; only recovering
+// riders are skipped. Without this, every following rider eventually
+// self-promotes when its puller pulls away.
 // See [[bike/bikeai#Tactical FSM]].
 // ============================================================
 void BikeGameApplication::update_paceline()
@@ -116,8 +124,7 @@ void BikeGameApplication::update_paceline()
 			if (other->group_id != me->group_id) continue;
 			BikeAI* oai = dynamic_cast<BikeAI*>(other->input.get());
 			if (!oai) return false;  // player counts as a stable wheel
-			if (oai->paceline_state == PacelineState::Peeling ||
-			    oai->paceline_state == PacelineState::DriftingBack) continue;
+			if (oai->recovering_s > 0.f) continue;
 			return false;
 		}
 		return true;
@@ -131,6 +138,8 @@ void BikeGameApplication::update_paceline()
 		ai->paceline_timer_s += dt;
 		if (ai->pull_cooldown_s > 0.f)
 			ai->pull_cooldown_s = glm::max(0.f, ai->pull_cooldown_s - dt);
+		if (ai->recovering_s > 0.f)
+			ai->recovering_s = glm::max(0.f, ai->recovering_s - dt);
 
 		const bool at_front = is_at_front(i);
 
@@ -138,38 +147,27 @@ void BikeGameApplication::update_paceline()
 		case PacelineState::Following:
 			// Becoming a leader by emergence triggers a pull (unless still cooling down).
 			if (at_front && ai->pull_cooldown_s <= 0.f) {
-				ai->paceline_state   = PacelineState::Pulling;
-				ai->paceline_timer_s = 0.f;
+				ai->paceline_state    = PacelineState::Pulling;
+				ai->paceline_timer_s  = 0.f;
+				// Randomized per-pull duration — avoids a metronomic rotation without
+				// needing the stamina system wired in.
+				const float t = (float)rand() / (float)RAND_MAX;
+				ai->pull_duration_roll = glm::mix(p.pull_duration_min_s, p.pull_duration_max_s, t);
 			}
 			break;
 
 		case PacelineState::Pulling:
-			// Pull until duration elapses, then peel off. If a stable rider appears
-			// ahead (someone moved up), drop back to Following without peeling.
+			// Pull until the rolled duration elapses, then end the pull and start
+			// recovering. If a stable rider appears ahead (someone moved up), drop
+			// back to Following immediately — no recovery penalty, the pull never
+			// really happened.
 			if (!at_front) {
 				ai->paceline_state   = PacelineState::Following;
 				ai->paceline_timer_s = 0.f;
-			} else if (ai->paceline_timer_s >= p.pull_duration_s) {
-				ai->paceline_state   = PacelineState::Peeling;
-				ai->paceline_timer_s = 0.f;
-				// Peel AWAY from road centre (right if exactly centred). Matches
-				// the BikeAIPaceline.PeelDir tests.
-				ai->peel_side_sign = (me->lateral_pos < 0.f) ? -1.f : +1.f;
-			}
-			break;
-
-		case PacelineState::Peeling:
-			if (ai->paceline_timer_s >= p.peel_duration_s) {
-				ai->paceline_state   = PacelineState::DriftingBack;
-				ai->paceline_timer_s = 0.f;
-			}
-			break;
-
-		case PacelineState::DriftingBack:
-			// Done drifting once we've found a stable wheel, or after a hard cap.
-			if (ai->wheel || ai->paceline_timer_s >= p.drift_duration_s) {
+			} else if (ai->paceline_timer_s >= ai->pull_duration_roll) {
 				ai->paceline_state   = PacelineState::Following;
 				ai->paceline_timer_s = 0.f;
+				ai->recovering_s     = p.recovery_duration_s;
 				ai->pull_cooldown_s  = p.pull_cooldown_s;
 			}
 			break;

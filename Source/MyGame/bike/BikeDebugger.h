@@ -23,4 +23,5 @@ private:
 	BikeObject* selected = nullptr;
 	bool        orbiting = false;
 	bool        initialized_fly_cam = false;
+	bool        draw_rider_state_text = false;  // per-rider paceline state + timer, drawn above their head
 };

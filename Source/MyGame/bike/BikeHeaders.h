@@ -214,18 +214,14 @@ struct BikeStrategicState {
 // Paceline rotation state machine
 // ============================================================
 enum class PacelineState {
-	Following,      // normal: follow the rider ahead, take draft
+	Following,      // normal: follow the rider ahead, take draft (or recovering off the front)
 	Pulling,        // at front of the AI group, doing work
-	Peeling,        // done pulling: steer hard to one side to move out of the line
-	DriftingBack,   // running at reduced power, drifting to the back of the group
 };
 
 static const char* paceline_state_name(PacelineState s) {
 	switch (s) {
 	case PacelineState::Following:    return "Following";
 	case PacelineState::Pulling:      return "Pulling";
-	case PacelineState::Peeling:      return "Peeling";
-	case PacelineState::DriftingBack: return "DriftBack";
 	}
 	return "?";
 }
@@ -293,14 +289,24 @@ struct BikeAIParams {
 	float clear_air_step        = 0.35f;  // m  — candidate spacing
 
 	// Paceline FSM — see [[bike/bikeai#Tactical FSM]]
-	float pull_cooldown_s    = 8.f;    // min seconds between pulls (per rider)
-	float pull_duration_s    = 30.f;   // max time spent at front before peeling
-	float peel_duration_s    = 2.5f;   // time spent steering to the side
-	float drift_duration_s   = 6.f;    // max drift-back duration (cap)
-	float peel_offset_m      = 1.0f;   // |lat_offset| while peeling
-	float peel_power_delta_w = -50.f;  // ΔW vs Following while peeling
-	float drift_power_frac   = 0.70f;  // multiplier on Following power while drifting back
-	float pull_power_frac    = 1.00f;  // multiplier on Following power while pulling
+	// Pull length is randomized per-pull (not stamina-driven — see [[bike/bikeai#Magnetism]]);
+	// gives rotation a less metronomic feel without needing the stamina system wired in.
+	float pull_cooldown_s     = 8.f;    // min seconds between pulls (per rider)
+	float pull_duration_min_s = 12.f;   // shortest pull before peeling off
+	float pull_duration_max_s = 35.f;   // longest pull before peeling off
+	float pull_power_frac     = 1.00f;  // multiplier on Following power while pulling
+
+	// Recovery window after a pull ends — no forced peel/drift steering. The rider just
+	// sheds power and stops being a valid wheel candidate; magnetism (wheel re-picking +
+	// clear-air routing others around them as a normal obstacle) does the rest.
+	float recovery_duration_s = 5.f;    // seconds spent non-wheel-candidate + reduced power
+	float recovery_power_frac = 0.75f;  // multiplier on Following power while recovering
+
+	// Gap cohesion — magnetism pull-back on gaps too large to be a wheel target (chasing a
+	// gap/breakaway). Weaker + longer-range than in-line gap regulation.
+	float cohesion_gap_power_k     = 15.f;   // W correction per metre of gap beyond wheel_long_max
+	float cohesion_gap_max_delta_w = 120.f;  // cap on the cohesion power boost
+	float cohesion_gap_range_m     = 60.f;   // beyond this, no cohesion pull (fully detached)
 };
 extern BikeAIParams g_ai_params;
 
@@ -330,10 +336,11 @@ public:
 	float       long_gap        = 1.5f; // m — target longitudinal spacing behind wheel
 
 	// ---- Paceline FSM (set by BikeGameApplication::update_paceline each frame) ----
-	PacelineState paceline_state    = PacelineState::Following;
-	float         paceline_timer_s  = 0.f;     // seconds spent in current state
-	float         pull_cooldown_s   = 0.f;     // seconds remaining before another pull is allowed
-	float         peel_side_sign    = 1.f;     // +1 = peel road-right, -1 = road-left
+	PacelineState paceline_state     = PacelineState::Following;
+	float         paceline_timer_s   = 0.f;    // seconds spent in current state
+	float         pull_duration_roll = 0.f;    // randomized duration for the current/last pull
+	float         pull_cooldown_s    = 0.f;    // seconds remaining before another pull is allowed
+	float         recovering_s       = 0.f;    // >0: just finished pulling — reduced power, not a valid wheel
 
 	// ---- Double echelon lane assignment ----
 	float preferred_lateral = 0.f;

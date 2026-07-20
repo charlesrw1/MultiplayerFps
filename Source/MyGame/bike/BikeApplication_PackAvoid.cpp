@@ -53,7 +53,14 @@ extern float YIELD_BRAKE_K;
 // Default ideal slot = 0 (best draft) + personality bias. If neighbors block
 // it within [clear_air_long_window × clear_air_lat_window], shift to the
 // candidate offset with the most open air. Smoothed over clear_air_damp_tau.
-// Peeling state forces lat_offset toward ±peel_offset_m, bypassing the search.
+//
+// A rider who just finished pulling has wheel == nullptr (they were leading)
+// and recovering_s > 0. They fall through to the leader branch below and just
+// decay toward their bias — no forced peel steer. The overtaking motion you
+// see from riders behind them is purely emergent: update_wheel_picking refuses
+// to hand them out as a wheel while recovering, so a follower whose wheel just
+// went stale re-targets a new (still-committed) wheel, and this same resolver
+// then treats the recovering rider as a normal occupied slot to route around.
 // See [[bike/bikeai#Lateral offset rule]].
 // ============================================================
 void BikeGameApplication::update_clear_air()
@@ -71,14 +78,6 @@ void BikeGameApplication::update_clear_air()
 		BikeObject* me = riders_sorted[i];
 		BikeAI*     ai = dynamic_cast<BikeAI*>(me->input.get());
 		if (!ai) continue;
-
-		// Peeling: forced offset, no search.
-		if (ai->paceline_state == PacelineState::Peeling) {
-			const float target = ai->peel_side_sign * p.peel_offset_m;
-			ai->dbg_lat_offset_target = target;
-			ai->lat_offset += (target - ai->lat_offset) * lerp;
-			continue;
-		}
 
 		// Leader: lat_offset is unused (racing line is the target). Decay toward 0
 		// so re-acquiring a wheel starts from the bias-neutral position.
