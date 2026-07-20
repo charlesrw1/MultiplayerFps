@@ -160,6 +160,21 @@ void BikeDebugger::on_imgui()
 	if (selected) {
 		ImGui::SeparatorText("Selected Rider");
 		ImGui::Text("Race position: P%d   Speed: %.1f m/s", selected->race_position, selected->speed);
+
+		// Slider range is the road's actual half-width at the rider's current
+		// position — "offset is a measure between centre line and sides of
+		// road", so the slider itself shouldn't be able to ask for anything the
+		// road can't represent. Also hard-clamped again downstream (BikeAI's
+		// normal edge_safety_m clamp) once the road curves under the rider.
+		float road_hw = 4.f;
+		if (g_bike_app && g_bike_app->course.is_built)
+			road_hw = g_bike_app->course.sample(selected->course_dist_m).road_half_width;
+		ImGui::SliderFloat("Manual lateral offset", &selected->manual_lateral_offset, -road_hw, road_hw, "%.2f m");
+		if (BikeAI* ai = dynamic_cast<BikeAI*>(selected->input.get()))
+			ImGui::Text("Offset blend: %.0f%% (0%% mid-corner, 100%% on a straight)", ai->offset_blend * 100.f);
+		else
+			ImGui::TextDisabled("Offset only affects AI riders.");
+
 		if (ImGui::Button("Clear Selection")) {
 			selected = nullptr;
 			orbiting = false;

@@ -36,11 +36,21 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float speed = my_bike->speed;
 	const glm::vec3 my_pos = my_bike->get_ws_position();
 
-	// ---- Corner lookahead (shared by braking + speed target) ----
+	// ---- Corner lookahead (shared by braking + speed target + manual offset blend) ----
 	const float corner_scan_m = glm::max(p.corner_look_m, speed * 0.8f);
 	const float raw_min_r     = course->min_turn_radius_ahead(my_bike->course_dist_m, corner_scan_m);
 	const float min_r         = glm::max(raw_min_r, 3.f);
 	dbg_min_r = min_r;
+
+	// Manual lateral offset blend: full weight on a straight (min_r large),
+	// low-passed toward 0 as upcoming curvature tightens, so a debug-assigned
+	// offset that made sense on the preceding straight doesn't put the bike on
+	// a nonsense line through the corner — it's already back on the racing
+	// line by corner entry, same anticipation horizon as the braking scan above.
+	const float offset_weight_raw = glm::clamp(
+		(min_r - p.offset_corner_r_m) / glm::max(p.offset_straight_r_m - p.offset_corner_r_m, 0.01f),
+		0.f, 1.f);
+	offset_blend = damp_dt_independent(offset_weight_raw, offset_blend, p.offset_blend_tau_s, dt);
 
 	// ============================================================
 	// 1. Sense — forward-hemisphere neighbor scan. Real geometry only:
@@ -145,8 +155,10 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float steer_lookahead_m = glm::max(p.steer_lookahead_m, speed * p.steer_lookahead_time_s);
 	const BikeWaypoint wp_ahead   = course->sample(my_bike->course_dist_m + steer_lookahead_m);
 
+	const float manual_offset_term = my_bike->manual_lateral_offset * offset_blend;
+
 	const float lat_limit      = glm::max(wp_ahead.road_half_width - p.edge_safety_m, 0.1f);
-	const float target_lat_raw = wp_ahead.racing_line_lateral + target_offset_delta;
+	const float target_lat_raw = wp_ahead.racing_line_lateral + target_offset_delta + manual_offset_term;
 	const float target_lat     = glm::clamp(target_lat_raw, -lat_limit, lat_limit);
 	dbg_clamped           = (target_lat != target_lat_raw);
 	dbg_target_lat_offset = target_lat;

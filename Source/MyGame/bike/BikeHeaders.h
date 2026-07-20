@@ -185,8 +185,15 @@ struct BikeAIParams {
 	// ---- Steer target lookahead — where along the course the target lateral
 	// offset is sampled from (pure-pursuit style preview, not the bike's own
 	// current position). effective_m = max(steer_lookahead_m, speed * steer_lookahead_time_s).
-	float steer_lookahead_m      = 4.f;   // floor distance (m), keeps a preview even near-stationary
-	float steer_lookahead_time_s = 0.4f;  // scales lookahead with speed above the floor
+	//
+	// Must anticipate corners on roughly the same horizon as the braking scan
+	// below (corner_look_m, ~20m+), not a much shorter one — a short lookahead
+	// here brakes for the corner in good time but doesn't start turning-in
+	// until nearly on top of it, so the target has already moved deep into the
+	// curve by the time steering reacts: reads as turning in late and cutting
+	// across toward the apex instead of tracking it smoothly.
+	float steer_lookahead_m      = 6.f;   // floor distance (m), keeps a preview even near-stationary
+	float steer_lookahead_time_s = 0.9f;  // scales lookahead with speed above the floor
 
 	// ---- Lateral shift PID — converts target lateral offset into ci.lateral_shift ----
 	// Command is clamped to [-1,1]; BikeObject::tick_transform maps it onto a
@@ -196,6 +203,17 @@ struct BikeAIParams {
 	float lateral_shift_ki      = 0.f;   // per metre-second of accumulated offset error
 	float lateral_shift_kd      = 0.4f;  // per (m/s) of lateral_vel opposing the error — damps outer-loop ring
 	float lateral_integral_clamp = 2.f;  // anti-windup clamp on the accumulated error (m*s)
+
+	// ---- Manual lateral offset blend — how much of BikeObject::manual_lateral_offset
+	// (debug-set per rider, see BikeDebugger) actually reaches the steering
+	// target. Full weight on straights; blended out toward the racing line as
+	// upcoming curvature tightens (reuses the same min_turn_radius_ahead scan as
+	// corner braking, so it anticipates on the same horizon) — an offset that
+	// made sense on the preceding straight would put the bike on a nonsense
+	// line through the corner itself. ----
+	float offset_straight_r_m = 50.f;  // min_r above this: full manual offset
+	float offset_corner_r_m   = 15.f;  // min_r at/below this: zero manual offset (racing line only)
+	float offset_blend_tau_s  = 0.3f;  // low-pass tau smoothing the blend transition
 
 	// ---- Off-track hard clamp ----
 	float edge_safety_m = 0.8f;  // margin inside road edge the magnetism offset may never cross
@@ -217,6 +235,11 @@ public:
 	float speed_integral    = 0.f;
 	float speed_prev_error  = 0.f;
 	float lateral_integral  = 0.f;
+
+	// Low-passed weight (0..1) of BikeObject::manual_lateral_offset actually
+	// applied this tick — 1 on a straight, blended toward 0 as upcoming
+	// curvature tightens. See BikeAIParams::offset_straight_r_m/offset_corner_r_m.
+	float offset_blend = 1.f;
 
 	// ---- Debug ----
 	glm::vec3 dbg_lookahead_pt{};
@@ -347,6 +370,12 @@ public:
 	float lateral_pos    = 0.f;   // signed offset from road centre, +ve = road-right (m)
 	int   course_segment = 0;     // nearest waypoint segment index (cached)
 	int   race_position  = 0;     // 1-indexed finishing position in sorted rider list
+
+	// Debug-set per-rider bias (BikeDebugger's Selected Rider panel), signed
+	// offset from road centre same as lateral_pos, +ve = road-right. AI-only:
+	// blended into the steering target on straights, blended out toward the
+	// racing line through corners (see BikeAI::evaluate / BikeAIParams).
+	float manual_lateral_offset = 0.f;
 
 	// Group context (written by BikeGameApplication::update_groups each frame)
 	int   group_id           = 0;
