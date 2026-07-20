@@ -3,32 +3,25 @@
 #include "Debug.h"
 #include "GameEnginePublic.h"
 #include <glm/gtx/vector_angle.hpp>
+#include <vector>
+#include <cfloat>
 
-// Rotate a vector around the world Y axis (CCW positive when viewed from above,
-// matching glm::rotate(mat4, angle, vec3(0,1,0))).
-static glm::vec3 rotate_y(glm::vec3 v, float angle_rad) {
-	const float c = glm::cos(angle_rad);
-	const float s = glm::sin(angle_rad);
-	return glm::vec3(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
-}
-
-// Project a flat arc (constant turn_rate, constant speed) to get world position after t seconds.
-// turn_rate sign convention: positive = turning right (matches BikeObject::tick_transform).
-static glm::vec3 arc_predict(glm::vec3 pos, glm::vec3 dir, float speed, float turn_rate, float t)
-{
-	if (glm::abs(turn_rate) < 0.001f)
-		return pos + dir * (speed * t);
-
-	const float R      = speed / glm::abs(turn_rate);
-	const glm::vec3 up = glm::vec3(0, 1, 0);
-	const glm::vec3 right  = glm::normalize(glm::cross(dir, up));
-	const glm::vec3 center = pos + right * (R * glm::sign(turn_rate));
-	const float sweep      = -turn_rate * t;
-	return center + rotate_y(pos - center, sweep);
-}
+// BikeGameApplication::all_riders is the sense source for the hemisphere scan
+// below. It is NOT sorted-order-relative — every neighbor relationship here
+// (ahead/behind/beside) is computed from real world positions / course_dist_m /
+// lateral_pos, never from array index. See [[bike/bikeai#Ground rule]].
+extern BikeGameApplication* g_bike_app;
 
 // ============================================================
-// BikeAI::evaluate
+// BikeAI::evaluate — the one magnetism layer.
+//
+// Heading (ci.steer) is driven purely by a PID tracking the racing line —
+// it never reflects pack position. Lateral repositioning for pack behavior
+// (cohesion/separation/draft/line-formation) is a separate desired-offset
+// target converted into ci.lateral_shift, a direct sideways translation
+// independent of heading (see BikeObject::tick_transform). This is what lets
+// a rider tuck in or dodge without having to physically re-aim the bike.
+// See [[bike/bikeai]].
 // ============================================================
 
 void BikeAI::evaluate(BikeObject* my_bike)
@@ -38,176 +31,148 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const BikeAIParams& p = g_ai_params;
 	const float dt    = eng->get_dt();
 	const float speed = my_bike->speed;
-
-	// ---- Lookahead geometry ----
-	const float corner_scan_m = glm::max(p.corner_look_m, speed * 0.8f);
-	const float raw_min_r     = course->min_turn_radius_ahead(my_bike->course_dist_m, corner_scan_m);
-	const float min_r         = glm::max(raw_min_r, 3.f);
-	dbg_min_r = min_r;
-
 	const glm::vec3 up = glm::vec3(0, 1, 0);
+	const glm::vec3 my_pos     = my_bike->get_ws_position();
 	const glm::vec3 bike_right = glm::normalize(glm::cross(my_bike->bike_direction, up));
 
-	// corner_factor — pulls lat_offset toward 0 in tight corners.
-	// See [[bike/bikeai#Target position]].
-	const float corner_factor = glm::clamp(min_r / p.corner_factor_r_full,
-	                                       p.corner_factor_min, 1.f);
-	dbg_corner_factor = corner_factor;
-
-	// Wheel-following: wheel != null  →  follower; null  →  leader (racing-line).
-	const bool follower = (wheel != nullptr);
-	dbg_has_wheel    = follower;
-
-	// Heading reference — leader steers to the course tangent (their own judgement,
-	// nobody ahead to follow). Followers steer to the WHEEL's own current heading —
-	// magnetism to the rider directly ahead, not the ideal line. If the wheel drifts
-	// off the racing line, the follower drifts with them. See [[bike/bikeai#Magnetism]].
-	const BikeWaypoint cur_wp  = course->sample(my_bike->course_dist_m);
-	const glm::vec3 path_right = glm::normalize(glm::cross(cur_wp.forward, up));
-	const glm::vec3 heading_ref_right = follower
-	    ? glm::normalize(glm::cross(wheel->bike_direction, up))
-	    : path_right;
-	const float heading_err = glm::dot(my_bike->bike_direction, heading_ref_right);
-
-	// Lookahead distances (shared by leader + follower; followers need full anticipation
-	// or they ride the chord into corners and overshoot).
-	const float look_base = p.lookahead_dist_base + speed * p.lookahead_dist_per_ms;
-	const float look_anti = look_base * p.anticipation_dist_scale;
-
 	auto angle_to_pt = [&](glm::vec3 pt) {
-		const glm::vec3 to = pt - my_bike->get_ws_position();
+		const glm::vec3 to = pt - my_pos;
 		const float d = glm::length(to);
 		if (d < 0.01f) return 0.f;
 		return glm::atan(glm::dot(to / d, bike_right),
 		                  glm::dot(to / d, my_bike->bike_direction));
 	};
 
-	glm::vec3 near_pt, far_pt;
-	float steer_gain = p.steer_k;
-	if (follower) {
-		// Follower: magnetism dominates. Target points trail the WHEEL's own arc —
-		// its current position, and a short-horizon prediction from its live
-		// turn_rate — instead of a course-relative lookahead. This is what makes
-		// following aggressive and line-agnostic: the follower chases the rider
-		// ahead's actual path, not what the racing line says they should be doing.
-		const glm::vec3 wheel_pos   = wheel->get_ws_position();
-		const glm::vec3 wheel_right = glm::normalize(glm::cross(wheel->bike_direction, up));
-		const float target_lat      = lat_offset * corner_factor;  // wheel-frame draft slot
-		near_pt = wheel_pos + wheel_right * target_lat;
-		far_pt  = arc_predict(wheel_pos, wheel->bike_direction, wheel->speed, wheel->turn_rate,
-		                      p.follow_anticipation_t) + wheel_right * target_lat;
-		steer_gain = p.follower_steer_k;
-	} else {
-		// Leader: track the racing line — their own judgement, no magnetism (nobody ahead).
-		near_pt = course->racing_line_lookahead(my_bike->course_dist_m, look_base);
-		far_pt  = course->racing_line_lookahead(my_bike->course_dist_m, look_anti);
-	}
-	dbg_lookahead_pt   = near_pt;
-	dbg_lookahead_dist = look_base;
+	// ---- Corner lookahead (shared by braking + speed target) ----
+	const float corner_scan_m = glm::max(p.corner_look_m, speed * 0.8f);
+	const float raw_min_r     = course->min_turn_radius_ahead(my_bike->course_dist_m, corner_scan_m);
+	const float min_r         = glm::max(raw_min_r, 3.f);
+	dbg_min_r = min_r;
 
-	const float steer_near = angle_to_pt(near_pt) * steer_gain - heading_err * 0.5f;
-	const float steer_far  = angle_to_pt(far_pt)  * steer_gain - heading_err * 0.5f;
-	dbg_steer_near = steer_near;
-	dbg_steer_far  = steer_far;
-	float steer_out_raw = steer_near + p.anticipation_k * (steer_far - steer_near);
-
-	// Followers: add direct road-frame lateral PD onto the wheel's track on top of
-	// the arc-tracking above. Arc-tracking supplies heading; this supplies hard
-	// lateral convergence (the PD lookahead above converges slowly when lateral
-	// error is small, since atan(err/look_dist) → 0). This is the dominant term —
-	// followers are "very very" wheel-magnetized, not racing-line-magnetized.
-	// Sign: lat_err > 0 means I'm road-right of the wheel's track → need road-LEFT
-	// (positive) steer → steer += +lat_err * k.
-	if (follower) {
-		const float target_lat_world = wheel->lateral_pos + lat_offset * corner_factor;
-		const float lat_err = my_bike->lateral_pos - target_lat_world;
-		// D term: damp my own lateral velocity (the wheel's lat_vel cancels out
-		// when both are tracking the same line).
-		steer_out_raw += lat_err * p.follower_lat_k
-		              - my_bike->lateral_vel * p.follower_lat_d_k;
-	}
-
-	float steer_out = glm::clamp(steer_out_raw, -1.f, 1.f);
-
-	// ---- Track boundary avoidance (PD) + off-track recovery ----
-	// While on-track (within safety margin): additive edge steer — racing-line following stays active.
-	// Once past the road edge: override steer entirely and brake to scrub lateral momentum.
-	// Overriding prevents the racing-line from fighting recovery and causing oscillation.
-	//
-	// Sign: positive steer = turn left. lateral_pos > 0 = road-right.
-	// corrective_vel > 0 means already moving toward centre.
-	float edge_brake = 0.f;
-	{
-		const float cur_lateral = my_bike->lateral_pos;
-		const float road_hw     = course->get_road_half_width(my_bike->course_segment);
-		const float safe_edge   = road_hw - p.edge_safety_m;
-		dbg_off_track = glm::abs(cur_lateral) > road_hw;
-
-		// Worst lateral: current position or arc prediction, whichever is further out
-		float worst_lateral = cur_lateral;
-		const glm::vec3 cur_pos = my_bike->get_ws_position();
-		const float sample_times[2] = { p.edge_predict_t * 0.5f, p.edge_predict_t };
-		for (float t : sample_times) {
-			glm::vec3 pred = arc_predict(cur_pos, my_bike->bike_direction, speed, my_bike->turn_rate, t);
-			float pred_lat = 0.f;
-			int   pred_seg = my_bike->course_segment;
-			course->project(pred, &pred_lat, &pred_seg, my_bike->course_dist_m);
-			if (glm::abs(pred_lat) > glm::abs(worst_lateral))
-				worst_lateral = pred_lat;
-		}
-		dbg_pred_lateral = worst_lateral;
-
-		// Excess: how far beyond the safe zone (0 if safely inside)
-		const float excess = glm::max(glm::abs(worst_lateral) - safe_edge, 0.f);
-
-		float edge_steer = 0.f;
-		if (excess > 0.f) {
-			// D term: lateral velocity component moving toward centre (positive = closing)
-			const float corrective_vel = -glm::sign(worst_lateral) * my_bike->lateral_vel;
-			const float pd = excess * p.edge_steer_k - corrective_vel * p.edge_vel_damp;
-			edge_steer = glm::sign(worst_lateral) * glm::clamp(pd, 0.f, 1.f);
-		}
-
-		const float abs_off_excess = glm::max(glm::abs(cur_lateral) - road_hw, 0.f);
-		if (abs_off_excess > 0.f) {
-			steer_out = edge_steer;
-			edge_brake = glm::clamp(abs_off_excess * p.edge_off_brake_k, 0.f, p.edge_off_brake_max);
-		} else {
-			steer_out = glm::clamp(steer_out + edge_steer, -1.f, 1.f);
-		}
-
-		dbg_edge_steer = edge_steer;
-		dbg_edge_brake = edge_brake;
-	}
-
-	// ---- Side-by-side avoidance steer (only fires when truly abreast) ----
-	// Suppress if it would push toward the predicted edge-danger zone.
-	// The edge avoidance above already computed dbg_pred_lateral; if that prediction shows
-	// danger, don't let a lateral push from a nearby rider fight the recovery steer.
-	// Sign: positive steer = road-left.  steer_toward_edge sign = -sign(pred_lateral).
-	// Suppress sep_steer when it has the same sign as steer_toward_edge.
-	float sep_steer = my_bike->avoidance_sep_steer;
-	{
-		const float road_hw   = course->get_road_half_width(my_bike->course_segment);
-		const float safe_edge = road_hw - p.edge_safety_m;
-		if (glm::abs(dbg_pred_lateral) > safe_edge && sep_steer != 0.f) {
-			if (glm::sign(sep_steer) == -glm::sign(dbg_pred_lateral))
-				sep_steer = 0.f;
+	// ============================================================
+	// 1. Sense — forward-hemisphere neighbor scan. Real geometry only:
+	//    world-space direction/distance for the cone test, course_dist_m/
+	//    lateral_pos for longitudinal/lateral relationships. Never array index.
+	// ============================================================
+	struct Neighbor { BikeObject* rider; float dist; float long_gap; float lat_gap; };
+	std::vector<Neighbor> neighbors;
+	if (g_bike_app) {
+		const float cos_half_angle = glm::cos(glm::radians(p.sense_half_angle_deg));
+		for (BikeObject* other : g_bike_app->all_riders) {
+			if (other == my_bike) continue;
+			const glm::vec3 to_other = other->get_ws_position() - my_pos;
+			const float dist = glm::length(to_other);
+			if (dist < 0.01f || dist > p.sense_radius_m) continue;
+			if (glm::dot(my_bike->bike_direction, to_other / dist) < cos_half_angle) continue;
+			neighbors.push_back({ other,
+			                       dist,
+			                       other->course_dist_m - my_bike->course_dist_m,  // +ve = ahead
+			                       other->lateral_pos    - my_bike->lateral_pos }); // +ve = neighbor road-right
 		}
 	}
-	dbg_avoid_steer = sep_steer;
-	steer_out = glm::clamp(steer_out + sep_steer, -1.f, 1.f);
+	dbg_num_neighbors = (int)neighbors.size();
 
-	// ---- Anticipatory braking ----
+	// ============================================================
+	// 2. Magnetism — desired lateral offset (delta from current lateral_pos).
+	// ============================================================
+	float target_offset_delta = 0.f;
+
+	// Separation: push away from any neighbor closer than separation_dist_m
+	// (real 3D distance), weighted by inverse falloff.
+	float separation_term = 0.f;
+	for (const Neighbor& n : neighbors) {
+		if (n.dist >= p.separation_dist_m) continue;
+		const float weight = 1.f - n.dist / p.separation_dist_m;
+		separation_term -= glm::sign(n.lat_gap) * weight * p.separation_k;
+	}
+	target_offset_delta += separation_term;
+
+	// Nearest forward neighbor — drives both draft and line-formation.
+	const Neighbor* nearest_ahead = nullptr;
+	for (const Neighbor& n : neighbors) {
+		if (n.long_gap <= 0.f) continue;
+		if (!nearest_ahead || n.long_gap < nearest_ahead->long_gap)
+			nearest_ahead = &n;
+	}
+
+	float draft_term = 0.f;
+	if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m) {
+		// Pull toward zero lateral offset from the neighbor's line (tuck in behind).
+		draft_term = -nearest_ahead->lat_gap * p.draft_k;
+	}
+	target_offset_delta += draft_term;
+
+	// Line formation: smaller, always-on pull toward alignment with the nearest
+	// forward neighbor (any range within the sense hemisphere), so riders settle
+	// into a single-file line even before they're close enough to draft.
+	float lineform_term = 0.f;
+	if (nearest_ahead)
+		lineform_term = -nearest_ahead->lat_gap * p.lineformation_k;
+	target_offset_delta += lineform_term;
+
+	// Cohesion: only when isolated (nearest neighbor farther than the trigger
+	// distance) — pull toward the lateral centroid of sensed neighbors so a
+	// rider doesn't drift away from the group when nobody is close enough for
+	// draft/line-formation to matter.
+	float cohesion_term = 0.f;
+	if (!neighbors.empty()) {
+		float nearest_dist = FLT_MAX;
+		for (const Neighbor& n : neighbors) nearest_dist = glm::min(nearest_dist, n.dist);
+		if (nearest_dist > p.cohesion_trigger_dist_m) {
+			float centroid_lat = 0.f;
+			for (const Neighbor& n : neighbors) centroid_lat += n.lat_gap;
+			centroid_lat /= (float)neighbors.size();
+			cohesion_term = centroid_lat * p.cohesion_k;
+		}
+	}
+	target_offset_delta += cohesion_term;
+
+	dbg_separation_offset = separation_term;
+	dbg_draft_offset      = draft_term;
+	dbg_lineform_offset   = lineform_term;
+	dbg_cohesion_offset   = cohesion_term;
+
+	// ---- Hard clamp: magnetism can never command a shift off the track. ----
+	const float road_hw     = course->get_road_half_width(my_bike->course_segment);
+	const float lat_limit   = glm::max(road_hw - p.edge_safety_m, 0.1f);
+	const float target_lat_raw = my_bike->lateral_pos + target_offset_delta;
+	const float target_lat     = glm::clamp(target_lat_raw, -lat_limit, lat_limit);
+	dbg_clamped           = (target_lat != target_lat_raw);
+	dbg_target_lat_offset = target_lat;
+
+	const float lat_error = target_lat - my_bike->lateral_pos;
+	const float lateral_shift = glm::clamp(lat_error * p.lateral_shift_kp, -1.f, 1.f);
+	dbg_lateral_shift = lateral_shift;
+
+	// ============================================================
+	// 3. Racing-line heading PID — the only contributor to ci.steer.
+	// ============================================================
+	const float look_dist = p.lookahead_dist_base + speed * p.lookahead_dist_per_ms;
+	const glm::vec3 look_pt = course->racing_line_lookahead(my_bike->course_dist_m, look_dist);
+	dbg_lookahead_pt = look_pt;
+
+	const float steer_error = angle_to_pt(look_pt);
+	steer_integral   = glm::clamp(steer_integral + steer_error * dt, -1.f, 1.f);
+	const float steer_deriv = (dt > 1e-4f) ? (steer_error - steer_prev_error) / dt : 0.f;
+	steer_prev_error = steer_error;
+
+	const float steer_out = glm::clamp(
+		p.steer_kp * steer_error + p.steer_ki * steer_integral + p.steer_kd * steer_deriv,
+		-1.f, 1.f);
+	dbg_steer_final = steer_out;
+
+	// ============================================================
+	// 4. Corner braking — lookahead safety scan, unchanged in spirit.
+	// ============================================================
 	const float max_decel = 0.8f * 7.f * my_bike->surface_traction;
 	float brake_amount = 0.f;
 	dbg_v_max = glm::sqrt(p.corner_speed_k * 9.81f * min_r * my_bike->surface_traction);
 
 	for (int i = 0; i < BRAKE_SCAN_STEPS; ++i) {
-		const float d_near   = i * BRAKE_SCAN_STEP_M;
-		const float d_mid    = d_near + BRAKE_SCAN_STEP_M * 0.5f;
-		const float raw_r    = course->min_turn_radius_ahead(my_bike->course_dist_m + d_near, BRAKE_SCAN_STEP_M);
-		const float r        = glm::max(raw_r, 3.f);
+		const float d_near = i * BRAKE_SCAN_STEP_M;
+		const float d_mid  = d_near + BRAKE_SCAN_STEP_M * 0.5f;
+		const float raw_r  = course->min_turn_radius_ahead(my_bike->course_dist_m + d_near, BRAKE_SCAN_STEP_M);
+		const float r      = glm::max(raw_r, 3.f);
 		const float v_corner = glm::sqrt(p.corner_speed_k * 9.81f * r * my_bike->surface_traction);
 		if (speed > v_corner) {
 			const float a_needed = (speed * speed - v_corner * v_corner) / (2.f * d_mid);
@@ -220,34 +185,45 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			}
 		}
 	}
-	// Collision avoidance brake: raise if the yield system detects a squeeze
-	dbg_avoid_brake = my_bike->avoidance_brake;
-	brake_amount = glm::max(brake_amount, my_bike->avoidance_brake);
-	// Off-track recovery brake — only scrub speed when moving; if stopped, allow power to escape
-	if (speed > 1.f)
-		brake_amount = glm::max(brake_amount, edge_brake);
 	dbg_brake_amount = brake_amount;
 
-	// ---- Power ----
-	actual_power_command = damp_dt_independent(target_power_watts, actual_power_command, POWER_SLEW, dt);
-	float power_out = actual_power_command + my_bike->boid_long_sep_power;
-	dbg_power_base = actual_power_command;
+	// ============================================================
+	// 5. Speed/power PID. No neighbor to hold pace with -> constant cruise
+	//    power. Otherwise, PID-track the nearest drafting neighbor's speed
+	//    (with a P-term gap correction) so followers actively burn matches to
+	//    hold the wheel rather than just relying on steering/shift alone.
+	// ============================================================
+	float power;
+	if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m) {
+		const float gap_err     = nearest_ahead->long_gap - (p.draft_dist_m * 0.4f);
+		const float target_speed = nearest_ahead->rider->speed + glm::clamp(gap_err * 0.5f, -3.f, 3.f);
+		dbg_target_speed = target_speed;
+
+		const float speed_error = target_speed - speed;
+		speed_integral    = glm::clamp(speed_integral + speed_error * dt, -50.f, 50.f);
+		const float speed_deriv = (dt > 1e-4f) ? (speed_error - speed_prev_error) / dt : 0.f;
+		speed_prev_error  = speed_error;
+
+		const float pid_out = p.speed_kp * speed_error + p.speed_ki * speed_integral + p.speed_kd * speed_deriv;
+		power = glm::clamp(p.base_power_w + pid_out, p.min_power_w, p.max_power_w);
+	} else {
+		dbg_target_speed = 0.f;
+		speed_integral   = 0.f;
+		speed_prev_error = 0.f;
+		power = p.base_power_w;
+	}
+	dbg_power_final = power;
+
+	// ---- Lateral velocity bookkeeping (debug / recorder use) ----
+	my_bike->lateral_vel      = (dt > 1e-6f) ? (my_bike->lateral_pos - my_bike->prev_lateral_pos) / dt : 0.f;
+	my_bike->prev_lateral_pos = my_bike->lateral_pos;
 
 	// ---- Fill ControlInput ----
-	dbg_steer_pre_boids = steer_out;
 	BikeObject::ControlInput ci;
-	const float steer_after_boids = glm::clamp(steer_out, -1.f, 1.f);
-	dbg_steer_pre_hard = steer_after_boids;
-
-	// All riders go through the normal handlebar-inertia steer path.
-	// Off-track recovery bypasses the priority-yield clamp so the bike can escape the edge.
-	ci.steer = dbg_off_track
-	    ? steer_after_boids
-	    : glm::clamp(steer_after_boids, hard_steer_min, hard_steer_max);
-	dbg_steer_final  = ci.steer;
+	ci.steer         = steer_out;
+	ci.lateral_shift = lateral_shift;
 	ci.brake_amount  = brake_amount;
-	ci.power         = (brake_amount > 0.1f) ? 0.f : power_out;
-	dbg_power_final  = power_out;
+	ci.power         = (brake_amount > 0.1f) ? 0.f : power;
 
 	my_bike->update_tick(ci);
 }

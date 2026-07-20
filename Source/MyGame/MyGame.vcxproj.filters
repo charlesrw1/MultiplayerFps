@@ -42,15 +42,6 @@
     <ClCompile Include="bike\BikeApplication_Pack.cpp">
       <Filter>bike</Filter>
     </ClCompile>
-    <ClCompile Include="bike\BikeApplication_PackAI.cpp">
-      <Filter>bike</Filter>
-    </ClCompile>
-    <ClCompile Include="bike\BikeApplication_PackAvoid.cpp">
-      <Filter>bike</Filter>
-    </ClCompile>
-    <ClCompile Include="bike\BikeApplication_PackDebug.cpp">
-      <Filter>bike</Filter>
-    </ClCompile>
     <ClCompile Include="bike\BikeApplication_Player.cpp">
       <Filter>bike</Filter>
     </ClCompile>
@@ -82,9 +73,6 @@
       <Filter>bike</Filter>
     </ClCompile>
     <ClCompile Include="bike\BikeObject_Physics.cpp">
-      <Filter>bike</Filter>
-    </ClCompile>
-    <ClCompile Include="bike\BikeObject_Stamina.cpp">
       <Filter>bike</Filter>
     </ClCompile>
     <ClCompile Include="bike\BikeObject_Steer.cpp">

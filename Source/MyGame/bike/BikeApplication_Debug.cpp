@@ -60,7 +60,7 @@ void snapshot_record()
 		snap.course_segment       = bo->course_segment;
 		snap.actual_power_command = 0.f;
 		if (auto* ai = dynamic_cast<BikeAI*>(bo->input.get()))
-			snap.actual_power_command = ai->actual_power_command;
+			snap.actual_power_command = ai->dbg_power_final;
 		s_rider_snapshots.push_back(snap);
 	}
 }
@@ -78,13 +78,8 @@ void snapshot_restore()
 		bo->course_dist_m   = snap.course_dist_m;
 		bo->lateral_pos     = snap.lateral_pos;
 		bo->course_segment  = snap.course_segment;
-		// Reset transient physics state so the bike doesn't carry over a crash or spin
+		// Reset transient physics state so the bike doesn't carry over a spin
 		bo->current_steer   = 0.f;
-		bo->steer_committed = 0.f;
-		bo->is_crashed      = false;
-		bo->crash_timer     = 0.f;
-		if (auto* ai = dynamic_cast<BikeAI*>(bo->input.get()))
-			ai->actual_power_command = snap.actual_power_command;
 	}
 }
 
@@ -111,12 +106,11 @@ void draw_rider_debug_info(BikeObject* bo)
 		GameplayStatic::debug_text(string_format("[Player] steer_final:   %.2f", bp->dbg_steer_final));
 	} else if (ai) {
 		// --- Mode and path-following breakdown ---
-		const char* ai_mode = ai->wheel ? paceline_state_name(ai->paceline_state) : "LEAD";
-		GameplayStatic::debug_text(string_format("[AI:%s] spd=%.1fm/s  look=%.1fm  near_r=%.1fm  cf=%.2f",
-			ai_mode, bo->speed, ai->dbg_lookahead_dist, ai->dbg_min_r, ai->dbg_corner_factor));
-		GameplayStatic::debug_text(string_format("[AI] lat_off=%+.2f→%+.2f  bias=%+.2f  pace=%s t=%.1fs",
-			ai->lat_offset, ai->dbg_lat_offset_target, ai->lat_offset_bias,
-			paceline_state_name(ai->paceline_state), ai->paceline_timer_s));
+		GameplayStatic::debug_text(string_format("[AI] spd=%.1fm/s  neighbors=%d  min_r=%.1fm%s",
+			bo->speed, ai->dbg_num_neighbors, ai->dbg_min_r, ai->dbg_clamped ? "  CLAMPED" : ""));
+		GameplayStatic::debug_text(string_format("[AI] lat_target=%+.2f  cohesion=%+.2f  separation=%+.2f  draft=%+.2f  lineform=%+.2f  shift=%+.2f",
+			ai->dbg_target_lat_offset, ai->dbg_cohesion_offset, ai->dbg_separation_offset,
+			ai->dbg_draft_offset, ai->dbg_lineform_offset, ai->dbg_lateral_shift));
 		// Upcoming corner: distance, radius, safe speed, brake demand
 		if (ai->dbg_brake_dist_m > 0.f)
 			GameplayStatic::debug_text(string_format("[AI] corner in %.0fm  r=%.1fm  v_max=%.1fm/s  brake=%.2f",
@@ -124,13 +118,8 @@ void draw_rider_debug_info(BikeObject* bo)
 		else
 			GameplayStatic::debug_text(string_format("[AI] corner: clear for %.0fm",
 				(float)(ai->BRAKE_SCAN_STEPS * ai->BRAKE_SCAN_STEP_M)));
-		GameplayStatic::debug_text(string_format("[AI] steer: near=%+.2f  far=%+.2f  edge=%+.2f  avoid=%+.2f  final=%+.2f",
-			ai->dbg_steer_near, ai->dbg_steer_far, ai->dbg_edge_steer, ai->dbg_avoid_steer, ai->dbg_steer_final));
-		if (ai->dbg_avoid_brake > 0.f || ai->hard_steer_min > -1.f || ai->hard_steer_max < 1.f)
-			GameplayStatic::debug_text(string_format("[AI] YIELD: brake=%.2f  steer_min=%+.1f  steer_max=%+.1f",
-				ai->dbg_avoid_brake, ai->hard_steer_min, ai->hard_steer_max));
-		GameplayStatic::debug_text(string_format("[AI] power base:%.0fW  sep:%+.0fW  cmd=%.0fW  actual=%.0fW",
-			ai->dbg_power_base, bo->boid_long_sep_power, ai->dbg_power_final, bo->stamina.actual_power));
+		GameplayStatic::debug_text(string_format("[AI] steer_final=%+.2f  target_speed=%.1fm/s  power=%.0fW",
+			ai->dbg_steer_final, ai->dbg_target_speed, ai->dbg_power_final));
 
 		// --- Visual overlays for selected AI ---
 		// Lookahead point + line
@@ -206,69 +195,46 @@ static void bike_course_debug()
 	if (ImGui::Button("Respawn AI"))
 		g_bike_app->respawn_ai();
 
-	ImGui::SeparatorText("Wheel picker");
+	ImGui::SeparatorText("Steering PID / lookahead");
 	{
 		BikeAIParams& p = g_ai_params;
-		ImGui::DragFloat("wheel_long_min",     &p.wheel_long_min,     0.05f, 0.f,   5.f, "%.2f");
-		ImGui::DragFloat("wheel_long_max",     &p.wheel_long_max,     0.1f,  1.f,  20.f, "%.1f");
-		ImGui::DragFloat("wheel_lat_max",      &p.wheel_lat_max,      0.05f, 0.5f,  6.f, "%.2f");
-		ImGui::DragFloat("wheel_long_gap",     &p.wheel_long_gap,     0.05f, 0.5f, 10.f, "%.2f");
-		ImGui::DragFloat("wheel_w_long",       &p.wheel_w_long,       0.05f, 0.f,   5.f, "%.2f");
-		ImGui::DragFloat("wheel_w_lat",        &p.wheel_w_lat,        0.05f, 0.f,   5.f, "%.2f");
-		ImGui::DragFloat("wheel_w_draft",      &p.wheel_w_draft,      0.05f, 0.f,   5.f, "%.2f");
-		ImGui::DragFloat("wheel_stickiness",   &p.wheel_stickiness,   0.05f, 0.f,   3.f, "%.2f");
-		ImGui::DragFloat("wheel_score_thresh", &p.wheel_score_thresh, 0.05f,-2.f,   2.f, "%.2f");
+		ImGui::DragFloat("steer_kp", &p.steer_kp, 0.05f, 0.f, 10.f, "%.2f");
+		ImGui::DragFloat("steer_ki", &p.steer_ki, 0.01f, 0.f, 2.f,  "%.2f");
+		ImGui::DragFloat("steer_kd", &p.steer_kd, 0.01f, 0.f, 2.f,  "%.2f");
+		ImGui::DragFloat("lookahead_dist_base",   &p.lookahead_dist_base,   0.05f, 0.f, 10.f, "%.2f");
+		ImGui::DragFloat("lookahead_dist_per_ms", &p.lookahead_dist_per_ms, 0.02f, 0.f, 2.f,  "%.2f");
 	}
 
-	ImGui::SeparatorText("Clear-air resolver");
+	ImGui::SeparatorText("Speed/power PID");
 	{
 		BikeAIParams& p = g_ai_params;
-		ImGui::DragFloat("clear_air_lat_window",  &p.clear_air_lat_window,  0.05f, 0.1f, 3.f, "%.2f");
-		ImGui::DragFloat("clear_air_long_window", &p.clear_air_long_window, 0.05f, 0.1f, 3.f, "%.2f");
-		ImGui::DragFloat("clear_air_center_bias", &p.clear_air_center_bias, 0.01f, 0.f,  1.f, "%.2f");
-		ImGui::DragFloat("clear_air_damp_tau",    &p.clear_air_damp_tau,    0.05f, 0.1f, 5.f, "%.2f");
-		ImGui::DragFloat("clear_air_max_offset",  &p.clear_air_max_offset,  0.05f, 0.1f, 3.f, "%.2f");
-		ImGui::DragFloat("clear_air_step",        &p.clear_air_step,        0.05f, 0.1f, 1.f, "%.2f");
-		ImGui::DragFloat("corner_factor_r_full",  &p.corner_factor_r_full,  1.f,   5.f, 200.f, "%.0f");
-		ImGui::DragFloat("corner_factor_min",     &p.corner_factor_min,     0.01f, 0.f,  1.f, "%.2f");
-		ImGui::DragFloat("follower_lat_k",        &p.follower_lat_k,        0.05f, 0.f,  3.f, "%.2f");
-		ImGui::SameLine(); ImGui::TextDisabled("near-field lat error → steer (followers)");
-		ImGui::DragFloat("follower_lat_d_k",      &p.follower_lat_d_k,      0.02f, 0.f,  2.f, "%.2f");
-		ImGui::SameLine(); ImGui::TextDisabled("damp lateral velocity");
-		ImGui::DragFloat("follower_steer_k",      &p.follower_steer_k,      0.1f,  0.f,  10.f, "%.2f");
-		ImGui::SameLine(); ImGui::TextDisabled("angle-to-wheel-arc gain (magnetism dominance)");
-		ImGui::DragFloat("follow_anticipation_t", &p.follow_anticipation_t, 0.05f, 0.f,  2.f, "%.2f");
-		ImGui::SameLine(); ImGui::TextDisabled("s ahead to project wheel's own arc");
+		ImGui::DragFloat("speed_kp",     &p.speed_kp,     1.f,  0.f, 300.f, "%.0f");
+		ImGui::DragFloat("speed_ki",     &p.speed_ki,     0.5f, 0.f, 50.f,  "%.1f");
+		ImGui::DragFloat("speed_kd",     &p.speed_kd,     0.5f, 0.f, 50.f,  "%.1f");
+		ImGui::DragFloat("base_power_w", &p.base_power_w, 5.f, 50.f, 800.f, "%.0f");
+		ImGui::DragFloat("min_power_w",  &p.min_power_w,  5.f,  0.f, 200.f, "%.0f");
+		ImGui::DragFloat("max_power_w",  &p.max_power_w,  10.f, 200.f, 1500.f, "%.0f");
 	}
 
-	ImGui::SeparatorText("Gap Regulation");
+	ImGui::SeparatorText("Hemisphere sense");
 	{
-		// These live in BikeApplication_Pack.cpp; expose via externs (non-static there)
-		extern float GAP_POWER_K;
-		extern float GAP_POWER_MAX_DELTA;
-		extern float GAP_FREE_POWER_W;
-		ImGui::DragFloat("GAP_POWER_K",         &GAP_POWER_K,         1.f,   0.f, 200.f, "%.0f");
-		ImGui::SameLine(); ImGui::TextDisabled("W correction per metre of gap error");
-		ImGui::DragFloat("GAP_POWER_MAX_DELTA", &GAP_POWER_MAX_DELTA, 5.f,  10.f, 600.f, "%.0f");
-		ImGui::DragFloat("GAP_FREE_POWER_W",    &GAP_FREE_POWER_W,    5.f,  50.f, 800.f, "%.0f");
+		BikeAIParams& p = g_ai_params;
+		ImGui::DragFloat("sense_radius_m",       &p.sense_radius_m,       0.5f, 1.f, 50.f, "%.1f");
+		ImGui::DragFloat("sense_half_angle_deg", &p.sense_half_angle_deg, 1.f,  10.f, 180.f, "%.0f");
 	}
 
-	ImGui::SeparatorText("Paceline FSM");
+	ImGui::SeparatorText("Magnetism");
 	{
 		BikeAIParams& p = g_ai_params;
-		ImGui::DragFloat("pull_cooldown_s",     &p.pull_cooldown_s,     0.5f, 0.f,  60.f, "%.1f");
-		ImGui::DragFloat("pull_duration_min_s", &p.pull_duration_min_s, 1.f,  1.f, 120.f, "%.0f");
-		ImGui::DragFloat("pull_duration_max_s", &p.pull_duration_max_s, 1.f,  1.f, 120.f, "%.0f");
-		ImGui::DragFloat("pull_power_frac",     &p.pull_power_frac,     0.02f,0.5f,  1.5f, "%.2f");
-		ImGui::DragFloat("recovery_duration_s", &p.recovery_duration_s,0.5f,  0.5f, 30.f, "%.1f");
-		ImGui::DragFloat("recovery_power_frac", &p.recovery_power_frac,0.02f, 0.3f,  1.f, "%.2f");
-	}
-	ImGui::SeparatorText("Gap Cohesion (off-wheel-range pull-back)");
-	{
-		BikeAIParams& p = g_ai_params;
-		ImGui::DragFloat("cohesion_gap_power_k",     &p.cohesion_gap_power_k,     1.f, 0.f, 100.f, "%.0f");
-		ImGui::DragFloat("cohesion_gap_max_delta_w", &p.cohesion_gap_max_delta_w, 5.f, 0.f, 400.f, "%.0f");
-		ImGui::DragFloat("cohesion_gap_range_m",     &p.cohesion_gap_range_m,     1.f, 0.f, 200.f, "%.0f");
+		ImGui::DragFloat("cohesion_k",              &p.cohesion_k,              0.02f, 0.f, 3.f,  "%.2f");
+		ImGui::DragFloat("cohesion_trigger_dist_m", &p.cohesion_trigger_dist_m, 0.2f,  0.f, 30.f, "%.1f");
+		ImGui::DragFloat("separation_k",            &p.separation_k,            0.05f, 0.f, 5.f,  "%.2f");
+		ImGui::DragFloat("separation_dist_m",       &p.separation_dist_m,       0.05f, 0.1f, 5.f, "%.2f");
+		ImGui::DragFloat("draft_k",                 &p.draft_k,                 0.05f, 0.f, 3.f,  "%.2f");
+		ImGui::DragFloat("draft_dist_m",             &p.draft_dist_m,           0.5f,  0.f, 30.f, "%.1f");
+		ImGui::DragFloat("lineformation_k",         &p.lineformation_k,         0.02f, 0.f, 2.f,  "%.2f");
+		ImGui::DragFloat("lateral_shift_kp",        &p.lateral_shift_kp,        0.05f, 0.f, 5.f,  "%.2f");
+		ImGui::DragFloat("edge_safety_m",           &p.edge_safety_m,           0.05f, 0.f, 3.f,  "%.2f");
 	}
 
 	ImGui::SeparatorText("Riders");
@@ -276,9 +242,7 @@ static void bike_course_debug()
 	for (int i = 0; i < (int)sorted.size(); ++i) {
 		const BikeObject* r = sorted[i];
 		const BikeAI*     ai = dynamic_cast<const BikeAI*>(r->input.get());
-		const char* mode = ai
-		    ? (ai->wheel ? paceline_state_name(ai->paceline_state) : "LEAD")
-		    : "player";
+		const char* mode = ai ? "AI" : "player";
 		ImGui::Text("P%d  dist=%.0f m  lat=%+.2f m  draft=%.2f  [%s]",
 			r->race_position, r->course_dist_m, r->lateral_pos, r->draft_factor, mode);
 	}

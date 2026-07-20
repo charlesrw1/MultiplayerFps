@@ -193,12 +193,6 @@ void BikeGameApplication::update()
 		sort_riders();
 		update_groups();
 		update_drafting();
-		update_wheel_picking();
-		update_paceline();
-		update_clear_air();
-		update_avoidance();
-		update_gap_regulation();
-
 	}
 	update_crack_triggers();
 	apply_debug_follow_camera();
@@ -252,11 +246,6 @@ BikeObject* BikeGameApplication::create_player(glm::vec3 pos)
 
 BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 {
-	// Deterministic seed so same spawn order produces same biases each run.
-	// ±0.1m keeps even biased riders within ~half a draft cone of the wheel's exact track.
-	static std::mt19937 s_bias_rng(0xC0FFEEu);
-	static std::uniform_real_distribution<float> s_bias_dist(-0.1f, 0.1f);
-
 	Entity* e = GameplayStatic::spawn_entity();
 	e->set_ws_position(pos);
 	auto bo = e->create_component<BikeObject>();
@@ -264,7 +253,6 @@ BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 	{
 		auto ai    = std::make_unique<BikeAI>();
 		ai->course = &course;
-		ai->lat_offset_bias = s_bias_dist(s_bias_rng);
 
 		bo->input = std::move(ai);
 	}

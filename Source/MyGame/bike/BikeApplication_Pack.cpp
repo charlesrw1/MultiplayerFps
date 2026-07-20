@@ -1,31 +1,15 @@
 // BikeApplication_Pack.cpp
-// Pack dynamics: grouping, drafting, gap regulation, and shared avoidance
-// constants (externed by BikeApplication_PackAvoid.cpp and BikeApplication_PackDebug.cpp).
-// All functions are methods of BikeGameApplication (declared in BikeHeaders.h).
-
+// Pack dynamics: grouping and drafting. All functions are methods of
+// BikeGameApplication (declared in BikeHeaders.h). Wheel-picking, paceline
+// FSM, clear-air resolver, and priority-yield have been removed — magnetism
+// (BikeAI::evaluate) is the only positioning layer now. See [[bike/bikeai]].
 #include "BikeHeaders.h"
 
-#include "Render/Texture.h"
-#include "Render/Model.h"
 #include "Game/GameplayStatic.h"
-#include "Game/Components/MeshComponent.h"
-#include "Game/Components/DecalComponent.h"
-#include "Game/Components/PhysicsComponents.h"
-#include "Game/Entities/CharacterController.h"
-#include "Input/InputSystem.h"
-#include "GameEnginePublic.h"
 #include "Framework/MathLib.h"
-#include "Framework/Config.h"
-#include "imgui.h"
-#include "Input/Sdl2CompatGamepad.h"
-#include <glm/gtc/matrix_transform.hpp>
 #include "Render/DrawPublic.h"
-#include "Render/RenderObj.h"
-#include "UI/Gui.h"
 #include "Debug.h"
 #include <algorithm>
-#include <fstream>
-#include <random>
 
 // ============================================================
 // Group context
@@ -105,6 +89,10 @@ static constexpr float DRAFT_MAX_BENEFIT =  0.35f; // max CdA reduction (35%)
 static constexpr float DRAFT_FLOOR       =  0.55f; // minimum draft_factor (hard floor)
 static constexpr int   DRAFT_STACK_CHECK =  5;     // how many riders ahead to check for stacking
 
+// riders_sorted is used only as a search-order optimization here (front-to-back
+// so we can early-exit after DRAFT_STACK_CHECK candidates) — every benefit
+// decision below is gated by real course_dist_m/lateral_pos gaps, never by
+// array index adjacency. See [[bike/bikeai#Ground rule]].
 void BikeGameApplication::update_drafting()
 {
 	ASSERT(!riders_sorted.empty() || true);  // empty pack is valid
@@ -136,106 +124,5 @@ void BikeGameApplication::update_drafting()
 		}
 
 		me->draft_factor = glm::max(DRAFT_FLOOR, 1.f - total_benefit);
-	}
-}
-
-// ============================================================
-// Pack / gap constants (definitions — externed by PackAvoid and PackDebug)
-// ============================================================
-
-// Longitudinal power yield when side-by-side: the slightly-behind rider sheds watts
-float SIDE_BY_SIDE_LONG_M   = 2.5f;   // longitudinal range to count as abreast (m)
-float SIDE_BY_SIDE_LAT_M    = 1.0f;   // lateral range to count as abreast (m)
-float SIDE_BY_SIDE_POWER_W  = 60.f;   // max W shed / gained
-
-// Predictive inter-rider avoidance (soft steer push, truly side-by-side only)
-// Only fires when riders are nearly abreast (long_gap < AVOID_LONG_MAX).
-// Weighted by (1 - long_gap / AVOID_LONG_MAX) so the push fades longitudinally.
-float AVOID_LONG_MAX     = 3.5f;   // m — longitudinal range; beyond this = single file, no push
-float AVOID_BIKE_HALF_W  = 0.38f;  // m — half shoulder width
-float AVOID_CLEARANCE    = 0.25f;  // m — additional margin beyond bike width
-float AVOID_PREDICT_T1   = 0.5f;   // s — first prediction horizon
-float AVOID_PREDICT_T2   = 1.0f;   // s — second prediction horizon
-float AVOID_STEER_KP     = 0.8f;   // additive steer per m of predicted overlap (soft nudge)
-
-// Priority yield (hard enforcement — lower-priority yielder only)
-// Priority is an explicit course_dist_m comparison (with YIELD_DEADBAND_M) done
-// per-pair in update_avoidance, NOT riders_sorted array position — near-tied
-// course_dist_m (e.g. two riders mid-overtake) makes array order flicker, which
-// would otherwise flicker who yields to whom frame to frame.
-// The yielder is forbidden from steering into the higher-priority rider's zone.
-// Sign convention fix vs. old HARD_SEP: positive steer = road-LEFT, negative = road-RIGHT.
-//   Other road-right → block road-right movement → block negative steer → hard_steer_min = 0
-//   Other road-left  → block road-left movement  → block positive steer → hard_steer_max = 0
-float YIELD_LONG_RADIUS  = 3.5f;   // m — longitudinal range for yield clamp
-float YIELD_DEADBAND_M   = 0.15f;  // m — |course_dist_m gap| below this: neither yields (tie noise)
-float YIELD_OUTER_LAT    = 1.3f;   // m — engage clamp inside this lateral gap
-float YIELD_INNER_LAT    = 0.05f;  // m — disengage when already overlapping (escape)
-float YIELD_SQUEEZE_M    = 0.35f;  // m — available road width below this triggers brake
-float YIELD_BRAKE_K      = 0.55f;  // brake fraction when fully squeezed
-
-// ============================================================
-// Gap regulation — match the explicit wheel rider's power, with P-control on
-// gap error. wheel == null  →  leader or off-the-front-of-range: pulls toward
-// the nearest rider ahead (magnetism cohesion) instead of a flat free power,
-// so gaps beyond wheel range don't just balloon forever. See [[bike/bikeai#Power]].
-// ============================================================
-
-// Aggressive P-gain: power is a magnetism channel too, not just steering — a
-// follower should burn matches to hold the wheel's speed rather than let the
-// gap drift and rely on steering alone to close it back up.
-float GAP_POWER_K         = 90.f;   // W correction per metre of gap error
-float GAP_POWER_MAX_DELTA = 300.f;  // max ±W applied on top of wheel rider's power
-float GAP_FREE_POWER_W    = 250.f;  // power when leader (no wheel, nobody ahead in range)
-
-void BikeGameApplication::update_gap_regulation()
-{
-	ASSERT(!all_riders.empty() || true);  // empty pack is valid
-	const BikeAIParams& p = g_ai_params;
-	const int n = (int)riders_sorted.size();
-	for (int i = 0; i < n; ++i) {
-		BikeObject* me = riders_sorted[i];
-		BikeAI* ai = dynamic_cast<BikeAI*>(me->input.get());
-		if (!ai) continue;
-
-		float base = GAP_FREE_POWER_W;
-		if (ai->wheel) {
-			// Base target: match wheel power + P on gap.
-			const glm::vec3 to_wheel = ai->wheel->get_ws_position() - me->get_ws_position();
-			const float gap_m      = glm::dot(to_wheel, me->bike_direction);
-			const float gap_err    = gap_m - ai->long_gap;  // +ve = too far back
-			const float correction = glm::clamp(gap_err * GAP_POWER_K,
-			                                    -GAP_POWER_MAX_DELTA, GAP_POWER_MAX_DELTA);
-			base = ai->wheel->stamina.actual_power + correction;
-		} else {
-			// No wheel — either the race leader (nobody ahead at all) or gap to
-			// whoever's ahead exceeds wheel range (chasing a break, or trailing a
-			// group). Find the smallest positive course_dist_m gap by explicit
-			// search — NOT "riders_sorted[i-1]": with near-tied course_dist_m
-			// (e.g. two riders mid-overtake) array adjacency can flicker between
-			// riders frame to frame, which would flicker the cohesion target too.
-			// Magnetism cohesion: pull toward whoever's nearest-ahead proportional
-			// to gap, weaker and longer-range than in-line gap regulation, tapering
-			// to nothing past cohesion_gap_range_m so a real breakaway can still stick.
-			float best_gap = 1e9f;
-			for (const BikeObject* other : riders_sorted) {
-				if (other == me) continue;
-				const float gap_m = other->course_dist_m - me->course_dist_m;
-				if (gap_m > 0.f && gap_m < best_gap) best_gap = gap_m;
-			}
-			if (best_gap < p.cohesion_gap_range_m) {
-				const float correction = glm::clamp(best_gap * p.cohesion_gap_power_k,
-				                                    0.f, p.cohesion_gap_max_delta_w);
-				base = GAP_FREE_POWER_W + correction;
-			}
-		}
-
-		// Tactical FSM modifies the base.
-		if (ai->paceline_state == PacelineState::Pulling)
-			base *= p.pull_power_frac;
-		if (ai->recovering_s > 0.f)
-			base *= p.recovery_power_frac;
-
-		ai->target_power_watts = glm::clamp(base, 50.f, 1000.f);
 	}
 }

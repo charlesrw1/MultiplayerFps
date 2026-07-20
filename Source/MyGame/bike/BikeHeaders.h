@@ -15,62 +15,6 @@ class Texture;
 class MeshComponent;
 class MeshBuilderComponent;
 
-// ============================================================
-// Rider stats — fixed per-archetype attributes
-// ============================================================
-struct RiderStats {
-	float base_ftp     = 280.f;    // W — functional threshold power
-	float w_prime_max  = 20000.f;  // J — anaerobic work capacity
-	float sprint_watts = 1100.f;   // W — hard ceiling on peak power
-	float hr_rest      = 55.f;     // bpm
-	float hr_max       = 185.f;    // bpm
-};
-
-// ============================================================
-// Stamina state — runtime physiology
-// ============================================================
-struct StaminaState {
-	float glycogen     = 1.f;      // [0,1] — 1.0 = fresh, depletes irreversibly
-	float w_prime      = 20000.f;  // J     — recoverable anaerobic reservoir
-	float lactate      = 0.f;      // J     — O2-debt accumulator; raises HR floor, decays ~5min
-	float heat_stress  = 0.f;      // [0,1] — thermoregulatory load; driven by temp, sun, effort, cooled by airspeed
-	float hr_current   = 55.f;     // bpm   — lagging HR
-	float hr_drift     = 0.f;      // bpm   — cardiac drift from glycogen depletion (long-term)
-	float hr_pulse_phase = 0.f;    // rad   — oscillates at HR rate, drives UI pulsing
-
-	// Derived (recomputed each tick)
-	float effective_ftp   = 280.f;
-	float power_ceiling   = 1100.f;
-	float actual_power    = 0.f;
-
-	const char* legs_descriptor() const {
-		if (glycogen > 0.85f) return "Fresh";
-		if (glycogen > 0.70f) return "Good";
-		if (glycogen > 0.55f) return "Fading";
-		if (glycogen > 0.40f) return "Struggling";
-		return "Cooked";
-	}
-
-	// 0..3 bars of W' remaining
-	int w_prime_bars(float w_prime_max_) const {
-		const float frac = w_prime / w_prime_max_;
-		if (frac > 0.66f) return 3;
-		if (frac > 0.33f) return 2;
-		if (frac > 0.10f) return 1;
-		return 0;
-	}
-
-	// HR zone 0..4
-	int hr_zone(float hr_rest_, float hr_max_) const {
-		const float frac = (hr_current + hr_drift - hr_rest_) / (hr_max_ - hr_rest_);
-		if (frac < 0.60f) return 0;
-		if (frac < 0.70f) return 1;
-		if (frac < 0.80f) return 2;
-		if (frac < 0.90f) return 3;
-		return 4;
-	}
-};
-
 // Discrete power levels available to the player (watts)
 static constexpr int BIKE_POWER_LEVELS[] = {50, 100, 150, 200, 225, 250, 275, 300, 325, 350, 400, 450, 500, 600, 800, 1000 };
 static constexpr int BIKE_NUM_POWER_LEVELS = (int)(sizeof(BIKE_POWER_LEVELS) / sizeof(BIKE_POWER_LEVELS[0]));
@@ -202,119 +146,53 @@ private:
 extern WindSystem g_wind;
 
 // ============================================================
-// Strategic context (distilled intent from rule-based strategic layer)
-// ============================================================
-struct BikeStrategicState {
-	float desired_effort_fraction = 1.0f;  // ×FTP: 0.5=easy, 1.0=tempo, 1.2=attack
-	float target_lateral          = 0.f;   // preferred lateral position for echelon/peel
-	int   tactical_objective      = 0;     // 0=Hold, 1=Follow, 2=Pull, 3=Peel, 4=DriftBack, 5=Attack, 6=Recover, 7=Sprint
-};
-
-// ============================================================
-// Paceline rotation state machine
-// ============================================================
-enum class PacelineState {
-	Following,      // normal: follow the rider ahead, take draft (or recovering off the front)
-	Pulling,        // at front of the AI group, doing work
-};
-
-static const char* paceline_state_name(PacelineState s) {
-	switch (s) {
-	case PacelineState::Following:    return "Following";
-	case PacelineState::Pulling:      return "Pulling";
-	}
-	return "?";
-}
-
-// ============================================================
 // BikeAIParams — global tuning knobs shared by all AI riders.
 // Edit via the debug menu; never loop through riders to set these.
+//
+// ONE layer: racing-line PID (heading) + speed PID (power) + boids-style
+// magnetism (cohesion/separation/draft/line-formation -> desired lateral
+// offset -> lateral_shift, a direct sideways translation independent of
+// heading). See [[bike/bikeai]].
 // ============================================================
 struct BikeAIParams {
-	// Waypoint following
+	// ---- Racing-line steering PID (drives ci.steer / heading only) ----
+	float steer_kp = 2.0f;
+	float steer_ki = 0.0f;
+	float steer_kd = 0.15f;
 	float lookahead_dist_base   = 0.8f;
 	float lookahead_dist_per_ms = 0.4f;
-	float steer_k               = 2.0f;
 
-	// Corner scanning
+	// ---- Corner braking (lookahead safety scan, not a magnetism term) ----
 	float corner_look_m  = 20.f;
 	float corner_speed_k = 1.4f;
 
-	// Steering anticipation
-	float anticipation_dist_scale = 2.0f;
-	float anticipation_k          = 1.0f;
+	// ---- Speed/power PID (drives ci.power toward a target speed) ----
+	float speed_kp      = 60.f;   // W per (m/s) of speed error
+	float speed_ki      = 5.f;
+	float speed_kd      = 10.f;
+	float base_power_w  = 250.f;  // constant cruise power when no neighbors sensed
+	float min_power_w   = 50.f;
+	float max_power_w   = 1000.f;
 
-	// Track boundary avoidance (PD controller on lateral position)
-	float edge_predict_t  = 1.0f;  // seconds ahead to project arc
-	float edge_safety_m   = 0.8f;  // danger zone margin inside road edge (m)
-	float edge_steer_k    = 1.0f;  // P gain: steer per metre beyond safe zone
-	float edge_vel_damp   = 0.4f;  // D gain: reduce correction as lateral_vel approaches centre
+	// ---- Hemisphere neighbor sense ----
+	float sense_radius_m      = 15.f;  // m — ignore riders beyond this
+	float sense_half_angle_deg = 100.f; // deg — forward cone half-angle
 
-	// Off-track recovery: braking + committed steer when past the road edge
-	float edge_off_brake_k   = 0.5f;  // brake fraction per metre past road edge
-	float edge_off_brake_max = 0.6f;  // maximum brake fraction during off-track recovery
+	// ---- Magnetism: desired lateral offset (m, road/wheel frame) ----
+	float cohesion_k               = 0.5f;  // pull toward neighbor centroid beyond this range
+	float cohesion_trigger_dist_m  = 6.f;   // only cohere if nearest neighbor farther than this
+	float separation_k             = 1.2f;  // push away from neighbors closer than separation_dist_m
+	float separation_dist_m        = 1.0f;  // m — full-strength push starts inside this radius
+	float draft_k                  = 1.0f;  // pull toward the slot directly behind the nearest forward neighbor
+	float draft_dist_m             = 8.0f;  // m — only draft-pull within this longitudinal range
+	float lineformation_k          = 0.35f; // always-on bias toward zero lateral offset from neighbors' track
 
-	// Wheel picker — see [[bike/bikeai#Wheel picking]]
-	// long_max is wider than the canonical 8m to allow chains to re-form after a
-	// gap opens (gap-regulation P-control then closes the gap via power). lat_max
-	// must be ≥ 2*clear_air_max_offset so two riders in opposite lanes can still
-	// see each other as candidates.
-	float wheel_long_min     = 0.3f;  // min longitudinal gap for a candidate (m)
-	float wheel_long_max     = 15.0f; // max longitudinal gap (m)
-	float wheel_lat_max      = 3.0f;  // lateral overlap window (m)
-	float wheel_long_gap     = 1.5f;  // ideal wheel-to-wheel target gap (m)
-	float wheel_w_long       = 1.0f;  // score weight: closeness to ideal long_gap
-	float wheel_w_lat        = 1.5f;  // score weight: lateral alignment to my offset
-	float wheel_w_draft      = 0.8f;  // score weight: draft potential (1 - draft_factor)
-	float wheel_stickiness   = 1.0f;  // score bonus for keeping current wheel
-	float wheel_score_thresh = 0.0f;  // if best score below this, no wheel (leader)
+	// ---- Lateral shift — converts target lateral offset into ci.lateral_shift ----
+	// Command is clamped to [-1,1] and scaled by BIKE_MAX_LATERAL_SHIFT_MPS (physics layer).
+	float lateral_shift_kp = 1.5f;  // shift command (pre-clamp) per metre of offset error
 
-	// Corner factor — pulls lat_offset → 0 in tight corners
-	float corner_factor_r_full = 30.f;  // radius (m) at which corner_factor = 1
-	float corner_factor_min    = 0.3f;  // floor on corner_factor (very tight corners)
-
-	// Follower steering — magnetism to the wheel dominates over the leader's
-	// racing-line steer_k. follower_steer_k feeds the wheel-arc-tracking angle term;
-	// follow_anticipation_t is how far ahead (seconds) to project the wheel's own
-	// arc from its live turn_rate, so followers anticipate the wheel's line change
-	// rather than lagging it. follower_lat_k/d_k is the on-top hard-convergence PD
-	// (PD-based steering converges slowly because lookahead is far; this term
-	// injects road-frame lat_err directly into steer for tight wheel-hugging).
-	// Together these should make following dominate over independent line-following —
-	// see [[bike/bikeai#Magnetism]].
-	float follower_steer_k     = 4.0f;   // angle-to-wheel-arc gain (vs steer_k=2.0 for the leader)
-	float follow_anticipation_t = 0.5f;  // s — how far to project the wheel's own arc
-	float follower_lat_k       = 1.2f;   // steer per metre of lateral error from wheel's track
-	float follower_lat_d_k     = 0.35f;  // steer per (m/s) of lateral velocity (damping)
-
-	// Clear-air resolver — see [[bike/bikeai#Lateral offset rule]]
-	float clear_air_lat_window  = 1.0f;   // m — lateral half-window of overlap penalty
-	float clear_air_long_window = 1.0f;   // m — longitudinal half-window of overlap penalty
-	float clear_air_center_bias = 0.05f;  // score penalty per m of |offset - bias| (prefers draft)
-	float clear_air_damp_tau    = 1.5f;   // s  — low-pass time constant on lat_offset
-	float clear_air_max_offset  = 0.7f;   // m  — search range each side of bias
-	                                      //       (must be ≤ wheel_lat_max/2 or chains break)
-	float clear_air_step        = 0.35f;  // m  — candidate spacing
-
-	// Paceline FSM — see [[bike/bikeai#Tactical FSM]]
-	// Pull length is randomized per-pull (not stamina-driven — see [[bike/bikeai#Magnetism]]);
-	// gives rotation a less metronomic feel without needing the stamina system wired in.
-	float pull_cooldown_s     = 8.f;    // min seconds between pulls (per rider)
-	float pull_duration_min_s = 12.f;   // shortest pull before peeling off
-	float pull_duration_max_s = 35.f;   // longest pull before peeling off
-	float pull_power_frac     = 1.00f;  // multiplier on Following power while pulling
-
-	// Recovery window after a pull ends — no forced peel/drift steering. The rider just
-	// sheds power and stops being a valid wheel candidate; magnetism (wheel re-picking +
-	// clear-air routing others around them as a normal obstacle) does the rest.
-	float recovery_duration_s = 5.f;    // seconds spent non-wheel-candidate + reduced power
-	float recovery_power_frac = 0.75f;  // multiplier on Following power while recovering
-
-	// Gap cohesion — magnetism pull-back on gaps too large to be a wheel target (chasing a
-	// gap/breakaway). Weaker + longer-range than in-line gap regulation.
-	float cohesion_gap_power_k     = 15.f;   // W correction per metre of gap beyond wheel_long_max
-	float cohesion_gap_max_delta_w = 120.f;  // cap on the cohesion power boost
-	float cohesion_gap_range_m     = 60.f;   // beyond this, no cohesion pull (fully detached)
+	// ---- Off-track hard clamp ----
+	float edge_safety_m = 0.8f;  // margin inside road edge the magnetism offset may never cross
 };
 extern BikeAIParams g_ai_params;
 
@@ -329,60 +207,30 @@ public:
 	static constexpr int   BRAKE_SCAN_STEPS  = 8;
 	static constexpr float BRAKE_SCAN_STEP_M = 10.f;
 
-	// ---- Per-rider state ----
-	float target_power_watts   = 250.f;
-	float actual_power_command = 150.f;
-	static constexpr float POWER_SLEW = 0.05f;
-
-
-	// ---- Wheel-following state (set by BikeGameApplication::update_wheel_picking each frame) ----
-	// wheel == null  →  I'm a leader; target = racing-line lookahead.
-	// wheel != null  →  follow this rider's road frame at offset (long_gap, lat_offset).
-	BikeObject* wheel           = nullptr;
-	float       lat_offset      = 0.f;  // m — smoothed road-relative offset from the wheel's track
-	float       lat_offset_bias = 0.f;  // m — per-rider personality preference (~±0.2)
-	float       long_gap        = 1.5f; // m — target longitudinal spacing behind wheel
-
-	// ---- Paceline FSM (set by BikeGameApplication::update_paceline each frame) ----
-	PacelineState paceline_state     = PacelineState::Following;
-	float         paceline_timer_s   = 0.f;    // seconds spent in current state
-	float         pull_duration_roll = 0.f;    // randomized duration for the current/last pull
-	float         pull_cooldown_s    = 0.f;    // seconds remaining before another pull is allowed
-	float         recovering_s       = 0.f;    // >0: just finished pulling — reduced power, not a valid wheel
-
-	// ---- Double echelon lane assignment ----
-	float preferred_lateral = 0.f;
-	float lane_strength     = 0.f;
-
-	// ---- Hard steer clamp — set by BikeGameApplication::update_boids each frame ----
-	float hard_steer_min = -1.f;
-	float hard_steer_max =  1.f;
+	// ---- PID controller state ----
+	float steer_integral    = 0.f;
+	float steer_prev_error  = 0.f;
+	float speed_integral    = 0.f;
+	float speed_prev_error  = 0.f;
 
 	// ---- Debug ----
 	glm::vec3 dbg_lookahead_pt{};
-	float dbg_steer_pre_boids    = 0.f;
-	float dbg_steer_pre_hard     = 0.f;
 	float dbg_steer_final        = 0.f;
-	float dbg_power_base         = 0.f;
 	float dbg_power_final        = 0.f;
 	float dbg_brake_amount       = 0.f;
 	float dbg_brake_dist_m       = 0.f;
 	float dbg_brake_corner_r     = 0.f;
 	float dbg_min_r              = 0.f;
 	float dbg_v_max              = 0.f;
-	float dbg_lookahead_dist     = 0.f;
-	float dbg_steer_near         = 0.f;
-	float dbg_steer_far          = 0.f;
-	float dbg_edge_steer         = 0.f;
-	float dbg_edge_brake         = 0.f;
-	float dbg_pred_lateral       = 0.f;
-	bool  dbg_off_track          = false;
-	float dbg_avoid_steer        = 0.f;
-	float dbg_avoid_brake        = 0.f;
-	bool  dbg_has_wheel          = false;
-	float dbg_wheel_score        = 0.f;
-	float dbg_corner_factor      = 1.f;
-	float dbg_lat_offset_target  = 0.f;
+	float dbg_target_speed       = 0.f;
+	int   dbg_num_neighbors      = 0;
+	float dbg_cohesion_offset    = 0.f;
+	float dbg_separation_offset  = 0.f;
+	float dbg_draft_offset       = 0.f;
+	float dbg_lineform_offset    = 0.f;
+	float dbg_target_lat_offset  = 0.f;
+	bool  dbg_clamped            = false;
+	float dbg_lateral_shift      = 0.f;
 };
 
 class BikePlayer : public IBikeInput {
@@ -392,7 +240,6 @@ public:
 	void evaluate(BikeObject* my_bike) final;
 	void update_camera(BikeObject* bike, float steer, float brake_amount);
 	void draw_power_meter(float current_watts, int power_idx, bool coasting, bool speed_hold, float speed_hold_watts, float actual_watts, float power_ceiling);
-	void draw_stamina_ui(const StaminaState& s, const RiderStats& r);
 
 	CameraComponent* cc = nullptr;
 	BikeCameraState  cam;
@@ -413,8 +260,6 @@ public:
 	SoundPlayer* pedal_player     = nullptr;
 
 	float dbg_steer_final         = 0.f;
-
-	Texture* heart_icon_tex = nullptr;
 };
 class AnimatorObject;
 class BikeAnimDriver {
@@ -434,8 +279,6 @@ public:
 
 	BikeAnimDriver anim;
 	std::unique_ptr<IBikeInput> input;
-	RiderStats rider;
-	StaminaState stamina;
 
 	void start() final;
 	void update() final;
@@ -443,7 +286,8 @@ public:
 	// input:
 	struct ControlInput {
 		float aero_coeff = 0.0;	// determied by stance
-		float steer = 0.0;// l,r
+		float steer = 0.0;// l,r — heading only, rotates bike_direction
+		float lateral_shift = 0.0; // -1..1 — direct sideways translation, independent of heading (see [[bike/bikeai#Lateral shift]])
 		float brake_amount = 0.0;// 0,1
 		float power = 0.0;	// input _watts_ requested
 
@@ -453,7 +297,6 @@ public:
 	ControlInput update_tick(ControlInput input);
 
 	// Sub-tick functions (called in order by update_tick)
-	void tick_stamina(ControlInput& ci, float dt);
 	void tick_physics(ControlInput& ci, float dt);
 	void tick_steer(const ControlInput& ci, float dt);
 	void tick_gears(float dt);
@@ -463,7 +306,7 @@ public:
 
 
 	// Cross-tick communication (written by one sub-tick, read by another)
-	float     steer_input_raw      = 0.f;       // resolved raw stick input (0 when crashed)
+	float     steer_input_raw      = 0.f;       // resolved raw stick input
 	glm::vec3 terrain_forward_dir  = {0,0,1};   // terrain-aligned forward from last raycast
 
 	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);
@@ -472,40 +315,18 @@ public:
 	float turn_rate = 0.f;   // rad/s, written by update_tick() from physics each frame
 	float cadence = 0.f;	// cadence at gear
 	float current_roll = 0.0;
-	float current_steer    = 0.f;  // inertia-smoothed steer, persists briefly after input release
-	float steer_committed  = 0.f;  // current_steer after inertia but before wobble/wind/bump — written by update_tick()
-	float prev_steer_input = 0.f; // raw steer last frame, for stick velocity calculation
+	float current_steer    = 0.f;  // low-pass-smoothed steer
 	float terrain_gradient    = 0.f;   // radians, + = uphill, - = downhill
 	float prev_gradient       = 0.f;   // last frame gradient, for bump detection
-	float bump_impulse        = 0.f;   // magnitude of bump this frame (speed-scaled)
-	float crack_impulse       = 0.f;   // set by app when bike crosses a crack decal
+	float bump_impulse        = 0.f;   // magnitude of bump this frame (speed-scaled) — consumed by BikeCamera shake
+	float crack_impulse       = 0.f;   // set by app when bike crosses a crack decal — consumed by BikeCamera shake
 	float crack_cooldown      = 0.f;   // seconds until crack can retrigger
 
-	// Cosmetic crack pitch spring (visual only, does not affect physics)
-	float crack_pitch_disp    = 0.f;   // current angular displacement (radians)
-	float crack_pitch_vel     = 0.f;   // angular velocity (rad/s)
-
-	// Bump steer spring — handlebar kickback from road irregularities
-	float bump_steer_disp     = 0.f;   // lateral steer displacement [-1,1] fraction
-	float bump_steer_vel      = 0.f;   // rate of change
 	float gear_shift_cooldown = 0.f;   // seconds remaining until next shift is allowed
 	bool  just_shifted        = false; // set true for one tick when a shift occurs
 	GearSelector gear;
 
-	float wobble_steer = 0.f;
-	float wobble_vel   = 0.f;
-	float wobble_timer = 0.f;
-	float wind_steer          = 0.f;  // crosswind handlebar perturbation
-	float wind_vel            = 0.f;  // rate of change of wind_steer
-	float crosswind_gust_timer = 0.f; // countdown to next gust event
-	float stroke_phase       = 0.f;  // pedal cycle phase (0..2π per revolution)
-	float stroke_speed_smooth = 0.f; // heavily smoothed speed for phase advancement (breaks feedback loop)
-
-	float surface_traction  = 1.0f;   // [0,1] — road grip: 1=dry tarmac, 0.6=wet, 0.3=gravel
-	float rear_skid         = 0.f;    // [0,1] — rear wheel lock from heavy braking (recoverable)
-	bool  is_crashed        = false;  // true when corner overspeed exceeded the grip limit
-	float crash_timer       = 0.f;    // seconds until rider can resume after a crash
-	float corner_warn_timer = 0.f;    // seconds the corner has been over the grip limit
+	float surface_traction = 1.0f;  // [0,1] — road grip: 1=dry tarmac, 0.6=wet, 0.3=gravel; scales max braking decel and corner speed limit
 
 	// Course state (updated each frame by BikeGameApplication before input runs)
 	float course_dist_m  = 0.f;   // arc-length from course start (m)
@@ -519,23 +340,13 @@ public:
 	float group_rank_norm    = 0.f;  // 0=leading group, 1=last group
 	float group_size_norm    = 0.f;  // group_size / total_riders
 
-	// Strategic context (set by strategic layer or paceline logic)
-	BikeStrategicState strategic_state;
-
 	// Drafting (written by BikeGameApplication::update_drafting before physics runs)
 	// 1.0 = no draft (open air), 0.65 = full draft at ideal position
 	float draft_factor = 1.0f;
 
-	// Lateral position history and velocity (written at end of update_boids)
+	// Lateral position history and velocity (written each frame by BikeAI::evaluate)
 	float prev_lateral_pos = 0.f;
 	float lateral_vel      = 0.f;  // m/s, positive = moving road-right
-
-	// Pack outputs (written by BikeGameApplication::update_boids, read by input handlers)
-	float boid_long_sep_power    = 0.f;  // W shed when side-by-side (slightly behind yields)
-
-	// Collision avoidance outputs (written by BikeGameApplication::update_boids, read by BikeAI::evaluate)
-	float avoidance_sep_steer = 0.f;  // predictive soft lateral push away from nearby riders
-	float avoidance_brake     = 0.f;  // [0,1] brake pressure when squeezed with no lateral escape
 
 	EntityPtr fork_entity;
 
@@ -601,11 +412,6 @@ private:
 	void sort_riders();
 	void update_groups();
 	void update_drafting();
-	void update_wheel_picking();
-	void update_clear_air();
-	void update_paceline();
-	void update_avoidance();
-	void update_gap_regulation();
 	void update_crack_triggers();
 	void debug_draw_course() const;
 

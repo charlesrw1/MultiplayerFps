@@ -21,7 +21,6 @@ struct AIDebugFrame {
     float time_s;
     int   rider_idx;
     bool  is_ai;
-    bool  is_crashed;
     bool  is_off_track;  // |lateral_pos| > road_half_width
     bool  is_colliding;  // nearest rider within 0.76 m lat and 2 m long
 
@@ -37,51 +36,34 @@ struct AIDebugFrame {
     float rl_lateral;    // racing-line lateral offset (positive = road-right)
     float lat_err;       // lateral_pos - rl_lateral
 
-    // Steering (AI only; 0 for player)
-    float steer_near;
-    float steer_far;
-    float edge_steer;
-    float avoid_steer;
-    float pred_lateral;   // worst arc-predicted lateral (edge avoidance)
-    float steer_pre_hard; // steer after avoidance, before hard yield clamp
-    float hard_steer_min;
-    float hard_steer_max;
-    float steer_final;    // AI steer output
-    float steer_committed;// inertia-smoothed steer from physics
+    // Steering / magnetism (AI only; 0 for player)
+    float steer_final;
+    int   num_neighbors;
+    float cohesion_offset;
+    float separation_offset;
+    float draft_offset;
+    float lineform_offset;
+    float target_lat_offset;
+    int   clamped;
+    float lateral_shift;
 
     // Braking
     float brake_amount;
-    float avoid_brake;
     float brake_dist_m;   // distance to braking corner
     float v_max_corner;   // safe speed for that corner
     float brake_corner_r;
     float min_r;          // tightest radius in scan window
 
     // Power
-    float power_base;
     float power_final;
-    float actual_power;
-    float boid_long_sep_power;
-
-    // Pack context
-    float avoidance_sep_steer;
-    float avoidance_brake;
+    float target_speed;
 
     // Nearest rider (longitudinally closest within 10 m)
     float nearest_lat_sep_m;
     float nearest_long_gap_m;
 
-    // Lookahead point fed to the steer PD (BikeAI::dbg_lookahead_pt)
+    // Lookahead point fed to the steer PID (BikeAI::dbg_lookahead_pt)
     float lookahead_pt_x, lookahead_pt_y, lookahead_pt_z;
-    float lookahead_dist;     // distance from rider to lookahead pt
-    int   has_wheel;          // 1 = follower (wheel-anchored target), 0 = leader (racing-line)
-    int   wheel_idx;          // index of wheel rider, or -1 if none
-    int   paceline_state;     // 0=Following 1=Pulling
-    float paceline_timer_s;
-    float lat_offset;         // smoothed
-    float lat_offset_target;  // resolver pick this frame
-    float lat_offset_bias;
-    float corner_factor;
 };
 
 static constexpr int   AI_DBG_MAX_FRAMES = 100000;
@@ -113,7 +95,6 @@ static void ai_debug_record(BikeGameApplication* app)
         fr.time_s    = s_ai_dbg_time;
         fr.rider_idx = i;
         fr.is_ai     = (ai != nullptr);
-        fr.is_crashed = bo->is_crashed;
 
         fr.course_dist_m = bo->course_dist_m;
         fr.lateral_pos   = bo->lateral_pos;
@@ -142,47 +123,26 @@ static void ai_debug_record(BikeGameApplication* app)
         }
         fr.is_colliding = (fr.nearest_lat_sep_m < 0.76f && fr.nearest_long_gap_m < 2.f);
 
-        fr.avoidance_sep_steer = bo->avoidance_sep_steer;
-        fr.avoidance_brake     = bo->avoidance_brake;
-        fr.boid_long_sep_power = bo->boid_long_sep_power;
-        fr.steer_committed     = bo->steer_committed;
-        fr.actual_power        = bo->stamina.actual_power;
-
         if (ai) {
-            fr.steer_near        = ai->dbg_steer_near;
-            fr.steer_far         = ai->dbg_steer_far;
-            fr.edge_steer        = ai->dbg_edge_steer;
-            fr.avoid_steer       = ai->dbg_avoid_steer;
-            fr.pred_lateral      = ai->dbg_pred_lateral;
-            fr.steer_pre_hard    = ai->dbg_steer_pre_hard;
-            fr.hard_steer_min    = ai->hard_steer_min;
-            fr.hard_steer_max    = ai->hard_steer_max;
             fr.steer_final       = ai->dbg_steer_final;
+            fr.num_neighbors     = ai->dbg_num_neighbors;
+            fr.cohesion_offset   = ai->dbg_cohesion_offset;
+            fr.separation_offset = ai->dbg_separation_offset;
+            fr.draft_offset      = ai->dbg_draft_offset;
+            fr.lineform_offset   = ai->dbg_lineform_offset;
+            fr.target_lat_offset = ai->dbg_target_lat_offset;
+            fr.clamped           = ai->dbg_clamped ? 1 : 0;
+            fr.lateral_shift     = ai->dbg_lateral_shift;
             fr.brake_amount      = ai->dbg_brake_amount;
-            fr.avoid_brake       = ai->dbg_avoid_brake;
             fr.brake_dist_m      = ai->dbg_brake_dist_m;
             fr.v_max_corner      = ai->dbg_v_max;
             fr.brake_corner_r    = ai->dbg_brake_corner_r;
             fr.min_r             = ai->dbg_min_r;
-            fr.power_base        = ai->dbg_power_base;
             fr.power_final       = ai->dbg_power_final;
+            fr.target_speed      = ai->dbg_target_speed;
             fr.lookahead_pt_x    = ai->dbg_lookahead_pt.x;
             fr.lookahead_pt_y    = ai->dbg_lookahead_pt.y;
             fr.lookahead_pt_z    = ai->dbg_lookahead_pt.z;
-            fr.lookahead_dist    = ai->dbg_lookahead_dist;
-            fr.has_wheel         = ai->dbg_has_wheel ? 1 : 0;
-            fr.wheel_idx         = -1;
-            if (ai->wheel) {
-                for (int wj = 0; wj < n; ++wj) if (all[wj] == ai->wheel) { fr.wheel_idx = wj; break; }
-            }
-            fr.paceline_state    = (int)ai->paceline_state;
-            fr.paceline_timer_s  = ai->paceline_timer_s;
-            fr.lat_offset        = ai->lat_offset;
-            fr.lat_offset_target = ai->dbg_lat_offset_target;
-            fr.lat_offset_bias   = ai->lat_offset_bias;
-            fr.corner_factor     = ai->dbg_corner_factor;
-        } else {
-            fr.wheel_idx = -1;
         }
 
         s_ai_dbg_frames.push_back(fr);
@@ -197,39 +157,31 @@ static void ai_debug_dump(BikeGameApplication* app)
             sys_print(Warning, "AI debug recorder: failed to open D:/Data/ai_debug_dump.csv\n");
             return;
         }
-        f << "time_s,rider_idx,is_ai,is_crashed,is_off_track,is_colliding,"
+        f << "time_s,rider_idx,is_ai,is_off_track,is_colliding,"
              "course_dist_m,lateral_pos,lateral_vel,speed_ms,heading_deg,"
              "road_half_width,rl_lateral,lat_err,"
-             "steer_near,steer_far,edge_steer,avoid_steer,pred_lateral,"
-             "steer_pre_hard,hard_steer_min,hard_steer_max,steer_final,steer_committed,"
-             "brake_amount,avoid_brake,brake_dist_m,v_max_corner,brake_corner_r,min_r,"
-             "power_base,power_final,actual_power,boid_long_sep_power,"
-             "avoidance_sep_steer,avoidance_brake,"
+             "steer_final,num_neighbors,cohesion_offset,separation_offset,draft_offset,lineform_offset,"
+             "target_lat_offset,clamped,lateral_shift,"
+             "brake_amount,brake_dist_m,v_max_corner,brake_corner_r,min_r,"
+             "power_final,target_speed,"
              "nearest_lat_sep_m,nearest_long_gap_m,"
-             "lookahead_pt_x,lookahead_pt_y,lookahead_pt_z,lookahead_dist,has_wheel,"
-             "wheel_idx,paceline_state,paceline_timer_s,lat_offset,lat_offset_target,lat_offset_bias,corner_factor\n";
+             "lookahead_pt_x,lookahead_pt_y,lookahead_pt_z\n";
         for (const auto& fr : s_ai_dbg_frames) {
             f << fr.time_s              << ','
               << fr.rider_idx           << ',' << (int)fr.is_ai         << ','
-              << (int)fr.is_crashed     << ',' << (int)fr.is_off_track  << ',' << (int)fr.is_colliding << ','
+              << (int)fr.is_off_track   << ',' << (int)fr.is_colliding  << ','
               << fr.course_dist_m       << ',' << fr.lateral_pos        << ',' << fr.lateral_vel      << ','
               << fr.speed_ms            << ',' << fr.heading_deg        << ','
               << fr.road_half_width     << ',' << fr.rl_lateral         << ',' << fr.lat_err           << ','
-              << fr.steer_near          << ',' << fr.steer_far          << ',' << fr.edge_steer        << ','
-              << fr.avoid_steer         << ',' << fr.pred_lateral       << ','
-              << fr.steer_pre_hard      << ',' << fr.hard_steer_min     << ',' << fr.hard_steer_max    << ','
-              << fr.steer_final         << ',' << fr.steer_committed    << ','
-              << fr.brake_amount        << ',' << fr.avoid_brake        << ',' << fr.brake_dist_m      << ','
+              << fr.steer_final         << ',' << fr.num_neighbors      << ','
+              << fr.cohesion_offset     << ',' << fr.separation_offset  << ',' << fr.draft_offset      << ','
+              << fr.lineform_offset     << ',' << fr.target_lat_offset  << ',' << fr.clamped           << ','
+              << fr.lateral_shift       << ','
+              << fr.brake_amount        << ',' << fr.brake_dist_m       << ','
               << fr.v_max_corner        << ',' << fr.brake_corner_r     << ',' << fr.min_r             << ','
-              << fr.power_base          << ',' << fr.power_final        << ',' << fr.actual_power      << ','
-              << fr.boid_long_sep_power << ','
-              << fr.avoidance_sep_steer << ',' << fr.avoidance_brake    << ','
+              << fr.power_final         << ',' << fr.target_speed       << ','
               << fr.nearest_lat_sep_m   << ',' << fr.nearest_long_gap_m << ','
-              << fr.lookahead_pt_x      << ',' << fr.lookahead_pt_y     << ',' << fr.lookahead_pt_z << ','
-              << fr.lookahead_dist      << ',' << fr.has_wheel          << ','
-              << fr.wheel_idx           << ',' << fr.paceline_state     << ',' << fr.paceline_timer_s << ','
-              << fr.lat_offset          << ',' << fr.lat_offset_target  << ',' << fr.lat_offset_bias  << ','
-              << fr.corner_factor       << '\n';
+              << fr.lookahead_pt_x      << ',' << fr.lookahead_pt_y     << ',' << fr.lookahead_pt_z << '\n';
         }
         sys_print(Debug, "AI debug recorder: wrote %d frames to D:/Data/ai_debug_dump.csv\n",
                   (int)s_ai_dbg_frames.size());
@@ -347,7 +299,7 @@ static void ai_recorder_debug_menu()
 	float spd_min   = FLT_MAX, spd_max   = -FLT_MAX;
 	float str_min   = FLT_MAX, str_max   = -FLT_MAX;
 	float sep_min   = FLT_MAX;
-	int   off_count = 0, col_count = 0, crash_count = 0, rider_frames = 0;
+	int   off_count = 0, col_count = 0, clamp_count = 0, rider_frames = 0;
 
 	for (const auto& fr : s_ai_dbg_frames) {
 		if (fr.rider_idx != s_stats_rider) continue;
@@ -365,7 +317,7 @@ static void ai_recorder_debug_menu()
 		sep_min    = glm::min(sep_min, fr.nearest_lat_sep_m);
 		if (fr.is_off_track) ++off_count;
 		if (fr.is_colliding) ++col_count;
-		if (fr.is_crashed)   ++crash_count;
+		if (fr.clamped)      ++clamp_count;
 	}
 
 	if (rider_frames == 0) {
@@ -401,10 +353,10 @@ static void ai_recorder_debug_menu()
 	else
 		ImGui::TextDisabled("Colliding: 0 frames");
 
-	if (crash_count > 0)
-		ImGui::TextColored({1.f, 0.2f, 0.2f, 1.f},
-			"Crashed:   %d / %d (%.1f%%)", crash_count, rider_frames, crash_count * 100.f / rider_frames);
+	if (clamp_count > 0)
+		ImGui::TextColored({1.f, 0.6f, 0.f, 1.f},
+			"Edge-clamped: %d / %d (%.1f%%)", clamp_count, rider_frames, clamp_count * 100.f / rider_frames);
 	else
-		ImGui::TextDisabled("Crashed:   0 frames");
+		ImGui::TextDisabled("Edge-clamped: 0 frames");
 }
 ADD_TO_DEBUG_MENU(ai_recorder_debug_menu);

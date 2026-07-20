@@ -83,8 +83,6 @@ BikePlayer::BikePlayer()
 	pedal_player->volume_multiply = 0.f;
 	pedal_player->set_play(true);
 
-	heart_icon_tex = Texture::load("ui/heart_icon.png");
-
 	g_wind.init();
 }
 
@@ -258,8 +256,7 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 	}
 
 	draw_power_meter(ci.power, power_level_idx, is_coasting, speed_hold_active, speed_hold_power,
-	                 my_bike->stamina.actual_power, my_bike->stamina.power_ceiling);
-	draw_stamina_ui(my_bike->stamina, my_bike->rider);
+	                 ci.power, BIKE_POWER_LEVELS[BIKE_NUM_POWER_LEVELS - 1]);
 
 	bp_for_debug = this;
 	bo_for_debug = my_bike;
@@ -302,21 +299,6 @@ static void bike_status_debug()
 		glm::degrees(my_bike->terrain_gradient));
 	ImGui::Text("Steer committed: %.3f", my_bike->current_steer);
 	ImGui::Text("[UP/DOWN] Power  [C/B] Coast  [SPACE] Brake  [V/X] Speed Hold");
-
-	if (bo_for_debug) {
-		const StaminaState& s = bo_for_debug->stamina;
-		const RiderStats&   r = bo_for_debug->rider;
-		ImGui::SeparatorText("Stamina");
-		ImGui::Text("Glycogen:     %.1f%%   eff_FTP=%.0fW  (%s)",
-			s.glycogen * 100.f, s.effective_ftp, s.legs_descriptor());
-		ImGui::Text("W':           %.0f / %.0f J  (%d bars)  ceiling=%.0fW",
-			s.w_prime, r.w_prime_max, s.w_prime_bars(r.w_prime_max), s.power_ceiling);
-		ImGui::Text("HR:           %.0f bpm  (drift +%.1f  lactate +%.1f  heat +%.1f)  zone %d",
-			s.hr_current, s.hr_drift, s.lactate * 0.002f, s.heat_stress * 20.f,
-			s.hr_zone(r.hr_rest, r.hr_max));
-		ImGui::Text("Heat stress:  %.1f%%   eff_FTP=%.0fW (heat factor %.2f)",
-			s.heat_stress * 100.f, s.effective_ftp, 1.f - s.heat_stress * 0.12f);
-	}
 
 	ImGui::SeparatorText("Boids (player)");
 	if (bp_for_debug && bo_for_debug) {

@@ -7,6 +7,7 @@ inline constexpr float BIKE_GRAVITY     = 9.81f;
 inline constexpr float BIKE_REAR_Z      = -0.449f;
 inline constexpr float BIKE_FRONT_Z     =  0.5394f;
 inline constexpr float BIKE_WHEELBASE   = BIKE_FRONT_Z - BIKE_REAR_Z;
+inline constexpr float BIKE_MAX_LATERAL_SHIFT_MPS = 2.0f;  // physical cap on ci.lateral_shift's sideways translation rate
 
 // Steering/visual tuning vars — defined in BikeObject_Steer.cpp.
 extern float steer_max_deg;

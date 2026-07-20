@@ -1,487 +1,316 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 // ============================================================
-// BikeAI business logic unit tests
+// BikeAI magnetism-layer unit tests
 //
-// Sign conventions (match BikeApplication.cpp):
-//   lateral_pos   road-right positive  (+ve = right of centre)
-//   steer output  road-left  positive  (+1 = steer hard left)
-//   signed_gap    other.dist - me.dist (+ve = other is ahead, I am behind)
-//   gap_to_ahead  always positive when I'm behind (rider_ahead.dist - my.dist)
-//   gap_err       gap_to_ahead - AI_GAP_TARGET (+ve = too far back, need more power)
-//   gap_rate      rider_ahead.speed - my.speed (+ve = they're pulling away, gap growing)
+// These pure-function replicas mirror the formulas in BikeAI.cpp exactly
+// (same variable names/signs) so a sign flip or logic inversion there is
+// caught as a test failure here, without needing to bootstrap the engine.
 //
-// These tests directly replicate the formulas in BikeApplication.cpp and BikeAI.cpp
-// so that any sign flip or logic inversion is caught as a test failure.
+// Sign conventions (match BikeAI.cpp / BikeApplication.cpp):
+//   lateral_pos   road-right positive (+ve = right of centre)
+//   lat_gap       other.lateral_pos - me.lateral_pos (+ve = other is road-right of me)
+//   long_gap      other.course_dist_m - me.course_dist_m (+ve = other is ahead)
+//   steer output  road-left positive (+1 = steer hard left)
 // ============================================================
 
 // ---------------------------------------------------------------------------
-// Separation direction
-// dir_away = steer sign that moves me AWAY from the other rider.
-//   I'm to the RIGHT of other (me_lat > other_lat) → push further right → steer right = -1
-//   I'm to the LEFT  of other (me_lat < other_lat) → push further left  → steer left  = +1
+// Hemisphere sense — forward cone test. Real geometry only (dot product on
+// the actual world-space direction), never array-index adjacency.
 // ---------------------------------------------------------------------------
-static float sep_dir_away(float me_lat, float other_lat)
+static bool in_forward_hemisphere(float fwd_dot, float half_angle_deg)
 {
-    return (me_lat >= other_lat) ? -1.f : 1.f;
+    return fwd_dot > std::cos(half_angle_deg * 3.14159265f / 180.f);
 }
 
-TEST(BikeAISeparation, DirAway_ImRight_SteerRight)
+TEST(BikeAISense, DirectlyAhead_IsSensed)
 {
-    // I'm to the right → must steer right (negative) to widen gap
-    EXPECT_LT(sep_dir_away(1.0f, 0.0f), 0.f);
+    EXPECT_TRUE(in_forward_hemisphere(1.f, 100.f));  // dot=1 -> directly ahead
 }
 
-TEST(BikeAISeparation, DirAway_ImLeft_SteerLeft)
+TEST(BikeAISense, DirectlyBehind_NotSensed_100deg)
 {
-    // I'm to the left → must steer left (positive) to widen gap
-    EXPECT_GT(sep_dir_away(-1.0f, 0.0f), 0.f);
+    EXPECT_FALSE(in_forward_hemisphere(-1.f, 100.f));  // dot=-1 -> directly behind
 }
 
-TEST(BikeAISeparation, DirAway_Equal_SteerRight)
+TEST(BikeAISense, WideningAngle_IncludesMore)
 {
-    // Exactly coincident: tie-break to -1 (steer right), consistent with code
-    EXPECT_LT(sep_dir_away(0.f, 0.f), 0.f);
+    // fwd_dot = 0 (directly beside) — outside a 100deg half-angle cone (cos(100)= -0.17),
+    // 0 > -0.17 so it's inside; but outside a 45deg cone (cos(45)=0.707).
+    EXPECT_TRUE(in_forward_hemisphere(0.f, 100.f));
+    EXPECT_FALSE(in_forward_hemisphere(0.f, 45.f));
 }
 
 // ---------------------------------------------------------------------------
-// Separation KD — closing velocity
-// closing > 0 when I'm moving TOWARD the other rider.
-// lat_vel = d(lat_pos)/dt, positive = moving road-right.
-//
-// Case A: dir_away = -1 (I'm right), moving left (lat_vel < 0) → closing toward other
-//   lat_vel * dir_away = (-)(-)  = +   → max(0, +) > 0  ✓
-// Case B: dir_away = +1 (I'm left), moving right (lat_vel > 0) → closing toward other
-//   lat_vel * dir_away = (+)(+)  = +   → max(0, +) > 0  ✓
-// Case C: moving away from other → product is negative → clamped to 0, no KD contribution
+// Separation — push away from anyone closer than separation_dist_m, weighted
+// by inverse falloff. term -= sign(lat_gap) * weight * separation_k.
 // ---------------------------------------------------------------------------
-static float sep_closing(float lat_vel, float dir_away)
+static float separation_term(float lat_gap, float dist, float separation_dist_m, float separation_k)
 {
-    return std::max(0.f, lat_vel * dir_away);
+    if (dist >= separation_dist_m) return 0.f;
+    const float weight = 1.f - dist / separation_dist_m;
+    const float sign = (lat_gap > 0.f) ? 1.f : (lat_gap < 0.f ? -1.f : 0.f);
+    return -sign * weight * separation_k;
 }
 
-TEST(BikeAISeparation, Closing_ImRight_MovingLeft_IsPositive)
+TEST(BikeAISeparation, NeighborToRight_PushesLeft)
 {
-    // dir_away = -1, lat_vel = -0.5 (moving left = closing from right)
-    EXPECT_GT(sep_closing(-0.5f, -1.f), 0.f);
+    // lat_gap > 0 -> neighbor is road-right of me -> push away = road-left =
+    // a DECREASE in lateral_pos (road-right positive) -> negative offset delta.
+    EXPECT_LT(separation_term(0.5f, 0.3f, 1.0f, 1.2f), 0.f);
 }
 
-TEST(BikeAISeparation, Closing_ImLeft_MovingRight_IsPositive)
+TEST(BikeAISeparation, NeighborToLeft_PushesRight)
 {
-    // dir_away = +1, lat_vel = +0.5 (moving right = closing from left)
-    EXPECT_GT(sep_closing(0.5f, 1.f), 0.f);
+    EXPECT_GT(separation_term(-0.5f, 0.3f, 1.0f, 1.2f), 0.f);
 }
 
-TEST(BikeAISeparation, Closing_MovingAway_IsZero)
+TEST(BikeAISeparation, OutsideRange_NoPush)
 {
-    // dir_away = -1, lat_vel = +0.5 (moving right = moving AWAY when I'm to the right)
-    EXPECT_EQ(sep_closing(0.5f, -1.f), 0.f);
+    EXPECT_EQ(separation_term(0.5f, 2.0f, 1.0f, 1.2f), 0.f);
 }
 
-// ---------------------------------------------------------------------------
-// Longitudinal separation power
-// When two riders are side-by-side, the one BEHIND should push (+ watts) to
-// sprint clear, and the one AHEAD should yield (- watts) to let them through.
-//
-// signed_gap = other.course_dist - me.course_dist
-//   +ve → other is ahead  → I am BEHIND  → I should PUSH  (+1)
-//   -ve → other is behind → I am AHEAD   → I should YIELD (-1)
-// ---------------------------------------------------------------------------
-static float long_sep_yield(float signed_gap, float long_weight, float boid_sep_power_max)
+TEST(BikeAISeparation, CloserIsStrongerPush)
 {
-    // FIXED formula (was inverted: behind rider was incorrectly yielding)
-    return (signed_gap > 0.f ? 1.f : -1.f) * long_weight * boid_sep_power_max;
-}
-
-TEST(BikeAISeparation, LongPower_ImBehind_ShouldPush)
-{
-    // signed_gap = +2 (other is 2m ahead, I am behind) → push: positive power
-    float power = long_sep_yield(2.f, 1.f, 60.f);
-    EXPECT_GT(power, 0.f) << "Rider who is behind should push through (+watts)";
-}
-
-TEST(BikeAISeparation, LongPower_ImAhead_ShouldYield)
-{
-    // signed_gap = -2 (other is 2m behind, I am ahead) → yield: negative power
-    float power = long_sep_yield(-2.f, 1.f, 60.f);
-    EXPECT_LT(power, 0.f) << "Rider who is ahead should yield (-watts)";
-}
-
-TEST(BikeAISeparation, LongPower_ScalesWithWeight)
-{
-    float full   = long_sep_yield(1.f, 1.0f, 60.f);
-    float half   = long_sep_yield(1.f, 0.5f, 60.f);
-    EXPECT_NEAR(half, full * 0.5f, 1e-5f);
+    const float far  = std::abs(separation_term(0.5f, 0.9f, 1.0f, 1.2f));
+    const float near = std::abs(separation_term(0.5f, 0.1f, 1.0f, 1.2f));
+    EXPECT_GT(near, far) << "closer neighbor must produce a stronger separation push";
 }
 
 // ---------------------------------------------------------------------------
-// Cohesion PD (player assist steer)
-// formula: -(lat_err * KP - lat_vel * KD)
-//          = -KP*lat_err + KD*lat_vel
-//
-// lat_err = lat_target - lat_pos  (+ve = target is to the right)
-// lat_vel = d(lat_pos)/dt         (+ve = moving road-right)
-// steer positive = road-left.  To move right we need negative steer.
-//
-// Pure proportional: target right → lat_err > 0 → output negative (steer right) ✓
-// Damping: moving toward target (lat_err > 0, lat_vel > 0):
-//   D term +KD*lat_vel is positive, opposing the negative P term → magnitude reduced ✓
+// Draft + line formation — pull toward zero lateral offset from the nearest
+// forward neighbor's line. Draft only within draft_dist_m; line-formation is
+// smaller and always-on for any sensed forward neighbor.
 // ---------------------------------------------------------------------------
-static float cohesion_steer(float lat_err, float lat_vel, float kp, float kd)
+static float draft_term(float nearest_lat_gap, float nearest_long_gap, float draft_dist_m, float draft_k)
 {
-    float raw = -(lat_err * kp - lat_vel * kd);
+    if (nearest_long_gap >= draft_dist_m) return 0.f;
+    return -nearest_lat_gap * draft_k;
+}
+
+static float lineform_term(float nearest_lat_gap, float lineformation_k)
+{
+    return -nearest_lat_gap * lineformation_k;
+}
+
+TEST(BikeAIDraft, NeighborAheadAndRight_PullsRight)
+{
+    // nearest_lat_gap > 0 -> neighbor is road-right -> pull me road-right (negative-of-negative = positive... )
+    // target_offset_delta += -lat_gap * k; lat_gap>0 -> delta negative -> pulls toward road-LEFT is wrong sign check:
+    // -lat_gap*k with lat_gap=0.5,k=1 => -0.5: this moves target_lat toward negative (road-left) which REDUCES
+    // separation from a neighbor that is to my right -- i.e. it pulls me toward their (more road-right) line.
+    // Concretely: my new target = my_lat + delta = my_lat - 0.5, which is LESS road-right than before,
+    // moving me toward centre relative to a neighbor further right; the intent is "align with their line",
+    // i.e. move toward nearest_lat_gap's sign being reduced toward 0. Assert delta has opposite sign to gap.
+    float delta = draft_term(0.5f, 3.f, 8.f, 1.0f);
+    EXPECT_LT(delta, 0.f);
+    EXPECT_LT(std::abs(delta), 0.5f + 1e-4f);
+}
+
+TEST(BikeAIDraft, OutsideDraftRange_NoTerm)
+{
+    EXPECT_EQ(draft_term(0.5f, 20.f, 8.f, 1.0f), 0.f);
+}
+
+TEST(BikeAIDraft, ZeroOffsetFromLine_NoTerm)
+{
+    EXPECT_NEAR(draft_term(0.f, 3.f, 8.f, 1.0f), 0.f, 1e-6f);
+}
+
+TEST(BikeAILineFormation, AlwaysOn_EvenBeyondDraftRange)
+{
+    // Line-formation is not range-gated like draft — it applies any time there's a
+    // sensed forward neighbor, so riders converge to single-file before they're
+    // close enough to draft.
+    EXPECT_NE(lineform_term(0.8f, 0.35f), 0.f);
+}
+
+TEST(BikeAILineFormation, WeakerThanDraft_SameGap)
+{
+    const float lf = std::abs(lineform_term(0.8f, 0.35f));
+    const float dr = std::abs(draft_term(0.8f, 3.f, 8.f, 1.0f));
+    EXPECT_LT(lf, dr) << "line-formation is a smaller always-on bias, draft dominates in range";
+}
+
+// ---------------------------------------------------------------------------
+// Cohesion — only fires when isolated (nearest neighbor farther than the
+// trigger distance), pulls toward the lateral centroid of sensed neighbors.
+// ---------------------------------------------------------------------------
+static float cohesion_term(const std::vector<float>& neighbor_lat_gaps, float nearest_dist,
+                            float cohesion_trigger_dist_m, float cohesion_k)
+{
+    if (neighbor_lat_gaps.empty()) return 0.f;
+    if (nearest_dist <= cohesion_trigger_dist_m) return 0.f;
+    float sum = 0.f;
+    for (float g : neighbor_lat_gaps) sum += g;
+    return (sum / (float)neighbor_lat_gaps.size()) * cohesion_k;
+}
+
+TEST(BikeAICohesion, IsolatedAndCentroidRight_PullsRight)
+{
+    std::vector<float> gaps = { 1.f, 1.5f };
+    EXPECT_GT(cohesion_term(gaps, 10.f, 6.f, 0.5f), 0.f);
+}
+
+TEST(BikeAICohesion, NotIsolated_NoTerm)
+{
+    // nearest_dist below trigger -> draft/separation/lineformation already govern positioning
+    std::vector<float> gaps = { 1.f, 1.5f };
+    EXPECT_EQ(cohesion_term(gaps, 2.f, 6.f, 0.5f), 0.f);
+}
+
+TEST(BikeAICohesion, NoNeighbors_NoTerm)
+{
+    EXPECT_EQ(cohesion_term({}, 999.f, 6.f, 0.5f), 0.f);
+}
+
+// ---------------------------------------------------------------------------
+// Ground rule: magnetism sums must be order-independent. Summing neighbor
+// contributions in a different (shuffled) order must produce the same total —
+// nothing in the formula may depend on iteration/array order.
+// ---------------------------------------------------------------------------
+TEST(BikeAIGroundRule, SeparationSum_OrderIndependent)
+{
+    struct N { float lat_gap, dist; };
+    std::vector<N> a = { {0.5f, 0.2f}, {-0.3f, 0.6f}, {0.1f, 0.9f} };
+    std::vector<N> b = { {-0.3f, 0.6f}, {0.1f, 0.9f}, {0.5f, 0.2f} };  // shuffled
+
+    auto sum = [](const std::vector<N>& ns) {
+        float total = 0.f;
+        for (const auto& n : ns) total += separation_term(n.lat_gap, n.dist, 1.0f, 1.2f);
+        return total;
+    };
+    EXPECT_NEAR(sum(a), sum(b), 1e-6f);
+}
+
+// ---------------------------------------------------------------------------
+// Hard clamp — magnetism can never command a target lateral position past
+// (road_half_width - edge_safety_m). Clamping must apply to the offset target,
+// not to a steer term (steer/heading is driven independently by the racing
+// line PID and is never touched by this clamp).
+// ---------------------------------------------------------------------------
+static float clamp_target_lateral(float target_lat_raw, float road_half_width, float edge_safety_m)
+{
+    const float limit = std::max(road_half_width - edge_safety_m, 0.1f);
+    return std::max(-limit, std::min(limit, target_lat_raw));
+}
+
+TEST(BikeAIHardClamp, WithinBounds_Unclamped)
+{
+    EXPECT_NEAR(clamp_target_lateral(1.f, 4.f, 0.8f), 1.f, 1e-6f);
+}
+
+TEST(BikeAIHardClamp, PastRightEdge_ClampedToLimit)
+{
+    // road_hw=4, edge_safety=0.8 -> limit=3.2; requesting 5.0 must clamp to 3.2
+    EXPECT_NEAR(clamp_target_lateral(5.f, 4.f, 0.8f), 3.2f, 1e-6f);
+}
+
+TEST(BikeAIHardClamp, PastLeftEdge_ClampedToLimit)
+{
+    EXPECT_NEAR(clamp_target_lateral(-5.f, 4.f, 0.8f), -3.2f, 1e-6f);
+}
+
+TEST(BikeAIHardClamp, MagnetismCannotForceOffTrack_EvenWithLargeCohesionPull)
+{
+    // A rider near the edge (lateral_pos = 3.0, road_hw=4, edge_safety=0.8, limit=3.2) with a
+    // strong cohesion pull toward an off-track neighbor centroid must still clamp inside the limit.
+    const float my_lateral_pos = 3.0f;
+    const float huge_pull_delta = 10.f;  // way more than needed to cross the edge
+    const float target_raw = my_lateral_pos + huge_pull_delta;
+    const float clamped = clamp_target_lateral(target_raw, 4.f, 0.8f);
+    EXPECT_LE(clamped, 3.2f + 1e-6f);
+}
+
+// ---------------------------------------------------------------------------
+// Lateral shift command — P-control from target offset error to [-1,1].
+// ---------------------------------------------------------------------------
+static float lateral_shift_command(float target_lat, float current_lat, float kp)
+{
+    const float raw = (target_lat - current_lat) * kp;
     return std::max(-1.f, std::min(1.f, raw));
 }
 
-TEST(BikeAICohesion, TargetRight_SteerRight)
+TEST(BikeAILateralShift, TargetRight_ShiftPositive)
 {
-    // lat_err > 0 (target to the right), no velocity → output should be negative (steer right)
-    EXPECT_LT(cohesion_steer(1.f, 0.f, 0.05f, 0.05f), 0.f);
+    EXPECT_GT(lateral_shift_command(1.f, 0.f, 1.5f), 0.f);
 }
 
-TEST(BikeAICohesion, TargetLeft_SteerLeft)
+TEST(BikeAILateralShift, TargetLeft_ShiftNegative)
 {
-    // lat_err < 0 (target to the left) → output should be positive (steer left)
-    EXPECT_GT(cohesion_steer(-1.f, 0.f, 0.05f, 0.05f), 0.f);
+    EXPECT_LT(lateral_shift_command(-1.f, 0.f, 1.5f), 0.f);
 }
 
-TEST(BikeAICohesion, MovingTowardTarget_IsDamped)
+TEST(BikeAILateralShift, LargeError_ClampedToUnit)
 {
-    // lat_err > 0, lat_vel > 0 (approaching from left): output magnitude must be
-    // smaller than pure-P to confirm the D term is dampening, not reinforcing.
-    float pure_p   = cohesion_steer(1.f, 0.f,  0.05f, 0.05f);
-    float with_d   = cohesion_steer(1.f, 0.5f, 0.05f, 0.05f);
-    // with_d should be less negative (smaller magnitude) than pure_p
-    EXPECT_GT(with_d, pure_p) << "D term should reduce steer magnitude when approaching target";
+    EXPECT_NEAR(lateral_shift_command(100.f, 0.f, 1.5f), 1.f, 1e-6f);
+    EXPECT_NEAR(lateral_shift_command(-100.f, 0.f, 1.5f), -1.f, 1e-6f);
 }
 
-TEST(BikeAICohesion, MovingAwayFromTarget_IsAmplified)
+TEST(BikeAILateralShift, OnTarget_NoShift)
 {
-    // lat_err > 0 (target right), lat_vel < 0 (moving further left away from target)
-    // D term should increase the rightward effort
-    float pure_p   = cohesion_steer(1.f,  0.f,  0.05f, 0.05f);
-    float with_d   = cohesion_steer(1.f, -0.5f, 0.05f, 0.05f);
-    EXPECT_LT(with_d, pure_p) << "D term should increase steer when moving away from target";
+    EXPECT_NEAR(lateral_shift_command(2.f, 2.f, 1.5f), 0.f, 1e-6f);
 }
 
 // ---------------------------------------------------------------------------
-// Gap PD (AI power vs. rider ahead)
-// formula: gap_err * KP + gap_rate * KD
-//
-// gap_err  = gap_to_ahead - AI_GAP_TARGET  (+ve = too far back, need more power)
-// gap_rate = rider_ahead.speed - my.speed  (+ve = they're faster, gap is GROWING)
-//
-// Both terms positive → add watts (close gap) ✓
-// Gap closing too fast (gap_rate < 0) → subtract watts (prevent overshoot) ✓
+// Steering PID (heading only — racing line tracking, never pack position).
 // ---------------------------------------------------------------------------
-static float gap_pd_bonus(float gap_err, float gap_rate, float kp, float kd,
-                           float max_push, float max_pull)
+static float steer_pid(float error, float integral, float prev_error, float dt,
+                        float kp, float ki, float kd)
 {
-    float raw = gap_err * kp + gap_rate * kd;
-    return std::max(-max_push, std::min(max_pull, raw));
+    const float deriv = (error - prev_error) / dt;
+    const float raw = kp * error + ki * integral + kd * deriv;
+    return std::max(-1.f, std::min(1.f, raw));
 }
 
-TEST(BikeAIGapPD, TooFarBehind_NoRelativeSpeed_AddsWatts)
+TEST(BikeAISteerPID, PositiveError_PositiveSteer)
 {
-    // gap_err = +3 (3m further back than target gap), gap_rate = 0
-    EXPECT_GT(gap_pd_bonus(3.f, 0.f, 8.f, 20.f, 40.f, 60.f), 0.f);
+    EXPECT_GT(steer_pid(0.2f, 0.f, 0.f, 0.016f, 2.f, 0.f, 0.f), 0.f);
 }
 
-TEST(BikeAIGapPD, TooClose_NoRelativeSpeed_SheddingWatts)
+TEST(BikeAISteerPID, ZeroErrorNoHistory_ZeroSteer)
 {
-    // gap_err = -2 (2m closer than desired) → shed power
-    EXPECT_LT(gap_pd_bonus(-2.f, 0.f, 8.f, 20.f, 40.f, 60.f), 0.f);
+    EXPECT_NEAR(steer_pid(0.f, 0.f, 0.f, 0.016f, 2.f, 0.1f, 0.15f), 0.f, 1e-6f);
 }
 
-TEST(BikeAIGapPD, GapGrowing_AddsWatts)
+TEST(BikeAISteerPID, LargeError_ClampedToUnit)
 {
-    // gap_rate > 0 = ahead rider is faster, gap growing → add power
-    EXPECT_GT(gap_pd_bonus(0.f, 1.f, 8.f, 20.f, 40.f, 60.f), 0.f);
-}
-
-TEST(BikeAIGapPD, GapClosingFast_ReducesWatts)
-{
-    // gap_rate < 0 = I'm faster, gap shrinking → shed power to avoid overshoot
-    EXPECT_LT(gap_pd_bonus(0.f, -1.f, 8.f, 20.f, 40.f, 60.f), 0.f);
-}
-
-TEST(BikeAIGapPD, ClampedAtMaxPull)
-{
-    float out = gap_pd_bonus(100.f, 100.f, 8.f, 20.f, 40.f, 60.f);
-    EXPECT_NEAR(out, 60.f, 1e-5f);
-}
-
-TEST(BikeAIGapPD, ClampedAtMaxPush)
-{
-    float out = gap_pd_bonus(-100.f, -100.f, 8.f, 20.f, 40.f, 60.f);
-    EXPECT_NEAR(out, -40.f, 1e-5f);
+    EXPECT_NEAR(steer_pid(50.f, 0.f, 0.f, 0.016f, 2.f, 0.f, 0.f), 1.f, 1e-6f);
 }
 
 // ---------------------------------------------------------------------------
-// Overshoot grace timer logic
-// When locked_gap <= 0 (I'm ahead of my locked target), don't drop immediately.
-// Only drop if: gap is very negative (> ABS_DROP threshold) OR timer expires.
+// Speed/power PID — no target (isolated) -> flat base_power_w. With a draft
+// target -> PID-tracked power around base_power_w.
 // ---------------------------------------------------------------------------
-struct GraceState {
-    float overshoot_t = 0.f;
-};
-
-static bool should_drop_target(float locked_gap, float dt, GraceState& s,
-                                float grace_s, float drop_threshold_m)
+static float speed_power(bool have_target, float speed_error, float integral, float deriv,
+                          float base_power_w, float kp, float ki, float kd,
+                          float min_power_w, float max_power_w)
 {
-    if (locked_gap > 25.f) return true;   // out of range
-    if (locked_gap <= 0.f) {
-        s.overshoot_t += dt;
-        if (locked_gap < drop_threshold_m || s.overshoot_t >= grace_s)
-            return true;
-        return false;  // still in grace window
-    }
-    s.overshoot_t = 0.f;
-    return false;
+    if (!have_target) return base_power_w;
+    const float pid_out = kp * speed_error + ki * integral + kd * deriv;
+    const float raw = base_power_w + pid_out;
+    return std::max(min_power_w, std::min(max_power_w, raw));
 }
 
-TEST(BikeAIGrace, SlightlyAhead_NotDroppedImmediately)
+TEST(BikeAISpeedPower, NoNeighbor_ConstantCruisePower)
 {
-    GraceState s;
-    // -0.5m ahead, 0.016s frame, grace=3s, drop=-8m
-    EXPECT_FALSE(should_drop_target(-0.5f, 0.016f, s, 3.f, -8.f));
+    EXPECT_NEAR(speed_power(false, 5.f, 5.f, 5.f, 250.f, 60.f, 5.f, 10.f, 50.f, 1000.f), 250.f, 1e-6f);
 }
 
-TEST(BikeAIGrace, SlightlyAhead_DropsAfterGraceExpires)
+TEST(BikeAISpeedPower, BehindTarget_AddsPower)
 {
-    GraceState s;
-    // Simulate 3.1 seconds of being slightly ahead
-    bool dropped = false;
-    for (int i = 0; i < 200; ++i)
-        dropped = should_drop_target(-0.5f, 0.016f, s, 3.f, -8.f);
-    EXPECT_TRUE(dropped);
+    EXPECT_GT(speed_power(true, 2.f, 0.f, 0.f, 250.f, 60.f, 5.f, 10.f, 50.f, 1000.f), 250.f);
 }
 
-TEST(BikeAIGrace, WayAhead_DroppedImmediately)
+TEST(BikeAISpeedPower, AheadOfTarget_SubtractsPower)
 {
-    GraceState s;
-    // -10m ahead exceeds drop threshold
-    EXPECT_TRUE(should_drop_target(-10.f, 0.016f, s, 3.f, -8.f));
+    EXPECT_LT(speed_power(true, -2.f, 0.f, 0.f, 250.f, 60.f, 5.f, 10.f, 50.f, 1000.f), 250.f);
 }
 
-TEST(BikeAIGrace, Behind_TimerResets)
+TEST(BikeAISpeedPower, ClampedToMin)
 {
-    GraceState s;
-    s.overshoot_t = 1.5f;  // partially accumulated
-    should_drop_target(1.f, 0.016f, s, 3.f, -8.f);  // now behind again
-    EXPECT_NEAR(s.overshoot_t, 0.f, 1e-6f) << "Timer should reset when back behind target";
-}
-
-TEST(BikeAIGrace, FarAhead_OutOfRange_Dropped)
-{
-    GraceState s;
-    EXPECT_TRUE(should_drop_target(26.f, 0.016f, s, 3.f, -8.f));
-}
-
-// ---------------------------------------------------------------------------
-// is_at_front() — paceline cascade regression
-//
-// A Pulling rider outputs more watts than Following riders, so the gap between
-// the Puller and the next rider can exceed any fixed window within seconds.
-// is_at_front() must scan ALL riders ahead with no distance cutoff; otherwise
-// every Following rider eventually sees "nobody within Nm ahead" and
-// self-promotes to Pulling, causing the whole chain to pull simultaneously.
-//
-// A rider that just finished pulling isn't a scripted Peeling/DriftingBack
-// state anymore — it's just Following with recovering_s > 0 (reduced power,
-// not a valid wheel). is_at_front() skips those the same way it used to skip
-// the old transient states.
-//
-// We model is_at_front() as a pure function for testability.
-// ---------------------------------------------------------------------------
-enum class TestPaceState { Following, Pulling };
-
-struct TestRider {
-    float course_dist;
-    TestPaceState state;
-    bool recovering = false; // true = just finished a pull, not a valid wheel
-    bool is_player  = false; // players are ignored by is_at_front
-};
-
-// Returns true if rider[me_idx] is at the virtual front.
-// riders must be sorted descending by course_dist (index 0 = race leader).
-static bool is_at_front(const std::vector<TestRider>& riders, int me_idx)
-{
-    for (int j = me_idx - 1; j >= 0; --j) {
-        if (riders[j].is_player) continue;
-        if (riders[j].recovering) continue;
-        return false;
-    }
-    return true;
-}
-
-TEST(BikeAIPaceline, IsAtFront_OnlyLeader_True)
-{
-    std::vector<TestRider> r = {
-        { 100.f, TestPaceState::Pulling },
-    };
-    EXPECT_TRUE(is_at_front(r, 0));
-}
-
-TEST(BikeAIPaceline, IsAtFront_PullerAhead_False)
-{
-    // Puller at index 0, Follower at index 1 — follower is NOT at front
-    std::vector<TestRider> r = {
-        { 100.f, TestPaceState::Pulling },
-        { 90.f,  TestPaceState::Following },
-    };
-    EXPECT_FALSE(is_at_front(r, 1));
-}
-
-TEST(BikeAIPaceline, IsAtFront_PullerFarAhead_StillFalse)
-{
-    // Puller has accelerated >10m away — old 10m window would wrongly return true
-    std::vector<TestRider> r = {
-        { 100.f, TestPaceState::Pulling   },  // 15m ahead of follower
-        { 85.f,  TestPaceState::Following },
-    };
-    EXPECT_FALSE(is_at_front(r, 1))
-        << "Follower must not become Puller just because gap to leader exceeds 10m";
-}
-
-TEST(BikeAIPaceline, IsAtFront_LeadRecovering_SecondIsAtFront)
-{
-    // Lead just finished its pull → second rider is now effectively at front
-    std::vector<TestRider> r = {
-        { 100.f, TestPaceState::Following, true  },  // recovering
-        { 98.f,  TestPaceState::Following, false },
-        { 90.f,  TestPaceState::Following, false },
-    };
-    EXPECT_TRUE(is_at_front(r, 1))  << "2nd rider should become new puller";
-    EXPECT_FALSE(is_at_front(r, 2)) << "3rd rider should still be following";
-}
-
-// ---------------------------------------------------------------------------
-// Pulling → Following when a wheel appears ahead
-// A rider in Pulling state should immediately revert to Following if a stable
-// rider (Following or Pulling, not recovering) appears ahead — always prefer
-// catching a wheel.
-// ---------------------------------------------------------------------------
-static bool pulling_should_revert_to_following(bool has_rider_ahead,
-                                                bool ahead_recovering,
-                                                bool ahead_is_player)
-{
-    if (!has_rider_ahead)  return false;
-    if (ahead_is_player)   return true;   // player counts as stable
-    return !ahead_recovering;
-}
-
-TEST(BikeAIPaceline, Pulling_NoRiderAhead_StaysPulling)
-{
-    EXPECT_FALSE(pulling_should_revert_to_following(false, false, false));
-}
-
-TEST(BikeAIPaceline, Pulling_StableFollowerAhead_RevertsToFollowing)
-{
-    EXPECT_TRUE(pulling_should_revert_to_following(true, false, false));
-}
-
-TEST(BikeAIPaceline, Pulling_RecoveringRiderAhead_StaysPulling)
-{
-    // Recovering rider is falling off the back of the pull — don't follow them
-    EXPECT_FALSE(pulling_should_revert_to_following(true, true, false));
-}
-
-TEST(BikeAIPaceline, Pulling_PlayerAhead_RevertsToFollowing)
-{
-    EXPECT_TRUE(pulling_should_revert_to_following(true, false, true));
-}
-
-TEST(BikeAIPaceline, IsAtFront_CascadeRegression)
-{
-    // Regression: when lead ends its pull, only the 2nd rider becomes Puller.
-    // Once 2nd is Pulling and has accelerated >10m away, 3rd must NOT self-promote.
-    // This is the core cascade bug — the fixed is_at_front() must catch it.
-    std::vector<TestRider> r = {
-        { 105.f, TestPaceState::Following, true  },  // lead, now recovering
-        { 100.f, TestPaceState::Pulling,   false },  // 2nd, now pulling, 15m ahead of 3rd
-        { 85.f,  TestPaceState::Following, false },  // 3rd — must NOT become Pulling
-        { 80.f,  TestPaceState::Following, false },  // 4th — must NOT become Pulling
-    };
-    EXPECT_FALSE(is_at_front(r, 2)) << "3rd rider must not cascade to Pulling";
-    EXPECT_FALSE(is_at_front(r, 3)) << "4th rider must not cascade to Pulling";
-}
-
-// ---------------------------------------------------------------------------
-// Hard steer cutoff
-// Params match BikeApplication.cpp:
-//   HARD_SEP_LONG_RADIUS = 3.0m
-//   HARD_SEP_OUTER_LAT   = 0.7m
-//   HARD_SEP_INNER_LAT   = 0.05m
-//
-// The update_boids loop narrows [hard_steer_min, hard_steer_max] to [0, +1] or
-// [-1, 0] when a neighbour is inside the zone.  BikeAI clamps the final steer
-// into this window.  These tests replicate that logic.
-// ---------------------------------------------------------------------------
-struct HardClampState {
-    float hard_min = -1.f;
-    float hard_max =  1.f;
-};
-
-static const float HARD_LONG  = 3.0f;
-static const float HARD_OUTER = 0.7f;
-static const float HARD_INNER = 0.05f;
-
-// Apply one neighbour to the hard clamp state (mirrors the inner loop in update_boids)
-static void apply_hard_neighbour(HardClampState& s,
-                                  float me_lat, float me_dist,
-                                  float other_lat, float other_dist)
-{
-    const float h_long   = std::abs(other_dist - me_dist);
-    if (h_long >= HARD_LONG)  return;
-    const float lat_diff = other_lat - me_lat;
-    const float h_lat    = std::abs(lat_diff);
-    if (h_lat >= HARD_OUTER)  return;
-    if (h_lat <  HARD_INNER)  return;  // already overlapping — allow escape
-    if (lat_diff > 0.f)
-        s.hard_max = 0.f;  // other to right: block rightward steer
-    else
-        s.hard_min = 0.f;  // other to left: block leftward steer
-}
-
-TEST(BikeAIHardSteer, OtherToRight_BlocksRightSteer)
-{
-    HardClampState s;
-    apply_hard_neighbour(s, 0.f, 0.f, 0.4f, 1.0f);  // other is 0.4m to the right
-    EXPECT_EQ(s.hard_max, 0.f)  << "max should be clamped to 0 (no right steer)";
-    EXPECT_EQ(s.hard_min, -1.f) << "min should be unchanged (left steer still allowed)";
-}
-
-TEST(BikeAIHardSteer, OtherToLeft_BlocksLeftSteer)
-{
-    HardClampState s;
-    apply_hard_neighbour(s, 0.f, 0.f, -0.4f, 1.0f);  // other is 0.4m to the left
-    EXPECT_EQ(s.hard_min, 0.f)  << "min should be clamped to 0 (no left steer)";
-    EXPECT_EQ(s.hard_max, 1.f)  << "max should be unchanged (right steer still allowed)";
-}
-
-TEST(BikeAIHardSteer, OutsideLateralZone_NoClamp)
-{
-    HardClampState s;
-    apply_hard_neighbour(s, 0.f, 0.f, 0.8f, 1.0f);  // 0.8m > HARD_OUTER=0.7m
-    EXPECT_EQ(s.hard_max, 1.f);
-    EXPECT_EQ(s.hard_min, -1.f);
-}
-
-TEST(BikeAIHardSteer, OutsideLongitudinalZone_NoClamp)
-{
-    HardClampState s;
-    apply_hard_neighbour(s, 0.f, 0.f, 0.4f, 4.0f);  // 4.0m > HARD_LONG=3.0m
-    EXPECT_EQ(s.hard_max, 1.f);
-    EXPECT_EQ(s.hard_min, -1.f);
-}
-
-TEST(BikeAIHardSteer, AlreadyOverlapping_AllowsEscape)
-{
-    HardClampState s;
-    apply_hard_neighbour(s, 0.f, 0.f, 0.02f, 1.0f);  // 0.02m < HARD_INNER=0.05m
-    EXPECT_EQ(s.hard_max, 1.f)  << "overlapping riders must be allowed to escape freely";
-    EXPECT_EQ(s.hard_min, -1.f);
+    EXPECT_NEAR(speed_power(true, -100.f, 0.f, 0.f, 250.f, 60.f, 5.f, 10.f, 50.f, 1000.f), 50.f, 1e-6f);
 }

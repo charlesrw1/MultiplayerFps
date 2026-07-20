@@ -17,13 +17,8 @@
 #include <cfloat>
 
 // ============================================================
-// Transform / crack tuning vars
+// Transform / gear tuning vars
 // ============================================================
-
-// Crack visual pitch spring (cosmetic only)
-static float crack_vis_pitch_impulse = 5;    // rad/s applied per unit crack_impulse
-static float crack_vis_spring        = 340;  // spring constant
-static float crack_vis_damp          = 10.f; // damping
 
 // Gear shift cooldown
 static float bike_gear_shift_cooldown = 3.f;
@@ -131,7 +126,6 @@ BikeObject::ControlInput BikeObject::update_tick(ControlInput ci)
 {
 	ASSERT(eng != nullptr);
 	const float dt = eng->get_dt();
-	tick_stamina(ci, dt);
 	tick_physics(ci, dt);
 	tick_steer(ci, dt);
 	tick_gears(dt);
@@ -180,6 +174,14 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 		glm::vec3 rear_contact = pos + bike_direction * BIKE_REAR_Z;
 		rear_contact += bike_direction * speed * dt;
 		pos = rear_contact - bike_direction * BIKE_REAR_Z;
+	}
+
+	// Lateral shift — direct sideways translation, independent of heading/bike_direction.
+	// Rate-capped "shimmy" for line changes that don't require re-aiming the whole bike.
+	// See [[bike/bikeai#Lateral shift]].
+	if (ci.lateral_shift != 0.f) {
+		const glm::vec3 bike_right = glm::normalize(glm::cross(bike_direction, glm::vec3(0, 1, 0)));
+		pos += bike_right * (glm::clamp(ci.lateral_shift, -1.f, 1.f) * BIKE_MAX_LATERAL_SHIFT_MPS * dt);
 	}
 
 	// Terrain raycasts
@@ -252,14 +254,7 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	const glm::quat base_orient = glm::quat(glm::mat3(right, terrain_up, -terrain_forward_dir));
 	const glm::quat orient      = glm::angleAxis(current_roll, terrain_forward_dir) * base_orient;
 
-	// Cosmetic crack pitch spring — fires on crack_impulse, springs back to neutral
-	if (crack_impulse > 0.f)
-		crack_pitch_vel -= crack_vis_pitch_impulse * crack_impulse;
-	crack_pitch_vel  += (-crack_vis_spring * crack_pitch_disp - crack_vis_damp * crack_pitch_vel) * dt;
-	crack_pitch_disp += crack_pitch_vel * dt;
-	const glm::quat crack_pitch_rot = glm::angleAxis(crack_pitch_disp, right);
-
-	get_owner()->set_ws_position_rotation(pos, crack_pitch_rot * orient);
+	get_owner()->set_ws_position_rotation(pos, orient);
 
 	// Fork steer rotation
 	if (fork_entity) {
@@ -298,7 +293,7 @@ glm::vec3 BikeObject::get_wind_along_bike_vector() const
 }
 
 // ============================================================
-// Debug menu: Transform / Gears / Crack
+// Debug menu: Transform / Gears
 // ============================================================
 
 static void bike_transform_debug()
@@ -311,14 +306,6 @@ static void bike_transform_debug()
 				s_bike_debug->cadence,
 				s_bike_debug->gear.current_high_gear,
 				s_bike_debug->gear.current_low_gear);
-	}
-	ImGui::SeparatorText("Crack Visual Pitch");
-	{
-		ImGui::DragFloat("crack_vis_pitch_impulse (deg)", &crack_vis_pitch_impulse, 0.001f, 0.f, glm::radians(20.f));
-		ImGui::DragFloat("crack_vis_spring",              &crack_vis_spring,        1.f,    10.f, 400.f);
-		ImGui::DragFloat("crack_vis_damp",                &crack_vis_damp,          0.1f,   0.f,  30.f);
-		if (s_bike_debug)
-			ImGui::Text("pitch_disp=%.3f rad  vel=%.2f", s_bike_debug->crack_pitch_disp, s_bike_debug->crack_pitch_vel);
 	}
 	ImGui::SeparatorText("Handlebar Visual");
 	{
