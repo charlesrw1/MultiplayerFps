@@ -212,8 +212,8 @@ struct BikeAIParams {
 	// until nearly on top of it, so the target has already moved deep into the
 	// curve by the time steering reacts: reads as turning in late and cutting
 	// across toward the apex instead of tracking it smoothly.
-	float steer_lookahead_m      = 6.f;   // floor distance (m), keeps a preview even near-stationary
-	float steer_lookahead_time_s = 0.9f;  // scales lookahead with speed above the floor
+	float steer_lookahead_m      = 2.f;   // floor distance (m), keeps a preview even near-stationary
+	float steer_lookahead_time_s = 0.0f;  // scales lookahead with speed above the floor
 
 	// ---- Lateral guidance — converts target lateral offset into ci.lateral_shift ----
 	// Deliberately simple proportional-only: this just sets the setpoint for
@@ -222,7 +222,7 @@ struct BikeAIParams {
 	// two stacked PIDs here was one tunable loop too many. Command is clamped
 	// to [-1,1]; BikeObject::tick_transform maps it onto a heading offset
 	// (bike_heading_max_offset_deg) from the track tangent.
-	float lateral_shift_kp = 1.5f;  // shift command (pre-clamp) per metre of offset error
+	float lateral_shift_kp = 0.5f;  // shift command (pre-clamp) per metre of offset error
 
 	// ---- Heading guidance — lateral_shift_kp alone only ever points the bike
 	// at the ROAD's own tangent (wp.forward), offset by a lateral-error angle;
@@ -237,7 +237,7 @@ struct BikeAIParams {
 	// manual offset above but inverted — negligible on a straight (where the
 	// road tangent and racing line tangent are ~identical anyway), full
 	// strength mid-corner. ----
-	float heading_shift_kp = 1.2f;  // shift command (pre-clamp) per radian of heading error, at full corner weight
+	float heading_shift_kp = 4.5f;  // shift command (pre-clamp) per radian of heading error, at full corner weight
 
 	// ---- Manual lateral offset blend — how much of BikeObject::manual_lateral_offset
 	// (debug-set per rider, see BikeDebugger) actually reaches the steering
@@ -246,9 +246,9 @@ struct BikeAIParams {
 	// corner braking, so it anticipates on the same horizon) — an offset that
 	// made sense on the preceding straight would put the bike on a nonsense
 	// line through the corner itself. ----
-	float offset_straight_r_m = 50.f;  // min_r above this: full manual offset
-	float offset_corner_r_m   = 15.f;  // min_r at/below this: zero manual offset (racing line only)
-	float offset_blend_tau_s  = 0.3f;  // low-pass tau smoothing the blend transition
+	float offset_straight_r_m = 20.f;  // min_r above this: full manual offset
+	float offset_corner_r_m   = 6.f;  // min_r at/below this: zero manual offset (racing line only)
+	float offset_blend_tau_s  = 0.05f;  // low-pass tau smoothing the blend transition
 
 	// ---- Off-track hard clamp ----
 	float edge_safety_m = 0.8f;  // margin inside road edge the magnetism offset may never cross

@@ -29,12 +29,12 @@ static float bike_gear_shift_cooldown = 3.f;
 // output = angular acceleration). Defaults reproduce the old fixed damped-
 // spring behavior (kp=8 rad/s^2/rad, kd=2*sqrt(kp) for critical damping,
 // ki=0) as a starting point now that it's actually tunable.
-PidGains bike_heading_gains        = { 8.f, 0.f, 5.66f };
+PidGains bike_heading_gains        = { 16.f, 0.f, 5.4f };
 float bike_heading_integral_clamp  = 1.f;    // anti-windup clamp on the heading PID's accumulated error (rad*s)
-float bike_heading_max_offset_deg  = 45.f;   // max heading deviation from track tangent at |ci.lateral_shift|=1
+float bike_heading_max_offset_deg  = 35.f;   // max heading deviation from track tangent at |ci.lateral_shift|=1
 float bike_heading_turn_rate_dps   = 180.f;  // max angular velocity the heading can turn at, independent of speed
 float bike_heading_turn_accel_dps2 = 400.f;  // max angular acceleration — also the heading PID's output clamp
-float bike_min_turn_radius_m       = 2.5f;   // physical curvature limit — max turn rate is also capped at speed/this
+float bike_min_turn_radius_m       = 4.5f;   // physical curvature limit — max turn rate is also capped at speed/this
 
 static BikeObject* s_bike_debug = nullptr;  // set each tick for debug menu
 
