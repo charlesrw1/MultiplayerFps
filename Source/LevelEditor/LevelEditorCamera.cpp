@@ -158,7 +158,7 @@ void ed_cam_debug() {
 	if (EditorCamera::inst)
 		EditorCamera::inst->imgui();
 }
-ADD_TO_DEBUG_MENU(ed_cam_debug);
+//ADD_TO_DEBUG_MENU(ed_cam_debug);
 
 void EditorCamera::imgui() {
 	ImGui::Text("is_orbit: %d", (int)get_is_using_ortho());

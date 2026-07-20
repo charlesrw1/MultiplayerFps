@@ -101,11 +101,7 @@ glm::vec3 Player::calc_eye_position() {
 	return get_ws_position() + vec3(0, view_height, 0);
 }
 
-float bike_view_damp = 0.01;
-void bike_view_menu() {
-	ImGui::InputFloat("bike_view_damp", &bike_view_damp);
-}
-ADD_TO_DEBUG_MENU(bike_view_menu);
+
 
 void Player::get_view(glm::mat4& viewMat, float& fov) {
 	ASSERT(get_owner());

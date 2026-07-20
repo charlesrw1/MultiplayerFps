@@ -181,7 +181,7 @@ void ui_state_debug() {
 	ImGui::Text("is_game_capturing_mouse: %d\n", (int)UiSystem::inst->is_game_capturing_mouse());
 }
 
-ADD_TO_DEBUG_MENU(ui_state_debug);
+//ADD_TO_DEBUG_MENU(ui_state_debug);
 
 void UiSystem::sync_to_renderer() {
 	RenderWindowBackend::inst->update_window({1}, window);

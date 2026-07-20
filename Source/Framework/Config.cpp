@@ -214,7 +214,7 @@ void imgui_vars_hook() {
 }
 
 VarManImpl::VarManImpl() {
-	Debug_Interface::get()->add_hook("Cvars", imgui_vars_hook);
+	//Debug_Interface::get()->add_hook("Cvars", imgui_vars_hook);
 }
 
 std::vector<std::string> tokenize_string(const std::string& input) {

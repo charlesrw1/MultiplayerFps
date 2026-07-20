@@ -352,7 +352,7 @@ void taa_menu() {
 	ImGui::DragFloat("taa_doc_bias", &taa_doc_bias, 0.01, 0.001, 0.2);
 	ImGui::DragFloat("taa_doc_pow", &taa_doc_pow, 0.01, 0, 1);
 }
-ADD_TO_DEBUG_MENU(taa_menu);
+//ADD_TO_DEBUG_MENU(taa_menu);
 static glm::vec3 pp_color_tint = glm::vec3(1.f);
 
 void post_process_menu() {
@@ -365,7 +365,7 @@ void post_process_menu() {
 	ImGui::Text("exposure:     %.3f", pp.exposure);
 	ImGui::Text("bloom:        %s  intensity %.4f", pp.bloom_enabled ? "on" : "off", pp.bloom_intensity);
 }
-ADD_TO_DEBUG_MENU(post_process_menu);
+//ADD_TO_DEBUG_MENU(post_process_menu);
 
 void Renderer::upload_light_and_decal_buffers() {
 	GPU_SCOPE("upload_light_and_decal_buffers");

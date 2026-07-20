@@ -65,7 +65,7 @@ static void draw_dashed_line_debug_menu() {
 	ImGui::SliderFloat("dash period (px)", &g_dashed_period_px, 20.f, 500.f, "%.1f");
 	ImGui::TextDisabled("prefab-edit relationship lines");
 }
-static AddToDebugMenu s_dashed_line_menu("Parent Lines", draw_dashed_line_debug_menu);
+//static AddToDebugMenu s_dashed_line_menu("Parent Lines", draw_dashed_line_debug_menu);
 
 // Builds one camera-facing dashed ribbon (a stretched textured quad) from `from` to `to`. Both the
 // UV.x tiling and the ribbon width are driven off the line's *screen-space* size so the dash sprite

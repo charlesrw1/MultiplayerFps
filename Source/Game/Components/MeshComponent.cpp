@@ -348,7 +348,7 @@ void anim_preview_debug_menu() {
 			anim->get_owner()->set_ws_position(glm::vec3(0, 2, fmod(GetTime(), 5.0) * 3.7));
 	}
 }
-ADD_TO_DEBUG_MENU(anim_preview_debug_menu);
+//ADD_TO_DEBUG_MENU(anim_preview_debug_menu);
 
 void AnimPreviewComponent::update_mesh_component() {
 	eval = nullptr;

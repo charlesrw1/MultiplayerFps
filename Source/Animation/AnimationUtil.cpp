@@ -71,24 +71,7 @@ static bool apply_to_local = false;
 static bool apply_to_all = false;
 #include "imgui.h"
 #include "GameEnginePublic.h"
-void menu1235() {
-	if (ImGui::Begin("abc")) {
-		ImGui::SliderFloat4("dir", &forward_dir.x, -1, 1);
-		ImGui::Checkbox("ff", &face_foward);
-		ImGui::Checkbox("apply_to_local", &apply_to_local);
-		ImGui::Checkbox("apply_to_all", &apply_to_all);
 
-		forward_dir = glm::normalize(forward_dir);
-	}
-	ImGui::End();
-
-	glm::mat4 transform = glm::mat4_cast(forward_dir);
-	Debug::add_line(vec3(0.f), transform[0], COLOR_RED, -1.f, false);
-	Debug::add_line(vec3(0.f), transform[1], COLOR_GREEN, -1.f, false);
-	Debug::add_line(vec3(0.f), transform[2], COLOR_BLUE, -1.f, false);
-}
-
-static AddToDebugMenu aeasdf("meun", menu1235);
 
 static void draw_skeleton_util_debug(const glm::mat4* bones, const MSkeleton* model, int count, float line_len,
 									 const glm::mat4& transform) {
@@ -422,7 +405,7 @@ void bone_menu() {
 		bone_to_bool[b.strname] = bb;
 	}
 }
-ADD_TO_DEBUG_MENU(bone_menu);
+//ADD_TO_DEBUG_MENU(bone_menu);
 
 void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time,
 						 const BoneIndexRetargetMap* remap_indicies, Pose& outpose,
