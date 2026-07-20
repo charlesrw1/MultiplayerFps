@@ -72,37 +72,39 @@ void half_lap_classic(Turtle& t) {
 	t.arc(RADIUS_TIGHT, 90.f);
 }
 
-// Chicanes and alternating-direction bends — tighter radii (6-10m) and
+// Chicanes and alternating-direction bends — tighter radii (7-14m) and
 // several sign reversals per half-lap, so the direction keeps changing
-// instead of settling into long straights between a few big corners.
-// Turn sum: 30 - 20 + 45 - 15 + 50 + 90 = 180.
+// instead of settling into long straights between a few big corners. Sized
+// to fill most of the -40..+40m play area (bbox ~72 x 68m).
+// Turn sum: 50 - 25 + 55 - 20 + 30 + 90 = 180.
 void half_lap_twisty(Turtle& t) {
+	t.straight(14.f);
+	t.arc(14.f,  50.f);
 	t.straight(10.f);
-	t.arc(10.f,  30.f);
-	t.straight(6.f);
-	t.arc(6.f,  -20.f);  // chicane kick, opposite direction
-	t.straight(8.f);
-	t.arc(8.f,   45.f);
-	t.straight(6.f);
-	t.arc(6.f,  -15.f);  // small wiggle
+	t.arc(9.f,  -25.f);  // chicane kick, opposite direction
+	t.straight(12.f);
+	t.arc(12.f,  55.f);
+	t.straight(9.f);
+	t.arc(7.f,  -20.f);  // small wiggle
+	t.straight(12.f);
+	t.arc(9.f,   30.f);
 	t.straight(10.f);
-	t.arc(9.f,   50.f);
-	t.straight(8.f);
-	t.arc(6.f,   90.f);  // sharper corner heading back toward the return leg
+	t.arc(7.f,   90.f);  // sharper corner heading back toward the return leg
 }
 
 // Distinct sharp-angle corners (90/45/60 deg) on tight radii, long straights
 // between — reads as intersections/city-block corners rather than swept
-// racetrack curves. Turn sum: 90 + 45 - 15 + 60 = 180.
+// racetrack curves. Sized to fill most of the -40..+40m play area (bbox
+// ~69 x 64m). Turn sum: 90 + 45 - 15 + 60 = 180.
 void half_lap_sharp_angles(Turtle& t) {
-	t.straight(14.f);
-	t.arc(3.f,   90.f);  // sharp near-square corner
-	t.straight(12.f);
-	t.arc(4.f,   45.f);  // medium corner
-	t.straight(10.f);
-	t.arc(4.f,  -15.f);  // slight bend the other way
-	t.straight(12.f);
-	t.arc(3.5f,  60.f);  // medium-sharp corner
+	t.straight(28.f);
+	t.arc(4.f,   90.f);  // sharp near-square corner
+	t.straight(24.f);
+	t.arc(4.5f,  45.f);  // medium corner
+	t.straight(20.f);
+	t.arc(4.5f, -15.f);  // slight bend the other way
+	t.straight(24.f);
+	t.arc(4.f,   60.f);  // medium-sharp corner
 }
 
 // Converts a completed turtle path into course.waypoints (forward/right/
