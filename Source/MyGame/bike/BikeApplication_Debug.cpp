@@ -233,6 +233,13 @@ static void bike_course_debug()
 		ImGui::DragFloat("sense_half_angle_deg", &p.sense_half_angle_deg, 1.f,  10.f, 180.f, "%.0f");
 	}
 
+	ImGui::SeparatorText("Steering");
+	{
+		BikeAIParams& p = g_ai_params;
+		ImGui::DragFloat("steer_lookahead_m",      &p.steer_lookahead_m,      0.2f,  0.f, 20.f, "%.1f");
+		ImGui::DragFloat("steer_lookahead_time_s", &p.steer_lookahead_time_s, 0.02f, 0.f, 2.f,  "%.2f");
+	}
+
 	ImGui::SeparatorText("Magnetism");
 	{
 		BikeAIParams& p = g_ai_params;

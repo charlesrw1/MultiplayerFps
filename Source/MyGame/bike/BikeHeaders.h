@@ -182,6 +182,12 @@ struct BikeAIParams {
 	float draft_dist_m             = 8.0f;  // m — only draft-pull within this longitudinal range
 	float lineformation_k          = 0.35f; // always-on bias toward zero lateral offset from neighbors' track
 
+	// ---- Steer target lookahead — where along the course the target lateral
+	// offset is sampled from (pure-pursuit style preview, not the bike's own
+	// current position). effective_m = max(steer_lookahead_m, speed * steer_lookahead_time_s).
+	float steer_lookahead_m      = 4.f;   // floor distance (m), keeps a preview even near-stationary
+	float steer_lookahead_time_s = 0.4f;  // scales lookahead with speed above the floor
+
 	// ---- Lateral shift — converts target lateral offset into ci.lateral_shift ----
 	// Command is clamped to [-1,1]; BikeObject::tick_transform maps it onto a
 	// heading offset (bike_heading_max_offset_deg) from the track tangent.

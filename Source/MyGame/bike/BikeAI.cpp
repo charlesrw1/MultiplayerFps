@@ -35,7 +35,6 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float dt    = eng->get_dt();
 	const float speed = my_bike->speed;
 	const glm::vec3 my_pos = my_bike->get_ws_position();
-	const BikeWaypoint wp  = course->sample(my_bike->course_dist_m);
 
 	// ---- Corner lookahead (shared by braking + speed target) ----
 	const float corner_scan_m = glm::max(p.corner_look_m, speed * 0.8f);
@@ -133,13 +132,25 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	dbg_cohesion_offset   = cohesion_term;
 
 	// ---- Target lateral position: racing line + magnetism, hard-clamped to
-	// the road surface so the AI can never be commanded off the track. ----
-	const float lat_limit      = glm::max(wp.road_half_width - p.edge_safety_m, 0.1f);
-	const float target_lat_raw = wp.racing_line_lateral + target_offset_delta;
+	// the road surface so the AI can never be commanded off the track.
+	//
+	// Sampled a lookahead distance AHEAD of the bike, not at its current
+	// position. At zero lookahead the target is the instantaneous racing-line
+	// offset, which changes fast per metre of arc-length through a tight
+	// corner (small radius = large curvature); the P-controller below was
+	// chasing that fast-moving point and overshooting every tick, visible as
+	// wobble specifically on the hardcoded course's two hairpins. Previewing
+	// the target this far ahead (a standard pure-pursuit tweak) gives the
+	// steering something to anticipate instead of react to. ----
+	const float steer_lookahead_m = glm::max(p.steer_lookahead_m, speed * p.steer_lookahead_time_s);
+	const BikeWaypoint wp_ahead   = course->sample(my_bike->course_dist_m + steer_lookahead_m);
+
+	const float lat_limit      = glm::max(wp_ahead.road_half_width - p.edge_safety_m, 0.1f);
+	const float target_lat_raw = wp_ahead.racing_line_lateral + target_offset_delta;
 	const float target_lat     = glm::clamp(target_lat_raw, -lat_limit, lat_limit);
 	dbg_clamped           = (target_lat != target_lat_raw);
 	dbg_target_lat_offset = target_lat;
-	dbg_lookahead_pt      = wp.position + wp.right * target_lat;  // world-space target point
+	dbg_lookahead_pt      = wp_ahead.position + wp_ahead.right * target_lat;  // world-space target point
 
 	const float lat_error = target_lat - my_bike->lateral_pos;
 	const float lateral_shift = glm::clamp(lat_error * p.lateral_shift_kp, -1.f, 1.f);
