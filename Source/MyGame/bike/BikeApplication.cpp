@@ -189,7 +189,6 @@ void BikeGameApplication::update()
 
 	g_bike_app = this;
 	if (course.is_built) {
-		update_course_positions();
 		sort_riders();
 		update_groups();
 		update_drafting();
@@ -204,17 +203,6 @@ void BikeGameApplication::update()
 void BikeGameApplication::on_imgui()
 {
 	debugger.on_imgui();
-}
-
-void BikeGameApplication::update_course_positions()
-{
-	for (auto* r : all_riders) {
-		r->course_dist_m = course.project(
-			r->get_ws_position(),
-			&r->lateral_pos,
-			&r->course_segment,
-			r->course_dist_m);   // prev_dist_m: restricts search to ±window, prevents loop aliasing
-	}
 }
 
 void BikeGameApplication::sort_riders()
@@ -238,7 +226,13 @@ BikeObject* BikeGameApplication::create_player(glm::vec3 pos)
 	Entity* e = GameplayStatic::spawn_entity();
 	e->set_ws_position(pos);
 	auto bo = e->create_component<BikeObject>();
-	bo->input = std::make_unique<BikePlayer>();
+	bo->input  = std::make_unique<BikePlayer>();
+	bo->course = &course;
+	// One-time projection: seeds the rail-authoritative course_dist_m/lateral_pos
+	// from the spawn world position. Never called again after this — position is
+	// derived FROM these fields from here on (see BikeObject::tick_transform).
+	if (course.is_built)
+		bo->course_dist_m = course.project(pos, &bo->lateral_pos, &bo->course_segment);
 	all_riders.push_back(bo);
 	riders_sorted.push_back(bo);
 	return bo;
@@ -249,6 +243,7 @@ BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 	Entity* e = GameplayStatic::spawn_entity();
 	e->set_ws_position(pos);
 	auto bo = e->create_component<BikeObject>();
+	bo->course = &course;
 
 	{
 		auto ai    = std::make_unique<BikeAI>();
@@ -256,6 +251,11 @@ BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 
 		bo->input = std::move(ai);
 	}
+
+	// One-time projection: seeds the rail-authoritative course_dist_m/lateral_pos
+	// from the spawn world position (see note in create_player).
+	if (course.is_built)
+		bo->course_dist_m = course.project(pos, &bo->lateral_pos, &bo->course_segment);
 
 	all_riders.push_back(bo);
 	riders_sorted.push_back(bo);

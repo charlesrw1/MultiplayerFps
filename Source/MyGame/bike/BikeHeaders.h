@@ -149,19 +149,13 @@ extern WindSystem g_wind;
 // BikeAIParams — global tuning knobs shared by all AI riders.
 // Edit via the debug menu; never loop through riders to set these.
 //
-// ONE layer: racing-line PID (heading) + speed PID (power) + boids-style
-// magnetism (cohesion/separation/draft/line-formation -> desired lateral
-// offset -> lateral_shift, a direct sideways translation independent of
-// heading). See [[bike/bikeai]].
+// ONE layer: speed PID (power) + boids-style magnetism (cohesion/separation/
+// draft/line-formation, layered on the racing line's own offset) -> a target
+// lateral position -> lateral_shift, a rate-capped sideways translation.
+// Heading is never AI-controlled — bike_direction always equals the track
+// tangent (see BikeObject::tick_transform). See [[bike/bikeai]].
 // ============================================================
 struct BikeAIParams {
-	// ---- Racing-line steering PID (drives ci.steer / heading only) ----
-	float steer_kp = 2.0f;
-	float steer_ki = 0.0f;
-	float steer_kd = 0.15f;
-	float lookahead_dist_base   = 0.8f;
-	float lookahead_dist_per_ms = 0.4f;
-
 	// ---- Corner braking (lookahead safety scan, not a magnetism term) ----
 	float corner_look_m  = 20.f;
 	float corner_speed_k = 1.4f;
@@ -179,6 +173,8 @@ struct BikeAIParams {
 	float sense_half_angle_deg = 100.f; // deg — forward cone half-angle
 
 	// ---- Magnetism: desired lateral offset (m, road/wheel frame) ----
+	bool  enable_magnetism         = true;  // if false, lateral_shift is never commanded — AI just follows the racing line
+	bool  force_racing_line        = false; // debug: snap lateral_pos onto the racing line every tick, bypassing magnetism entirely
 	float cohesion_k               = 0.5f;  // pull toward neighbor centroid beyond this range
 	float cohesion_trigger_dist_m  = 6.f;   // only cohere if nearest neighbor farther than this
 	float separation_k             = 1.2f;  // push away from neighbors closer than separation_dist_m
@@ -208,8 +204,6 @@ public:
 	static constexpr float BRAKE_SCAN_STEP_M = 10.f;
 
 	// ---- PID controller state ----
-	float steer_integral    = 0.f;
-	float steer_prev_error  = 0.f;
 	float speed_integral    = 0.f;
 	float speed_prev_error  = 0.f;
 
@@ -280,14 +274,20 @@ public:
 	BikeAnimDriver anim;
 	std::unique_ptr<IBikeInput> input;
 
+	// Set once at spawn (BikeGameApplication::create_player/create_ai) — the
+	// course tick_transform's rail movement samples from. Not read via
+	// g_bike_app, since that global isn't set until BikeGameApplication::update()
+	// runs, which is after entity ticks on the frame a rider is spawned.
+	BikeCourse* course = nullptr;
+
 	void start() final;
 	void update() final;
 
 	// input:
 	struct ControlInput {
 		float aero_coeff = 0.0;	// determied by stance
-		float steer = 0.0;// l,r — heading only, rotates bike_direction
-		float lateral_shift = 0.0; // -1..1 — direct sideways translation, independent of heading (see [[bike/bikeai#Lateral shift]])
+		float steer = 0.0;// l,r — cosmetic only (fork angle / lean); never rotates bike_direction, see tick_steer
+		float lateral_shift = 0.0; // -1..1 — the only lateral control: rate-capped sideways translation of lateral_pos (see [[bike/bikeai#Lateral shift]])
 		float brake_amount = 0.0;// 0,1
 		float power = 0.0;	// input _watts_ requested
 
@@ -309,10 +309,10 @@ public:
 	float     steer_input_raw      = 0.f;       // resolved raw stick input
 	glm::vec3 terrain_forward_dir  = {0,0,1};   // terrain-aligned forward from last raycast
 
-	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);
+	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);  // exact rail tangent — used for sensing/wind/probe placement, never smoothed
+	glm::vec3 visual_heading = glm::vec3(0.f, 0, 1.f);  // low-passed toward actual velocity direction (forward + lateral); drives render orientation only, see tick_transform
 	float speed = 0.f;
 	float speed_smoothed = 0.f; // low-pass filtered speed, used for gear cadence checks
-	float turn_rate = 0.f;   // rad/s, written by update_tick() from physics each frame
 	float cadence = 0.f;	// cadence at gear
 	float current_roll = 0.0;
 	float current_steer    = 0.f;  // low-pass-smoothed steer
@@ -328,7 +328,9 @@ public:
 
 	float surface_traction = 1.0f;  // [0,1] — road grip: 1=dry tarmac, 0.6=wet, 0.3=gravel; scales max braking decel and corner speed limit
 
-	// Course state (updated each frame by BikeGameApplication before input runs)
+	// Course state — authoritative rail position, advanced by BikeObject::tick_transform
+	// each tick (course_dist_m += speed*dt, lateral_pos += lateral_shift command).
+	// World position/orientation are always derived FROM these, never the reverse.
 	float course_dist_m  = 0.f;   // arc-length from course start (m)
 	float lateral_pos    = 0.f;   // signed offset from road centre, +ve = road-right (m)
 	int   course_segment = 0;     // nearest waypoint segment index (cached)
@@ -344,9 +346,8 @@ public:
 	// 1.0 = no draft (open air), 0.65 = full draft at ideal position
 	float draft_factor = 1.0f;
 
-	// Lateral position history and velocity (written each frame by BikeAI::evaluate)
-	float prev_lateral_pos = 0.f;
-	float lateral_vel      = 0.f;  // m/s, positive = moving road-right
+	// Lateral velocity — written each tick by BikeObject::tick_transform
+	float lateral_vel = 0.f;  // m/s, positive = moving road-right
 
 	EntityPtr fork_entity;
 
@@ -408,7 +409,6 @@ public:
 
 private:
 	void collect_crack_decals();
-	void update_course_positions();
 	void sort_riders();
 	void update_groups();
 	void update_drafting();

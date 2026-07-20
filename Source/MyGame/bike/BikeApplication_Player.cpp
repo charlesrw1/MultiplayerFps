@@ -182,9 +182,19 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 
 
 	// --- Fill ControlInput ---
+	// steer_combined is the only lateral control: it drives ci.lateral_shift
+	// directly (rate-capped sideways translation of lateral_pos), which moves
+	// the bike along wp.right (BikeCourse's convention). ci.steer drives
+	// cosmetic fork lean only — it never rotates bike_direction, which always
+	// tracks the road tangent — and is fed the NEGATED value: wp.right is the
+	// exact opposite handedness of the engine's own cross(bike_direction, up)
+	// "right" that the lean/roll math (BikeObject::tick_steer) is built on, so
+	// this keeps the lean banking toward the side actually being moved to. See
+	// [[bike/bikeai#Rail movement]] / BikeObject::tick_transform.
 	BikeObject::ControlInput ci;
-	ci.steer        = steer_combined;
-	ci.brake_amount = kb_brake ? 1.f : brake_amount;
+	ci.steer         = -steer_combined;
+	ci.lateral_shift = steer_combined;
+	ci.brake_amount  = kb_brake ? 1.f : brake_amount;
 
 	if (speed_hold_active) {
 		const float v            = glm::max(my_bike->speed, 0.3f);

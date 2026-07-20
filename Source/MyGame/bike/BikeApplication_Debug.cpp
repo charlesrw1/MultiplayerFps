@@ -195,16 +195,6 @@ static void bike_course_debug()
 	if (ImGui::Button("Respawn AI"))
 		g_bike_app->respawn_ai();
 
-	ImGui::SeparatorText("Steering PID / lookahead");
-	{
-		BikeAIParams& p = g_ai_params;
-		ImGui::DragFloat("steer_kp", &p.steer_kp, 0.05f, 0.f, 10.f, "%.2f");
-		ImGui::DragFloat("steer_ki", &p.steer_ki, 0.01f, 0.f, 2.f,  "%.2f");
-		ImGui::DragFloat("steer_kd", &p.steer_kd, 0.01f, 0.f, 2.f,  "%.2f");
-		ImGui::DragFloat("lookahead_dist_base",   &p.lookahead_dist_base,   0.05f, 0.f, 10.f, "%.2f");
-		ImGui::DragFloat("lookahead_dist_per_ms", &p.lookahead_dist_per_ms, 0.02f, 0.f, 2.f,  "%.2f");
-	}
-
 	ImGui::SeparatorText("Speed/power PID");
 	{
 		BikeAIParams& p = g_ai_params;
@@ -226,6 +216,8 @@ static void bike_course_debug()
 	ImGui::SeparatorText("Magnetism");
 	{
 		BikeAIParams& p = g_ai_params;
+		ImGui::Checkbox("enable_magnetism (off = follow path only)", &p.enable_magnetism);
+		ImGui::Checkbox("force_racing_line (debug: snap onto racing line)", &p.force_racing_line);
 		ImGui::DragFloat("cohesion_k",              &p.cohesion_k,              0.02f, 0.f, 3.f,  "%.2f");
 		ImGui::DragFloat("cohesion_trigger_dist_m", &p.cohesion_trigger_dist_m, 0.2f,  0.f, 30.f, "%.1f");
 		ImGui::DragFloat("separation_k",            &p.separation_k,            0.05f, 0.f, 5.f,  "%.2f");
@@ -286,19 +278,13 @@ static void bike_course_debug()
 	ImGui::TextDisabled("Sphere on spline, line to actual position.");
 	ImGui::TextDisabled("Gap shows projection error.");
 	ImGui::Unindent();
-	ImGui::Checkbox("Draw lookahead (all riders)", &draw_lookahead_all);
+	ImGui::Checkbox("Draw lateral target (all riders)", &draw_lookahead_all);
 	ImGui::Indent();
 	ImGui::TextDisabled("Cyan = player  Light cyan = AI");
 	ImGui::Unindent();
 
 	if (draw_course)
 		c.debug_draw();
-
-	// Lookahead parameters mirror BikeAI defaults so the player's dot is comparable.
-	static constexpr float LOOK_BASE_M  = 10.f;
-	static constexpr float LOOK_PER_MS  = 2.0f;
-	static constexpr float CORNER_SCAN  = 50.f;
-	static constexpr float CORNER_COEFF = 2.5f;
 
 	for (auto* r : g_bike_app->all_riders) {
 		const bool is_player = (dynamic_cast<BikePlayer*>(r->input.get()) != nullptr);
@@ -317,17 +303,13 @@ static void bike_course_debug()
 		}
 
 		if (draw_lookahead_all) {
+			// AI: exact target lateral point computed this frame (racing line + magnetism).
+			// Player: no magnetism, so just the racing line's own offset at their position.
 			glm::vec3 lookahead_pt;
 			if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
 				lookahead_pt = ai->dbg_lookahead_pt;  // already computed this frame
 			} else {
-				// Compute the same lookahead the AI would use, applied to the player.
-				const float scan    = glm::max(CORNER_SCAN, r->speed * 0.8f);
-				const float raw_r   = c.min_turn_radius_ahead(r->course_dist_m, scan);
-				const float min_r   = glm::max(raw_r, 3.f);
-				const float look_d  = glm::min(LOOK_BASE_M + r->speed * LOOK_PER_MS,
-				                               CORNER_COEFF * min_r);
-				lookahead_pt = c.racing_line_lookahead(r->course_dist_m, look_d);
+				lookahead_pt = c.racing_line_lookahead(r->course_dist_m, 0.f);
 			}
 			const Color32 col = is_player
 			    ? Color32(0x00, 0xff, 0xff, 0xff)   // cyan       = player

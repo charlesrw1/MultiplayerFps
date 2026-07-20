@@ -90,6 +90,10 @@ public:
 
 	float get_road_half_width(int segment) const;
 
+	// Nearest waypoint segment index for a given arc-length position (same
+	// wrap/clamp + binary search as sample()). Cheap — no world-space search.
+	int segment_at(float dist_m) const;
+
 	// Interpolated waypoint at a given arc-length (Catmull-Rom for position, lerp for the rest).
 	// Wraps when is_loop is true.
 	BikeWaypoint sample(float dist_m) const;

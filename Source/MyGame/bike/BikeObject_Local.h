@@ -14,8 +14,6 @@ extern float steer_max_deg;
 extern float steer_max_deg_hi;
 extern float steer_ref_speed;
 extern float steer_speed_power;
-extern float steer_min_radius;
-extern float steer_radius_coeff;
 extern float lean_max_deg;
 extern float bar_scale_lo_steer;
 extern float bar_scale_hi_steer;

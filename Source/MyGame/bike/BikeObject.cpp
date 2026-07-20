@@ -64,6 +64,7 @@ void BikeObject::start()
 	ASSERT(get_owner() != nullptr);
 	set_ticking(true);
 	bike_direction = glm::vec3(0.f, 0.f, 1.f);
+	visual_heading = bike_direction;
 
 	// Assign palette colors by spawn order, not randomly, so concurrently-alive
 	// riders never duplicate a jersey color (as long as rider count <= palette size).
@@ -165,24 +166,54 @@ void BikeObject::tick_gears(float dt)
 }
 
 // ------------------------------------------------------------
+// Rail movement: course_dist_m/lateral_pos are the authoritative position —
+// world position and bike_direction are derived FROM them every tick, never
+// the reverse. This guarantees a bike can never point off-track (heading is
+// always the sampled track tangent) or leave the road surface (lateral_pos is
+// hard-clamped to the road half-width). See [[bike/bikeai#Rail movement]].
+// ------------------------------------------------------------
 void BikeObject::tick_transform(const ControlInput& ci, float dt)
 {
 	ASSERT(dt > 0.f);
-	// Move: advance rear contact point, reconstruct entity origin
-	glm::vec3 pos = get_owner()->get_ws_position();
-	{
-		glm::vec3 rear_contact = pos + bike_direction * BIKE_REAR_Z;
-		rear_contact += bike_direction * speed * dt;
-		pos = rear_contact - bike_direction * BIKE_REAR_Z;
-	}
+	ASSERT(course != nullptr);
 
-	// Lateral shift — direct sideways translation, independent of heading/bike_direction.
-	// Rate-capped "shimmy" for line changes that don't require re-aiming the whole bike.
-	// See [[bike/bikeai#Lateral shift]].
-	if (ci.lateral_shift != 0.f) {
-		const glm::vec3 bike_right = glm::normalize(glm::cross(bike_direction, glm::vec3(0, 1, 0)));
-		pos += bike_right * (glm::clamp(ci.lateral_shift, -1.f, 1.f) * BIKE_MAX_LATERAL_SHIFT_MPS * dt);
+	// Captured before any of this tick's movement, so the real displacement
+	// below reflects actual worldspace motion (rail advance + lateral shift +
+	// terrain height change), not a reconstruction from rail-space components.
+	const glm::vec3 prev_ws_pos = get_owner()->get_ws_position();
+
+	// Advance arc-length by speed, wrapping/clamping exactly like BikeCourse::sample.
+	float new_dist = course_dist_m + speed * dt;
+	if (course->is_loop && course->total_length_m > 0.f) {
+		new_dist = std::fmod(new_dist, course->total_length_m);
+		if (new_dist < 0.f) new_dist += course->total_length_m;
+	} else {
+		new_dist = glm::clamp(new_dist, 0.f, course->total_length_m);
 	}
+	course_dist_m = new_dist;
+
+	// Lateral shift — the only lateral control. Rate-capped "shimmy" for line
+	// changes; never rotates bike_direction. See [[bike/bikeai#Lateral shift]].
+	const float lateral_pos_before = lateral_pos;
+	lateral_pos += glm::clamp(ci.lateral_shift, -1.f, 1.f) * BIKE_MAX_LATERAL_SHIFT_MPS * dt;
+
+	const BikeWaypoint wp = course->sample(course_dist_m);
+	course_segment = course->segment_at(course_dist_m);
+
+	// Hard clamp: lateral_pos can never put the bike off the road surface.
+	const float edge_margin = 0.15f;
+	const float lat_limit   = glm::max(wp.road_half_width - edge_margin, 0.05f);
+	lateral_pos = glm::clamp(lateral_pos, -lat_limit, lat_limit);
+	lateral_vel = (dt > 1e-6f) ? (lateral_pos - lateral_pos_before) / dt : 0.f;
+
+	// NOTE: wp.right (BikeCourse's cross(WORLD_UP, forward) convention) is the
+	// exact opposite handedness of this file's own cross(bike_direction, up)
+	// "right" used below for the orientation basis. Positive ci.steer/lean is
+	// tuned against THIS file's convention (see tick_steer), so callers
+	// feeding ci.steer from ci.lateral_shift must negate it — see BikeAI.cpp /
+	// BikePlayer::evaluate.
+	glm::vec3 pos = wp.position + wp.right * lateral_pos;
+	bike_direction = wp.forward;
 
 	// Terrain raycasts
 	// The fork rotates around the head-tube hinge, not the bike origin.
@@ -219,11 +250,13 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	// Fix: measure gradient and height interpolation along the bike's forward axis only.
 	const float front_fwd = FORK_HINGE_FWD + glm::cos(steer_angle_t) * FORK_LEG;
 	terrain_forward_dir = bike_direction;
+	float pitch_rise = 0.f, pitch_horiz = 1.f;  // captured for the visual_terrain_forward blend below
 	if (front_hit && rear_hit) {
 		const float rise    = front_res.hit_pos.y - rear_res.hit_pos.y;
 		const float horiz   = front_fwd - BIKE_REAR_Z; // forward span along bike axis
 		terrain_gradient    = atan2f(rise, horiz);
 		terrain_forward_dir = glm::normalize(bike_direction * horiz + glm::vec3(0, rise, 0));
+		pitch_rise = rise; pitch_horiz = horiz;
 		const float orig_t  = -BIKE_REAR_Z / horiz;
 		pos.y = rear_res.hit_pos.y + rise * orig_t;
 	} else if (rear_hit)  { pos.y = rear_res.hit_pos.y;  terrain_gradient = 0.f; }
@@ -248,11 +281,29 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	prev_gradient = damp_dt_independent(terrain_gradient, prev_gradient, 0.08f, dt);
 	bump_impulse  = glm::abs(terrain_gradient - prev_gradient) * speed;
 
-	// Orientation: terrain pitch + roll
-	const glm::vec3 right       = glm::normalize(glm::cross(bike_direction, glm::vec3(0, 1, 0)));
-	const glm::vec3 terrain_up  = glm::normalize(glm::cross(right, terrain_forward_dir));
-	const glm::quat base_orient = glm::quat(glm::mat3(right, terrain_up, -terrain_forward_dir));
-	const glm::quat orient      = glm::angleAxis(current_roll, terrain_forward_dir) * base_orient;
+	// Smoothed VISUAL heading: the model's yaw tracks the bike's actual
+	// worldspace displacement this tick (not the rail tangent directly), so it
+	// turns based on real movement — including any lateral shift and, under a
+	// hard force-onto-racing-line snap, the snap itself. Low-passed so it eases
+	// in rather than snapping every tick. bike_direction stays the exact,
+	// un-smoothed rail tangent (used for sensing/wind/raycast-probe placement
+	// above); only rendering below reads visual_heading.
+	{
+		const glm::vec3 real_vel = (pos - prev_ws_pos) / dt;
+		const float real_speed = glm::length(real_vel);
+		const glm::vec3 target_heading = (real_speed > 0.05f) ? (real_vel / real_speed) : bike_direction;
+		visual_heading = glm::normalize(damp_dt_independent(target_heading, visual_heading, 0.03f, dt));
+	}
+	// visual_terrain_forward mirrors terrain_forward_dir's pitch blend (see
+	// above), but built on visual_heading — used only for the orientation
+	// quat below, so the smoothed yaw survives slope pitching too.
+	const glm::vec3 visual_terrain_forward = glm::normalize(visual_heading * pitch_horiz + glm::vec3(0, pitch_rise, 0));
+
+	// Orientation: smoothed yaw (visual_heading) + terrain pitch + roll
+	const glm::vec3 right       = glm::normalize(glm::cross(visual_heading, glm::vec3(0, 1, 0)));
+	const glm::vec3 terrain_up  = glm::normalize(glm::cross(right, visual_terrain_forward));
+	const glm::quat base_orient = glm::quat(glm::mat3(right, terrain_up, -visual_terrain_forward));
+	const glm::quat orient      = glm::angleAxis(current_roll, visual_terrain_forward) * base_orient;
 
 	get_owner()->set_ws_position_rotation(pos, orient);
 

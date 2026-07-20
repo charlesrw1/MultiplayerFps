@@ -223,6 +223,17 @@ float BikeCourse::get_road_half_width(int segment) const
 	return waypoints.at(segment).road_half_width;
 }
 
+int BikeCourse::segment_at(float dist_m) const
+{
+	if (waypoints.empty()) return 0;
+	if (is_loop && total_length_m > 0.f) {
+		dist_m = std::fmod(dist_m, total_length_m);
+		if (dist_m < 0.f) dist_m += total_length_m;
+	}
+	dist_m = glm::clamp(dist_m, 0.f, total_length_m);
+	return arc_to_seg_idx(waypoints, dist_m);
+}
+
 // ============================================================
 // sample
 // ============================================================
