@@ -12,6 +12,7 @@
 #include "Render/MaterialPublic.h"
 #include "Framework/MathLib.h"
 #include "Framework/Config.h"
+#include "Framework/PidTuner.h"
 #include "Physics/Physics2.h"
 #include "imgui.h"
 #include <cfloat>
@@ -24,9 +25,15 @@
 static float bike_gear_shift_cooldown = 3.f;
 
 // Worldspace steering — see tick_transform. Declared extern in BikeObject_Local.h.
+// bike_heading_gains is THE steering PID (kp/ki/kd on heading angle error,
+// output = angular acceleration). Defaults reproduce the old fixed damped-
+// spring behavior (kp=8 rad/s^2/rad, kd=2*sqrt(kp) for critical damping,
+// ki=0) as a starting point now that it's actually tunable.
+PidGains bike_heading_gains        = { 8.f, 0.f, 5.66f };
+float bike_heading_integral_clamp  = 1.f;    // anti-windup clamp on the heading PID's accumulated error (rad*s)
 float bike_heading_max_offset_deg  = 45.f;   // max heading deviation from track tangent at |ci.lateral_shift|=1
 float bike_heading_turn_rate_dps   = 180.f;  // max angular velocity the heading can turn at, independent of speed
-float bike_heading_turn_accel_dps2 = 400.f;  // max angular acceleration — momentum: how fast turn rate builds/decays
+float bike_heading_turn_accel_dps2 = 400.f;  // max angular acceleration — also the heading PID's output clamp
 float bike_min_turn_radius_m       = 2.5f;   // physical curvature limit — max turn rate is also capped at speed/this
 
 static BikeObject* s_bike_debug = nullptr;  // set each tick for debug menu
@@ -182,10 +189,11 @@ void BikeObject::tick_gears(float dt)
 // See [[bike/bikeai#Worldspace steering]].
 //
 // ci.lateral_shift is the only lateral control: it bends bike_direction away
-// from the track tangent (toward wp.right for +ve). heading_turn_rate is
-// persistent angular momentum, not a rate-capped snap — it accelerates
-// toward a target turn rate at a capped angular acceleration, and that
-// target rate is itself capped by the bike's physical curvature limit
+// from the track tangent (toward wp.right for +ve) via bike_heading_gains, a
+// real PID (kp/ki/kd on heading angle error, output = angular acceleration —
+// see PidTuner.h). heading_turn_rate is persistent angular momentum, not a
+// rate-capped snap — the PID's output accelerates it, capped both by a flat
+// rate limit and by the bike's physical curvature limit
 // (speed / bike_min_turn_radius_m), so slow riders can't out-turn their own
 // geometry. There is no hard clamp keeping the bike on the road surface
 // anymore (that was a rail-space guarantee) — staying on track is now
@@ -225,22 +233,26 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	const float max_omega_curvature = (bike_min_turn_radius_m > 0.01f) ? (speed / bike_min_turn_radius_m) : max_omega_flat;
 	const float max_omega           = glm::min(max_omega_flat, max_omega_curvature);
 
-	// Heading has no gains of its own to tune — BikeAI's lateral PID
-	// (lateral_shift_kp/ki/kd) is the only tunable feedback loop in the whole
-	// steering chain. From here down it's pure physics: a target turn rate
-	// proportional to the angle error at a fixed internal reaction time (not a
-	// knob), which heading_turn_rate (real momentum) can only approach at a
-	// capped angular acceleration — the bike's actual "weight." Used to be its
-	// own damped-spring PD controller stacked under the lateral PID as a
-	// second tunable loop; collapsed into this because the lateral PID's own D
-	// term (BikeAI::evaluate, using measured lateral_vel) already damps the
-	// combined system end to end, so a second set of stability-tuning gains
-	// here was redundant — one PID, not two.
-	static constexpr float HEADING_REACTION_TIME_S = 0.12f;
-	const float target_turn_rate = glm::clamp(angle_to_target / HEADING_REACTION_TIME_S, -max_omega, max_omega);
-	const float max_turn_accel   = glm::radians(bike_heading_turn_accel_dps2);
-	const float rate_delta       = glm::clamp(target_turn_rate - heading_turn_rate, -max_turn_accel * dt, max_turn_accel * dt);
-	heading_turn_rate = glm::clamp(heading_turn_rate + rate_delta, -max_omega, max_omega);
+	// THE steering PID: bike_heading_gains (kp/ki/kd) on heading angle error,
+	// output = angular acceleration — this is the one real feedback controller
+	// in the whole steering chain (BikeAI's lateral guidance upstream is
+	// deliberately proportional-only; it just sets angle_to_target's setpoint).
+	// D term uses heading_turn_rate directly (the measured d(angle)/dt) rather
+	// than a finite-difference of the error, so there's no derivative kick.
+	// heading_turn_rate is real momentum: the PID's output is an acceleration,
+	// clamped to bike_heading_turn_accel_dps2 (the "actuator torque" limit),
+	// not applied directly to the angle — the bike's actual "weight" comes
+	// from that accel cap, not from the gains themselves. Tune it live with
+	// the widget in the Worldspace Steering debug menu below.
+	heading_error_integral = glm::clamp(heading_error_integral + angle_to_target * dt,
+	                                     -bike_heading_integral_clamp, bike_heading_integral_clamp);
+	const float heading_derivative = -heading_turn_rate;
+	const float pid_accel = bike_heading_gains.kp * angle_to_target
+	                       + bike_heading_gains.ki * heading_error_integral
+	                       + bike_heading_gains.kd * heading_derivative;
+	const float max_turn_accel = glm::radians(bike_heading_turn_accel_dps2);
+	const float turn_accel     = glm::clamp(pid_accel, -max_turn_accel, max_turn_accel);
+	heading_turn_rate = glm::clamp(heading_turn_rate + turn_accel * dt, -max_omega, max_omega);
 
 	bike_direction = glm::normalize(glm::vec3(
 	    glm::rotate(glm::mat4(1.f), heading_turn_rate * dt, glm::vec3(0, 1, 0)) * glm::vec4(bike_direction, 0.f)));
@@ -418,8 +430,23 @@ static void bike_transform_debug()
 		ImGui::DragFloat("bar_lean_fade_lo",    &bar_lean_fade_lo,    0.01f, 0.f,  1.f);
 		ImGui::DragFloat("bar_lean_fade_hi",    &bar_lean_fade_hi,    0.01f, 0.f,  1.f);
 	}
-	ImGui::SeparatorText("Worldspace Steering (physics — steering's only PID is BikeAI's lateral one)");
+	ImGui::SeparatorText("Worldspace Steering — the steering PID");
 	{
+		ImGui::TextDisabled("BikeAI's lateral guidance (Steering section above) just sets this PID's setpoint.");
+		imgui_pid_gains_editor("bike_heading_gains (kp/ki/kd on heading angle, rad/s^2 output)", bike_heading_gains,
+		                       0.2f, 60.f, 0.05f, 10.f, 0.2f, 30.f);
+		ImGui::DragFloat("bike_heading_integral_clamp", &bike_heading_integral_clamp, 0.05f, 0.f, 5.f);
+
+		// Live visualizer: simulates the exact same PID -> accel -> rate -> angle
+		// chain as tick_transform above, driven by the SAME bike_heading_gains, so
+		// dragging the target here and watching it settle previews in-game response
+		// before touching a rider. accel/rate limits mirror the real caps below.
+		static PidVisualizerState s_heading_pid_viz;
+		imgui_pid_visualizer("Heading PID response preview", s_heading_pid_viz, bike_heading_gains,
+		                     glm::radians(bike_heading_turn_accel_dps2), glm::radians(bike_heading_turn_rate_dps),
+		                     glm::radians(bike_heading_max_offset_deg));
+
+		ImGui::SeparatorText("Physical limits (not gains)");
 		ImGui::DragFloat("bike_heading_max_offset_deg",  &bike_heading_max_offset_deg,  0.5f, 5.f,  80.f);
 		ImGui::DragFloat("bike_heading_turn_rate_dps",   &bike_heading_turn_rate_dps,   1.f,  10.f, 400.f);
 		ImGui::DragFloat("bike_heading_turn_accel_dps2", &bike_heading_turn_accel_dps2, 5.f,  20.f, 2000.f);

@@ -261,6 +261,9 @@
     <ClCompile Include="Framework\MyImguiLib.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
+    <ClCompile Include="Framework\PidTuner.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
     <ClCompile Include="Framework\Profiler.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
@@ -1122,6 +1125,9 @@
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\MyImguiLib.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\PidTuner.h">
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\NodeMenuItem.h">

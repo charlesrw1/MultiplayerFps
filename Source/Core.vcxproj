@@ -101,6 +101,7 @@
     <ClCompile Include="Framework\MeshBuilder.cpp" />
     <ClCompile Include="Framework\EditorTheme.cpp" />
     <ClCompile Include="Framework\MyImguiLib.cpp" />
+    <ClCompile Include="Framework\PidTuner.cpp" />
     <ClCompile Include="Framework\Profiler.cpp" />
     <ClCompile Include="Framework\ProfilerUI.cpp" />
     <ClCompile Include="Framework\PropertyEd.cpp" />
@@ -510,6 +511,7 @@
     <ClInclude Include="Framework\MeshBuilder.h" />
     <ClInclude Include="Framework\MulticastDelegate.h" />
     <ClInclude Include="Framework\MyImguiLib.h" />
+    <ClInclude Include="Framework\PidTuner.h" />
     <ClInclude Include="Framework\PoolAllocator.h" />
     <ClInclude Include="Framework\PropertyEd.h" />
     <ClInclude Include="Framework\Rect2d.h" />

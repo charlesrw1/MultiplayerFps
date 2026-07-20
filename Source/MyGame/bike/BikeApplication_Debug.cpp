@@ -79,8 +79,9 @@ void snapshot_restore()
 		bo->lateral_pos     = snap.lateral_pos;
 		bo->course_segment  = snap.course_segment;
 		// Reset transient physics state so the bike doesn't carry over a spin
-		bo->current_steer     = 0.f;
-		bo->heading_turn_rate = 0.f;
+		bo->current_steer          = 0.f;
+		bo->heading_turn_rate      = 0.f;
+		bo->heading_error_integral = 0.f;
 	}
 }
 
@@ -240,9 +241,7 @@ static void bike_course_debug()
 		ImGui::DragFloat("steer_lookahead_m",       &p.steer_lookahead_m,       0.2f,  0.f, 20.f, "%.1f");
 		ImGui::DragFloat("steer_lookahead_time_s",  &p.steer_lookahead_time_s,  0.02f, 0.f, 2.f,  "%.2f");
 		ImGui::DragFloat("lateral_shift_kp",        &p.lateral_shift_kp,        0.05f, 0.f, 5.f,  "%.2f");
-		ImGui::DragFloat("lateral_shift_ki",        &p.lateral_shift_ki,        0.01f, 0.f, 2.f,  "%.2f");
-		ImGui::DragFloat("lateral_shift_kd",        &p.lateral_shift_kd,        0.02f, 0.f, 3.f,  "%.2f");
-		ImGui::DragFloat("lateral_integral_clamp",  &p.lateral_integral_clamp,  0.1f,  0.f, 10.f, "%.1f");
+		ImGui::TextDisabled("(the steering PID itself lives in Worldspace Steering below)");
 		ImGui::DragFloat("offset_straight_r_m",     &p.offset_straight_r_m,     1.f,   5.f, 200.f, "%.0f");
 		ImGui::DragFloat("offset_corner_r_m",       &p.offset_corner_r_m,       1.f,   3.f, 100.f, "%.0f");
 		ImGui::DragFloat("offset_blend_tau_s",      &p.offset_blend_tau_s,      0.02f, 0.f, 2.f,  "%.2f");

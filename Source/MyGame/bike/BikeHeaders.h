@@ -195,14 +195,14 @@ struct BikeAIParams {
 	float steer_lookahead_m      = 6.f;   // floor distance (m), keeps a preview even near-stationary
 	float steer_lookahead_time_s = 0.9f;  // scales lookahead with speed above the floor
 
-	// ---- Lateral shift PID — converts target lateral offset into ci.lateral_shift ----
-	// Command is clamped to [-1,1]; BikeObject::tick_transform maps it onto a
-	// heading offset (bike_heading_max_offset_deg) from the track tangent.
-	// D term uses the bike's measured lateral_vel (see BikeAI::evaluate).
-	float lateral_shift_kp      = 1.5f;  // shift command (pre-clamp) per metre of offset error
-	float lateral_shift_ki      = 0.f;   // per metre-second of accumulated offset error
-	float lateral_shift_kd      = 0.4f;  // per (m/s) of lateral_vel opposing the error — damps outer-loop ring
-	float lateral_integral_clamp = 2.f;  // anti-windup clamp on the accumulated error (m*s)
+	// ---- Lateral guidance — converts target lateral offset into ci.lateral_shift ----
+	// Deliberately simple proportional-only: this just sets the setpoint for
+	// BikeObject's own heading PID (bike_heading_gains in BikeObject_Local.h),
+	// which is where the actual feedback control (and its damping) lives now —
+	// two stacked PIDs here was one tunable loop too many. Command is clamped
+	// to [-1,1]; BikeObject::tick_transform maps it onto a heading offset
+	// (bike_heading_max_offset_deg) from the track tangent.
+	float lateral_shift_kp = 1.5f;  // shift command (pre-clamp) per metre of offset error
 
 	// ---- Manual lateral offset blend — how much of BikeObject::manual_lateral_offset
 	// (debug-set per rider, see BikeDebugger) actually reaches the steering
@@ -231,10 +231,9 @@ public:
 	static constexpr int   BRAKE_SCAN_STEPS  = 8;
 	static constexpr float BRAKE_SCAN_STEP_M = 10.f;
 
-	// ---- PID controller state ----
+	// ---- PID controller state (speed only — lateral guidance is proportional-only) ----
 	float speed_integral    = 0.f;
 	float speed_prev_error  = 0.f;
-	float lateral_integral  = 0.f;
 
 	// Low-passed weight (0..1) of BikeObject::manual_lateral_offset actually
 	// applied this tick — 1 on a straight, blended toward 0 as upcoming
@@ -345,6 +344,7 @@ public:
 
 	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);  // actual steered heading (worldspace-authoritative) — used for sensing/wind/probe placement, never smoothed
 	float heading_turn_rate  = 0.f;  // rad/s, persists tick to tick — the bike's actual angular momentum while steering (see BikeObject::tick_transform)
+	float heading_error_integral = 0.f;  // rad*s, accumulated heading-PID error (see bike_heading_gains, BikeObject::tick_transform)
 	glm::vec3 visual_heading = glm::vec3(0.f, 0, 1.f);  // low-passed toward actual velocity direction (forward + lateral); drives render orientation only, see tick_transform
 	float speed = 0.f;
 	float speed_smoothed = 0.f; // low-pass filtered speed, used for gear cadence checks
