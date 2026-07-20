@@ -54,14 +54,20 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	                                       p.corner_factor_min, 1.f);
 	dbg_corner_factor = corner_factor;
 
-	// Heading error vs course tangent — common to leader + follower steer.
-	const BikeWaypoint cur_wp  = course->sample(my_bike->course_dist_m);
-	const glm::vec3 path_right = glm::normalize(glm::cross(cur_wp.forward, up));
-	const float heading_err    = glm::dot(my_bike->bike_direction, path_right);
-
 	// Wheel-following: wheel != null  →  follower; null  →  leader (racing-line).
 	const bool follower = (wheel != nullptr);
 	dbg_has_wheel    = follower;
+
+	// Heading reference — leader steers to the course tangent (their own judgement,
+	// nobody ahead to follow). Followers steer to the WHEEL's own current heading —
+	// magnetism to the rider directly ahead, not the ideal line. If the wheel drifts
+	// off the racing line, the follower drifts with them. See [[bike/bikeai#Magnetism]].
+	const BikeWaypoint cur_wp  = course->sample(my_bike->course_dist_m);
+	const glm::vec3 path_right = glm::normalize(glm::cross(cur_wp.forward, up));
+	const glm::vec3 heading_ref_right = follower
+	    ? glm::normalize(glm::cross(wheel->bike_direction, up))
+	    : path_right;
+	const float heading_err = glm::dot(my_bike->bike_direction, heading_ref_right);
 
 	// Lookahead distances (shared by leader + follower; followers need full anticipation
 	// or they ride the chord into corners and overshoot).
@@ -77,33 +83,39 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	};
 
 	glm::vec3 near_pt, far_pt;
+	float steer_gain = p.steer_k;
 	if (follower) {
-		// Follower: same lookahead pattern as leader, but the target lane tracks the
-		// wheel's road-relative lateral position plus my desired offset. Long gap is
-		// regulated by power, not by aiming at a chord behind the wheel.
-		const float target_lat = wheel->lateral_pos + lat_offset * corner_factor;
-		const BikeWaypoint near_wp = course->sample(my_bike->course_dist_m + look_base);
-		const BikeWaypoint far_wp  = course->sample(my_bike->course_dist_m + look_anti);
-		near_pt = near_wp.position + near_wp.right * target_lat;
-		far_pt  = far_wp.position  + far_wp.right  * target_lat;
+		// Follower: magnetism dominates. Target points trail the WHEEL's own arc —
+		// its current position, and a short-horizon prediction from its live
+		// turn_rate — instead of a course-relative lookahead. This is what makes
+		// following aggressive and line-agnostic: the follower chases the rider
+		// ahead's actual path, not what the racing line says they should be doing.
+		const glm::vec3 wheel_pos   = wheel->get_ws_position();
+		const glm::vec3 wheel_right = glm::normalize(glm::cross(wheel->bike_direction, up));
+		const float target_lat      = lat_offset * corner_factor;  // wheel-frame draft slot
+		near_pt = wheel_pos + wheel_right * target_lat;
+		far_pt  = arc_predict(wheel_pos, wheel->bike_direction, wheel->speed, wheel->turn_rate,
+		                      p.follow_anticipation_t) + wheel_right * target_lat;
+		steer_gain = p.follower_steer_k;
 	} else {
-		// Leader: track the racing line.
+		// Leader: track the racing line — their own judgement, no magnetism (nobody ahead).
 		near_pt = course->racing_line_lookahead(my_bike->course_dist_m, look_base);
 		far_pt  = course->racing_line_lookahead(my_bike->course_dist_m, look_anti);
 	}
 	dbg_lookahead_pt   = near_pt;
 	dbg_lookahead_dist = look_base;
 
-	const float steer_near = angle_to_pt(near_pt) * p.steer_k - heading_err * 0.5f;
-	const float steer_far  = angle_to_pt(far_pt)  * p.steer_k - heading_err * 0.5f;
+	const float steer_near = angle_to_pt(near_pt) * steer_gain - heading_err * 0.5f;
+	const float steer_far  = angle_to_pt(far_pt)  * steer_gain - heading_err * 0.5f;
 	dbg_steer_near = steer_near;
 	dbg_steer_far  = steer_far;
 	float steer_out_raw = steer_near + p.anticipation_k * (steer_far - steer_near);
 
-	// Followers: add direct road-frame lateral PD onto the wheel's track. The PD
-	// lookahead converges slowly when lateral error is small (atan(err/look_dist)
-	// goes to zero), so it never cleanly hugs the wheel. This term gives explicit
-	// pull-toward-the-wheel proportional to the actual lat error.
+	// Followers: add direct road-frame lateral PD onto the wheel's track on top of
+	// the arc-tracking above. Arc-tracking supplies heading; this supplies hard
+	// lateral convergence (the PD lookahead above converges slowly when lateral
+	// error is small, since atan(err/look_dist) → 0). This is the dominant term —
+	// followers are "very very" wheel-magnetized, not racing-line-magnetized.
 	// Sign: lat_err > 0 means I'm road-right of the wheel's track → need road-LEFT
 	// (positive) steer → steer += +lat_err * k.
 	if (follower) {

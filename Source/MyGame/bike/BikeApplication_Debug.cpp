@@ -235,6 +235,10 @@ static void bike_course_debug()
 		ImGui::SameLine(); ImGui::TextDisabled("near-field lat error → steer (followers)");
 		ImGui::DragFloat("follower_lat_d_k",      &p.follower_lat_d_k,      0.02f, 0.f,  2.f, "%.2f");
 		ImGui::SameLine(); ImGui::TextDisabled("damp lateral velocity");
+		ImGui::DragFloat("follower_steer_k",      &p.follower_steer_k,      0.1f,  0.f,  10.f, "%.2f");
+		ImGui::SameLine(); ImGui::TextDisabled("angle-to-wheel-arc gain (magnetism dominance)");
+		ImGui::DragFloat("follow_anticipation_t", &p.follow_anticipation_t, 0.05f, 0.f,  2.f, "%.2f");
+		ImGui::SameLine(); ImGui::TextDisabled("s ahead to project wheel's own arc");
 	}
 
 	ImGui::SeparatorText("Gap Regulation");

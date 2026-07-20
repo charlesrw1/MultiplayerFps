@@ -43,6 +43,7 @@ extern float AVOID_STEER_KP;
 
 // Priority yield (hard enforcement — lower-priority yielder only)
 extern float YIELD_LONG_RADIUS;
+extern float YIELD_DEADBAND_M;
 extern float YIELD_OUTER_LAT;
 extern float YIELD_INNER_LAT;
 extern float YIELD_SQUEEZE_M;
@@ -229,8 +230,13 @@ void BikeGameApplication::update_avoidance()
 		}
 
 		// ---- Priority yield: hard steer clamp + brake escape (BikeAI riders only) ----
-		// Lower index in riders_sorted = further ahead in race = higher priority.
-		// The yielder (higher index i) must not steer into a higher-priority rider's exclusion zone.
+		// Priority is decided by an explicit course_dist_m comparison with a deadband,
+		// NOT riders_sorted array position: two riders can be laterally beside each
+		// other with a nearly-tied course_dist_m, and index order for a tied pair is
+		// noise — using it as priority made both riders flicker which one yields,
+		// frame to frame, i.e. the classic side-by-side dodge-dance. Within the
+		// deadband neither yields; the soft separation push above still keeps them apart.
+		// The yielder must not steer into a clearly-ahead rider's exclusion zone.
 		// Sign: positive steer = road-LEFT (decreases lateral_pos).
 		//   Other road-right of me → block road-right movement → block negative steer → min = 0
 		//   Other road-left  of me → block road-left  movement → block positive steer → max = 0
@@ -240,13 +246,15 @@ void BikeGameApplication::update_avoidance()
 			ai_rider->hard_steer_min = -1.f;
 			ai_rider->hard_steer_max =  1.f;
 
-			for (int j = 0; j < i; ++j) {  // only higher-priority riders
+			for (int j = 0; j < n; ++j) {
+				if (j == i) continue;
 				const BikeObject* other = riders_sorted[j];
 				// Skip my wheel: I'm intentionally drafting it. The clamp would otherwise
 				// prevent me from converging onto the wheel's lateral track.
 				if (other == ai_rider->wheel) continue;
-				const float long_gap = glm::abs(other->course_dist_m - me->course_dist_m);
-				if (long_gap >= YIELD_LONG_RADIUS) continue;
+				const float signed_gap = other->course_dist_m - me->course_dist_m;  // +ve: other ahead
+				if (signed_gap <= YIELD_DEADBAND_M) continue;  // not clearly ahead of me — no yield
+				if (signed_gap >= YIELD_LONG_RADIUS) continue;
 				const float lat_diff = other->lateral_pos - me->lateral_pos;  // +ve: other road-right
 				const float h_lat    = glm::abs(lat_diff);
 				if (h_lat >= YIELD_OUTER_LAT) continue;

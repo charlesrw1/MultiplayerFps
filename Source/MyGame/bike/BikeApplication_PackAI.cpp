@@ -105,9 +105,16 @@ void BikeGameApplication::update_wheel_picking()
 //
 // Cascade-safe promotion: Pulling riders accelerate, so the gap to the next
 // rider can exceed wheel_long_max within seconds. is_at_front() walks ALL
-// riders ahead in the same group with no distance cutoff; only recovering
-// riders are skipped. Without this, every following rider eventually
-// self-promotes when its puller pulls away.
+// riders in the same group with no distance cutoff (only recovering riders
+// are skipped) — without this, every following rider eventually self-promotes
+// when its puller pulls away.
+//
+// Deliberately does NOT use riders_sorted array position as "who's ahead" —
+// two riders can be laterally beside each other with a nearly-tied (or just
+// noisy) course_dist_m sort order that means nothing about front-status.
+// Instead it does an explicit numeric course_dist_m comparison plus a lateral
+// window, over every group member: only a rider roughly in my line who is
+// actually further along blocks me from being "at the front."
 // See [[bike/bikeai#Tactical FSM]].
 // ============================================================
 void BikeGameApplication::update_paceline()
@@ -119,9 +126,11 @@ void BikeGameApplication::update_paceline()
 
 	auto is_at_front = [&](int idx) -> bool {
 		BikeObject* me = riders_sorted[idx];
-		for (int j = idx - 1; j >= 0; --j) {
-			BikeObject* other = riders_sorted[j];
+		for (BikeObject* other : riders_sorted) {
+			if (other == me) continue;
 			if (other->group_id != me->group_id) continue;
+			if (glm::abs(other->lateral_pos - me->lateral_pos) > p.wheel_lat_max) continue;
+			if (other->course_dist_m <= me->course_dist_m) continue;  // not actually ahead of me
 			BikeAI* oai = dynamic_cast<BikeAI*>(other->input.get());
 			if (!oai) return false;  // player counts as a stable wheel
 			if (oai->recovering_s > 0.f) continue;

@@ -273,11 +273,19 @@ struct BikeAIParams {
 	float corner_factor_r_full = 30.f;  // radius (m) at which corner_factor = 1
 	float corner_factor_min    = 0.3f;  // floor on corner_factor (very tight corners)
 
-	// Follower near-field lateral correction (PD-based steering converges slowly
-	// because lookahead is far; this term injects road-frame lat_err directly
-	// into steer for tight wheel-hugging). Only fires for followers.
-	float follower_lat_k       = 0.5f;  // steer per metre of lateral error from wheel's track
-	float follower_lat_d_k     = 0.2f;  // steer per (m/s) of lateral velocity (damping)
+	// Follower steering — magnetism to the wheel dominates over the leader's
+	// racing-line steer_k. follower_steer_k feeds the wheel-arc-tracking angle term;
+	// follow_anticipation_t is how far ahead (seconds) to project the wheel's own
+	// arc from its live turn_rate, so followers anticipate the wheel's line change
+	// rather than lagging it. follower_lat_k/d_k is the on-top hard-convergence PD
+	// (PD-based steering converges slowly because lookahead is far; this term
+	// injects road-frame lat_err directly into steer for tight wheel-hugging).
+	// Together these should make following dominate over independent line-following —
+	// see [[bike/bikeai#Magnetism]].
+	float follower_steer_k     = 4.0f;   // angle-to-wheel-arc gain (vs steer_k=2.0 for the leader)
+	float follow_anticipation_t = 0.5f;  // s — how far to project the wheel's own arc
+	float follower_lat_k       = 1.2f;   // steer per metre of lateral error from wheel's track
+	float follower_lat_d_k     = 0.35f;  // steer per (m/s) of lateral velocity (damping)
 
 	// Clear-air resolver — see [[bike/bikeai#Lateral offset rule]]
 	float clear_air_lat_window  = 1.0f;   // m — lateral half-window of overlap penalty

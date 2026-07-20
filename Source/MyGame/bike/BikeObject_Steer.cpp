@@ -71,7 +71,56 @@ float compute_max_steer_rad(float speed)
 }
 
 // ------------------------------------------------------------
+// AI direct-steer path.
+//
+// The player path below simulates imperfect human hands: asymmetric build/
+// release inertia, uphill wobble, crosswind gusts, bump-steer kicks, all
+// funneled through a tan()-based bicycle-geometry conversion. Layering an AI
+// controller's steer command through all of that — on top of the AI's own
+// wheel-chasing PD terms — produces weave/oscillation: noise and lag that
+// exist to simulate human error get amplified by a controller that recomputes
+// its target every frame from a moving wheel. AI riders have steady hands, so
+// they get ONE smoothing constant straight to a capped turn rate — no
+// bicycle-geometry indirection, no noise layers.
+// ------------------------------------------------------------
+static float ai_steer_smoothing_tau = 0.12f;  // s — single low-pass, no build/release asymmetry
+static float ai_max_turn_rate_dps   = 220.f;  // deg/s hard ceiling regardless of the speed-based cap
+
+static void tick_steer_ai(BikeObject& b, const BikeObject::ControlInput& ci, float dt)
+{
+	b.steer_input_raw = b.is_crashed ? 0.f : ci.steer;
+	b.current_steer   = damp_dt_independent(b.steer_input_raw, b.current_steer, ai_steer_smoothing_tau, dt);
+	b.steer_committed = b.current_steer;
+
+	// Speed-scaled turn-rate cap — same physical grounding as the player's
+	// min-turn-radius floor (tighter turns only above a minimum radius), applied
+	// directly to turn rate instead of routed through wheelbase/tan().
+	const float min_turn_r = glm::max(steer_min_radius, b.speed * b.speed * steer_radius_coeff);
+	const float speed_cap  = (min_turn_r > 0.01f) ? (b.speed / min_turn_r) : 0.f;
+	const float max_rate   = glm::min(speed_cap, glm::radians(ai_max_turn_rate_dps));
+
+	b.turn_rate = b.current_steer * max_rate;
+	const float angle = -b.turn_rate * dt;
+	b.bike_direction = glm::normalize(glm::mat3(glm::rotate(glm::mat4(1.f), angle, glm::vec3(0, 1, 0))) * b.bike_direction);
+
+	// Visual lean — same formula as the player path, derived from the resulting turn rate.
+	float target_roll = 0.f;
+	if (glm::abs(b.turn_rate) > 0.001f && b.speed > 0.1f) {
+		const float turn_r             = b.speed / glm::max(glm::abs(b.turn_rate), 0.001f);
+		const float centripetal_accel  = (b.speed * b.speed) / turn_r;
+		const float lean_speed_scale   = glm::smoothstep(0.f, 8.f, b.speed);
+		const float lean_uncapped      = atanf(centripetal_accel / BIKE_GRAVITY) * lean_speed_scale;
+		target_roll = glm::sign(b.current_steer) * glm::min(lean_uncapped, glm::radians(lean_max_deg));
+	}
+	b.current_roll = damp_dt_independent(target_roll, b.current_roll, 0.01f, dt);
+}
+
+// ------------------------------------------------------------
 // BikeObject::tick_steer
+//
+// AI riders take tick_steer_ai() above and return immediately. The rest of
+// this function (inertia, wobble, crosswind, bump steer, bicycle geometry) is
+// the player path only.
 //
 // Resolves steering inertia, uphill wobble, crosswind gusts, and bump steer
 // into current_steer.  Applies bicycle geometry to yaw bike_direction and
@@ -83,6 +132,11 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 {
 	ASSERT(dt > 0.f);
 	s_steer_debug = this;
+
+	if (dynamic_cast<BikeAI*>(input.get())) {
+		tick_steer_ai(*this, ci, dt);
+		return;
+	}
 
 	const float speed_range  = glm::max(steer_speed_gate_hi - steer_speed_gate_lo, 0.001f);
 	const float speed_factor = glm::clamp((speed - steer_speed_gate_lo) / speed_range, 0.f, 1.f);

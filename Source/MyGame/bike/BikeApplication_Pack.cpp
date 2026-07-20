@@ -159,12 +159,16 @@ float AVOID_PREDICT_T2   = 1.0f;   // s — second prediction horizon
 float AVOID_STEER_KP     = 0.8f;   // additive steer per m of predicted overlap (soft nudge)
 
 // Priority yield (hard enforcement — lower-priority yielder only)
-// Lower index in riders_sorted = further ahead = higher priority.
-// The yielder (higher index) is forbidden from steering into the higher-priority rider's zone.
+// Priority is an explicit course_dist_m comparison (with YIELD_DEADBAND_M) done
+// per-pair in update_avoidance, NOT riders_sorted array position — near-tied
+// course_dist_m (e.g. two riders mid-overtake) makes array order flicker, which
+// would otherwise flicker who yields to whom frame to frame.
+// The yielder is forbidden from steering into the higher-priority rider's zone.
 // Sign convention fix vs. old HARD_SEP: positive steer = road-LEFT, negative = road-RIGHT.
 //   Other road-right → block road-right movement → block negative steer → hard_steer_min = 0
 //   Other road-left  → block road-left movement  → block positive steer → hard_steer_max = 0
 float YIELD_LONG_RADIUS  = 3.5f;   // m — longitudinal range for yield clamp
+float YIELD_DEADBAND_M   = 0.15f;  // m — |course_dist_m gap| below this: neither yields (tie noise)
 float YIELD_OUTER_LAT    = 1.3f;   // m — engage clamp inside this lateral gap
 float YIELD_INNER_LAT    = 0.05f;  // m — disengage when already overlapping (escape)
 float YIELD_SQUEEZE_M    = 0.35f;  // m — available road width below this triggers brake
@@ -177,8 +181,11 @@ float YIELD_BRAKE_K      = 0.55f;  // brake fraction when fully squeezed
 // so gaps beyond wheel range don't just balloon forever. See [[bike/bikeai#Power]].
 // ============================================================
 
-float GAP_POWER_K         = 50.f;   // W correction per metre of gap error
-float GAP_POWER_MAX_DELTA = 250.f;  // max ±W applied on top of wheel rider's power
+// Aggressive P-gain: power is a magnetism channel too, not just steering — a
+// follower should burn matches to hold the wheel's speed rather than let the
+// gap drift and rely on steering alone to close it back up.
+float GAP_POWER_K         = 90.f;   // W correction per metre of gap error
+float GAP_POWER_MAX_DELTA = 300.f;  // max ±W applied on top of wheel rider's power
 float GAP_FREE_POWER_W    = 250.f;  // power when leader (no wheel, nobody ahead in range)
 
 void BikeGameApplication::update_gap_regulation()
@@ -200,16 +207,24 @@ void BikeGameApplication::update_gap_regulation()
 			const float correction = glm::clamp(gap_err * GAP_POWER_K,
 			                                    -GAP_POWER_MAX_DELTA, GAP_POWER_MAX_DELTA);
 			base = ai->wheel->stamina.actual_power + correction;
-		} else if (i > 0) {
-			// No wheel but not the race leader — gap to whoever's ahead exceeds wheel
-			// range (chasing a break, or trailing a group). Magnetism cohesion: pull
-			// toward them proportional to gap, weaker and longer-range than in-line
-			// gap regulation, tapering to nothing past cohesion_gap_range_m so a real
-			// breakaway can still stick.
-			const BikeObject* ahead = riders_sorted[i - 1];
-			const float gap_m = ahead->course_dist_m - me->course_dist_m;
-			if (gap_m < p.cohesion_gap_range_m) {
-				const float correction = glm::clamp(gap_m * p.cohesion_gap_power_k,
+		} else {
+			// No wheel — either the race leader (nobody ahead at all) or gap to
+			// whoever's ahead exceeds wheel range (chasing a break, or trailing a
+			// group). Find the smallest positive course_dist_m gap by explicit
+			// search — NOT "riders_sorted[i-1]": with near-tied course_dist_m
+			// (e.g. two riders mid-overtake) array adjacency can flicker between
+			// riders frame to frame, which would flicker the cohesion target too.
+			// Magnetism cohesion: pull toward whoever's nearest-ahead proportional
+			// to gap, weaker and longer-range than in-line gap regulation, tapering
+			// to nothing past cohesion_gap_range_m so a real breakaway can still stick.
+			float best_gap = 1e9f;
+			for (const BikeObject* other : riders_sorted) {
+				if (other == me) continue;
+				const float gap_m = other->course_dist_m - me->course_dist_m;
+				if (gap_m > 0.f && gap_m < best_gap) best_gap = gap_m;
+			}
+			if (best_gap < p.cohesion_gap_range_m) {
+				const float correction = glm::clamp(best_gap * p.cohesion_gap_power_k,
 				                                    0.f, p.cohesion_gap_max_delta_w);
 				base = GAP_FREE_POWER_W + correction;
 			}
