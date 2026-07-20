@@ -170,10 +170,28 @@ void BikeDebugger::on_imgui()
 		if (g_bike_app && g_bike_app->course.is_built)
 			road_hw = g_bike_app->course.sample(selected->course_dist_m).road_half_width;
 		ImGui::SliderFloat("Manual lateral offset", &selected->manual_lateral_offset, -road_hw, road_hw, "%.2f m");
-		if (BikeAI* ai = dynamic_cast<BikeAI*>(selected->input.get()))
+		if (BikeAI* ai = dynamic_cast<BikeAI*>(selected->input.get())) {
 			ImGui::Text("Offset blend: %.0f%% (0%% mid-corner, 100%% on a straight)", ai->offset_blend * 100.f);
-		else
-			ImGui::TextDisabled("Offset only affects AI riders.");
+
+			// Hard overrides — unlike the offset above, these bypass the AI's own
+			// decision-making entirely rather than biasing it. Meant for forcing
+			// one rider into an odd state (too slow, parked off-line, etc.) to see
+			// how the REST of the pack reacts — draft/separation/avoidance all key
+			// off this rider's real sensed speed/lateral_pos regardless of what's
+			// driving them, so an overridden rider is a legitimate stimulus.
+			ImGui::SeparatorText("AI Overrides (this rider only)");
+			ImGui::Checkbox("Override target speed", &selected->ai_override_speed_enabled);
+			if (selected->ai_override_speed_enabled) {
+				ImGui::SliderFloat("Target speed", &selected->ai_override_target_speed_ms, 0.f, 25.f, "%.1f m/s");
+				ImGui::SameLine();
+				ImGui::TextDisabled("(%.1f km/h)", selected->ai_override_target_speed_ms * 3.6f);
+			}
+			ImGui::Checkbox("Override lateral position", &selected->ai_override_lateral_enabled);
+			if (selected->ai_override_lateral_enabled)
+				ImGui::SliderFloat("Target lateral", &selected->ai_override_lateral_pos_m, -road_hw, road_hw, "%.2f m");
+		} else {
+			ImGui::TextDisabled("Offset/overrides only affect AI riders.");
+		}
 
 		if (ImGui::Button("Clear Selection")) {
 			selected = nullptr;

@@ -160,6 +160,65 @@ void draw_rider_debug_info(BikeObject* bo)
 			const glm::vec3 bike_pos = bo->get_ws_position();
 			const glm::vec3 bike_on_road = cur_wp.position + cur_wp.right * bo->lateral_pos;
 			Debug::add_line(bike_on_road, rl_ref, Color32(0xff, 0x33, 0x33, 0xff), -1.f);
+
+			// Upcoming braking point, if this rider is actively slowing for a corner
+			// (or a collision-avoidance yield — see the AVOIDANCE line above).
+			if (ai->dbg_brake_amount > 0.01f) {
+				const glm::vec3 brake_pt = g_bike_app->course.sample(bo->course_dist_m + ai->dbg_brake_dist_m).position;
+				Debug::add_sphere(brake_pt, 0.4f, Color32(0xff, 0x20, 0x20, 0xff), -1.f);
+				Debug::add_line(bike_pos, brake_pt, Color32(0xff, 0x20, 0x20, 0x80), -1.f);
+				Debug::add_text_ex(brake_pt + glm::vec3(0.f, 0.6f, 0.f),
+					string_format("BRAKE %.0f%%  v_max=%.1fm/s  r=%.1fm", ai->dbg_brake_amount * 100.f, ai->dbg_v_max, ai->dbg_brake_corner_r),
+					Color32(0xff, 0x20, 0x20, 0xff), 0.f, true, true, true);
+			}
+		}
+
+		// Cohesion centroid — only meaningful while cohesion is actually pulling
+		// (isolated: nearest neighbor farther than cohesion_trigger_dist_m).
+		if (ai->dbg_cohesion_offset != 0.f) {
+			Debug::add_sphere(ai->dbg_cohesion_centroid_pt, 0.3f, Color32(0x40, 0x80, 0xff, 0xff), -1.f);
+			Debug::add_line(bo->get_ws_position(), ai->dbg_cohesion_centroid_pt, Color32(0x40, 0x80, 0xff, 0xa0), -1.f);
+			Debug::add_text_ex(ai->dbg_cohesion_centroid_pt + glm::vec3(0.f, 0.4f, 0.f), "cohesion centroid",
+				Color32(0x40, 0x80, 0xff, 0xff), 0.f, true, true, true);
+		}
+
+		// --- Per-neighbor magnetism contribution: text above THEIR head, plus a
+		// colored vector from the selected rider to them, one per active term
+		// (a single neighbor can carry more than one — e.g. the draft leader is
+		// almost always the lineform leader too). See BikeAIDebugNeighbor. ---
+		for (const BikeAIDebugNeighbor& dn : ai->dbg_neighbors) {
+			if (!dn.rider) continue;
+			const bool active = dn.separation_contrib != 0.f || dn.is_draft_leader || dn.is_lineform_leader
+			                  || dn.is_cohesion_member || dn.is_avoidance_conflict;
+			if (!active) continue;
+
+			const glm::vec3 n_pos  = dn.rider->get_ws_position();
+			const glm::vec3 n_head = n_pos + glm::vec3(0.f, 1.9f, 0.f);
+			const glm::vec3 my_pos = bo->get_ws_position();
+
+			std::string label;
+			if (dn.is_avoidance_conflict) {
+				label += string_format("AVOID sev=%.2f\n", dn.avoidance_severity);
+				Debug::add_line(my_pos, n_pos, Color32(0xff, 0x20, 0x20, 0xff), -1.f);
+			}
+			if (dn.is_draft_leader) {
+				label += "DRAFT LEADER\n";
+				Debug::add_line(my_pos, n_pos, Color32(0x20, 0xff, 0x20, 0xff), -1.f);
+			} else if (dn.is_lineform_leader) {
+				label += "lineform leader\n";
+				Debug::add_line(my_pos, n_pos, Color32(0x20, 0xaa, 0x60, 0xff), -1.f);
+			}
+			if (dn.separation_contrib != 0.f) {
+				label += string_format("separation=%+.2f\n", dn.separation_contrib);
+				Debug::add_line(my_pos, n_pos, Color32(0xff, 0x90, 0x00, 0xff), -1.f);
+			}
+			if (dn.is_cohesion_member) {
+				label += "cohesion member\n";
+				Debug::add_line(my_pos, n_pos, Color32(0x40, 0x80, 0xff, 0x60), -1.f);
+			}
+			label += string_format("dist=%.1fm  long=%+.1fm  lat=%+.2fm", dn.dist, dn.long_gap, dn.lat_gap);
+
+			Debug::add_text_ex(n_head, label, COLOR_WHITE, 0.f, true, true, true);
 		}
 	}
 }

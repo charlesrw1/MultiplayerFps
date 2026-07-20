@@ -255,6 +255,24 @@ struct BikeAIParams {
 };
 extern BikeAIParams g_ai_params;
 
+// Per-neighbor breakdown of this tick's magnetism, rebuilt fresh every
+// BikeAI::evaluate() call (same lifetime as the hemisphere scan itself —
+// riders drift in/out of sense range tick to tick). Debug-only: lets
+// BikeDebugger draw exactly which sensed riders contributed what, and how
+// much, rather than just the summed totals in BikeAI::dbg_*_offset.
+struct BikeAIDebugNeighbor {
+	BikeObject* rider              = nullptr;
+	float       dist               = 0.f;
+	float       long_gap           = 0.f;  // +ve = ahead of me
+	float       lat_gap            = 0.f;  // +ve = road-right of me
+	float       separation_contrib = 0.f;  // this neighbor's own share of dbg_separation_offset (m)
+	bool        is_draft_leader    = false;  // == the rider draft_blend is locking onto
+	bool        is_lineform_leader = false;  // == the rider lineform is pulling toward (same as draft leader when both active)
+	bool        is_cohesion_member = false;  // included in this tick's cohesion centroid average
+	bool        is_avoidance_conflict = false;
+	float       avoidance_severity    = 0.f;
+};
+
 class BikeAI : public IBikeInput {
 public:
 	void evaluate(BikeObject* my_bike) final;
@@ -297,6 +315,8 @@ public:
 	bool  dbg_avoidance_active   = false;
 	float dbg_avoidance_lat_term = 0.f;  // extra target-offset delta from yielding sideways (m)
 	float dbg_avoidance_brake    = 0.f;  // extra brake_amount from an unavoidable conflict (0..1)
+	glm::vec3 dbg_cohesion_centroid_pt{};  // world-space point at the cohesion centroid lateral offset, valid iff dbg_cohesion_offset != 0
+	std::vector<BikeAIDebugNeighbor> dbg_neighbors;  // rebuilt every evaluate() — see BikeAIDebugNeighbor
 };
 
 class BikePlayer : public IBikeInput {
@@ -415,6 +435,19 @@ public:
 	// blended into the steering target on straights, blended out toward the
 	// racing line through corners (see BikeAI::evaluate / BikeAIParams).
 	float manual_lateral_offset = 0.f;
+
+	// Debug-only per-rider AI overrides (BikeDebugger's Selected Rider panel).
+	// Unlike manual_lateral_offset (a bias that still blends/fades through
+	// corners) these are hard overrides — force one AI's behavior directly so
+	// you can watch how OTHER AI react to it (draft/separation/avoidance all
+	// key off real sensed lateral_pos/speed, so an overridden rider is a
+	// legitimate stimulus for the rest of the pack), without touching global
+	// BikeAIParams which would affect every rider at once. AI-only; no effect
+	// on a player-controlled bike. See BikeAI::evaluate.
+	bool  ai_override_speed_enabled   = false;
+	float ai_override_target_speed_ms = 8.f;
+	bool  ai_override_lateral_enabled = false;
+	float ai_override_lateral_pos_m   = 0.f;  // hard target lateral offset — bypasses racing line/magnetism/draft entirely
 
 	// Group context (written by BikeGameApplication::update_groups each frame)
 	int   group_id           = 0;

@@ -76,6 +76,14 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	}
 	dbg_num_neighbors = (int)neighbors.size();
 
+	// Debug breakdown, one entry per sensed neighbor, same order/size as
+	// `neighbors` above — filled in as each magnetism term below decides its
+	// contribution. See BikeAIDebugNeighbor / BikeDebugger's selected-rider view.
+	dbg_neighbors.clear();
+	dbg_neighbors.reserve(neighbors.size());
+	for (const Neighbor& n : neighbors)
+		dbg_neighbors.push_back({ n.rider, n.dist, n.long_gap, n.lat_gap });
+
 	// ============================================================
 	// 2. Magnetism — desired lateral offset, layered on top of the racing
 	// line's own precomputed offset. Disabled via p.enable_magnetism: AI then
@@ -103,10 +111,13 @@ void BikeAI::evaluate(BikeObject* my_bike)
 		// (real 3D distance), weighted by inverse falloff. Soft/continuous —
 		// not decisive enough on its own to stop an actual overlap when someone
 		// cuts across laterally; see the collision-avoidance block below for that.
-		for (const Neighbor& n : neighbors) {
+		for (size_t i = 0; i < neighbors.size(); ++i) {
+			const Neighbor& n = neighbors[i];
 			if (n.dist >= p.separation_dist_m) continue;
 			const float weight = 1.f - n.dist / p.separation_dist_m;
-			separation_term -= glm::sign(n.lat_gap) * weight * p.separation_k;
+			const float contrib = -glm::sign(n.lat_gap) * weight * p.separation_k;
+			separation_term += contrib;
+			dbg_neighbors[i].separation_contrib = contrib;
 		}
 		target_offset_delta += separation_term;
 
@@ -115,14 +126,18 @@ void BikeAI::evaluate(BikeObject* my_bike)
 		// BikeAIParams::draft_follow_k. Computed here (not as a target_offset_delta
 		// term) because "adopt their line" and "nudge toward their line" are
 		// different operations; strengthens as the gap closes.
-		if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m)
+		if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m) {
 			draft_blend = glm::clamp(1.f - nearest_ahead->long_gap / p.draft_dist_m, 0.f, 1.f) * p.draft_follow_k;
+			dbg_neighbors[nearest_ahead - neighbors.data()].is_draft_leader = (draft_blend > 0.f);
+		}
 
 		// Line formation: smaller, always-on pull toward alignment with the nearest
 		// forward neighbor (any range within the sense hemisphere), so riders settle
 		// into a single-file line even before they're close enough to draft.
-		if (nearest_ahead)
+		if (nearest_ahead) {
 			lineform_term = -nearest_ahead->lat_gap * p.lineformation_k;
+			dbg_neighbors[nearest_ahead - neighbors.data()].is_lineform_leader = true;
+		}
 		target_offset_delta += lineform_term;
 
 		// Cohesion: only when isolated (nearest neighbor farther than the trigger
@@ -137,6 +152,9 @@ void BikeAI::evaluate(BikeObject* my_bike)
 				for (const Neighbor& n : neighbors) centroid_lat += n.lat_gap;
 				centroid_lat /= (float)neighbors.size();
 				cohesion_term = centroid_lat * p.cohesion_k;
+				for (BikeAIDebugNeighbor& dn : dbg_neighbors) dn.is_cohesion_member = true;
+				const BikeWaypoint wp_centroid = course->sample(my_bike->course_dist_m);
+				dbg_cohesion_centroid_pt = wp_centroid.position + wp_centroid.right * (my_bike->lateral_pos + centroid_lat);
 			}
 		}
 		target_offset_delta += cohesion_term;
@@ -160,6 +178,9 @@ void BikeAI::evaluate(BikeObject* my_bike)
 		}
 		float avoidance_lat_term = 0.f;
 		if (conflict) {
+			BikeAIDebugNeighbor& dn_conflict = dbg_neighbors[conflict - neighbors.data()];
+			dn_conflict.is_avoidance_conflict = true;
+			dn_conflict.avoidance_severity    = conflict_severity;
 			// Prefer yielding sideways, away from the conflicting neighbor.
 			// Room check: the resulting lateral position must stay on the
 			// road, and no OTHER sensed neighbor at a similar longitudinal
@@ -216,9 +237,12 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// (locked onto the leader's wheel) this fully overrides the racing-line
 	// target with their actual lateral_pos — that's the point of drafting,
 	// sitting where they are rather than where the ideal line says to be.
-	const float target_lat_raw = (nearest_ahead)
-	    ? glm::mix(racing_line_target_raw, nearest_ahead->rider->lateral_pos, draft_blend)
-	    : racing_line_target_raw;
+	// Debug lateral override: hard-pin the target, bypassing racing line,
+	// magnetism, and draft entirely — see BikeObject::ai_override_lateral_enabled.
+	const float target_lat_raw = my_bike->ai_override_lateral_enabled
+	    ? my_bike->ai_override_lateral_pos_m
+	    : (nearest_ahead ? glm::mix(racing_line_target_raw, nearest_ahead->rider->lateral_pos, draft_blend)
+	                      : racing_line_target_raw);
 	const float target_lat = glm::clamp(target_lat_raw, -lat_limit, lat_limit);
 	dbg_clamped           = (target_lat != target_lat_raw);
 	dbg_target_lat_offset = target_lat;
@@ -295,11 +319,22 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	//    power. Otherwise, PID-track the nearest drafting neighbor's speed
 	//    (with a P-term gap correction) so followers actively burn matches to
 	//    hold the wheel rather than just relying on steering/shift alone.
+	//    Debug override (BikeObject::ai_override_speed_enabled) replaces
+	//    whichever target this tick would otherwise have picked.
 	// ============================================================
 	float power;
-	if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m) {
-		const float gap_err     = nearest_ahead->long_gap - (p.draft_dist_m * 0.4f);
-		const float target_speed = nearest_ahead->rider->speed + glm::clamp(gap_err * 0.5f, -3.f, 3.f);
+	bool  have_speed_target = false;
+	float target_speed      = 0.f;
+	if (my_bike->ai_override_speed_enabled) {
+		have_speed_target = true;
+		target_speed      = my_bike->ai_override_target_speed_ms;
+	} else if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m) {
+		const float gap_err = nearest_ahead->long_gap - (p.draft_dist_m * 0.4f);
+		have_speed_target = true;
+		target_speed      = nearest_ahead->rider->speed + glm::clamp(gap_err * 0.5f, -3.f, 3.f);
+	}
+
+	if (have_speed_target) {
 		dbg_target_speed = target_speed;
 
 		const float speed_error = target_speed - speed;
