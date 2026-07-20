@@ -161,9 +161,12 @@ void draw_rider_debug_info(BikeObject* bo)
 			const glm::vec3 bike_on_road = cur_wp.position + cur_wp.right * bo->lateral_pos;
 			Debug::add_line(bike_on_road, rl_ref, Color32(0xff, 0x33, 0x33, 0xff), -1.f);
 
-			// Upcoming braking point, if this rider is actively slowing for a corner
-			// (or a collision-avoidance yield — see the AVOIDANCE line above).
-			if (ai->dbg_brake_amount > 0.01f) {
+			// Upcoming braking point — only when a corner is actually the reason
+			// (dbg_brake_dist_m is reset to 0 every tick no corner demands
+			// braking, see BikeAI::evaluate section 3). Braking from collision
+			// avoidance alone has no "point ahead" to mark — its own AVOID line
+			// (drawn per-neighbor below) already shows what's being avoided.
+			if (ai->dbg_brake_dist_m > 0.f) {
 				const glm::vec3 brake_pt = g_bike_app->course.sample(bo->course_dist_m + ai->dbg_brake_dist_m).position;
 				Debug::add_sphere(brake_pt, 0.4f, Color32(0xff, 0x20, 0x20, 0xff), -1.f);
 				Debug::add_line(bike_pos, brake_pt, Color32(0xff, 0x20, 0x20, 0x80), -1.f);

@@ -290,6 +290,15 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float max_decel = 0.8f * 7.f * my_bike->surface_traction;
 	float brake_amount = 0.f;
 	dbg_v_max = glm::sqrt(p.corner_speed_k * 9.81f * min_r * my_bike->surface_traction);
+	// Reset every tick, not just when the loop below finds a new worst corner:
+	// these fields only get written inside "if (frac > brake_amount)", so if no
+	// corner needs braking this tick they'd otherwise keep holding whatever
+	// stale point they last pointed at (maybe a lap ago) — and the debug
+	// overlay draws a sphere there whenever brake_amount > 0, including from
+	// collision-avoidance braking alone, making it look like it's pointing at
+	// a random, unrelated spot on the track.
+	dbg_brake_dist_m   = 0.f;
+	dbg_brake_corner_r = 0.f;
 
 	for (int i = 0; i < BRAKE_SCAN_STEPS; ++i) {
 		const float d_near = i * BRAKE_SCAN_STEP_M;
