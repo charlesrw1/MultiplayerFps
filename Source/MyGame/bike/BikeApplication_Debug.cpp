@@ -79,7 +79,8 @@ void snapshot_restore()
 		bo->lateral_pos     = snap.lateral_pos;
 		bo->course_segment  = snap.course_segment;
 		// Reset transient physics state so the bike doesn't carry over a spin
-		bo->current_steer   = 0.f;
+		bo->current_steer     = 0.f;
+		bo->heading_turn_rate = 0.f;
 	}
 }
 

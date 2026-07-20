@@ -24,8 +24,11 @@
 static float bike_gear_shift_cooldown = 3.f;
 
 // Worldspace steering — see tick_transform. Declared extern in BikeObject_Local.h.
-float bike_heading_max_offset_deg = 45.f;   // max heading deviation from track tangent at |ci.lateral_shift|=1
-float bike_heading_turn_rate_dps  = 180.f;  // max rate bike_direction turns to close that deviation
+float bike_heading_max_offset_deg  = 45.f;   // max heading deviation from track tangent at |ci.lateral_shift|=1
+float bike_heading_turn_rate_dps   = 180.f;  // max angular velocity the heading can turn at, independent of speed
+float bike_heading_turn_accel_dps2 = 400.f;  // max angular acceleration — momentum: how fast turn rate builds/decays
+float bike_heading_rate_kp         = 8.f;    // target turn rate (pre-clamp) per radian of heading error
+float bike_min_turn_radius_m       = 2.5f;   // physical curvature limit — max turn rate is also capped at speed/this
 
 static BikeObject* s_bike_debug = nullptr;  // set each tick for debug menu
 
@@ -180,9 +183,13 @@ void BikeObject::tick_gears(float dt)
 // See [[bike/bikeai#Worldspace steering]].
 //
 // ci.lateral_shift is the only lateral control: it bends bike_direction away
-// from the track tangent (toward wp.right for +ve), rate-limited so it turns
-// rather than snaps. There is no hard clamp keeping the bike on the road
-// surface anymore (that was a rail-space guarantee) — staying on track is now
+// from the track tangent (toward wp.right for +ve). heading_turn_rate is
+// persistent angular momentum, not a rate-capped snap — it accelerates
+// toward a target turn rate at a capped angular acceleration, and that
+// target rate is itself capped by the bike's physical curvature limit
+// (speed / bike_min_turn_radius_m), so slow riders can't out-turn their own
+// geometry. There is no hard clamp keeping the bike on the road surface
+// anymore (that was a rail-space guarantee) — staying on track is now
 // entirely the AI's job, via how aggressively it closes the lateral error.
 // ------------------------------------------------------------
 void BikeObject::tick_transform(const ControlInput& ci, float dt)
@@ -207,19 +214,35 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	const float heading_offset_rad = steer_cmd * glm::radians(bike_heading_max_offset_deg);
 	const glm::vec3 desired_heading = glm::normalize(wp_here.forward + wp_here.right * glm::tan(heading_offset_rad));
 
-	// Signed angle (about world up) from bike_direction to desired_heading,
-	// rate-capped so the heading turns rather than snaps onto it.
+	// Signed angle (about world up) from bike_direction to desired_heading.
 	const float angle_to_target = std::atan2(glm::dot(glm::vec3(0, 1, 0), glm::cross(bike_direction, desired_heading)),
 	                                          glm::dot(bike_direction, desired_heading));
-	const float max_turn_delta  = glm::radians(bike_heading_turn_rate_dps) * dt;
-	const float turn_delta      = glm::clamp(angle_to_target, -max_turn_delta, max_turn_delta);
+
+	// Max achievable turn rate: the flat cap, further limited by the bike's
+	// physical curvature limit (a real bike can't out-turn its own geometry —
+	// turn rate at a given curvature is speed/radius, so slower riders turn
+	// slower even if the flat cap would allow more).
+	const float max_omega_flat      = glm::radians(bike_heading_turn_rate_dps);
+	const float max_omega_curvature = (bike_min_turn_radius_m > 0.01f) ? (speed / bike_min_turn_radius_m) : max_omega_flat;
+	const float max_omega           = glm::min(max_omega_flat, max_omega_curvature);
+
+	// Second-order heading control: target turn rate is proportional to the
+	// angle error, but heading_turn_rate (persistent angular velocity, real
+	// momentum) can only approach it at a capped angular acceleration — the
+	// heading visibly spins up and coasts down instead of snapping onto a
+	// rate-capped track every tick.
+	const float target_turn_rate = glm::clamp(angle_to_target * bike_heading_rate_kp, -max_omega, max_omega);
+	const float max_turn_accel   = glm::radians(bike_heading_turn_accel_dps2);
+	const float rate_delta       = glm::clamp(target_turn_rate - heading_turn_rate, -max_turn_accel * dt, max_turn_accel * dt);
+	heading_turn_rate = glm::clamp(heading_turn_rate + rate_delta, -max_omega, max_omega);
+
 	bike_direction = glm::normalize(glm::vec3(
-	    glm::rotate(glm::mat4(1.f), turn_delta, glm::vec3(0, 1, 0)) * glm::vec4(bike_direction, 0.f)));
+	    glm::rotate(glm::mat4(1.f), heading_turn_rate * dt, glm::vec3(0, 1, 0)) * glm::vec4(bike_direction, 0.f)));
 
 	// ---- Steering debug (on-screen overlay, draw_rider_debug_info) ----
 	dbg_steer_cmd                  = steer_cmd;
 	dbg_desired_heading_offset_deg = glm::degrees(heading_offset_rad);
-	dbg_turn_rate_dps              = glm::degrees(turn_delta) / dt;
+	dbg_turn_rate_dps              = glm::degrees(heading_turn_rate);
 	{
 		const float actual_angle = std::atan2(glm::dot(glm::vec3(0, 1, 0), glm::cross(wp_here.forward, bike_direction)),
 		                                       glm::dot(wp_here.forward, bike_direction));
@@ -391,8 +414,11 @@ static void bike_transform_debug()
 	}
 	ImGui::SeparatorText("Worldspace Steering");
 	{
-		ImGui::DragFloat("bike_heading_max_offset_deg", &bike_heading_max_offset_deg, 0.5f, 5.f,  80.f);
-		ImGui::DragFloat("bike_heading_turn_rate_dps",   &bike_heading_turn_rate_dps,  1.f,  10.f, 400.f);
+		ImGui::DragFloat("bike_heading_max_offset_deg",  &bike_heading_max_offset_deg,  0.5f, 5.f,  80.f);
+		ImGui::DragFloat("bike_heading_turn_rate_dps",   &bike_heading_turn_rate_dps,   1.f,  10.f, 400.f);
+		ImGui::DragFloat("bike_heading_turn_accel_dps2", &bike_heading_turn_accel_dps2, 5.f,  20.f, 2000.f);
+		ImGui::DragFloat("bike_heading_rate_kp",         &bike_heading_rate_kp,         0.2f, 0.5f, 30.f);
+		ImGui::DragFloat("bike_min_turn_radius_m",       &bike_min_turn_radius_m,       0.1f, 0.5f, 15.f);
 	}
 }
 ADD_TO_DEBUG_MENU(bike_transform_debug);

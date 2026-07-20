@@ -316,6 +316,7 @@ public:
 	glm::vec3 terrain_forward_dir  = {0,0,1};   // terrain-aligned forward from last raycast
 
 	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);  // actual steered heading (worldspace-authoritative) — used for sensing/wind/probe placement, never smoothed
+	float heading_turn_rate  = 0.f;  // rad/s, persists tick to tick — the bike's actual angular momentum while steering (see BikeObject::tick_transform)
 	glm::vec3 visual_heading = glm::vec3(0.f, 0, 1.f);  // low-passed toward actual velocity direction (forward + lateral); drives render orientation only, see tick_transform
 	float speed = 0.f;
 	float speed_smoothed = 0.f; // low-pass filtered speed, used for gear cadence checks
