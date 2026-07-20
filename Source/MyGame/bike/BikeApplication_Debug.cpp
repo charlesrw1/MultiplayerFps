@@ -102,15 +102,30 @@ void draw_rider_debug_info(BikeObject* bo)
 	if (!bo) return;
 	BikePlayer* bp = dynamic_cast<BikePlayer*>(bo->input.get());
 	BikeAI*     ai = dynamic_cast<BikeAI*>(bo->input.get());
+
+	// Worldspace velocity vector, drawn from the rider's (approximate) head
+	// position — bike_direction*speed is the true integrated velocity, see
+	// BikeObject::tick_transform.
+	{
+		const glm::vec3 head_pos   = bo->get_ws_position() + glm::vec3(0.f, 1.5f, 0.f);
+		const glm::vec3 world_vel  = bo->bike_direction * bo->speed;
+		Debug::add_line(head_pos, head_pos + world_vel, Color32(0xff, 0x00, 0xff, 0xff), -1.f);
+		Debug::add_text_ex(head_pos + glm::vec3(0.f, 0.3f, 0.f),
+			string_format("vel: (%.2f, %.2f, %.2f)  |v|=%.2fm/s", world_vel.x, world_vel.y, world_vel.z, bo->speed),
+			Color32(0xff, 0x00, 0xff, 0xff), 0.f, true, true, true);
+	}
+
 	if (bp) {
 		GameplayStatic::debug_text(string_format("[Player] steer_final:   %.2f", bp->dbg_steer_final));
+		GameplayStatic::debug_text(string_format("[Steer] cur_lat=%+.2fm  cmd=%+.2f", bo->lateral_pos, bo->dbg_steer_cmd));
+		GameplayStatic::debug_text(string_format("[Steer] heading target=%+.1fdeg  actual=%+.1fdeg", bo->dbg_desired_heading_offset_deg, bo->dbg_heading_offset_deg));
+		GameplayStatic::debug_text(string_format("[Steer] turn_rate=%+.0fdeg/s", bo->dbg_turn_rate_dps));
 	} else if (ai) {
 		// --- Mode and path-following breakdown ---
 		GameplayStatic::debug_text(string_format("[AI] spd=%.1fm/s  neighbors=%d  min_r=%.1fm%s",
 			bo->speed, ai->dbg_num_neighbors, ai->dbg_min_r, ai->dbg_clamped ? "  CLAMPED" : ""));
-		GameplayStatic::debug_text(string_format("[AI] lat_target=%+.2f  cohesion=%+.2f  separation=%+.2f  draft=%+.2f  lineform=%+.2f  shift=%+.2f",
-			ai->dbg_target_lat_offset, ai->dbg_cohesion_offset, ai->dbg_separation_offset,
-			ai->dbg_draft_offset, ai->dbg_lineform_offset, ai->dbg_lateral_shift));
+		GameplayStatic::debug_text(string_format("[AI] cohesion=%+.2f  separation=%+.2f", ai->dbg_cohesion_offset, ai->dbg_separation_offset));
+		GameplayStatic::debug_text(string_format("[AI] draft=%+.2f  lineform=%+.2f", ai->dbg_draft_offset, ai->dbg_lineform_offset));
 		// Upcoming corner: distance, radius, safe speed, brake demand
 		if (ai->dbg_brake_dist_m > 0.f)
 			GameplayStatic::debug_text(string_format("[AI] corner in %.0fm  r=%.1fm  v_max=%.1fm/s  brake=%.2f",
@@ -118,8 +133,13 @@ void draw_rider_debug_info(BikeObject* bo)
 		else
 			GameplayStatic::debug_text(string_format("[AI] corner: clear for %.0fm",
 				(float)(ai->BRAKE_SCAN_STEPS * ai->BRAKE_SCAN_STEP_M)));
-		GameplayStatic::debug_text(string_format("[AI] steer_final=%+.2f  target_speed=%.1fm/s  power=%.0fW",
-			ai->dbg_steer_final, ai->dbg_target_speed, ai->dbg_power_final));
+		GameplayStatic::debug_text(string_format("[AI] target_speed=%.1fm/s  power=%.0fW", ai->dbg_target_speed, ai->dbg_power_final));
+
+		// --- Steering breakdown ---
+		GameplayStatic::debug_text(string_format("[Steer] cur_lat=%+.2fm  lat_target=%+.2fm", bo->lateral_pos, ai->dbg_target_lat_offset));
+		GameplayStatic::debug_text(string_format("[Steer] lat_err=%+.2fm  cmd=%+.2f", ai->dbg_target_lat_offset - bo->lateral_pos, bo->dbg_steer_cmd));
+		GameplayStatic::debug_text(string_format("[Steer] heading target=%+.1fdeg  actual=%+.1fdeg", bo->dbg_desired_heading_offset_deg, bo->dbg_heading_offset_deg));
+		GameplayStatic::debug_text(string_format("[Steer] turn_rate=%+.0fdeg/s", bo->dbg_turn_rate_dps));
 
 		// --- Visual overlays for selected AI ---
 		// Lookahead point + line
@@ -217,7 +237,6 @@ static void bike_course_debug()
 	{
 		BikeAIParams& p = g_ai_params;
 		ImGui::Checkbox("enable_magnetism (off = follow path only)", &p.enable_magnetism);
-		ImGui::Checkbox("force_racing_line (debug: snap onto racing line)", &p.force_racing_line);
 		ImGui::DragFloat("cohesion_k",              &p.cohesion_k,              0.02f, 0.f, 3.f,  "%.2f");
 		ImGui::DragFloat("cohesion_trigger_dist_m", &p.cohesion_trigger_dist_m, 0.2f,  0.f, 30.f, "%.1f");
 		ImGui::DragFloat("separation_k",            &p.separation_k,            0.05f, 0.f, 5.f,  "%.2f");

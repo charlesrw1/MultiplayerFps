@@ -23,6 +23,10 @@
 // Gear shift cooldown
 static float bike_gear_shift_cooldown = 3.f;
 
+// Worldspace steering — see tick_transform. Declared extern in BikeObject_Local.h.
+float bike_heading_max_offset_deg = 45.f;   // max heading deviation from track tangent at |ci.lateral_shift|=1
+float bike_heading_turn_rate_dps  = 180.f;  // max rate bike_direction turns to close that deviation
+
 static BikeObject* s_bike_debug = nullptr;  // set each tick for debug menu
 
 // ============================================================
@@ -166,11 +170,20 @@ void BikeObject::tick_gears(float dt)
 }
 
 // ------------------------------------------------------------
-// Rail movement: course_dist_m/lateral_pos are the authoritative position —
-// world position and bike_direction are derived FROM them every tick, never
-// the reverse. This guarantees a bike can never point off-track (heading is
-// always the sampled track tangent) or leave the road surface (lateral_pos is
-// hard-clamped to the road half-width). See [[bike/bikeai#Rail movement]].
+// Worldspace movement: worldspace position is authoritative — it integrates
+// from bike_direction*speed every tick, never resampled from the course rail.
+// course_dist_m/lateral_pos are DERIVED each tick (course->project of the new
+// position) for AI targeting / braking lookahead / lean-vs-curvature; they
+// feed back into nothing but next tick's projection window hint. This means
+// track-parametrization quirks (fillet seams, uneven waypoint spacing) can no
+// longer teleport the bike sideways in corners — only real steering moves it.
+// See [[bike/bikeai#Worldspace steering]].
+//
+// ci.lateral_shift is the only lateral control: it bends bike_direction away
+// from the track tangent (toward wp.right for +ve), rate-limited so it turns
+// rather than snaps. There is no hard clamp keeping the bike on the road
+// surface anymore (that was a rail-space guarantee) — staying on track is now
+// entirely the AI's job, via how aggressively it closes the lateral error.
 // ------------------------------------------------------------
 void BikeObject::tick_transform(const ControlInput& ci, float dt)
 {
@@ -182,38 +195,48 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	// terrain height change), not a reconstruction from rail-space components.
 	const glm::vec3 prev_ws_pos = get_owner()->get_ws_position();
 
-	// Advance arc-length by speed, wrapping/clamping exactly like BikeCourse::sample.
-	float new_dist = course_dist_m + speed * dt;
-	if (course->is_loop && course->total_length_m > 0.f) {
-		new_dist = std::fmod(new_dist, course->total_length_m);
-		if (new_dist < 0.f) new_dist += course->total_length_m;
-	} else {
-		new_dist = glm::clamp(new_dist, 0.f, course->total_length_m);
-	}
-	course_dist_m = new_dist;
-
-	// Lateral shift — the only lateral control. Rate-capped "shimmy" for line
-	// changes; never rotates bike_direction. See [[bike/bikeai#Lateral shift]].
-	const float lateral_pos_before = lateral_pos;
-	lateral_pos += glm::clamp(ci.lateral_shift, -1.f, 1.f) * BIKE_MAX_LATERAL_SHIFT_MPS * dt;
-
-	const BikeWaypoint wp = course->sample(course_dist_m);
-	course_segment = course->segment_at(course_dist_m);
-
-	// Hard clamp: lateral_pos can never put the bike off the road surface.
-	const float edge_margin = 0.15f;
-	const float lat_limit   = glm::max(wp.road_half_width - edge_margin, 0.05f);
-	lateral_pos = glm::clamp(lateral_pos, -lat_limit, lat_limit);
-	lateral_vel = (dt > 1e-6f) ? (lateral_pos - lateral_pos_before) / dt : 0.f;
-
+	// ---- Heading: track tangent bent by the steer command ----
 	// NOTE: wp.right (BikeCourse's cross(WORLD_UP, forward) convention) is the
 	// exact opposite handedness of this file's own cross(bike_direction, up)
 	// "right" used below for the orientation basis. Positive ci.steer/lean is
 	// tuned against THIS file's convention (see tick_steer), so callers
 	// feeding ci.steer from ci.lateral_shift must negate it — see BikeAI.cpp /
 	// BikePlayer::evaluate.
-	glm::vec3 pos = wp.position + wp.right * lateral_pos;
-	bike_direction = wp.forward;
+	const BikeWaypoint wp_here     = course->sample(course_dist_m);
+	const float steer_cmd          = glm::clamp(ci.lateral_shift, -1.f, 1.f);
+	const float heading_offset_rad = steer_cmd * glm::radians(bike_heading_max_offset_deg);
+	const glm::vec3 desired_heading = glm::normalize(wp_here.forward + wp_here.right * glm::tan(heading_offset_rad));
+
+	// Signed angle (about world up) from bike_direction to desired_heading,
+	// rate-capped so the heading turns rather than snaps onto it.
+	const float angle_to_target = std::atan2(glm::dot(glm::vec3(0, 1, 0), glm::cross(bike_direction, desired_heading)),
+	                                          glm::dot(bike_direction, desired_heading));
+	const float max_turn_delta  = glm::radians(bike_heading_turn_rate_dps) * dt;
+	const float turn_delta      = glm::clamp(angle_to_target, -max_turn_delta, max_turn_delta);
+	bike_direction = glm::normalize(glm::vec3(
+	    glm::rotate(glm::mat4(1.f), turn_delta, glm::vec3(0, 1, 0)) * glm::vec4(bike_direction, 0.f)));
+
+	// ---- Steering debug (on-screen overlay, draw_rider_debug_info) ----
+	dbg_steer_cmd                  = steer_cmd;
+	dbg_desired_heading_offset_deg = glm::degrees(heading_offset_rad);
+	dbg_turn_rate_dps              = glm::degrees(turn_delta) / dt;
+	{
+		const float actual_angle = std::atan2(glm::dot(glm::vec3(0, 1, 0), glm::cross(wp_here.forward, bike_direction)),
+		                                       glm::dot(wp_here.forward, bike_direction));
+		dbg_heading_offset_deg = glm::degrees(actual_angle);
+	}
+
+	// ---- Position: integrate worldspace velocity directly ----
+	glm::vec3 pos = prev_ws_pos + bike_direction * speed * dt;
+
+	// ---- Re-derive rail state from the new worldspace position ----
+	const float lateral_pos_before = lateral_pos;
+	float new_lateral = lateral_pos;
+	int   new_segment = course_segment;
+	course_dist_m  = course->project(pos, &new_lateral, &new_segment, course_dist_m);
+	lateral_pos    = new_lateral;
+	course_segment = new_segment;
+	lateral_vel    = (dt > 1e-6f) ? (lateral_pos - lateral_pos_before) / dt : 0.f;
 
 	// Terrain raycasts
 	// The fork rotates around the head-tube hinge, not the bike origin.
@@ -365,6 +388,11 @@ static void bike_transform_debug()
 		ImGui::DragFloat("bar_visual_lean_min", &bar_visual_lean_min, 0.02f, 0.f,  1.f);
 		ImGui::DragFloat("bar_lean_fade_lo",    &bar_lean_fade_lo,    0.01f, 0.f,  1.f);
 		ImGui::DragFloat("bar_lean_fade_hi",    &bar_lean_fade_hi,    0.01f, 0.f,  1.f);
+	}
+	ImGui::SeparatorText("Worldspace Steering");
+	{
+		ImGui::DragFloat("bike_heading_max_offset_deg", &bike_heading_max_offset_deg, 0.5f, 5.f,  80.f);
+		ImGui::DragFloat("bike_heading_turn_rate_dps",   &bike_heading_turn_rate_dps,  1.f,  10.f, 400.f);
 	}
 }
 ADD_TO_DEBUG_MENU(bike_transform_debug);

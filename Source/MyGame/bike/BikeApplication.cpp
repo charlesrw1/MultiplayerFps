@@ -228,9 +228,9 @@ BikeObject* BikeGameApplication::create_player(glm::vec3 pos)
 	auto bo = e->create_component<BikeObject>();
 	bo->input  = std::make_unique<BikePlayer>();
 	bo->course = &course;
-	// One-time projection: seeds the rail-authoritative course_dist_m/lateral_pos
-	// from the spawn world position. Never called again after this — position is
-	// derived FROM these fields from here on (see BikeObject::tick_transform).
+	// One-time projection: seeds the derived course_dist_m/lateral_pos from the
+	// spawn world position (worldspace position is authoritative from here on;
+	// these fields are re-derived from it every tick — see BikeObject::tick_transform).
 	if (course.is_built)
 		bo->course_dist_m = course.project(pos, &bo->lateral_pos, &bo->course_segment);
 	all_riders.push_back(bo);
@@ -252,8 +252,8 @@ BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 		bo->input = std::move(ai);
 	}
 
-	// One-time projection: seeds the rail-authoritative course_dist_m/lateral_pos
-	// from the spawn world position (see note in create_player).
+	// One-time projection: seeds the derived course_dist_m/lateral_pos from the
+	// spawn world position (see note in create_player).
 	if (course.is_built)
 		bo->course_dist_m = course.project(pos, &bo->lateral_pos, &bo->course_segment);
 

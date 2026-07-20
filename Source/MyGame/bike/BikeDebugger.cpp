@@ -99,7 +99,7 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 			const char* text = string_format("neighbors=%d%s", ai->dbg_num_neighbors,
 				ai->dbg_clamped ? " CLAMPED" : "");
 
-			Debug::add_text(r->get_ws_position() + glm::vec3(0.f, 1.5f, 0.f), text, COLOR_WHITE, 0.f, true);
+			Debug::add_text_ex(r->get_ws_position() + glm::vec3(0.f, 1.5f, 0.f), text, COLOR_WHITE, 0.f,true,true, true);
 		}
 	}
 }

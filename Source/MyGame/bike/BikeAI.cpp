@@ -13,14 +13,18 @@
 extern BikeGameApplication* g_bike_app;
 
 // ============================================================
-// BikeAI::evaluate — the one magnetism layer.
+// BikeAI::evaluate
 //
-// Heading is never driven directly — bike_direction always equals the track
-// tangent (see BikeObject::tick_transform's rail movement). The AI's only
-// lateral control surface is a target lateral position on the course:
-// the racing line's precomputed offset, adjusted by pack-behavior magnetism
-// (cohesion/separation/draft/line-formation), converted into ci.lateral_shift,
-// a rate-capped sideways translation. See [[bike/bikeai]].
+// Target lateral position = the racing line's precomputed offset, adjusted by
+// pack-behavior magnetism (cohesion/separation/draft/line-formation; off by
+// default via p.enable_magnetism while worldspace steering is being tuned —
+// see BikeAIParams). The AI computes its current lateral offset (derived each
+// tick from the worldspace position, BikeObject::tick_transform) and
+// aggressively P-controls ci.lateral_shift to close the error. ci.lateral_shift
+// bends bike_direction toward the target rather than translating a rail
+// position, so position always integrates in worldspace — corner-parametrization
+// quirks (fillet seams, uneven waypoint spacing) get smoothed out instead of
+// yanking the bike sideways. See [[bike/bikeai]].
 // ============================================================
 
 void BikeAI::evaluate(BikeObject* my_bike)
@@ -83,7 +87,7 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	float lineform_term   = 0.f;
 	float cohesion_term   = 0.f;
 
-	if (p.enable_magnetism && !p.force_racing_line) {
+	if (p.enable_magnetism) {
 		// Separation: push away from any neighbor closer than separation_dist_m
 		// (real 3D distance), weighted by inverse falloff.
 		for (const Neighbor& n : neighbors) {
@@ -141,22 +145,14 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float lateral_shift = glm::clamp(lat_error * p.lateral_shift_kp, -1.f, 1.f);
 	dbg_lateral_shift = lateral_shift;
 
-	// ci.steer no longer commands heading, and no longer drives roll/lean
-	// either (BikeObject::tick_steer computes that from the track's own
-	// curvature now, so it's correct even under force_racing_line below).
-	// This only drives cosmetic fork/handlebar twist. Negated because
-	// physical lateral movement follows wp.right (BikeObject::tick_transform),
-	// the exact opposite handedness of the engine's own cross(bike_direction,
-	// up) "right" the fork-twist math is built on — negating keeps the fork
-	// turned toward the side the bike is actually moving to.
+	// ci.steer doesn't command heading either — it only drives cosmetic
+	// fork/handlebar twist (BikeObject::tick_steer computes roll/lean from the
+	// track's own curvature, not from this). Negated because physical lateral
+	// movement follows wp.right (BikeObject::tick_transform), the exact
+	// opposite handedness of the engine's own cross(bike_direction, up)
+	// "right" the fork-twist math is built on — negating keeps the fork
+	// turned toward the side the bike is actually steering to.
 	dbg_steer_final = -lateral_shift;
-
-	// Debug override: snap straight onto the racing line every tick, bypassing
-	// magnetism and the normal rate-capped approach entirely (position only —
-	// lateral_shift above still drives cosmetic roll/lean). For isolating
-	// whether a handling problem is in the racing line itself vs. the pack layer.
-	if (p.force_racing_line)
-		my_bike->lateral_pos = target_lat;
 
 	// ============================================================
 	// 3. Corner braking — lookahead safety scan, unchanged in spirit.
@@ -214,9 +210,7 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// ---- Fill ControlInput ----
 	BikeObject::ControlInput ci;
 	ci.steer         = -lateral_shift;  // cosmetic lean only, see note above (sign flipped vs. lateral_shift)
-	// force_racing_line already snapped lateral_pos directly above — zero the
-	// physical shift command so tick_transform doesn't move it again on top.
-	ci.lateral_shift = p.force_racing_line ? 0.f : lateral_shift;
+	ci.lateral_shift = lateral_shift;
 	ci.brake_amount  = brake_amount;
 	ci.power         = (brake_amount > 0.1f) ? 0.f : power;
 

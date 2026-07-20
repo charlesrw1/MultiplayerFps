@@ -151,9 +151,9 @@ extern WindSystem g_wind;
 //
 // ONE layer: speed PID (power) + boids-style magnetism (cohesion/separation/
 // draft/line-formation, layered on the racing line's own offset) -> a target
-// lateral position -> lateral_shift, a rate-capped sideways translation.
-// Heading is never AI-controlled — bike_direction always equals the track
-// tangent (see BikeObject::tick_transform). See [[bike/bikeai]].
+// lateral position -> lateral_shift, which BikeObject::tick_transform turns
+// into a heading correction (worldspace-authoritative steering, not a rail
+// translation). See [[bike/bikeai]].
 // ============================================================
 struct BikeAIParams {
 	// ---- Corner braking (lookahead safety scan, not a magnetism term) ----
@@ -173,8 +173,7 @@ struct BikeAIParams {
 	float sense_half_angle_deg = 100.f; // deg — forward cone half-angle
 
 	// ---- Magnetism: desired lateral offset (m, road/wheel frame) ----
-	bool  enable_magnetism         = true;  // if false, lateral_shift is never commanded — AI just follows the racing line
-	bool  force_racing_line        = false; // debug: snap lateral_pos onto the racing line every tick, bypassing magnetism entirely
+	bool  enable_magnetism         = false; // off while worldspace steering is being tuned — AI just tracks the racing line
 	float cohesion_k               = 0.5f;  // pull toward neighbor centroid beyond this range
 	float cohesion_trigger_dist_m  = 6.f;   // only cohere if nearest neighbor farther than this
 	float separation_k             = 1.2f;  // push away from neighbors closer than separation_dist_m
@@ -184,7 +183,8 @@ struct BikeAIParams {
 	float lineformation_k          = 0.35f; // always-on bias toward zero lateral offset from neighbors' track
 
 	// ---- Lateral shift — converts target lateral offset into ci.lateral_shift ----
-	// Command is clamped to [-1,1] and scaled by BIKE_MAX_LATERAL_SHIFT_MPS (physics layer).
+	// Command is clamped to [-1,1]; BikeObject::tick_transform maps it onto a
+	// heading offset (bike_heading_max_offset_deg) from the track tangent.
 	float lateral_shift_kp = 1.5f;  // shift command (pre-clamp) per metre of offset error
 
 	// ---- Off-track hard clamp ----
@@ -287,7 +287,7 @@ public:
 	struct ControlInput {
 		float aero_coeff = 0.0;	// determied by stance
 		float steer = 0.0;// l,r — cosmetic only (fork angle / lean); never rotates bike_direction, see tick_steer
-		float lateral_shift = 0.0; // -1..1 — the only lateral control: rate-capped sideways translation of lateral_pos (see [[bike/bikeai#Lateral shift]])
+		float lateral_shift = 0.0; // -1..1 — the only lateral control: bends bike_direction toward a lateral target (rate-capped turn, see BikeObject::tick_transform)
 		float brake_amount = 0.0;// 0,1
 		float power = 0.0;	// input _watts_ requested
 
@@ -309,7 +309,7 @@ public:
 	float     steer_input_raw      = 0.f;       // resolved raw stick input
 	glm::vec3 terrain_forward_dir  = {0,0,1};   // terrain-aligned forward from last raycast
 
-	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);  // exact rail tangent — used for sensing/wind/probe placement, never smoothed
+	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);  // actual steered heading (worldspace-authoritative) — used for sensing/wind/probe placement, never smoothed
 	glm::vec3 visual_heading = glm::vec3(0.f, 0, 1.f);  // low-passed toward actual velocity direction (forward + lateral); drives render orientation only, see tick_transform
 	float speed = 0.f;
 	float speed_smoothed = 0.f; // low-pass filtered speed, used for gear cadence checks
@@ -328,9 +328,9 @@ public:
 
 	float surface_traction = 1.0f;  // [0,1] — road grip: 1=dry tarmac, 0.6=wet, 0.3=gravel; scales max braking decel and corner speed limit
 
-	// Course state — authoritative rail position, advanced by BikeObject::tick_transform
-	// each tick (course_dist_m += speed*dt, lateral_pos += lateral_shift command).
-	// World position/orientation are always derived FROM these, never the reverse.
+	// Course state — DERIVED each tick from the authoritative worldspace position
+	// (course->project, in BikeObject::tick_transform). Used for AI targeting,
+	// braking lookahead, and curvature/lean; never fed back to move position.
 	float course_dist_m  = 0.f;   // arc-length from course start (m)
 	float lateral_pos    = 0.f;   // signed offset from road centre, +ve = road-right (m)
 	int   course_segment = 0;     // nearest waypoint segment index (cached)
@@ -348,6 +348,13 @@ public:
 
 	// Lateral velocity — written each tick by BikeObject::tick_transform
 	float lateral_vel = 0.f;  // m/s, positive = moving road-right
+
+	// Steering debug — written each tick by BikeObject::tick_transform. Applies
+	// to player and AI alike (it's the physical steering model, not AI-specific).
+	float dbg_steer_cmd               = 0.f;  // ci.lateral_shift this tick, [-1,1]
+	float dbg_desired_heading_offset_deg = 0.f;  // commanded heading offset from track tangent, pre rate-cap
+	float dbg_heading_offset_deg      = 0.f;  // actual signed angle between bike_direction and track tangent, +ve = right
+	float dbg_turn_rate_dps           = 0.f;  // actual heading turn rate applied this tick (deg/s)
 
 	EntityPtr fork_entity;
 

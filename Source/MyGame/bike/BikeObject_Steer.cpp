@@ -50,10 +50,10 @@ float compute_max_steer_rad(float speed)
 // corners based on the track's own curvature at the bike's current rail
 // position (central-difference on wp.forward's yaw, same technique as
 // BikeCourse::min_turn_radius_ahead, just signed). This is emergent from
-// actually following the road, so it's correct in every mode — including a
-// hard force-onto-racing-line snap (BikeAIParams::force_racing_line), where
-// ci.lateral_shift/ci.steer stay near zero but the bike still corners.
-// Mirrors real bike lean physics: bank angle ~ atan(v^2 * curvature / g).
+// actually following the road, so it's correct in every mode — including
+// when ci.lateral_shift/ci.steer are near zero but the bike still corners
+// because course_dist_m (derived from worldspace position) is advancing
+// through a curve. Mirrors real bike lean physics: bank angle ~ atan(v^2 * curvature / g).
 // ------------------------------------------------------------
 void BikeObject::tick_steer(const ControlInput& ci, float dt)
 {
