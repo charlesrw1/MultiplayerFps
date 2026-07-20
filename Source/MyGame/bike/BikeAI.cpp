@@ -152,8 +152,19 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	dbg_target_lat_offset = target_lat;
 	dbg_lookahead_pt      = wp_ahead.position + wp_ahead.right * target_lat;  // world-space target point
 
+	// Full PID, not P-only: this is the outer loop around BikeObject's own
+	// damped-spring heading controller (see tick_transform), and a P-only outer
+	// loop cascaded onto any underdamped/lagging inner loop rings — the D term
+	// (using lateral_vel, the bike's actual measured lateral rate, not a
+	// finite-difference of target_lat which jumps whenever the lookahead point
+	// crosses a waypoint) is what actually damps that out; I trims the small
+	// steady-state offset the heading-angle model leaves under lasting error.
 	const float lat_error = target_lat - my_bike->lateral_pos;
-	const float lateral_shift = glm::clamp(lat_error * p.lateral_shift_kp, -1.f, 1.f);
+	lateral_integral = glm::clamp(lateral_integral + lat_error * dt, -p.lateral_integral_clamp, p.lateral_integral_clamp);
+	const float lat_deriv = -my_bike->lateral_vel;
+	const float lateral_shift = glm::clamp(
+		p.lateral_shift_kp * lat_error + p.lateral_shift_ki * lateral_integral + p.lateral_shift_kd * lat_deriv,
+		-1.f, 1.f);
 	dbg_lateral_shift = lateral_shift;
 
 	// ci.steer doesn't command heading either — it only drives cosmetic

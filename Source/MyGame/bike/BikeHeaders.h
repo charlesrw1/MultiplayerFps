@@ -188,10 +188,14 @@ struct BikeAIParams {
 	float steer_lookahead_m      = 4.f;   // floor distance (m), keeps a preview even near-stationary
 	float steer_lookahead_time_s = 0.4f;  // scales lookahead with speed above the floor
 
-	// ---- Lateral shift — converts target lateral offset into ci.lateral_shift ----
+	// ---- Lateral shift PID — converts target lateral offset into ci.lateral_shift ----
 	// Command is clamped to [-1,1]; BikeObject::tick_transform maps it onto a
 	// heading offset (bike_heading_max_offset_deg) from the track tangent.
-	float lateral_shift_kp = 1.5f;  // shift command (pre-clamp) per metre of offset error
+	// D term uses the bike's measured lateral_vel (see BikeAI::evaluate).
+	float lateral_shift_kp      = 1.5f;  // shift command (pre-clamp) per metre of offset error
+	float lateral_shift_ki      = 0.f;   // per metre-second of accumulated offset error
+	float lateral_shift_kd      = 0.4f;  // per (m/s) of lateral_vel opposing the error — damps outer-loop ring
+	float lateral_integral_clamp = 2.f;  // anti-windup clamp on the accumulated error (m*s)
 
 	// ---- Off-track hard clamp ----
 	float edge_safety_m = 0.8f;  // margin inside road edge the magnetism offset may never cross
@@ -212,6 +216,7 @@ public:
 	// ---- PID controller state ----
 	float speed_integral    = 0.f;
 	float speed_prev_error  = 0.f;
+	float lateral_integral  = 0.f;
 
 	// ---- Debug ----
 	glm::vec3 dbg_lookahead_pt{};

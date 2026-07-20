@@ -237,8 +237,12 @@ static void bike_course_debug()
 	ImGui::SeparatorText("Steering");
 	{
 		BikeAIParams& p = g_ai_params;
-		ImGui::DragFloat("steer_lookahead_m",      &p.steer_lookahead_m,      0.2f,  0.f, 20.f, "%.1f");
-		ImGui::DragFloat("steer_lookahead_time_s", &p.steer_lookahead_time_s, 0.02f, 0.f, 2.f,  "%.2f");
+		ImGui::DragFloat("steer_lookahead_m",       &p.steer_lookahead_m,       0.2f,  0.f, 20.f, "%.1f");
+		ImGui::DragFloat("steer_lookahead_time_s",  &p.steer_lookahead_time_s,  0.02f, 0.f, 2.f,  "%.2f");
+		ImGui::DragFloat("lateral_shift_kp",        &p.lateral_shift_kp,        0.05f, 0.f, 5.f,  "%.2f");
+		ImGui::DragFloat("lateral_shift_ki",        &p.lateral_shift_ki,        0.01f, 0.f, 2.f,  "%.2f");
+		ImGui::DragFloat("lateral_shift_kd",        &p.lateral_shift_kd,        0.02f, 0.f, 3.f,  "%.2f");
+		ImGui::DragFloat("lateral_integral_clamp",  &p.lateral_integral_clamp,  0.1f,  0.f, 10.f, "%.1f");
 	}
 
 	ImGui::SeparatorText("Magnetism");
@@ -252,7 +256,6 @@ static void bike_course_debug()
 		ImGui::DragFloat("draft_k",                 &p.draft_k,                 0.05f, 0.f, 3.f,  "%.2f");
 		ImGui::DragFloat("draft_dist_m",             &p.draft_dist_m,           0.5f,  0.f, 30.f, "%.1f");
 		ImGui::DragFloat("lineformation_k",         &p.lineformation_k,         0.02f, 0.f, 2.f,  "%.2f");
-		ImGui::DragFloat("lateral_shift_kp",        &p.lateral_shift_kp,        0.05f, 0.f, 5.f,  "%.2f");
 		ImGui::DragFloat("edge_safety_m",           &p.edge_safety_m,           0.05f, 0.f, 3.f,  "%.2f");
 	}
 
