@@ -29,7 +29,7 @@ static float bike_gear_shift_cooldown = 3.f;
 // output = angular acceleration). Defaults reproduce the old fixed damped-
 // spring behavior (kp=8 rad/s^2/rad, kd=2*sqrt(kp) for critical damping,
 // ki=0) as a starting point now that it's actually tunable.
-PidGains bike_heading_gains        = { 16.f, 0.f, 5.4f };
+PidGains bike_heading_gains        = { 9.f, 0.f, 5.4f };
 float bike_heading_integral_clamp  = 1.f;    // anti-windup clamp on the heading PID's accumulated error (rad*s)
 float bike_heading_max_offset_deg  = 35.f;   // max heading deviation from track tangent at |ci.lateral_shift|=1
 float bike_heading_turn_rate_dps   = 180.f;  // max angular velocity the heading can turn at, independent of speed
@@ -345,8 +345,8 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 		                               : (hinge_pos + steered_front_dir * FORK_LEG);
 		const glm::vec3 rc = rear_hit  ? rear_res.hit_pos  : (pos + bike_direction * BIKE_REAR_Z);
 		if (wheel_history_initialized) {
-			Debug::add_line(prev_front_wheel_pos, fc, COLOR_CYAN,  3.f, false);
-			Debug::add_line(prev_rear_wheel_pos,  rc, COLOR_GREEN, 3.f, false);
+			//Debug::add_line(prev_front_wheel_pos, fc, COLOR_CYAN,  3.f, false);
+			//Debug::add_line(prev_rear_wheel_pos,  rc, COLOR_GREEN, 3.f, false);
 		}
 		prev_front_wheel_pos = fc;
 		prev_rear_wheel_pos  = rc;

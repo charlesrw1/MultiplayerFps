@@ -124,6 +124,12 @@ void draw_rider_debug_info(BikeObject* bo)
 		GameplayStatic::debug_text(string_format("[Steer] turn_rate=%+.0fdeg/s", bo->dbg_turn_rate_dps));
 	} else if (ai) {
 		// --- Mode and path-following breakdown ---
+		if (bo->ai_behavior_state == BikeAIBehaviorState::MovingToFront)
+			GameplayStatic::debug_text(string_format("[AI] STATE: MOVING TO FRONT  group=%d pos_in_group=%.2f",
+				bo->group_id, bo->pos_in_group_norm));
+		else if (bo->ai_behavior_state == BikeAIBehaviorState::StayingAtFront)
+			GameplayStatic::debug_text(string_format("[AI] STATE: STAYING AT FRONT  group=%d pos_in_group=%.2f",
+				bo->group_id, bo->pos_in_group_norm));
 		GameplayStatic::debug_text(string_format("[AI] spd=%.1fm/s  neighbors=%d  min_r=%.1fm%s",
 			bo->speed, ai->dbg_num_neighbors, ai->dbg_min_r, ai->dbg_clamped ? "  CLAMPED" : ""));
 		GameplayStatic::debug_text(string_format("[AI] cohesion behind=%+.2f  closer=%+.2f  gap=%.1fm", ai->dbg_cohesion_behind_lat, ai->dbg_cohesion_closer_lat, ai->dbg_cohesion_gap_m));

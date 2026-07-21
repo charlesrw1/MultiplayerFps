@@ -163,10 +163,88 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	                                             : (nearest_ahead ? nearest_ahead->long_gap : 0.f);
 	const float behind_lat_gap  = forced_leader ? (forced_leader->lateral_pos - my_bike->lateral_pos)
 	                                             : (nearest_ahead ? nearest_ahead->lat_gap : 0.f);
+	// Group's actual rank-0 leader (pos_in_group_norm==0 — a RANK, uniquely
+	// identifies whichever single rider is furthest along regardless of how
+	// close a tie is, real position not array index, same rule forced_leader
+	// above uses). near_group_front then measures "at the front" by actual
+	// course_dist_m distance to that leader instead of by rank/group-size —
+	// see BikeAIParams::front_abreast_join_dist_m for why rank alone doesn't
+	// work here. If I AM the leader myself, the search below finds no one
+	// else at rank 0, my_group_leader stays null, and near_group_front
+	// defaults to true for me — correctly "at the front" with a 0m gap.
+	BikeObject* my_group_leader = nullptr;
+	if (g_bike_app) {
+		for (BikeObject* other : g_bike_app->all_riders) {
+			if (other == my_bike) continue;
+			if (other->group_id != my_bike->group_id) continue;
+			if (other->pos_in_group_norm > 0.0001f) continue;
+			my_group_leader = other;
+			break;
+		}
+	}
+	auto near_group_front = [&](BikeObject* b) {
+		if (!my_group_leader) return true;
+		return (my_group_leader->course_dist_m - b->course_dist_m) <= p.front_abreast_join_dist_m;
+	};
+
+	// "Stay at front" (BikeObject::ai_behavior_state == StayingAtFront), once
+	// this rider is close enough to the front of its group (near_group_front
+	// above): suppresses the "behind" draft term entirely, overriding even a
+	// forced_leader from the override above (mutually exclusive in practice;
+	// this one wins). Without this, cohesion would pull the rider laterally
+	// into whichever other front-of-group rider it senses ahead and
+	// speed-match into a following gap — i.e. tuck into single file —
+	// defeating the point of holding the front. With it suppressed, several
+	// StayingAtFront riders near the front are left to the dedicated
+	// front_abreast separation force below (and avoidance's side-by-side
+	// rule as a last resort) to settle apart laterally instead, which is
+	// what "riding abreast" actually looks like.
+	const bool suppress_front_draft = my_bike->ai_behavior_state == BikeAIBehaviorState::StayingAtFront
+	    && near_group_front(my_bike);
 	// Forced leader is targeted at any distance; normal sensing still gates on
 	// cohesion_follow_dist_m (don't draft off someone way out of range).
-	const bool behind_target_active = forced_leader != nullptr
-	    || (nearest_ahead != nullptr && nearest_ahead->long_gap < p.cohesion_follow_dist_m);
+	const bool behind_target_active = !suppress_front_draft && (forced_leader != nullptr
+	    || (nearest_ahead != nullptr && nearest_ahead->long_gap < p.cohesion_follow_dist_m));
+
+	// Front-abreast pace match: suppress_front_draft above kills the normal
+	// draft speed-match (cohesion_have_speed_target below), so without this a
+	// StayingAtFront rider holding the front would just independently PID to
+	// base_power_w cruise — no coupling to whoever else is riding abreast, so
+	// tiny power/gradient differences compound over time and the line drifts
+	// apart or slides into a diagonal.
+	//
+	// Per-neighbor target = their current speed, corrected by how far ahead
+	// (+) or behind (-) I am of THEM along the course (front_abreast_gap_kp,
+	// same clamped-proportional shape as cohesion_gap_kp's draft follow-gap
+	// term above) — averaged over every OTHER StayingAtFront rider in my
+	// group, whether or not they've reached the front yet (a groupmate still
+	// sprinting to catch up should still pull my target down if I'm ahead of
+	// them, not just once they arrive). Matching raw speed alone would only
+	// ever hold whatever gap the pair happened to have when speeds first
+	// matched — being slightly ahead in POSITION, even at identical speed,
+	// still has to cost some target speed or the gap never actually closes.
+	// Uses g_bike_app->all_riders directly rather than the hemisphere-limited
+	// all_nearby scan — an abreast rider beside me is often outside my own
+	// forward sense cone entirely.
+	bool  front_abreast_have_speed_target = false;
+	float front_abreast_target_speed      = 0.f;  // may go <= 0 — see the coast branch in section 5
+	if (suppress_front_draft && g_bike_app) {
+		float target_sum = 0.f;
+		int   count       = 0;
+		for (BikeObject* other : g_bike_app->all_riders) {
+			if (other == my_bike) continue;
+			if (other->group_id != my_bike->group_id) continue;
+			if (other->ai_behavior_state != BikeAIBehaviorState::StayingAtFront) continue;
+			const float lead_m = my_bike->course_dist_m - other->course_dist_m;  // +ve = I'm ahead of them
+			const float correction = glm::clamp(lead_m * p.front_abreast_gap_kp, -p.front_abreast_gap_cap_ms, p.front_abreast_gap_cap_ms);
+			target_sum += other->speed - correction;
+			++count;
+		}
+		if (count > 0) {
+			front_abreast_have_speed_target = true;
+			front_abreast_target_speed      = target_sum / (float)count;
+		}
+	}
 
 	float cohesion_behind_lat = 0.f;
 	float cohesion_closer_lat = 0.f;
@@ -205,6 +283,14 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			for (size_t i = 0; i < all_nearby.size(); ++i) {
 				const Neighbor& n = all_nearby[i];
 				if (!n.in_forward_hemisphere) continue;
+				// A fellow front-abreast rider is handled entirely by the dedicated
+				// separation force below (a fixed target spacing), not this
+				// bunch-together pull — mixing the two fights itself: "closer" pulls
+				// them together, the separation force pushes them apart, and
+				// whichever direction wins changes tick to tick.
+				if (suppress_front_draft && n.rider->ai_behavior_state == BikeAIBehaviorState::StayingAtFront
+				    && n.rider->group_id == my_bike->group_id && near_group_front(n.rider))
+					continue;
 				centroid_lat += n.lat_gap;
 				++hemi_count;
 				dbg_neighbors[i].is_cohesion_closer_member = true;
@@ -220,6 +306,37 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	}
 	dbg_cohesion_behind_lat = cohesion_behind_lat;
 	dbg_cohesion_closer_lat = cohesion_closer_lat;
+
+	// Front-abreast lateral separation — independent of p.enable_cohesion (a
+	// distinct feature, not a cohesion sub-term). Continuous/proportional,
+	// unlike avoidance's binary box-overlap trigger below: without this,
+	// several StayingAtFront riders holding the front would all aim at the
+	// SAME racing-line target lateral position with nothing to differentiate
+	// them, so avoidance's binary push would be the only thing keeping them
+	// apart — constantly flipping in and out of its hard/soft zone as the
+	// racing-line target pulled them back together, i.e. visibly "pushing the
+	// other rider away" every time they drift back into range instead of
+	// settling into a stable line. This instead holds every OTHER
+	// StayingAtFront rider currently also at the front of my group at a fixed
+	// spacing (front_abreast_spacing_m) via a smooth per-metre-of-encroachment
+	// push, so the two riders settle at that spacing and avoidance's own
+	// (much narrower) zone never engages between them.
+	float front_abreast_lat = 0.f;
+	if (suppress_front_draft && g_bike_app) {
+		for (BikeObject* other : g_bike_app->all_riders) {
+			if (other == my_bike) continue;
+			if (other->group_id != my_bike->group_id) continue;
+			if (other->ai_behavior_state != BikeAIBehaviorState::StayingAtFront) continue;
+			if (!near_group_front(other)) continue;
+			const float lat_gap = other->lateral_pos - my_bike->lateral_pos;  // +ve = they're road-right of me
+			const float gap_abs = glm::abs(lat_gap);
+			if (gap_abs >= p.front_abreast_spacing_m) continue;
+			const float push_sign = (lat_gap >= 0.f) ? -1.f : 1.f;  // push away from them, my frame
+			const float encroach  = p.front_abreast_spacing_m - gap_abs;
+			front_abreast_lat += push_sign * encroach * p.front_abreast_separation_k;
+		}
+	}
+	target_offset_delta += front_abreast_lat;
 
 	// ============================================================
 	// 3. Avoidance — decentralized overlap prevention, computed and applied
@@ -446,7 +563,52 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	//    alone. Debug override (BikeObject::ai_override_speed_enabled)
 	//    replaces whichever target this tick would otherwise have picked.
 	// ============================================================
-	float power;
+	// "Move to front" / "Stay at front" debug behaviors (BikeObject::
+	// ai_behavior_state, toggled from BikeDebugger's per-rider panel).
+	// MovingToFront auto-cancels back to Default the instant this rider
+	// literally BECOMES the sole rank-0 leader of its own group
+	// (pos_in_group_norm reaches 0 — a one-shot goal, so the strict rank
+	// check is correct here) — checked every tick, not just on the debug
+	// button click, so it can't stay stuck active after the goal is already
+	// reached. StayingAtFront does NOT auto-cancel (that's the whole point of
+	// "stay"); instead it only sprints until near_group_front(my_bike) (see
+	// section 2 — actual course_dist_m proximity to the leader, NOT rank),
+	// then falls through to the front_abreast speed match computed in
+	// section 2 (cohesion's "behind" term is suppressed for it there — see
+	// suppress_front_draft — so it matches the pace of whoever else is
+	// abreast instead of drafting into them). Using suppress_front_draft
+	// (distance-based) instead of the rank check here specifically fixes a
+	// permanent back-and-forth: with the rank check, a trailing rider in a
+	// group bigger than 2-3 could never register as "at front" even once
+	// genuinely alongside the leader, so it kept sprinting at full power,
+	// overtook, and then the rider it just passed started sprinting in turn.
+	if (my_bike->ai_behavior_state == BikeAIBehaviorState::MovingToFront
+	    && my_bike->pos_in_group_norm <= 0.0001f)
+		my_bike->ai_behavior_state = BikeAIBehaviorState::Default;
+
+	// ai_override_speed_enabled is a hard debug override and still wins over
+	// either of these — same priority as it already had over cohesion below.
+	const bool sprinting_to_front = !my_bike->ai_override_speed_enabled
+	    && ((my_bike->ai_behavior_state == BikeAIBehaviorState::MovingToFront)
+	        || (my_bike->ai_behavior_state == BikeAIBehaviorState::StayingAtFront && !suppress_front_draft));
+
+	// Runs the shared speed-PID formula against whichever (integral,
+	// prev_error) state pair is passed in — factored out so the front-abreast
+	// case below can use its own dedicated state (front_abreast_speed_integral/
+	// _prev_error) instead of speed_integral/speed_prev_error, without
+	// duplicating the PID math itself.
+	auto run_speed_pid = [&](float target, float& integral, float& prev_error) {
+		dbg_target_speed = target;
+		const float speed_error = target - speed;
+		integral   = glm::clamp(integral + speed_error * dt, -50.f, 50.f);
+		const float speed_deriv = (dt > 1e-4f) ? (speed_error - prev_error) / dt : 0.f;
+		prev_error = speed_error;
+		const float pid_out = p.speed_kp * speed_error + p.speed_ki * integral + p.speed_kd * speed_deriv;
+		return glm::clamp(p.base_power_w + pid_out, p.min_power_w, p.max_power_w);
+	};
+
+	const bool use_front_abreast_target = !my_bike->ai_override_speed_enabled && front_abreast_have_speed_target;
+
 	bool  have_speed_target = false;
 	float target_speed      = 0.f;
 	if (my_bike->ai_override_speed_enabled) {
@@ -457,20 +619,50 @@ void BikeAI::evaluate(BikeObject* my_bike)
 		target_speed      = cohesion_target_speed;
 	}
 
-	if (have_speed_target) {
-		dbg_target_speed = target_speed;
-
-		const float speed_error = target_speed - speed;
-		speed_integral    = glm::clamp(speed_integral + speed_error * dt, -50.f, 50.f);
-		const float speed_deriv = (dt > 1e-4f) ? (speed_error - speed_prev_error) / dt : 0.f;
-		speed_prev_error  = speed_error;
-
-		const float pid_out = p.speed_kp * speed_error + p.speed_ki * speed_integral + p.speed_kd * speed_deriv;
-		power = glm::clamp(p.base_power_w + pid_out, p.min_power_w, p.max_power_w);
-	} else {
+	float power;
+	if (sprinting_to_front) {
+		// Full-effort sprint: bypass the speed PID entirely — there's no fixed
+		// speed to converge on, the goal is "get to the front", not "hold a
+		// speed". Corner braking (section 4) and avoidance still apply normally
+		// on top of this; only the cruise/draft power choice is replaced.
 		dbg_target_speed = 0.f;
+		speed_integral                 = 0.f;
+		speed_prev_error               = 0.f;
+		front_abreast_speed_integral   = 0.f;
+		front_abreast_speed_prev_error = 0.f;
+		power = p.move_to_front_power_w;
+	} else if (use_front_abreast_target) {
 		speed_integral   = 0.f;
 		speed_prev_error = 0.f;
+		if (front_abreast_target_speed <= 0.f) {
+			// The gap/speed correction wants me slower than stopped -- I'm far
+			// enough ahead that no feasible pedal power actually corrects it in
+			// one tick. Coast for real (power=0, no min_power_w floor) rather
+			// than bottoming out at min_power_w, which would still be gently
+			// accelerating away from the groupmate I'm supposed to be waiting
+			// for. Resets the dedicated PID state so there's no stale integral
+			// to snap back from once the correction shrinks enough to resume it.
+			dbg_target_speed                = 0.f;
+			front_abreast_speed_integral    = 0.f;
+			front_abreast_speed_prev_error  = 0.f;
+			power = 0.f;
+		} else {
+			// Dedicated PID state (see run_speed_pid above) -- keeps this
+			// converging smoothly onto the abreast target speed without
+			// carrying over integral windup from the shared speed_integral
+			// (used by ai_override/cohesion below), and vice versa.
+			power = run_speed_pid(front_abreast_target_speed, front_abreast_speed_integral, front_abreast_speed_prev_error);
+		}
+	} else if (have_speed_target) {
+		front_abreast_speed_integral   = 0.f;
+		front_abreast_speed_prev_error = 0.f;
+		power = run_speed_pid(target_speed, speed_integral, speed_prev_error);
+	} else {
+		dbg_target_speed = 0.f;
+		speed_integral                 = 0.f;
+		speed_prev_error               = 0.f;
+		front_abreast_speed_integral   = 0.f;
+		front_abreast_speed_prev_error = 0.f;
 		power = p.base_power_w;
 	}
 	dbg_power_final = power;

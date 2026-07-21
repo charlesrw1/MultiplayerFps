@@ -181,10 +181,10 @@ struct BikeAIParams {
 	// "Behind": lateral pull into the nearest ahead-neighbor's wheel track
 	// (drive their lat_gap toward 0) plus a following-gap speed match, once
 	// within cohesion_follow_dist_m longitudinally. This is the "draft" part.
-	float cohesion_behind_k       = 0.5f;   // lateral pull per metre of the leader's lat_gap
-	float cohesion_follow_dist_m  = 8.0f;   // m — only pulls/speed-matches within this longitudinal range ahead
+	float cohesion_behind_k       = 0.9f;   // lateral pull per metre of the leader's lat_gap
+	float cohesion_follow_dist_m  = 3.0f;   // m — only pulls/speed-matches within this longitudinal range ahead
 	float cohesion_gap_m          = 3.0f;   // m — target following gap once locked on (speed PID setpoint)
-	float cohesion_gap_kp         = 0.5f;   // (m/s) speed correction per metre of gap error
+	float cohesion_gap_kp         = 0.9f;   // (m/s) speed correction per metre of gap error
 	// "Closer": always-on lateral magnetism toward the lateral centroid of ALL
 	// sensed neighbors (ahead or behind) — keeps the group from spreading out
 	// sideways even when nobody is close enough ahead to draft off of.
@@ -221,13 +221,13 @@ struct BikeAIParams {
 	// box-overlap test (Minkowski sum): since every rider shares this box, two
 	// riders' boxes touch when the worldspace gap on an axis drops below TWICE
 	// the half-extent — see BikeAI.cpp section 3.
-	float avoidance_box_half_long_m   = 0.9f;   // half-extent, Z (front/back)
+	float avoidance_box_half_long_m   = 0.65f;   // half-extent, Z (front/back)
 	float avoidance_box_half_lat_m    = 0.25f;  // half-extent, X (left/right)
 	// Soft reaction zone: severity ramps 0..1 linearly across this extra
 	// distance OUTSIDE the hard box-overlap boundary (severity=1 once boxes
 	// actually touch), so the response builds in smoothly instead of snapping
 	// to full force the instant the hard boundary is crossed.
-	float avoidance_soft_margin_long_m = 1.5f;
+	float avoidance_soft_margin_long_m = 0.7f;
 	float avoidance_soft_margin_lat_m  = 0.5f;
 	// Below this worldspace longitudinal gap (full distance, not a half-extent),
 	// neither rider reads as clearly ahead/behind — treat it as side-by-side
@@ -235,7 +235,7 @@ struct BikeAIParams {
 	// neighbor is ahead of them) responds.
 	float avoidance_side_by_side_m     = 0.6f;
 	float avoidance_lateral_speed_mps  = 3.5f;  // direct worldspace lateral slide speed at severity=1 (m/s)
-	float avoidance_brake_k            = 0.9f;  // brake_amount at severity=1, applied directly (bypasses speed PID)
+	float avoidance_brake_k            = 0.5f;  // brake_amount at severity=1, applied directly (bypasses speed PID)
 
 	// ---- Steer target lookahead — where along the course the target lateral
 	// offset is sampled from (pure-pursuit style preview, not the bike's own
@@ -257,7 +257,7 @@ struct BikeAIParams {
 	// two stacked PIDs here was one tunable loop too many. Command is clamped
 	// to [-1,1]; BikeObject::tick_transform maps it onto a heading offset
 	// (bike_heading_max_offset_deg) from the track tangent.
-	float lateral_shift_kp = 0.5f;  // shift command (pre-clamp) per metre of offset error
+	float lateral_shift_kp = 0.35f;  // shift command (pre-clamp) per metre of offset error
 
 	// ---- Heading guidance — lateral_shift_kp alone only ever points the bike
 	// at the ROAD's own tangent (wp.forward), offset by a lateral-error angle;
@@ -272,7 +272,7 @@ struct BikeAIParams {
 	// manual offset above but inverted — negligible on a straight (where the
 	// road tangent and racing line tangent are ~identical anyway), full
 	// strength mid-corner. ----
-	float heading_shift_kp = 4.5f;  // shift command (pre-clamp) per radian of heading error, at full corner weight
+	float heading_shift_kp = 3.8f;  // shift command (pre-clamp) per radian of heading error, at full corner weight
 
 	// ---- Manual lateral offset blend — how much of BikeObject::manual_lateral_offset
 	// (debug-set per rider, see BikeDebugger) actually reaches the steering
@@ -287,6 +287,46 @@ struct BikeAIParams {
 
 	// ---- Off-track hard clamp ----
 	float edge_safety_m = 0.8f;  // margin inside road edge the cohesion offset may never cross
+
+	// ---- "Move to front" debug behavior (BikeObject::ai_behavior_state) —
+	// bypasses the speed PID entirely and just commands this much power while
+	// active; see BikeAI::evaluate section 5. ----
+	float move_to_front_power_w = 500.f;
+
+	// ---- "Stay at front" debug behavior, once at the front (suppress_front_draft
+	// in BikeAI::evaluate section 2) — a continuous, proportional lateral
+	// separation between riders holding the front together, DISTINCT from
+	// avoidance's binary box-overlap trigger: avoidance's own hard/soft zone is
+	// deliberately much narrower than the spacing below (its trigger_lat_m is
+	// ~2*avoidance_box_half_lat_m + avoidance_soft_margin_lat_m, well under 1m
+	// by default), so as long as this term holds riders apart at spacing_m,
+	// avoidance should stay dormant between them — no fighting between two
+	// separate "push apart" forces with different equilibria. ----
+	float front_abreast_spacing_m     = 1.4f;  // m — desired lateral gap between riders holding the front together
+	float front_abreast_separation_k  = 0.8f;  // lateral push per metre of encroachment inside spacing_m
+
+	// Pace target for the same behavior — see BikeAI::evaluate section 2/5.
+	// Same shape as cohesion_gap_kp/cohesion_gap_m (draft follow-gap match)
+	// but on POSITION along the course rather than a following gap, and
+	// symmetric (applies against every other StayingAtFront groupmate, not
+	// just whoever's "ahead" of me): being even slightly ahead of a groupmate
+	// lowers my target speed below theirs, and vice versa, so matching raw
+	// speed alone is never enough to stop settling into an even line —
+	// existing position error keeps correcting until the gap itself is zero.
+	float front_abreast_gap_kp        = 0.4f;   // (m/s) target-speed correction per metre I'm ahead of a groupmate
+	float front_abreast_gap_cap_ms    = 4.0f;   // clamp on the above, per neighbor
+
+	// How close (course_dist_m) a StayingAtFront rider has to get to the
+	// group's actual rank-0 leader before it's considered "at the front" and
+	// switches from sprinting to pace-holding. Deliberately NOT pos_in_group_norm
+	// itself (a RANK divided by group size — rank 1 of 5 riders is already
+	// 0.25, however physically close it actually is to the leader): using rank
+	// directly here meant a trailing StayingAtFront rider could never register
+	// as "at front" in a group bigger than 2-3, so it kept sprinting at full
+	// power indefinitely, overtook, and then the rider it just passed started
+	// sprinting in turn — a permanent back-and-forth. See BikeAI::evaluate
+	// section 2's near_group_front lambda.
+	float front_abreast_join_dist_m   = 3.0f;
 };
 extern BikeAIParams g_ai_params;
 
@@ -321,6 +361,15 @@ public:
 	// ---- PID controller state (speed only — lateral guidance is proportional-only) ----
 	float speed_integral    = 0.f;
 	float speed_prev_error  = 0.f;
+
+	// Separate PID state for the "stay at front" abreast speed-match (targets
+	// the average speed of other front-abreast riders — see BikeAI::evaluate
+	// section 5). Kept independent of speed_integral/speed_prev_error above so
+	// switching between "drafting behind a leader" (cohesion's follow-gap
+	// match) and "holding pace abreast at the front" — different speed
+	// regimes — never carries stale integral windup from one into the other.
+	float front_abreast_speed_integral   = 0.f;
+	float front_abreast_speed_prev_error = 0.f;
 
 	// Low-passed weight (0..1) of BikeObject::manual_lateral_offset actually
 	// applied this tick — 1 on a straight, blended toward 0 as upcoming
@@ -385,6 +434,21 @@ class BikeAnimDriver {
 public:
 	// handles animation
 	AnimatorObject* ao = nullptr;
+};
+
+// Debug goal states (BikeObject::ai_behavior_state), distinct from the
+// persistent per-rider toggles above (ride_2nd_wheel_enabled, ai_override_*).
+// MovingToFront is one-shot ("do X until done" — BikeAI::evaluate flips it
+// back to Default on its own once reached). StayingAtFront is persistent
+// ("always do X" — never auto-cancels): sprints to the front exactly like
+// MovingToFront while behind it, then holds there once reached, WITHOUT
+// re-cancelling to Default and WITHOUT drafting behind whoever else is at
+// the front — see BikeAI::evaluate sections 2/5 — so several StayingAtFront
+// riders naturally settle side-by-side instead of queuing single-file.
+enum class BikeAIBehaviorState : uint8_t {
+	Default,
+	MovingToFront,   // sprint (BikeAIParams::move_to_front_power_w) until this rider leads its own group, then auto-reverts to Default
+	StayingAtFront,  // sprint to the front like above, then HOLD there indefinitely — no cohesion "behind" draft-lock once at the front, so multiple riders can sit abreast
 };
 
 // physics of the bike. handles:
@@ -494,6 +558,16 @@ public:
 	// BikeAI::evaluate section 2.
 	bool  ride_2nd_wheel_enabled = false;
 
+	// Debug-only per-rider goal state (BikeDebugger's Selected Rider panel),
+	// AI-only — see BikeAIBehaviorState for MovingToFront (one-shot) vs.
+	// StayingAtFront (persistent) semantics. Toggling the corresponding debug
+	// button again while active cancels it back to Default early. Only
+	// power/speed (and, for StayingAtFront, cohesion's draft targeting) change
+	// — steering/lateral guidance and avoidance are untouched, so the AI still
+	// holds its normal racing line and won't physically overlap another rider.
+	// See BikeAI::evaluate sections 2/5.
+	BikeAIBehaviorState ai_behavior_state = BikeAIBehaviorState::Default;
+
 	// Group context (written by BikeGameApplication::update_groups each frame)
 	int   group_id           = 0;
 	float pos_in_group_norm  = 0.f;  // 0=front of group, 1=back
@@ -563,7 +637,7 @@ public:
 	std::vector<BikeObject*> riders_sorted;
 
 
-	int  num_ai                 = 5;
+	int  num_ai                 = 30;
 
 	// Crack decal instances collected at map load
 	struct CrackDecalInstance {

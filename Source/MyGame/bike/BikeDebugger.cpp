@@ -99,8 +99,12 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 			BikeAI* ai = dynamic_cast<BikeAI*>(r->input.get());
 			if (!ai) continue;
 
-			const char* text = string_format("neighbors=%d%s", ai->dbg_num_neighbors,
-				ai->dbg_clamped ? " CLAMPED" : "");
+			const char* state_suffix =
+				r->ai_behavior_state == BikeAIBehaviorState::MovingToFront  ? "\nMOVING TO FRONT" :
+				r->ai_behavior_state == BikeAIBehaviorState::StayingAtFront ? "\nSTAYING AT FRONT" : "";
+			const char* text = string_format("neighbors=%d%s%s", ai->dbg_num_neighbors,
+				ai->dbg_clamped ? " CLAMPED" : "",
+				state_suffix);
 
 			Debug::add_text_ex(r->get_ws_position() + glm::vec3(0.f, 1.5f, 0.f), text, COLOR_WHITE, 0.f,true,true, true);
 		}
@@ -204,6 +208,32 @@ void BikeDebugger::on_imgui()
 			ImGui::TextDisabled("leader, at any distance, instead of the nearest sensed rider ahead.");
 			if (selected->ride_2nd_wheel_enabled)
 				ImGui::Text("Group %d, pos_in_group=%.2f", selected->group_id, selected->pos_in_group_norm);
+
+			// One-shot goal: button starts it, clicking again while active cancels
+			// back to Default early. BikeAI::evaluate auto-cancels it on its own
+			// once this rider actually reaches the front of its group.
+			const bool moving_to_front = selected->ai_behavior_state == BikeAIBehaviorState::MovingToFront;
+			if (ImGui::Button(moving_to_front ? "Cancel move to front" : "Move to front of group"))
+				selected->ai_behavior_state = moving_to_front ? BikeAIBehaviorState::Default : BikeAIBehaviorState::MovingToFront;
+
+			// Persistent goal: unlike the one-shot above, this never auto-cancels
+			// once reached — the rider sprints to the front then holds there, with
+			// cohesion's draft-lock suppressed so it doesn't tuck in behind whoever
+			// else is at the front. Multiple riders with this enabled naturally
+			// settle side-by-side (avoidance's side-by-side rule pushes them apart
+			// laterally instead of single-file) rather than queuing.
+			const bool staying_at_front = selected->ai_behavior_state == BikeAIBehaviorState::StayingAtFront;
+			if (ImGui::Button(staying_at_front ? "Stop staying at front" : "Stay at front of group (abreast)"))
+				selected->ai_behavior_state = staying_at_front ? BikeAIBehaviorState::Default : BikeAIBehaviorState::StayingAtFront;
+
+			if (moving_to_front)
+				ImGui::TextColored(ImVec4(1.f, 0.6f, 0.1f, 1.f), "State: MOVING TO FRONT (group %d, pos_in_group=%.2f)",
+					selected->group_id, selected->pos_in_group_norm);
+			else if (staying_at_front)
+				ImGui::TextColored(ImVec4(0.2f, 0.9f, 1.f, 1.f), "State: STAYING AT FRONT (group %d, pos_in_group=%.2f)",
+					selected->group_id, selected->pos_in_group_norm);
+			else
+				ImGui::TextDisabled("State: Default");
 		} else {
 			ImGui::TextDisabled("Offset/overrides only affect AI riders.");
 		}
