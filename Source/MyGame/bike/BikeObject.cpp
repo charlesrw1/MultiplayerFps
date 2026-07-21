@@ -14,8 +14,11 @@
 #include "Framework/Config.h"
 #include "Framework/PidTuner.h"
 #include "Physics/Physics2.h"
+#include "BikeCourseHilly.h"
 #include "imgui.h"
 #include <cfloat>
+
+extern BikeGameApplication* g_bike_app;
 
 // ============================================================
 // Transform / gear tuning vars
@@ -315,8 +318,19 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	// other rider) instead of the ground — was causing riders to bounce vertically.
 	const uint32_t terrain_mask = ~(uint32_t)(1 << (int)PL::Character);
 	world_query_result front_res, rear_res;
-	const bool front_hit = g_physics.trace_ray(front_res, front_org, front_org + down, nullptr, terrain_mask);
-	const bool rear_hit  = g_physics.trace_ray(rear_res,  rear_org,  rear_org  + down, nullptr, terrain_mask);
+	bool front_hit, rear_hit;
+	// Hilly terrain is a procedural mesh with no physics collision (see
+	// BikeCourseHilly.h) -- query the exact analytic height function it was
+	// built from directly instead of raycasting, which is both simpler and
+	// perfectly exact (no mesh-resolution error).
+	if (g_bike_app && g_bike_app->course_variant == BikeHardcodedCourseKind::Hilly) {
+		front_res.hit_pos = glm::vec3(front_org.x, bike_hilly_terrain_height(front_org.x, front_org.z), front_org.z);
+		rear_res.hit_pos  = glm::vec3(rear_org.x,  bike_hilly_terrain_height(rear_org.x,  rear_org.z),  rear_org.z);
+		front_hit = rear_hit = true;
+	} else {
+		front_hit = g_physics.trace_ray(front_res, front_org, front_org + down, nullptr, terrain_mask);
+		rear_hit  = g_physics.trace_ray(rear_res,  rear_org,  rear_org  + down, nullptr, terrain_mask);
+	}
 
 	// When steered, the front contact is laterally displaced from bike_direction.
 	// slope_vec (front - rear) therefore has a lateral component that would corrupt:

@@ -626,6 +626,12 @@ public:
 	// Call after any full course rebuild (build_hardcoded_circuit/build_from_spawners).
 	void build_road_mesh();
 
+	// Builds/refreshes the procedural grass terrain mesh for the Hilly course
+	// (a terrain_size_m x terrain_size_m grid sampled from bike_hilly_height,
+	// groundgrass_01 material). Hides/frees it (set_model(nullptr) + reset)
+	// when course_variant isn't Hilly -- call after every rebuild_course().
+	void build_terrain_mesh();
+
 	// Show/hide the ideal racing line as a MeshBuilder line strip (orange), rebuilt
 	// from course.waypoints[*].racing_line_pos. Bound to BikeDebugger's checkbox.
 	void set_draw_racing_line(bool show);
@@ -637,7 +643,7 @@ public:
 	std::vector<BikeObject*> riders_sorted;
 
 
-	int  num_ai                 = 30;
+	int  num_ai                 = 5;
 
 	// Crack decal instances collected at map load
 	struct CrackDecalInstance {
@@ -650,6 +656,13 @@ public:
 	void rebuild_course();  // re-runs course build with current fillet params (call from debug menu)
 	void respawn_ai();      // destroy existing AI riders and re-spawn num_ai of them
 
+	// Destroys every rider (player included) and re-spawns them at the current
+	// course's start line, same layout as start(). Called by rebuild_course()
+	// so switching course type (e.g. into/out of Hilly) never leaves riders
+	// stranded mid-air over a track that no longer exists under them, or still
+	// projected onto stale course_dist_m/lateral_pos from the old course.
+	void respawn_all_riders();
+
 private:
 	void collect_crack_decals();
 	void sort_riders();
@@ -661,6 +674,10 @@ private:
 	DynamicModelUniquePtr road_mesh;
 	Entity*        road_mesh_entity    = nullptr;
 	MeshComponent* road_mesh_component = nullptr;
+
+	DynamicModelUniquePtr terrain_mesh;
+	Entity*        terrain_mesh_entity    = nullptr;
+	MeshComponent* terrain_mesh_component = nullptr;
 
 	Entity*               racing_line_entity = nullptr;
 	MeshBuilderComponent* racing_line_mb     = nullptr;

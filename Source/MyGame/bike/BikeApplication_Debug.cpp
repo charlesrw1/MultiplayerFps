@@ -3,6 +3,7 @@
 // rider snapshots, and bike_course_debug ImGui panel.
 
 #include "BikeHeaders.h"
+#include "BikeCourseHilly.h"
 
 #include "Render/Texture.h"
 #include "Render/Model.h"
@@ -474,6 +475,30 @@ static void bike_course_debug()
 			}
 			ImGui::EndCombo();
 		}
+	}
+
+	if (g_bike_app->course_variant == BikeHardcodedCourseKind::Hilly) {
+		ImGui::SeparatorText("Hilly Terrain");
+		BikeHillyParams& hp = g_hilly_params;
+		bool hilly_dirty = false;
+		hilly_dirty |= ImGui::DragInt  ("Perlin octaves",      &hp.octaves,        1,     1,    8);
+		hilly_dirty |= ImGui::DragFloat("Perlin base freq",    &hp.base_freq,      0.001f, 0.002f, 0.2f, "%.3f");
+		hilly_dirty |= ImGui::DragFloat("Perlin lacunarity",   &hp.lacunarity,     0.05f, 1.f,  4.f,  "%.2f");
+		hilly_dirty |= ImGui::DragFloat("Perlin gain",         &hp.gain,           0.02f, 0.1f, 0.9f, "%.2f");
+		hilly_dirty |= ImGui::DragFloat("Amplitude (m)",       &hp.amplitude_m,    0.2f,  0.f,  30.f, "%.1f");
+		int seed_i = (int)hp.seed;
+		if (ImGui::DragInt("Seed", &seed_i, 1, 0, INT32_MAX)) { hp.seed = (unsigned)glm::max(0, seed_i); hilly_dirty = true; }
+		ImGui::TextDisabled("Terrain mesh:");
+		hilly_dirty |= ImGui::DragFloat("Terrain size (m)",    &hp.terrain_size_m,      2.f, 50.f, 400.f, "%.0f");
+		hilly_dirty |= ImGui::DragFloat("Terrain grid step (m)", &hp.terrain_grid_step_m, 0.1f, 0.5f, 10.f, "%.2f");
+		ImGui::TextDisabled("Road grading:");
+		hilly_dirty |= ImGui::DragFloat("Max road grade (%%)", &hp.max_grade_pct, 0.2f, 1.f, 20.f, "%.1f");
+		hilly_dirty |= ImGui::DragInt  ("Grade smooth passes", &hp.grade_smooth_passes, 1, 1, 50);
+		hilly_dirty |= ImGui::DragFloat("Road embankment blend (m)", &hp.road_blend_dist_m, 0.2f, 0.5f, 30.f, "%.1f");
+		ImGui::SameLine(); ImGui::TextDisabled("terrain tapers to meet the graded road over this distance");
+		const bool hilly_rebuild_clicked = ImGui::Button("Rebuild Hilly Course");
+		if (hilly_dirty || hilly_rebuild_clicked)
+			g_bike_app->rebuild_course();
 	}
 
 	ImGui::SeparatorText("Road Network");

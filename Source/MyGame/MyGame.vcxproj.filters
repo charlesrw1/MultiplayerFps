@@ -57,6 +57,9 @@
     <ClCompile Include="bike\BikeCourseHardcoded.cpp">
       <Filter>bike</Filter>
     </ClCompile>
+    <ClCompile Include="bike\BikeCourseHilly.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
     <ClCompile Include="bike\BikeCourseMesh.cpp">
       <Filter>bike</Filter>
     </ClCompile>
@@ -64,6 +67,9 @@
       <Filter>bike</Filter>
     </ClCompile>
     <ClCompile Include="bike\BikeCourseRoadNetwork.cpp">
+      <Filter>bike</Filter>
+    </ClCompile>
+    <ClCompile Include="bike\BikeCourseTerrainMesh.cpp">
       <Filter>bike</Filter>
     </ClCompile>
     <ClCompile Include="bike\BikeDebugger.cpp">
@@ -107,6 +113,12 @@
     <ClInclude Include="bike\BikeCourse.h">
       <Filter>bike</Filter>
     </ClInclude>
+    <ClInclude Include="bike\BikeCourseHilly.h">
+      <Filter>bike</Filter>
+    </ClInclude>
+    <ClInclude Include="bike\BikeCourseTurtle.h">
+      <Filter>bike</Filter>
+    </ClInclude>
     <ClInclude Include="bike\BikeDebugger.h">
       <Filter>bike</Filter>
     </ClInclude>
@@ -114,6 +126,9 @@
       <Filter>bike</Filter>
     </ClInclude>
     <ClInclude Include="bike\BikeObject_Local.h">
+      <Filter>bike</Filter>
+    </ClInclude>
+    <ClInclude Include="bike\BikeTerrainNoise.h">
       <Filter>bike</Filter>
     </ClInclude>
   </ItemGroup>

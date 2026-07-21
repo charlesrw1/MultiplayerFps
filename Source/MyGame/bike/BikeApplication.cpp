@@ -97,6 +97,7 @@ void BikeGameApplication::start()
 
 	build_hardcoded_circuit(course, course_variant);
 	build_road_mesh();
+	build_terrain_mesh();
 
 	collect_crack_decals();
 	debugger.init();
@@ -138,8 +139,49 @@ void BikeGameApplication::rebuild_course()
 {
 	build_hardcoded_circuit(course, course_variant);
 	build_road_mesh();
+	build_terrain_mesh();
 	if (draw_racing_line_debug)
 		set_draw_racing_line(true);
+	respawn_all_riders();
+}
+
+void BikeGameApplication::respawn_all_riders()
+{
+	// Remember whether a player rider was among them -- create_player() isn't
+	// called anywhere yet (AI-only game mode today), but this stays correct
+	// once it is, instead of silently dropping player control on a rebuild.
+	bool had_player = false;
+	for (BikeObject* bo : all_riders)
+		if (!dynamic_cast<BikeAI*>(bo->input.get())) { had_player = true; break; }
+
+	// BikeDebugger holds a raw pointer to whichever rider is currently
+	// selected/orbited -- every rider below is about to be destroyed, so drop
+	// it first or on_imgui()/update() dereference a dangling BikeObject* next
+	// frame (crashed via the dynamic_cast in BikeDebugger::on_imgui).
+	debugger.deselect();
+
+	for (BikeObject* bo : all_riders)
+		bo->get_owner()->destroy();
+	all_riders.clear();
+	riders_sorted.clear();
+
+	const glm::vec3 start_pos = course.is_built ? course.sample(0.f).position : glm::vec3(0.f);
+
+	if (had_player)
+		create_player(start_pos);
+
+	static constexpr float AI_GAP_M      = 5.f;   // spacing along course (m)
+	static constexpr float AI_LAT_SPREAD = 1.2f;  // lateral spread so they don't all overlap
+	for (int i = 0; i < num_ai; ++i) {
+		const float dist = -(i + 1) * AI_GAP_M;  // behind the start line
+		glm::vec3   pos  = start_pos;
+		if (course.is_built) {
+			const BikeWaypoint wp = course.sample(glm::mod(dist + course.total_length_m, course.total_length_m));
+			const float lat = ((i % 3) - 1) * AI_LAT_SPREAD * 0.5f;
+			pos = wp.position + wp.right * lat;
+		}
+		create_ai(pos);
+	}
 }
 
 void BikeGameApplication::respawn_ai()
@@ -148,6 +190,12 @@ void BikeGameApplication::respawn_ai()
 	for (auto it = all_riders.begin(); it != all_riders.end(); ) {
 		BikeObject* bo = *it;
 		if (dynamic_cast<BikeAI*>(bo->input.get())) {
+			// BikeDebugger may be holding a raw pointer to this rider
+			// (selected/orbited) -- drop it before destroying, or on_imgui()
+			// dereferences a dangling BikeObject* next frame (see the
+			// identical note in respawn_all_riders()).
+			if (debugger.has_selection(bo))
+				debugger.deselect();
 			bo->get_owner()->destroy();
 			it = all_riders.erase(it);
 		} else {

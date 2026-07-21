@@ -52,9 +52,11 @@
     <ClCompile Include="bike\BikeCourse.cpp" />
     <ClCompile Include="bike\BikeCourseDebug.cpp" />
     <ClCompile Include="bike\BikeCourseHardcoded.cpp" />
+    <ClCompile Include="bike\BikeCourseHilly.cpp" />
     <ClCompile Include="bike\BikeCourseMesh.cpp" />
     <ClCompile Include="bike\BikeCourseRacingLine.cpp" />
     <ClCompile Include="bike\BikeCourseRoadNetwork.cpp" />
+    <ClCompile Include="bike\BikeCourseTerrainMesh.cpp" />
     <ClCompile Include="bike\BikeDebugger.cpp" />
     <ClCompile Include="bike\BikeObject.cpp" />
     <ClCompile Include="bike\BikeObject_Physics.cpp" />
@@ -71,9 +73,12 @@
     <ClInclude Include="fps\fpsObjects.h" />
     <ClInclude Include="fps\fpsTestObjects.h" />
     <ClInclude Include="bike\BikeCourse.h" />
+    <ClInclude Include="bike\BikeCourseHilly.h" />
+    <ClInclude Include="bike\BikeCourseTurtle.h" />
     <ClInclude Include="bike\BikeDebugger.h" />
     <ClInclude Include="bike\BikeHeaders.h" />
     <ClInclude Include="bike\BikeObject_Local.h" />
+    <ClInclude Include="bike\BikeTerrainNoise.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

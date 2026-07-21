@@ -15,6 +15,13 @@ public:
 	void update(const std::vector<BikeObject*>& riders); // drive camera + picking, called every frame
 	void on_imgui();
 
+	// Clears the current selection/orbit (if any). Call before destroying any
+	// rider that might be selected -- selected is a raw BikeObject* with no
+	// lifetime tracking of its own, so leaving it pointed at a destroyed rider
+	// crashes the next on_imgui()/update() call.
+	void deselect() { selected = nullptr; orbiting = false; }
+	bool has_selection(const BikeObject* rider) const { return selected == rider; }
+
 private:
 	BikeObject* pick_rider_under_cursor(const std::vector<BikeObject*>& riders) const;
 

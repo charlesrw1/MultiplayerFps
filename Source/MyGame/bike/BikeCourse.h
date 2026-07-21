@@ -150,13 +150,15 @@ enum class BikeHardcodedCourseKind {
 	ClassicLoop = 0,  // rounded rectangle: two wide sweepers + two tight hairpins
 	Twisty      = 1,  // chicanes and alternating-direction bends throughout
 	SharpAngles = 2,  // tight-radius corners at distinct angles (90/45/60 deg), city-block feel
-	Count       = 3,
+	Hilly       = 3,  // curvy road over procedural perlin-noise terrain, gradient-limited (see BikeCourseHilly.h)
+	Count       = 4,
 };
 inline const char* bike_hardcoded_course_name(BikeHardcodedCourseKind kind) {
 	switch (kind) {
 		case BikeHardcodedCourseKind::ClassicLoop: return "Classic Loop";
 		case BikeHardcodedCourseKind::Twisty:      return "Twisty";
 		case BikeHardcodedCourseKind::SharpAngles: return "Sharp Angles";
+		case BikeHardcodedCourseKind::Hilly:       return "Hilly";
 		default:                                   return "?";
 	}
 }
