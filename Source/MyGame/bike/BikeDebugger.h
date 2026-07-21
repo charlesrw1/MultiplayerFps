@@ -24,4 +24,6 @@ private:
 	bool        orbiting = false;
 	bool        initialized_fly_cam = false;
 	bool        draw_rider_state_text = false;  // per-rider paceline state + timer, drawn above their head
+	bool        draw_avoidance_box      = false;  // selected rider only — drop-dead box + avoid vectors, see draw_rider_avoidance_box
+	bool        draw_avoidance_soft_box = false;  // selected rider only — also draws the outer soft-reaction boundary, different color
 };

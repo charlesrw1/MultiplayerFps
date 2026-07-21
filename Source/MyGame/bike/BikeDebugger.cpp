@@ -88,8 +88,11 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 		}
 	}
 
-	if (orbiting && selected)
+	if (orbiting && selected) {
 		draw_rider_debug_info(selected);
+		if (draw_avoidance_box)
+			draw_rider_avoidance_box(selected, draw_avoidance_soft_box);
+	}
 
 	if (draw_rider_state_text) {
 		for (BikeObject* r : riders) {
@@ -170,6 +173,11 @@ void BikeDebugger::on_imgui()
 		if (g_bike_app && g_bike_app->course.is_built)
 			road_hw = g_bike_app->course.sample(selected->course_dist_m).road_half_width;
 		ImGui::SliderFloat("Manual lateral offset", &selected->manual_lateral_offset, -road_hw, road_hw, "%.2f m");
+		ImGui::Checkbox("Draw avoidance box + avoid vectors", &draw_avoidance_box);
+		if (draw_avoidance_box) {
+			ImGui::SameLine();
+			ImGui::Checkbox("+ soft box", &draw_avoidance_soft_box);
+		}
 		if (BikeAI* ai = dynamic_cast<BikeAI*>(selected->input.get())) {
 			ImGui::Text("Offset blend: %.0f%% (0%% mid-corner, 100%% on a straight)", ai->offset_blend * 100.f);
 

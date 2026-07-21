@@ -4,6 +4,7 @@
 #include "GameEnginePublic.h"
 #include <glm/gtx/vector_angle.hpp>
 #include <vector>
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 
@@ -17,15 +18,22 @@ extern BikeGameApplication* g_bike_app;
 // BikeAI::evaluate
 //
 // Target lateral position = the racing line's precomputed offset, adjusted by
-// pack-behavior magnetism (cohesion/separation/draft/line-formation; off by
-// default via p.enable_magnetism while worldspace steering is being tuned —
-// see BikeAIParams). The AI computes its current lateral offset (derived each
-// tick from the worldspace position, BikeObject::tick_transform) and
-// aggressively P-controls ci.lateral_shift to close the error. ci.lateral_shift
-// bends bike_direction toward the target rather than translating a rail
-// position, so position always integrates in worldspace — corner-parametrization
-// quirks (fillet seams, uneven waypoint spacing) get smoothed out instead of
-// yanking the bike sideways. See [[bike/bikeai]].
+// cohesion (draft: pulls in behind whoever's ahead, plus a general lateral
+// "bunch up" pull) — see BikeAIParams. The AI computes its current lateral
+// offset (derived each tick from the worldspace position, BikeObject::
+// tick_transform) and P-controls ci.lateral_shift to close the error.
+// ci.lateral_shift bends bike_direction toward the target rather than
+// translating a rail position, so position always integrates in worldspace —
+// corner-parametrization quirks (fillet seams, uneven waypoint spacing) get
+// smoothed out instead of yanking the bike sideways.
+//
+// Avoidance is a separate, independently-toggleable term and does NOT go
+// through any of that: it commands ci.avoidance_lateral_vel, a direct
+// worldspace lateral slide applied in tick_transform without touching
+// bike_direction/heading at all — seeded from a heading-based approach that
+// overshot and yoyoed against cohesion pulling back in (turn momentum has to
+// build up AND unwind; a direct velocity has no memory to unwind). See
+// [[bike/bikeai]].
 // ============================================================
 
 void BikeAI::evaluate(BikeObject* my_bike)
@@ -53,13 +61,36 @@ void BikeAI::evaluate(BikeObject* my_bike)
 		0.f, 1.f);
 	offset_blend = damp_dt_independent(offset_weight_raw, offset_blend, p.offset_blend_tau_s, dt);
 
+	// My own local frame — used ONLY by avoidance (section 3) for a true
+	// worldspace box-overlap test, deliberately NOT the course's road-tangent
+	// frame (wp.right), which diverges from the bike's actual facing through
+	// corners/while sliding. Same handedness as BikeObject::tick_transform's
+	// own orientation basis ("this file's own cross(bike_direction, up)").
+	const glm::vec3 my_right = glm::normalize(glm::cross(my_bike->bike_direction, glm::vec3(0.f, 1.f, 0.f)));
+
 	// ============================================================
-	// 1. Sense — forward-hemisphere neighbor scan. Real geometry only:
-	//    world-space direction/distance for the cone test, course_dist_m/
-	//    lateral_pos for longitudinal/lateral relationships. Never array index.
+	// 1. Sense — ALL nearby riders within sense_radius_m, omnidirectional
+	//    (360°). Real geometry only: world-space direction/distance,
+	//    course_dist_m/lateral_pos for cohesion's longitudinal/lateral
+	//    relationships, ws_fwd_gap/ws_right_gap (projected onto MY
+	//    bike_direction/right) for avoidance's box-overlap test. Never array
+	//    index.
+	//
+	//    in_forward_hemisphere additionally flags whether a rider falls
+	//    inside the forward sense cone — cohesion (section 2) only acts on
+	//    hemisphere-flagged riders (that's what "hemisphere-based" sensing
+	//    means for drafting: you draft off whoever's ahead of YOU, not
+	//    whoever's behind). Avoidance (section 3) deliberately ignores this
+	//    flag and scans everyone in radius: a physical box-overlap is
+	//    symmetric — if I don't sense someone who's overlapping my box
+	//    (e.g. they're right behind me, outside my forward cone), avoidance
+	//    would silently do nothing on my side even though we're overlapping,
+	//    leaving only THEIR avoidance to push us apart. Both riders need to
+	//    react for the overlap to resolve quickly and for it to look like a
+	//    mutual push instead of one bike getting shoved.
 	// ============================================================
-	struct Neighbor { BikeObject* rider; float dist; float long_gap; float lat_gap; };
-	std::vector<Neighbor> neighbors;
+	struct Neighbor { BikeObject* rider; float dist; float long_gap; float lat_gap; float ws_fwd_gap; float ws_right_gap; bool in_forward_hemisphere; };
+	std::vector<Neighbor> all_nearby;
 	if (g_bike_app) {
 		const float cos_half_angle = glm::cos(glm::radians(p.sense_half_angle_deg));
 		for (BikeObject* other : g_bike_app->all_riders) {
@@ -67,153 +98,188 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			const glm::vec3 to_other = other->get_ws_position() - my_pos;
 			const float dist = glm::length(to_other);
 			if (dist < 0.01f || dist > p.sense_radius_m) continue;
-			if (glm::dot(my_bike->bike_direction, to_other / dist) < cos_half_angle) continue;
-			neighbors.push_back({ other,
-			                       dist,
-			                       other->course_dist_m - my_bike->course_dist_m,  // +ve = ahead
-			                       other->lateral_pos    - my_bike->lateral_pos }); // +ve = neighbor road-right
+			const bool in_hemi = glm::dot(my_bike->bike_direction, to_other / dist) >= cos_half_angle;
+			all_nearby.push_back({ other,
+			                        dist,
+			                        other->course_dist_m - my_bike->course_dist_m,  // +ve = ahead
+			                        other->lateral_pos    - my_bike->lateral_pos,   // +ve = neighbor road-right
+			                        glm::dot(to_other, my_bike->bike_direction),    // +ve = ahead of me, MY facing
+			                        glm::dot(to_other, my_right),                   // +ve = to my right, MY facing
+			                        in_hemi });
 		}
 	}
-	dbg_num_neighbors = (int)neighbors.size();
+	dbg_num_neighbors = (int)std::count_if(all_nearby.begin(), all_nearby.end(),
+		[](const Neighbor& n) { return n.in_forward_hemisphere; });
 
-	// Debug breakdown, one entry per sensed neighbor, same order/size as
-	// `neighbors` above — filled in as each magnetism term below decides its
-	// contribution. See BikeAIDebugNeighbor / BikeDebugger's selected-rider view.
+	// Debug breakdown, one entry per sensed neighbor (omnidirectional — same
+	// order/size as `all_nearby` above), filled in as each cohesion/avoidance
+	// term below decides its contribution. See BikeAIDebugNeighbor /
+	// BikeDebugger's selected-rider view.
 	dbg_neighbors.clear();
-	dbg_neighbors.reserve(neighbors.size());
-	for (const Neighbor& n : neighbors)
+	dbg_neighbors.reserve(all_nearby.size());
+	for (const Neighbor& n : all_nearby)
 		dbg_neighbors.push_back({ n.rider, n.dist, n.long_gap, n.lat_gap });
 
 	// ============================================================
-	// 2. Magnetism — desired lateral offset, layered on top of the racing
-	// line's own precomputed offset. Disabled via p.enable_magnetism: AI then
-	// just tracks the racing line with no pack-position adjustment.
+	// 2. Cohesion (draft) — desired lateral offset, layered on top of the
+	// racing line's own precomputed offset. Independently toggleable from
+	// avoidance below via p.enable_cohesion.
 	// ============================================================
 	float target_offset_delta = 0.f;
 
-	// Nearest forward neighbor is still sensed (drives draft speed-matching in
-	// section 5 below regardless of the magnetism toggle).
+	// Nearest forward neighbor — hemisphere-sensed, never sorted/array-index
+	// (see file header). Drives both cohesion's "behind" pull and its
+	// following-gap speed match below, regardless of the cohesion toggle.
 	const Neighbor* nearest_ahead = nullptr;
-	for (const Neighbor& n : neighbors) {
+	for (const Neighbor& n : all_nearby) {
+		if (!n.in_forward_hemisphere) continue;
 		if (n.long_gap <= 0.f) continue;
 		if (!nearest_ahead || n.long_gap < nearest_ahead->long_gap)
 			nearest_ahead = &n;
 	}
 
-	float separation_term = 0.f;
-	float lineform_term   = 0.f;
-	float cohesion_term   = 0.f;
-	float draft_blend     = 0.f;  // 0..1 — see draft note below
-	float avoidance_brake = 0.f;  // combined into brake_amount in section 3
+	float cohesion_behind_lat = 0.f;
+	float cohesion_closer_lat = 0.f;
+	bool  cohesion_have_speed_target = false;
+	float cohesion_target_speed      = 0.f;
 
-	if (p.enable_magnetism) {
-		// Separation: push away from any neighbor closer than separation_dist_m
-		// (real 3D distance), weighted by inverse falloff. Soft/continuous —
-		// not decisive enough on its own to stop an actual overlap when someone
-		// cuts across laterally; see the collision-avoidance block below for that.
-		for (size_t i = 0; i < neighbors.size(); ++i) {
-			const Neighbor& n = neighbors[i];
-			if (n.dist >= p.separation_dist_m) continue;
-			const float weight = 1.f - n.dist / p.separation_dist_m;
-			const float contrib = -glm::sign(n.lat_gap) * weight * p.separation_k;
-			separation_term += contrib;
-			dbg_neighbors[i].separation_contrib = contrib;
+	if (p.enable_cohesion) {
+		// "Behind": pull laterally into the nearest ahead-neighbor's wheel
+		// track (drive their lat_gap toward 0) and hold a following gap by
+		// speed-matching, once within cohesion_follow_dist_m longitudinally —
+		// real drafting, sitting behind rather than beside.
+		if (nearest_ahead && nearest_ahead->long_gap < p.cohesion_follow_dist_m) {
+			// +lat_gap, not -lat_gap: target_lat is an ABSOLUTE lateral position
+			// (same frame as lateral_pos), and wp.racing_line_lateral is already
+			// close to my current position — so target += lat_gap converges
+			// toward leader.lateral_pos (my_pos + lat_gap), i.e. actually pulls
+			// in behind them, matching cohesion_closer_lat's sign convention below.
+			cohesion_behind_lat = nearest_ahead->lat_gap * p.cohesion_behind_k;
+			dbg_neighbors[nearest_ahead - all_nearby.data()].is_cohesion_behind_leader = true;
+			dbg_cohesion_gap_m = nearest_ahead->long_gap;
+
+			const float gap_err = nearest_ahead->long_gap - p.cohesion_gap_m;
+			cohesion_have_speed_target = true;
+			cohesion_target_speed      = nearest_ahead->rider->speed + glm::clamp(gap_err * p.cohesion_gap_kp, -3.f, 3.f);
 		}
-		target_offset_delta += separation_term;
+		target_offset_delta += cohesion_behind_lat;
 
-		// Draft: blend fraction toward the leader's own lateral_pos, applied
-		// further down once the racing-line target is known — see
-		// BikeAIParams::draft_follow_k. Computed here (not as a target_offset_delta
-		// term) because "adopt their line" and "nudge toward their line" are
-		// different operations; strengthens as the gap closes.
-		if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m) {
-			draft_blend = glm::clamp(1.f - nearest_ahead->long_gap / p.draft_dist_m, 0.f, 1.f) * p.draft_follow_k;
-			dbg_neighbors[nearest_ahead - neighbors.data()].is_draft_leader = (draft_blend > 0.f);
-		}
-
-		// Line formation: smaller, always-on pull toward alignment with the nearest
-		// forward neighbor (any range within the sense hemisphere), so riders settle
-		// into a single-file line even before they're close enough to draft.
-		if (nearest_ahead) {
-			lineform_term = -nearest_ahead->lat_gap * p.lineformation_k;
-			dbg_neighbors[nearest_ahead - neighbors.data()].is_lineform_leader = true;
-		}
-		target_offset_delta += lineform_term;
-
-		// Cohesion: only when isolated (nearest neighbor farther than the trigger
-		// distance) — pull toward the lateral centroid of sensed neighbors so a
-		// rider doesn't drift away from the group when nobody is close enough for
-		// draft/line-formation to matter.
-		if (!neighbors.empty()) {
-			float nearest_dist = FLT_MAX;
-			for (const Neighbor& n : neighbors) nearest_dist = glm::min(nearest_dist, n.dist);
-			if (nearest_dist > p.cohesion_trigger_dist_m) {
-				float centroid_lat = 0.f;
-				for (const Neighbor& n : neighbors) centroid_lat += n.lat_gap;
-				centroid_lat /= (float)neighbors.size();
-				cohesion_term = centroid_lat * p.cohesion_k;
-				for (BikeAIDebugNeighbor& dn : dbg_neighbors) dn.is_cohesion_member = true;
+		// "Closer": always-on lateral magnetism toward the centroid of
+		// hemisphere-sensed neighbors (ahead or behind, but still within MY
+		// forward cone) — bunches the group up laterally even when nobody is
+		// close enough ahead to draft off of.
+		{
+			float centroid_lat = 0.f;
+			int   hemi_count   = 0;
+			for (size_t i = 0; i < all_nearby.size(); ++i) {
+				const Neighbor& n = all_nearby[i];
+				if (!n.in_forward_hemisphere) continue;
+				centroid_lat += n.lat_gap;
+				++hemi_count;
+				dbg_neighbors[i].is_cohesion_closer_member = true;
+			}
+			if (hemi_count > 0) {
+				centroid_lat /= (float)hemi_count;
+				cohesion_closer_lat = centroid_lat * p.cohesion_closer_k;
 				const BikeWaypoint wp_centroid = course->sample(my_bike->course_dist_m);
 				dbg_cohesion_centroid_pt = wp_centroid.position + wp_centroid.right * (my_bike->lateral_pos + centroid_lat);
 			}
 		}
-		target_offset_delta += cohesion_term;
+		target_offset_delta += cohesion_closer_lat;
+	}
+	dbg_cohesion_behind_lat = cohesion_behind_lat;
+	dbg_cohesion_closer_lat = cohesion_closer_lat;
 
-		// ---- Collision avoidance ----
-		// Find the most severe active conflict among ALL sensed neighbors (not
-		// just nearest_ahead — someone beside or cutting in matters just as
-		// much as someone directly ahead). "Active" = inside BOTH the
-		// longitudinal and lateral collision thresholds at once; severity is
-		// how deep into both zones (0..1 each), multiplied, so being close on
-		// only one axis is never treated as urgent as being close on both.
+	// ============================================================
+	// 3. Avoidance — decentralized overlap prevention, computed and applied
+	// entirely in WORLDSPACE (ws_fwd_gap/ws_right_gap, projected onto MY OWN
+	// bike_direction/right from section 1 — never course_dist_m/lateral_pos,
+	// which is road-tangent-relative and diverges from actual physical
+	// position through corners). Conflict test is a true box-overlap
+	// (Minkowski sum): every rider shares the same prefab box
+	// (avoidance_box_half_long_m/lat_m half-extents), so two riders' boxes
+	// touch once the worldspace gap on an axis drops below TWICE the
+	// half-extent — that's the hard "drop dead" boundary. A soft margin
+	// OUTSIDE that boundary ramps severity 0->1, so the response builds in
+	// smoothly instead of snapping to full force. Touches LATERAL POSITION
+	// directly (a worldspace displacement vector, ci.avoidance_lateral_vel),
+	// never heading/bike_direction — see BikeAIParams::enable_avoidance for
+	// why: routing this through the heading PID (like cohesion's
+	// lateral_shift_kp path) built up turn momentum that overshot and had to
+	// unwind, yoyoing against cohesion pulling back in. A direct velocity,
+	// proportional only to this tick's severity, has no memory to unwind.
+	// ============================================================
+	glm::vec3 avoidance_lateral_vel(0.f);  // direct worldspace slide vector (ControlInput::avoidance_lateral_vel)
+	float avoidance_brake = 0.f;  // combined into brake_amount in section 5
+
+	if (p.enable_avoidance) {
+		const float hard_long_m    = 2.f * p.avoidance_box_half_long_m;
+		const float hard_lat_m     = 2.f * p.avoidance_box_half_lat_m;
+		const float trigger_long_m = hard_long_m + p.avoidance_soft_margin_long_m;
+		const float trigger_lat_m  = hard_lat_m  + p.avoidance_soft_margin_lat_m;
+		auto axis_severity = [](float gap_abs, float hard, float trigger) {
+			if (gap_abs >= trigger) return 0.f;
+			if (gap_abs <= hard)    return 1.f;
+			return (trigger - gap_abs) / (trigger - hard);  // linear ramp through the soft margin
+		};
+
+		// Find the most severe active conflict among ALL sensed neighbors,
+		// omnidirectionally (all_nearby, NOT hemisphere-filtered — see section
+		// 1: someone directly behind me still physically overlaps my box, and
+		// I need to react too, not just leave it to their avoidance). Severity
+		// is how deep into both axes' zones (0..1 each), multiplied, so being
+		// close on only one axis is never treated as urgent as being close on
+		// both.
 		const Neighbor* conflict = nullptr;
 		float conflict_severity  = 0.f;
-		for (const Neighbor& n : neighbors) {
-			if (glm::abs(n.long_gap) >= p.collision_long_m) continue;
-			if (glm::abs(n.lat_gap)  >= p.collision_lat_m)  continue;
-			const float long_severity = 1.f - glm::abs(n.long_gap) / p.collision_long_m;
-			const float lat_severity  = 1.f - glm::abs(n.lat_gap)  / p.collision_lat_m;
-			const float severity = long_severity * lat_severity;
+		for (const Neighbor& n : all_nearby) {
+			const float long_abs = glm::abs(n.ws_fwd_gap);
+			const float lat_abs  = glm::abs(n.ws_right_gap);
+			if (long_abs >= trigger_long_m) continue;
+			if (lat_abs  >= trigger_lat_m)  continue;
+			const float severity = axis_severity(long_abs, hard_long_m, trigger_long_m)
+			                      * axis_severity(lat_abs,  hard_lat_m,  trigger_lat_m);
 			if (severity > conflict_severity) { conflict_severity = severity; conflict = &n; }
 		}
-		float avoidance_lat_term = 0.f;
 		if (conflict) {
-			BikeAIDebugNeighbor& dn_conflict = dbg_neighbors[conflict - neighbors.data()];
+			BikeAIDebugNeighbor& dn_conflict = dbg_neighbors[conflict - all_nearby.data()];
 			dn_conflict.is_avoidance_conflict = true;
 			dn_conflict.avoidance_severity    = conflict_severity;
-			// Prefer yielding sideways, away from the conflicting neighbor.
-			// Room check: the resulting lateral position must stay on the
-			// road, and no OTHER sensed neighbor at a similar longitudinal
-			// offset can already be sitting where this move would put me —
-			// otherwise I'd just trade one overlap for another.
-			const float avoid_dir     = (conflict->lat_gap >= 0.f) ? -1.f : 1.f;  // move away from them
-			const float candidate_lat = my_bike->lateral_pos + avoid_dir * p.collision_lat_m;
+			// Prefer yielding sideways, away from the conflicting neighbor, by a
+			// full hard_lat_m clearance (guarantees the box no longer overlaps,
+			// not just "outside the soft zone"). Room check, also worldspace: the
+			// resulting position must stay on the road (approximated via the
+			// course frame — road edges are inherently road-relative), and no
+			// OTHER sensed neighbor's box can already be sitting where this move
+			// would put me — otherwise I'd just trade one overlap for another.
+			const float avoid_sign = (conflict->ws_right_gap >= 0.f) ? -1.f : 1.f;  // move away from them, MY right
+			const glm::vec3 move_vec = my_right * (avoid_sign * hard_lat_m);
 			const BikeWaypoint wp_now = course->sample(my_bike->course_dist_m);
+			const float candidate_lat = my_bike->lateral_pos + glm::dot(move_vec, wp_now.right);
 			const float road_limit    = glm::max(wp_now.road_half_width - p.edge_safety_m, 0.1f);
 			bool room_available = glm::abs(candidate_lat) <= road_limit;
 			if (room_available) {
-				for (const Neighbor& n : neighbors) {
+				for (const Neighbor& n : all_nearby) {
 					if (&n == conflict) continue;
-					if (glm::abs(n.long_gap) >= p.collision_long_m) continue;
-					const float n_gap_after_move = n.lat_gap - avoid_dir * p.collision_lat_m;
-					if (glm::abs(n_gap_after_move) < p.collision_lat_m) { room_available = false; break; }
+					if (glm::abs(n.ws_fwd_gap) >= trigger_long_m) continue;
+					const float n_right_after_move = n.ws_right_gap - avoid_sign * hard_lat_m;
+					if (glm::abs(n_right_after_move) < hard_lat_m) { room_available = false; break; }
 				}
 			}
+			// Proportional to severity only — no integrator, no accel/momentum
+			// to build up or unwind, so it self-cancels the instant the
+			// conflict clears instead of overshooting past it.
 			if (room_available)
-				avoidance_lat_term = avoid_dir * p.avoidance_lateral_k * conflict_severity;
+				avoidance_lateral_vel = my_right * (avoid_sign * p.avoidance_lateral_speed_mps * conflict_severity);
 			else
 				avoidance_brake = p.avoidance_brake_k * conflict_severity;
 		}
-		target_offset_delta += avoidance_lat_term;
-		dbg_avoidance_active   = (conflict != nullptr);
-		dbg_avoidance_lat_term = avoidance_lat_term;
-		dbg_avoidance_brake    = avoidance_brake;
+		dbg_avoidance_active = (conflict != nullptr);
+	} else {
+		dbg_avoidance_active = false;
 	}
-
-	dbg_separation_offset = separation_term;
-	dbg_draft_blend       = draft_blend;
-	dbg_lineform_offset   = lineform_term;
-	dbg_cohesion_offset   = cohesion_term;
+	dbg_avoidance_lateral_vel = glm::dot(avoidance_lateral_vel, my_right);
+	dbg_avoidance_brake       = avoidance_brake;
 
 	// ---- Target lateral position: racing line + magnetism, hard-clamped to
 	// the road surface so the AI can never be commanded off the track.
@@ -233,16 +299,13 @@ void BikeAI::evaluate(BikeObject* my_bike)
 
 	const float lat_limit = glm::max(wp_ahead.road_half_width - p.edge_safety_m, 0.1f);
 	const float racing_line_target_raw = wp_ahead.racing_line_lateral + target_offset_delta + manual_offset_term;
-	// Draft blend applied last, on top of everything else: at draft_blend=1
-	// (locked onto the leader's wheel) this fully overrides the racing-line
-	// target with their actual lateral_pos — that's the point of drafting,
-	// sitting where they are rather than where the ideal line says to be.
-	// Debug lateral override: hard-pin the target, bypassing racing line,
-	// magnetism, and draft entirely — see BikeObject::ai_override_lateral_enabled.
+	// Debug lateral override: hard-pin the target, bypassing racing line and
+	// cohesion entirely — see BikeObject::ai_override_lateral_enabled.
+	// Avoidance is NOT overridden by this (it's a direct lateral_shift command
+	// applied below, not part of the target lateral position).
 	const float target_lat_raw = my_bike->ai_override_lateral_enabled
 	    ? my_bike->ai_override_lateral_pos_m
-	    : (nearest_ahead ? glm::mix(racing_line_target_raw, nearest_ahead->rider->lateral_pos, draft_blend)
-	                      : racing_line_target_raw);
+	    : racing_line_target_raw;
 	const float target_lat = glm::clamp(target_lat_raw, -lat_limit, lat_limit);
 	dbg_clamped           = (target_lat != target_lat_raw);
 	dbg_target_lat_offset = target_lat;
@@ -271,6 +334,8 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	                                        glm::dot(my_bike->bike_direction, rl_tangent));
 	dbg_heading_error = heading_error;
 
+	// Cohesion/racing-line only — avoidance never touches this (or heading at
+	// all); it's a direct worldspace lateral slide instead, see section 3.
 	const float lateral_shift = glm::clamp(
 		p.lateral_shift_kp * lat_error + p.heading_shift_kp * heading_error * corner_weight, -1.f, 1.f);
 	dbg_lateral_shift = lateral_shift;
@@ -285,7 +350,7 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	dbg_steer_final = -lateral_shift;
 
 	// ============================================================
-	// 3. Corner braking — lookahead safety scan, unchanged in spirit.
+	// 4. Corner braking — lookahead safety scan, unrelated to cohesion/avoidance.
 	// ============================================================
 	const float max_decel = 0.8f * 7.f * my_bike->surface_traction;
 	float brake_amount = 0.f;
@@ -318,18 +383,20 @@ void BikeAI::evaluate(BikeObject* my_bike)
 		}
 	}
 
-	// Collision-avoidance braking (computed in section 2, applies regardless
-	// of whether a corner is also demanding it — take whichever is stronger).
+	// Avoidance braking (computed in section 3, applies regardless of whether
+	// a corner is also demanding it — take whichever is stronger). Applied
+	// directly, bypassing the speed PID below — no integral lag, full
+	// severity-scaled brake the instant a conflict has no room to yield.
 	brake_amount = glm::clamp(glm::max(brake_amount, avoidance_brake), 0.f, 1.f);
 	dbg_brake_amount = brake_amount;
 
 	// ============================================================
-	// 4. Speed/power PID. No neighbor to hold pace with -> constant cruise
-	//    power. Otherwise, PID-track the nearest drafting neighbor's speed
-	//    (with a P-term gap correction) so followers actively burn matches to
-	//    hold the wheel rather than just relying on steering/shift alone.
-	//    Debug override (BikeObject::ai_override_speed_enabled) replaces
-	//    whichever target this tick would otherwise have picked.
+	// 5. Speed/power PID. No cohesion follow target -> constant cruise power.
+	//    Otherwise, PID-track the behind-leader's speed (with a P-term gap
+	//    correction, computed in section 2) so a follower actively burns
+	//    matches to hold the wheel rather than just relying on steering
+	//    alone. Debug override (BikeObject::ai_override_speed_enabled)
+	//    replaces whichever target this tick would otherwise have picked.
 	// ============================================================
 	float power;
 	bool  have_speed_target = false;
@@ -337,10 +404,9 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	if (my_bike->ai_override_speed_enabled) {
 		have_speed_target = true;
 		target_speed      = my_bike->ai_override_target_speed_ms;
-	} else if (nearest_ahead && nearest_ahead->long_gap < p.draft_dist_m) {
-		const float gap_err = nearest_ahead->long_gap - (p.draft_dist_m * 0.4f);
+	} else if (cohesion_have_speed_target) {
 		have_speed_target = true;
-		target_speed      = nearest_ahead->rider->speed + glm::clamp(gap_err * 0.5f, -3.f, 3.f);
+		target_speed      = cohesion_target_speed;
 	}
 
 	if (have_speed_target) {
@@ -367,6 +433,7 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	ci.lateral_shift = lateral_shift;
 	ci.brake_amount  = brake_amount;
 	ci.power         = (brake_amount > 0.1f) ? 0.f : power;
+	ci.avoidance_lateral_vel = avoidance_lateral_vel;  // direct worldspace slide, bypasses heading entirely — see section 3
 
 	my_bike->update_tick(ci);
 }

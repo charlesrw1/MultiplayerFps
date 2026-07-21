@@ -1,8 +1,8 @@
 // BikeApplication_Pack.cpp
 // Pack dynamics: grouping and drafting. All functions are methods of
 // BikeGameApplication (declared in BikeHeaders.h). Wheel-picking, paceline
-// FSM, clear-air resolver, and priority-yield have been removed — magnetism
-// (BikeAI::evaluate) is the only positioning layer now. See [[bike/bikeai]].
+// FSM, clear-air resolver, and priority-yield have been removed — cohesion +
+// avoidance (BikeAI::evaluate) is the only positioning layer now. See [[bike/bikeai]].
 #include "BikeHeaders.h"
 
 #include "Game/GameplayStatic.h"

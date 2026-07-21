@@ -270,6 +270,18 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	// ---- Position: integrate worldspace velocity directly ----
 	glm::vec3 pos = prev_ws_pos + bike_direction * speed * dt;
 
+	// Avoidance slide: a direct worldspace displacement, already a full 3D
+	// vector (computed by BikeAI in its OWN local frame, not the course's),
+	// NOT routed through bike_direction/heading at all. Deliberately bypasses
+	// the heading PID's momentum/accel-cap chain — going through heading meant
+	// the turn kept accelerating past what was needed, then had to unwind the
+	// same way once clear, producing a spring/overshoot "yoyo" between
+	// avoidance and cohesion pulling back in. A direct velocity has no memory:
+	// it's proportional to this tick's conflict severity only, so it decays to
+	// zero exactly as fast as the conflict does, no unwind needed. See
+	// BikeAI.cpp section 3 / ControlInput::avoidance_lateral_vel.
+	pos += ci.avoidance_lateral_vel * dt;
+
 	// ---- Re-derive rail state from the new worldspace position ----
 	const float lateral_pos_before = lateral_pos;
 	float new_lateral = lateral_pos;

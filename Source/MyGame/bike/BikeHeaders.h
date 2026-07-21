@@ -149,8 +149,8 @@ extern WindSystem g_wind;
 // BikeAIParams — global tuning knobs shared by all AI riders.
 // Edit via the debug menu; never loop through riders to set these.
 //
-// ONE layer: speed PID (power) + boids-style magnetism (cohesion/separation/
-// draft/line-formation, layered on the racing line's own offset) -> a target
+// ONE layer: speed PID (power) + two pack-behavior terms — cohesion (draft)
+// and avoidance, layered on the racing line's own offset — -> a target
 // lateral position -> lateral_shift, which BikeObject::tick_transform turns
 // into a heading correction (worldspace-authoritative steering, not a rail
 // translation). See [[bike/bikeai]].
@@ -172,35 +172,59 @@ struct BikeAIParams {
 	float sense_radius_m      = 15.f;  // m — ignore riders beyond this
 	float sense_half_angle_deg = 100.f; // deg — forward cone half-angle
 
-	// ---- Magnetism: desired lateral offset (m, road/wheel frame) ----
-	bool  enable_magnetism         = true;  // if false, AI just tracks the racing line — no pack behavior at all
-	float cohesion_k               = 0.5f;  // pull toward neighbor centroid beyond this range
-	float cohesion_trigger_dist_m  = 6.f;   // only cohere if nearest neighbor farther than this
-	float separation_k             = 1.2f;  // push away from neighbors closer than separation_dist_m
-	float separation_dist_m        = 1.0f;  // m — full-strength push starts inside this radius
-	// Draft: ADOPTS the leader's actual lateral_pos (not a proportional nudge
-	// toward it) — real drafting means sitting on the wheel directly ahead,
-	// sacrificing the racing line if the leader isn't on it. draft_follow_k is
-	// a blend fraction (0=ignore leader's line, 1=fully lock onto it), scaled
-	// by how close the gap is (glm::clamp(1 - long_gap/draft_dist_m, 0, 1)) so
-	// the pull strengthens as you close in rather than snapping on at range.
-	float draft_follow_k           = 0.7f;
-	float draft_dist_m             = 8.0f;  // m — only draft-pull within this longitudinal range
-	float lineformation_k          = 0.35f; // always-on bias toward zero lateral offset from neighbors' track
+	// ---- Cohesion (draft): pulls a rider in behind whoever is sensed ahead,
+	// and bunches the whole sensed group closer together laterally. Two
+	// independent sub-terms — see BikeAI.cpp section 2. Smooth/gradual by
+	// design: real feedback lives in the shared speed PID and lateral_shift_kp
+	// below, not a fast override — that's the avoidance term's job. ----
+	bool  enable_cohesion         = true;   // if false, this whole term is skipped (avoidance is independent, see below)
+	// "Behind": lateral pull into the nearest ahead-neighbor's wheel track
+	// (drive their lat_gap toward 0) plus a following-gap speed match, once
+	// within cohesion_follow_dist_m longitudinally. This is the "draft" part.
+	float cohesion_behind_k       = 0.5f;   // lateral pull per metre of the leader's lat_gap
+	float cohesion_follow_dist_m  = 8.0f;   // m — only pulls/speed-matches within this longitudinal range ahead
+	float cohesion_gap_m          = 3.0f;   // m — target following gap once locked on (speed PID setpoint)
+	float cohesion_gap_kp         = 0.5f;   // (m/s) speed correction per metre of gap error
+	// "Closer": always-on lateral magnetism toward the lateral centroid of ALL
+	// sensed neighbors (ahead or behind) — keeps the group from spreading out
+	// sideways even when nobody is close enough ahead to draft off of.
+	float cohesion_closer_k       = 0.3f;   // pull toward neighbor lateral centroid, per metre of offset
 
-	// ---- Collision avoidance: decentralized — each rider independently
-	// detects an imminent overlap with ANY sensed neighbor (not just
-	// nearest_ahead) and resolves it by yielding sideways if there's room, or
-	// braking to fall back if there isn't. Both riders in a conflict run this
-	// same logic, so whichever has less room/more urgency ends up yielding —
-	// no central coordinator, same hemisphere-scan/no-array-index rule as the
-	// rest of this file. Separate from (and stacks on top of) the softer
-	// always-on separation term above, which alone isn't decisive enough to
-	// prevent an actual overlap when someone cuts across laterally. ----
-	float collision_long_m    = 2.0f;  // longitudinal gap inside this = an active conflict
-	float collision_lat_m     = 0.9f;  // lateral gap inside this = an active conflict (roughly bike width + margin)
-	float avoidance_lateral_k = 3.0f;  // strong lateral push when yielding, scaled by conflict severity (0..1)
-	float avoidance_brake_k   = 0.7f;  // brake_amount applied when there's no room to yield, scaled by severity
+	// ---- Avoidance: decentralized — every rider independently detects an
+	// imminent overlap with ANY sensed neighbor (not just the one ahead) and
+	// yields. Both riders in a conflict run this same logic, so whichever has
+	// less room/more urgency ends up yielding — no central coordinator, same
+	// hemisphere-scan/no-array-index rule as cohesion. Computed and applied
+	// entirely in WORLDSPACE, never course-space (course_dist_m/lateral_pos):
+	// each rider projects a neighbor's offset onto its OWN bike_direction/right
+	// (a real 3D box-overlap test, not a road-tangent-relative one, so it stays
+	// correct through corners where the two frames diverge). Also touches
+	// LATERAL POSITION directly (ControlInput::avoidance_lateral_vel, a
+	// worldspace velocity vector), never heading/bike_direction — routing it
+	// through the heading PID's momentum/accel-cap chain (like cohesion's
+	// lateral_shift_kp path does) meant the turn kept building past what was
+	// needed and then had to unwind the same way once clear, producing a
+	// spring/overshoot "yoyo" against cohesion pulling back in. A direct
+	// velocity, proportional only to this tick's conflict severity, has no
+	// memory to unwind. See BikeAI.cpp section 3 / BikeObject::tick_transform. ----
+	bool  enable_avoidance        = true;   // independent of enable_cohesion — can run with cohesion off
+	// Drop-dead box half-extents, matched to the rider prefab's own bounding
+	// box (prefab space: Z front/back, X left/right) — this is the box no
+	// other rider's own box should ever actually overlap, not an arbitrary
+	// tuning value. Prefab box is Z:[-0.9,0.9] X:[-0.25,0.25]. A conflict is a
+	// box-overlap test (Minkowski sum): since every rider shares this box, two
+	// riders' boxes touch when the worldspace gap on an axis drops below TWICE
+	// the half-extent — see BikeAI.cpp section 3.
+	float avoidance_box_half_long_m   = 0.9f;   // half-extent, Z (front/back)
+	float avoidance_box_half_lat_m    = 0.25f;  // half-extent, X (left/right)
+	// Soft reaction zone: severity ramps 0..1 linearly across this extra
+	// distance OUTSIDE the hard box-overlap boundary (severity=1 once boxes
+	// actually touch), so the response builds in smoothly instead of snapping
+	// to full force the instant the hard boundary is crossed.
+	float avoidance_soft_margin_long_m = 1.5f;
+	float avoidance_soft_margin_lat_m  = 0.5f;
+	float avoidance_lateral_speed_mps  = 3.5f;  // direct worldspace lateral slide speed at severity=1 (m/s)
+	float avoidance_brake_k            = 0.9f;  // brake_amount at severity=1, applied directly (bypasses speed PID)
 
 	// ---- Steer target lookahead — where along the course the target lateral
 	// offset is sampled from (pure-pursuit style preview, not the bike's own
@@ -251,26 +275,24 @@ struct BikeAIParams {
 	float offset_blend_tau_s  = 0.05f;  // low-pass tau smoothing the blend transition
 
 	// ---- Off-track hard clamp ----
-	float edge_safety_m = 0.8f;  // margin inside road edge the magnetism offset may never cross
+	float edge_safety_m = 0.8f;  // margin inside road edge the cohesion offset may never cross
 };
 extern BikeAIParams g_ai_params;
 
-// Per-neighbor breakdown of this tick's magnetism, rebuilt fresh every
-// BikeAI::evaluate() call (same lifetime as the hemisphere scan itself —
-// riders drift in/out of sense range tick to tick). Debug-only: lets
+// Per-neighbor breakdown of this tick's cohesion/avoidance, rebuilt fresh
+// every BikeAI::evaluate() call (same lifetime as the hemisphere scan itself
+// — riders drift in/out of sense range tick to tick). Debug-only: lets
 // BikeDebugger draw exactly which sensed riders contributed what, and how
-// much, rather than just the summed totals in BikeAI::dbg_*_offset.
+// much, rather than just the summed totals in BikeAI::dbg_*.
 struct BikeAIDebugNeighbor {
-	BikeObject* rider              = nullptr;
-	float       dist               = 0.f;
-	float       long_gap           = 0.f;  // +ve = ahead of me
-	float       lat_gap            = 0.f;  // +ve = road-right of me
-	float       separation_contrib = 0.f;  // this neighbor's own share of dbg_separation_offset (m)
-	bool        is_draft_leader    = false;  // == the rider draft_blend is locking onto
-	bool        is_lineform_leader = false;  // == the rider lineform is pulling toward (same as draft leader when both active)
-	bool        is_cohesion_member = false;  // included in this tick's cohesion centroid average
-	bool        is_avoidance_conflict = false;
-	float       avoidance_severity    = 0.f;
+	BikeObject* rider                     = nullptr;
+	float       dist                      = 0.f;
+	float       long_gap                  = 0.f;  // +ve = ahead of me
+	float       lat_gap                   = 0.f;  // +ve = road-right of me
+	bool        is_cohesion_behind_leader = false;  // nearest-ahead neighbor cohesion is pulling behind / speed-matching
+	bool        is_cohesion_closer_member = false;  // included in this tick's "closer" lateral centroid average
+	bool        is_avoidance_conflict     = false;
+	float       avoidance_severity        = 0.f;
 };
 
 class BikeAI : public IBikeInput {
@@ -304,18 +326,17 @@ public:
 	float dbg_v_max              = 0.f;
 	float dbg_target_speed       = 0.f;
 	int   dbg_num_neighbors      = 0;
-	float dbg_cohesion_offset    = 0.f;
-	float dbg_separation_offset  = 0.f;
-	float dbg_draft_blend        = 0.f;  // 0..1, how strongly locked onto the draft leader's own lateral_pos
-	float dbg_lineform_offset    = 0.f;
+	float dbg_cohesion_behind_lat = 0.f;  // lateral term from the "behind" sub-term (m)
+	float dbg_cohesion_closer_lat = 0.f;  // lateral term from the "closer" sub-term (m)
+	float dbg_cohesion_gap_m      = 0.f;  // actual longitudinal gap to the behind-leader, valid iff dbg_cohesion_behind_lat's leader exists
 	float dbg_target_lat_offset  = 0.f;
 	bool  dbg_clamped            = false;
 	float dbg_lateral_shift      = 0.f;
 	float dbg_heading_error      = 0.f;  // rad, signed angle from bike_direction to the racing line's own tangent
 	bool  dbg_avoidance_active   = false;
-	float dbg_avoidance_lat_term = 0.f;  // extra target-offset delta from yielding sideways (m)
+	float dbg_avoidance_lateral_vel = 0.f;  // signed speed along my own right vector (m/s) — dot(ci.avoidance_lateral_vel, my_right)
 	float dbg_avoidance_brake    = 0.f;  // extra brake_amount from an unavoidable conflict (0..1)
-	glm::vec3 dbg_cohesion_centroid_pt{};  // world-space point at the cohesion centroid lateral offset, valid iff dbg_cohesion_offset != 0
+	glm::vec3 dbg_cohesion_centroid_pt{};  // world-space point at the "closer" centroid lateral offset, valid iff dbg_cohesion_closer_lat != 0
 	std::vector<BikeAIDebugNeighbor> dbg_neighbors;  // rebuilt every evaluate() — see BikeAIDebugNeighbor
 };
 
@@ -382,6 +403,7 @@ public:
 		float lateral_shift = 0.0; // -1..1 — the only lateral control: bends bike_direction toward a lateral target (rate-capped turn, see BikeObject::tick_transform)
 		float brake_amount = 0.0;// 0,1
 		float power = 0.0;	// input _watts_ requested
+		glm::vec3 avoidance_lateral_vel = glm::vec3(0.f); // m/s, worldspace vector (already includes direction, e.g. along the yielding bike's own right vector) — a direct positional slide, deliberately NOT routed through bike_direction/heading (see BikeObject::tick_transform). Set by BikeAI's avoidance term only; BikePlayer never sets it.
 
 
 		bool is_coasting() const { return power == 0.0; }
@@ -550,3 +572,9 @@ private:
 // Shared per-rider stats text + gizmo overlay — defined in BikeApplication_Debug.cpp.
 // Used by the index-based follow camera and BikeDebugger's click-to-select orbit camera.
 void draw_rider_debug_info(BikeObject* bo);
+
+// Opt-in avoidance diagnostic overlay (drop-dead box, optionally the outer
+// soft-reaction box too, + vectors to yielded-to neighbors + the actual
+// commanded slide) — defined in BikeApplication_Debug.cpp.
+// See BikeDebugger::draw_avoidance_box / draw_avoidance_soft_box.
+void draw_rider_avoidance_box(BikeObject* bo, bool draw_soft_box);

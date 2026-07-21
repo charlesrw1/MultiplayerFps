@@ -126,10 +126,9 @@ void draw_rider_debug_info(BikeObject* bo)
 		// --- Mode and path-following breakdown ---
 		GameplayStatic::debug_text(string_format("[AI] spd=%.1fm/s  neighbors=%d  min_r=%.1fm%s",
 			bo->speed, ai->dbg_num_neighbors, ai->dbg_min_r, ai->dbg_clamped ? "  CLAMPED" : ""));
-		GameplayStatic::debug_text(string_format("[AI] cohesion=%+.2f  separation=%+.2f", ai->dbg_cohesion_offset, ai->dbg_separation_offset));
-		GameplayStatic::debug_text(string_format("[AI] draft_blend=%.0f%%  lineform=%+.2f", ai->dbg_draft_blend * 100.f, ai->dbg_lineform_offset));
+		GameplayStatic::debug_text(string_format("[AI] cohesion behind=%+.2f  closer=%+.2f  gap=%.1fm", ai->dbg_cohesion_behind_lat, ai->dbg_cohesion_closer_lat, ai->dbg_cohesion_gap_m));
 		if (ai->dbg_avoidance_active)
-			GameplayStatic::debug_text(string_format("[AI] AVOIDANCE lat=%+.2f brake=%.2f", ai->dbg_avoidance_lat_term, ai->dbg_avoidance_brake));
+			GameplayStatic::debug_text(string_format("[AI] AVOIDANCE lat_vel=%+.2fm/s brake=%.2f", ai->dbg_avoidance_lateral_vel, ai->dbg_avoidance_brake));
 		// Upcoming corner: distance, radius, safe speed, brake demand
 		if (ai->dbg_brake_dist_m > 0.f)
 			GameplayStatic::debug_text(string_format("[AI] corner in %.0fm  r=%.1fm  v_max=%.1fm/s  brake=%.2f",
@@ -176,23 +175,23 @@ void draw_rider_debug_info(BikeObject* bo)
 			}
 		}
 
-		// Cohesion centroid — only meaningful while cohesion is actually pulling
-		// (isolated: nearest neighbor farther than cohesion_trigger_dist_m).
-		if (ai->dbg_cohesion_offset != 0.f) {
+		// Cohesion "closer" centroid — meaningful whenever any neighbor is sensed
+		// (always-on term, see BikeAIParams::cohesion_closer_k).
+		if (ai->dbg_cohesion_closer_lat != 0.f) {
 			Debug::add_sphere(ai->dbg_cohesion_centroid_pt, 0.3f, Color32(0x40, 0x80, 0xff, 0xff), -1.f);
 			Debug::add_line(bo->get_ws_position(), ai->dbg_cohesion_centroid_pt, Color32(0x40, 0x80, 0xff, 0xa0), -1.f);
 			Debug::add_text_ex(ai->dbg_cohesion_centroid_pt + glm::vec3(0.f, 0.4f, 0.f), "cohesion centroid",
 				Color32(0x40, 0x80, 0xff, 0xff), 0.f, true, true, true);
 		}
 
-		// --- Per-neighbor magnetism contribution: text above THEIR head, plus a
-		// colored vector from the selected rider to them, one per active term
-		// (a single neighbor can carry more than one — e.g. the draft leader is
-		// almost always the lineform leader too). See BikeAIDebugNeighbor. ---
+		// --- Per-neighbor cohesion/avoidance contribution: text above THEIR
+		// head, plus a colored vector from the selected rider to them, one per
+		// active term (a single neighbor can carry more than one — e.g. the
+		// behind-leader is almost always also a "closer" member). See
+		// BikeAIDebugNeighbor. ---
 		for (const BikeAIDebugNeighbor& dn : ai->dbg_neighbors) {
 			if (!dn.rider) continue;
-			const bool active = dn.separation_contrib != 0.f || dn.is_draft_leader || dn.is_lineform_leader
-			                  || dn.is_cohesion_member || dn.is_avoidance_conflict;
+			const bool active = dn.is_cohesion_behind_leader || dn.is_cohesion_closer_member || dn.is_avoidance_conflict;
 			if (!active) continue;
 
 			const glm::vec3 n_pos  = dn.rider->get_ws_position();
@@ -204,25 +203,105 @@ void draw_rider_debug_info(BikeObject* bo)
 				label += string_format("AVOID sev=%.2f\n", dn.avoidance_severity);
 				Debug::add_line(my_pos, n_pos, Color32(0xff, 0x20, 0x20, 0xff), -1.f);
 			}
-			if (dn.is_draft_leader) {
-				label += "DRAFT LEADER\n";
+			if (dn.is_cohesion_behind_leader) {
+				label += "COHESION: behind leader\n";
 				Debug::add_line(my_pos, n_pos, Color32(0x20, 0xff, 0x20, 0xff), -1.f);
-			} else if (dn.is_lineform_leader) {
-				label += "lineform leader\n";
-				Debug::add_line(my_pos, n_pos, Color32(0x20, 0xaa, 0x60, 0xff), -1.f);
 			}
-			if (dn.separation_contrib != 0.f) {
-				label += string_format("separation=%+.2f\n", dn.separation_contrib);
-				Debug::add_line(my_pos, n_pos, Color32(0xff, 0x90, 0x00, 0xff), -1.f);
-			}
-			if (dn.is_cohesion_member) {
-				label += "cohesion member\n";
+			if (dn.is_cohesion_closer_member) {
+				label += "cohesion: closer member\n";
 				Debug::add_line(my_pos, n_pos, Color32(0x40, 0x80, 0xff, 0x60), -1.f);
 			}
 			label += string_format("dist=%.1fm  long=%+.1fm  lat=%+.2fm", dn.dist, dn.long_gap, dn.lat_gap);
 
 			Debug::add_text_ex(n_head, label, COLOR_WHITE, 0.f, true, true, true);
 		}
+	}
+}
+
+// Draws one oriented box outline (NOT an axis-aligned Debug::add_box, since
+// that would only look right when the bike happens to be facing a world
+// axis) — half-extents along `fwd`/`right`, fixed visual half-height.
+static void debug_draw_oriented_box(glm::vec3 center, glm::vec3 fwd, glm::vec3 right, glm::vec3 up,
+                                     float half_long, float half_lat, float half_height, Color32 col)
+{
+	auto corner = [&](float sz, float sx, float sy) {
+		return center + fwd * (sz * half_long) + right * (sx * half_lat) + up * (sy * half_height);
+	};
+	const glm::vec3 c[8] = {
+		corner(-1,-1,-1), corner(-1,-1, 1), corner(-1, 1,-1), corner(-1, 1, 1),
+		corner( 1,-1,-1), corner( 1,-1, 1), corner( 1, 1,-1), corner( 1, 1, 1),
+	};
+	// Edges: pairs of corners differing in exactly one of (z,x,y) — indices
+	// above are z*4 + x*2 + y, so edges are index pairs differing by 1, 2, or 4.
+	static constexpr int EDGE_BITS[3] = { 1, 2, 4 };
+	for (int i = 0; i < 8; ++i) {
+		for (int bit : EDGE_BITS) {
+			const int j = i ^ bit;
+			if (j > i) Debug::add_line(c[i], c[j], col, -1.f);
+		}
+	}
+}
+
+// Draws the selected rider's avoidance drop-dead box (oriented to their OWN
+// bike_direction/right, matching BikeAI.cpp's worldspace box-overlap test),
+// optionally the outer soft-reaction boundary too, plus a vector to every
+// neighbor it's currently yielding to and the actual commanded avoidance
+// slide vector. Opt-in (BikeDebugger::draw_avoidance_box/_soft_box) since
+// it's busy — meant for diagnosing avoidance specifically (e.g. the
+// yoyo/overshoot bug), not left on by default alongside draw_rider_debug_info's
+// own overlays.
+void draw_rider_avoidance_box(BikeObject* bo, bool draw_soft_box)
+{
+	if (!bo) return;
+	BikeAI* ai = dynamic_cast<BikeAI*>(bo->input.get());
+	if (!ai) return;
+
+	const BikeAIParams& p = g_ai_params;
+	const glm::vec3 my_pos = bo->get_ws_position();
+	const glm::vec3 fwd    = bo->bike_direction;
+	const glm::vec3 right  = glm::normalize(glm::cross(fwd, glm::vec3(0.f, 1.f, 0.f)));
+	const glm::vec3 up     = glm::vec3(0.f, 1.f, 0.f);
+	const float hh = 0.9f;  // half-height — purely visual, box has no real height concept
+
+	// Hard box: box_half_long/lat_m are the rider's OWN half-extents (the
+	// prefab box); the ACTUAL drop-dead boundary against another rider is
+	// double that (Minkowski sum, see BikeAI.cpp section 3) — draw the true
+	// hard boundary, not just my own half of it, so this matches what
+	// actually triggers a conflict against an identical neighbor.
+	const float hard_long = 2.f * p.avoidance_box_half_long_m;
+	const float hard_lat  = 2.f * p.avoidance_box_half_lat_m;
+	debug_draw_oriented_box(my_pos, fwd, right, up, hard_long, hard_lat, hh, Color32(0xff, 0xcc, 0x00, 0xff));
+
+	// Soft box: the outer trigger boundary where severity starts ramping up
+	// from 0 (see BikeAIParams::avoidance_soft_margin_long_m/lat_m) — margins
+	// are already full extra gap distances, added directly on top of the hard
+	// (already-doubled) boundary, not half-extents themselves.
+	if (draw_soft_box) {
+		const float soft_long = hard_long + p.avoidance_soft_margin_long_m;
+		const float soft_lat  = hard_lat  + p.avoidance_soft_margin_lat_m;
+		debug_draw_oriented_box(my_pos, fwd, right, up, soft_long, soft_lat, hh, Color32(0x00, 0xcc, 0xff, 0x90));
+	}
+
+	// Vector to every neighbor currently being yielded to.
+	for (const BikeAIDebugNeighbor& dn : ai->dbg_neighbors) {
+		if (!dn.rider || !dn.is_avoidance_conflict) continue;
+		const glm::vec3 n_pos = dn.rider->get_ws_position();
+		Debug::add_line(my_pos, n_pos, Color32(0xff, 0x00, 0x00, 0xff), -1.f);
+		Debug::add_text_ex(n_pos + glm::vec3(0.f, 2.1f, 0.f),
+			string_format("AVOIDING sev=%.2f", dn.avoidance_severity),
+			Color32(0xff, 0x00, 0x00, 0xff), 0.f, true, true, true);
+	}
+
+	// The actual commanded slide this tick (dbg_avoidance_lateral_vel is the
+	// signed speed along `right`, see BikeAI::evaluate section 3) — shows
+	// what's actually being sent to tick_transform, not just the geometry
+	// that triggered it.
+	if (glm::abs(ai->dbg_avoidance_lateral_vel) > 0.001f) {
+		const glm::vec3 slide_vec = right * ai->dbg_avoidance_lateral_vel;
+		Debug::add_line(my_pos, my_pos + slide_vec, Color32(0xff, 0x80, 0x00, 0xff), -1.f);
+		Debug::add_text_ex(my_pos + slide_vec + glm::vec3(0.f, 0.3f, 0.f),
+			string_format("slide %+.2fm/s", ai->dbg_avoidance_lateral_vel),
+			Color32(0xff, 0x80, 0x00, 0xff), 0.f, true, true, true);
 	}
 }
 
@@ -313,24 +392,33 @@ static void bike_course_debug()
 		ImGui::DragFloat("offset_blend_tau_s",      &p.offset_blend_tau_s,      0.02f, 0.f, 2.f,  "%.2f");
 	}
 
-	ImGui::SeparatorText("Magnetism");
+	ImGui::SeparatorText("Cohesion (draft)");
 	{
 		BikeAIParams& p = g_ai_params;
-		ImGui::Checkbox("enable_magnetism (off = follow path only)", &p.enable_magnetism);
-		ImGui::DragFloat("cohesion_k",              &p.cohesion_k,              0.02f, 0.f, 3.f,  "%.2f");
-		ImGui::DragFloat("cohesion_trigger_dist_m", &p.cohesion_trigger_dist_m, 0.2f,  0.f, 30.f, "%.1f");
-		ImGui::DragFloat("separation_k",            &p.separation_k,            0.05f, 0.f, 5.f,  "%.2f");
-		ImGui::DragFloat("separation_dist_m",       &p.separation_dist_m,       0.05f, 0.1f, 5.f, "%.2f");
-		ImGui::DragFloat("draft_follow_k",          &p.draft_follow_k,          0.02f, 0.f, 1.f,  "%.2f");
-		ImGui::DragFloat("draft_dist_m",             &p.draft_dist_m,           0.5f,  0.f, 30.f, "%.1f");
-		ImGui::DragFloat("lineformation_k",         &p.lineformation_k,         0.02f, 0.f, 2.f,  "%.2f");
-		ImGui::DragFloat("edge_safety_m",           &p.edge_safety_m,           0.05f, 0.f, 3.f,  "%.2f");
+		ImGui::Checkbox("enable_cohesion", &p.enable_cohesion);
+		ImGui::TextDisabled("Behind: lateral pull + speed match onto the nearest ahead-neighbor's wheel.");
+		ImGui::DragFloat("cohesion_behind_k",      &p.cohesion_behind_k,      0.02f, 0.f, 3.f,  "%.2f");
+		ImGui::DragFloat("cohesion_follow_dist_m", &p.cohesion_follow_dist_m, 0.5f,  0.f, 30.f, "%.1f");
+		ImGui::DragFloat("cohesion_gap_m",         &p.cohesion_gap_m,         0.1f,  0.f, 15.f, "%.2f");
+		ImGui::DragFloat("cohesion_gap_kp",        &p.cohesion_gap_kp,        0.02f, 0.f, 3.f,  "%.2f");
+		ImGui::TextDisabled("Closer: always-on lateral pull toward the sensed-group centroid.");
+		ImGui::DragFloat("cohesion_closer_k",      &p.cohesion_closer_k,      0.02f, 0.f, 3.f,  "%.2f");
+		ImGui::DragFloat("edge_safety_m",          &p.edge_safety_m,          0.05f, 0.f, 3.f,  "%.2f");
+	}
 
-		ImGui::SeparatorText("Collision avoidance");
-		ImGui::DragFloat("collision_long_m",    &p.collision_long_m,    0.1f,  0.2f, 10.f, "%.2f");
-		ImGui::DragFloat("collision_lat_m",     &p.collision_lat_m,     0.05f, 0.2f, 3.f,  "%.2f");
-		ImGui::DragFloat("avoidance_lateral_k", &p.avoidance_lateral_k, 0.1f,  0.f,  10.f, "%.2f");
-		ImGui::DragFloat("avoidance_brake_k",   &p.avoidance_brake_k,   0.02f, 0.f,  1.f,  "%.2f");
+	ImGui::SeparatorText("Avoidance (decentralized, worldspace box-overlap)");
+	{
+		BikeAIParams& p = g_ai_params;
+		ImGui::Checkbox("enable_avoidance", &p.enable_avoidance);
+		ImGui::TextDisabled("Direct worldspace slide, never touches heading — see BikeAI.cpp section 3.");
+		ImGui::TextDisabled("Box half-extents (rider prefab space, Z front/back, X left/right):");
+		ImGui::DragFloat("avoidance_box_half_long_m",    &p.avoidance_box_half_long_m,    0.05f, 0.1f, 3.f,  "%.2f");
+		ImGui::DragFloat("avoidance_box_half_lat_m",     &p.avoidance_box_half_lat_m,     0.05f, 0.1f, 2.f,  "%.2f");
+		ImGui::TextDisabled("Soft ramp distance OUTSIDE the hard box-overlap boundary:");
+		ImGui::DragFloat("avoidance_soft_margin_long_m", &p.avoidance_soft_margin_long_m, 0.1f,  0.f,  5.f,  "%.2f");
+		ImGui::DragFloat("avoidance_soft_margin_lat_m",  &p.avoidance_soft_margin_lat_m,  0.05f, 0.f,  3.f,  "%.2f");
+		ImGui::DragFloat("avoidance_lateral_speed_mps",  &p.avoidance_lateral_speed_mps,  0.1f,  0.f,  10.f, "%.2f");
+		ImGui::DragFloat("avoidance_brake_k",            &p.avoidance_brake_k,            0.02f, 0.f,  1.f,  "%.2f");
 	}
 
 	ImGui::SeparatorText("Riders");
