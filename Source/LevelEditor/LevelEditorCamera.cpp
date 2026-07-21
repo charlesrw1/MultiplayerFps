@@ -2,6 +2,11 @@
 #include "imgui.h"
 #include "Framework/Config.h"
 #include "EditorInputs.h"
+#include "Input/InputSystem.h"
+
+bool EditorCamera::is_ortho_panning() const {
+	return get_is_using_ortho() && ortho_camera.can_take_input();
+}
 
 Ray EditorCamera::unproject_mouse(int mx, int my) const {
 	Ray r;
@@ -181,15 +186,21 @@ void EditorCamera::tick(EditorInputs& inputs, float dt) {
 	float fov = glm::radians(g_fov.get_float());
 
 	if (inputs.can_use_mouse_click() && UiSystem::inst->is_vp_hovered()) {
+		// Set do_update_flag immediately (not just via on_focused_tick next frame) so the
+		// very first frame of a drag isn't dropped, waiting a frame is what made ortho pan
+		// and orbit feel a beat behind the cursor when starting a drag.
 		if (get_is_using_ortho() && ortho_camera.can_take_input()) {
 			inputs.set_focus(this);
+			do_update_flag = true;
 		}
 		else if (!get_is_using_ortho() && Input::is_mouse_down(2)) {
 			UiSystem::inst->set_game_capture_mouse(true);
 			inputs.set_focus(this);
+			do_update_flag = true;
 		}
 		else if (Input::is_mouse_down(1)) {
 			inputs.set_focus(this);
+			do_update_flag = true;
 		}
 	}
 

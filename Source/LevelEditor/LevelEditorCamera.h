@@ -89,6 +89,11 @@ public:
 	}
 	void imgui();
 
+	// True while the user is actively shift+MMB panning the ortho camera. Used to relax the
+	// editor's frame-rate cap for the duration of the pan so it tracks the cursor without a
+	// beat of lag. Orbit/perspective camera movement intentionally doesn't get this treatment.
+	bool is_ortho_panning() const;
+
 	MulticastDelegate<> on_ortho_state_change;
 
 private:

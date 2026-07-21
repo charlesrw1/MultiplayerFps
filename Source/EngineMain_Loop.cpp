@@ -60,6 +60,16 @@ extern ConfigVar g_engine_ticks_per_frame;
 extern ConfigVar g_slomo;
 extern ConfigVar stat_fps;
 
+// Software frame-rate cap (independent of vsync) so the loop doesn't spin at hundreds of fps
+// burning power when idle. r.editor_fast_frame_limit_fps is used instead, in the editor only,
+// while a latency-critical viewport interaction (drag select, camera pan/orbit) is in progress
+// -- see IEditorTool::wants_low_latency_frame() -- so mouse tracking stays snappy during the
+// interaction itself without giving up the low idle cap the rest of the time.
+ConfigVar r_frame_limit_fps("r.frame_limit_fps", "60", CVAR_INTEGER | CVAR_UNBOUNDED, "fps cap via sleep; 0 = uncapped");
+ConfigVar r_editor_fast_frame_limit_fps("r.editor_fast_frame_limit_fps", "0",
+										 CVAR_INTEGER | CVAR_UNBOUNDED,
+										 "editor fps cap while dragging/panning the viewport; 0 = uncapped");
+
 // Free functions defined in EngineMain_Debug.cpp
 extern void debug_shape_ctx_update(float dt);
 extern void debug_shape_ctx_fixed_update_start();
@@ -518,6 +528,24 @@ void GameEngineLocal::loop() {
 				auto flags = SDL_GetWindowFlags(window);
 				if (!(flags & SDL_WINDOW_INPUT_FOCUS))
 					SDL_Delay(200);
+			}
+
+			{
+				CPU_SCOPE("FrameLimiter");
+				int target_fps = r_frame_limit_fps.get_integer();
+#ifdef EDITOR_BUILD
+				if (is_editor_state() && editor_tool && editor_tool->wants_low_latency_frame())
+					target_fps = r_editor_fast_frame_limit_fps.get_integer();
+#endif
+				if (target_fps > 0) {
+					const double target_frame_time = 1.0 / (double)target_fps;
+					const double elapsed = GetTime() - now;
+					const double remaining = target_frame_time - elapsed;
+					// Leave a small slack so SDL_Delay's OS-scheduler granularity doesn't
+					// oversleep past the next vsync/frame boundary.
+					if (remaining > 0.001)
+						SDL_Delay((Uint32)((remaining - 0.001) * 1000.0));
+				}
 			}
 
 			prof::Profiler::end_frame();
