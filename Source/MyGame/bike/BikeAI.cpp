@@ -138,29 +138,60 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			nearest_ahead = &n;
 	}
 
+	// "Ride 2nd wheel" debug override (BikeObject::ride_2nd_wheel_enabled, set
+	// per-rider from BikeDebugger): locks the "behind" sub-term below onto the
+	// CURRENT LEADER of my own group specifically — not whichever
+	// hemisphere-sensed rider happens to be nearest ahead — and, unlike normal
+	// sensing, targets them regardless of distance (chases back onto their
+	// wheel from anywhere). Group leader = the rider sharing my group_id with
+	// pos_in_group_norm==0 (real position, written by
+	// BikeGameApplication::update_groups — never array index). If I AM the
+	// leader (or my group has only me), there's no one to target — falls
+	// through to normal hemisphere-based behavior below.
+	BikeObject* forced_leader = nullptr;
+	if (my_bike->ride_2nd_wheel_enabled && g_bike_app) {
+		for (BikeObject* other : g_bike_app->all_riders) {
+			if (other == my_bike) continue;
+			if (other->group_id != my_bike->group_id) continue;
+			if (other->pos_in_group_norm > 0.0001f) continue;
+			forced_leader = other;
+			break;
+		}
+	}
+	BikeObject* behind_rider    = forced_leader ? forced_leader : (nearest_ahead ? nearest_ahead->rider : nullptr);
+	const float behind_long_gap = forced_leader ? (forced_leader->course_dist_m - my_bike->course_dist_m)
+	                                             : (nearest_ahead ? nearest_ahead->long_gap : 0.f);
+	const float behind_lat_gap  = forced_leader ? (forced_leader->lateral_pos - my_bike->lateral_pos)
+	                                             : (nearest_ahead ? nearest_ahead->lat_gap : 0.f);
+	// Forced leader is targeted at any distance; normal sensing still gates on
+	// cohesion_follow_dist_m (don't draft off someone way out of range).
+	const bool behind_target_active = forced_leader != nullptr
+	    || (nearest_ahead != nullptr && nearest_ahead->long_gap < p.cohesion_follow_dist_m);
+
 	float cohesion_behind_lat = 0.f;
 	float cohesion_closer_lat = 0.f;
 	bool  cohesion_have_speed_target = false;
 	float cohesion_target_speed      = 0.f;
 
 	if (p.enable_cohesion) {
-		// "Behind": pull laterally into the nearest ahead-neighbor's wheel
-		// track (drive their lat_gap toward 0) and hold a following gap by
-		// speed-matching, once within cohesion_follow_dist_m longitudinally —
-		// real drafting, sitting behind rather than beside.
-		if (nearest_ahead && nearest_ahead->long_gap < p.cohesion_follow_dist_m) {
+		// "Behind": pull laterally into the target's wheel track (drive their
+		// lat_gap toward 0) and hold a following gap by speed-matching — real
+		// drafting, sitting behind rather than beside.
+		if (behind_target_active && behind_rider) {
 			// +lat_gap, not -lat_gap: target_lat is an ABSOLUTE lateral position
 			// (same frame as lateral_pos), and wp.racing_line_lateral is already
 			// close to my current position — so target += lat_gap converges
 			// toward leader.lateral_pos (my_pos + lat_gap), i.e. actually pulls
 			// in behind them, matching cohesion_closer_lat's sign convention below.
-			cohesion_behind_lat = nearest_ahead->lat_gap * p.cohesion_behind_k;
-			dbg_neighbors[nearest_ahead - all_nearby.data()].is_cohesion_behind_leader = true;
-			dbg_cohesion_gap_m = nearest_ahead->long_gap;
+			cohesion_behind_lat = behind_lat_gap * p.cohesion_behind_k;
+			for (size_t i = 0; i < all_nearby.size(); ++i) {
+				if (all_nearby[i].rider == behind_rider) { dbg_neighbors[i].is_cohesion_behind_leader = true; break; }
+			}
+			dbg_cohesion_gap_m = behind_long_gap;
 
-			const float gap_err = nearest_ahead->long_gap - p.cohesion_gap_m;
+			const float gap_err = behind_long_gap - p.cohesion_gap_m;
 			cohesion_have_speed_target = true;
-			cohesion_target_speed      = nearest_ahead->rider->speed + glm::clamp(gap_err * p.cohesion_gap_kp, -3.f, 3.f);
+			cohesion_target_speed      = behind_rider->speed + glm::clamp(gap_err * p.cohesion_gap_kp, -3.f, 3.f);
 		}
 		target_offset_delta += cohesion_behind_lat;
 
@@ -223,28 +254,45 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			return (trigger - gap_abs) / (trigger - hard);  // linear ramp through the soft margin
 		};
 
-		// Find the most severe active conflict among ALL sensed neighbors,
-		// omnidirectionally (all_nearby, NOT hemisphere-filtered — see section
-		// 1: someone directly behind me still physically overlaps my box, and
-		// I need to react too, not just leave it to their avoidance). Severity
-		// is how deep into both axes' zones (0..1 each), multiplied, so being
-		// close on only one axis is never treated as urgent as being close on
-		// both.
+		// Find the most severe conflict I'M RESPONSIBLE for, among ALL sensed
+		// neighbors, omnidirectionally (all_nearby, NOT hemisphere-filtered —
+		// see section 1). Severity is how deep into both axes' zones (0..1
+		// each), multiplied, so being close on only one axis is never treated
+		// as urgent as being close on both.
+		//
+		// Role: NOT symmetric — the TRAILING rider yields (n.ws_fwd_gap > 0,
+		// i.e. this neighbor is ahead of me, so I'm catching up from behind),
+		// same as a real pack: the rider out front has no reason to react to
+		// someone approaching from behind. Only within avoidance_side_by_side_m
+		// (neither rider unambiguously ahead/behind) do BOTH yield. Every
+		// overlapping neighbor still gets marked in dbg_neighbors regardless
+		// of role, so the debug overlay can show "conflict, not my job" vs.
+		// "conflict, I'm yielding" distinctly.
 		const Neighbor* conflict = nullptr;
 		float conflict_severity  = 0.f;
-		for (const Neighbor& n : all_nearby) {
+		for (size_t i = 0; i < all_nearby.size(); ++i) {
+			const Neighbor& n = all_nearby[i];
 			const float long_abs = glm::abs(n.ws_fwd_gap);
 			const float lat_abs  = glm::abs(n.ws_right_gap);
 			if (long_abs >= trigger_long_m) continue;
 			if (lat_abs  >= trigger_lat_m)  continue;
 			const float severity = axis_severity(long_abs, hard_long_m, trigger_long_m)
 			                      * axis_severity(lat_abs,  hard_lat_m,  trigger_lat_m);
+			if (severity <= 0.f) continue;
+
+			const bool near_side_by_side = long_abs < p.avoidance_side_by_side_m;
+			const bool im_trailing       = n.ws_fwd_gap > 0.f;  // they're ahead of me -> I'm catching up from behind
+			const bool responsible       = near_side_by_side || im_trailing;
+
+			BikeAIDebugNeighbor& dn = dbg_neighbors[i];
+			dn.is_avoidance_conflict    = true;
+			dn.is_avoidance_responsible = responsible;
+			dn.avoidance_severity       = severity;
+
+			if (!responsible) continue;  // clear gap and they're out front — leave it to them
 			if (severity > conflict_severity) { conflict_severity = severity; conflict = &n; }
 		}
 		if (conflict) {
-			BikeAIDebugNeighbor& dn_conflict = dbg_neighbors[conflict - all_nearby.data()];
-			dn_conflict.is_avoidance_conflict = true;
-			dn_conflict.avoidance_severity    = conflict_severity;
 			// Prefer yielding sideways, away from the conflicting neighbor, by a
 			// full hard_lat_m clearance (guarantees the box no longer overlaps,
 			// not just "outside the soft zone"). Room check, also worldspace: the

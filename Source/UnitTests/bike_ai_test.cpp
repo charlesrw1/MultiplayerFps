@@ -238,6 +238,57 @@ TEST(BikeAIAvoidance, CloseOnOneAxisOnly_NeverAsUrgentAsBoth)
     EXPECT_GT(both, one_axis_only);
 }
 
+// ---------------------------------------------------------------------------
+// Avoidance role — NOT symmetric by default: the trailing rider (conflicting
+// neighbor is ahead of them, ws_fwd_gap > 0) is the one who yields, matching
+// a real pack — the rider out front has no reason to react to someone
+// approaching from behind. Only within avoidance_side_by_side_m (neither
+// rider unambiguously ahead/behind) do BOTH yield.
+// ---------------------------------------------------------------------------
+static bool avoidance_responsible(float ws_fwd_gap, float side_by_side_m)
+{
+    const bool near_side_by_side = std::abs(ws_fwd_gap) < side_by_side_m;
+    const bool im_trailing       = ws_fwd_gap > 0.f;
+    return near_side_by_side || im_trailing;
+}
+
+TEST(BikeAIAvoidanceRole, NeighborClearlyAhead_ImTrailing_Responsible)
+{
+    // ws_fwd_gap=2.0 (well outside side_by_side_m=0.6) and positive -> they're
+    // ahead of me -> I'm catching up from behind -> I yield.
+    EXPECT_TRUE(avoidance_responsible(2.0f, 0.6f));
+}
+
+TEST(BikeAIAvoidanceRole, NeighborClearlyBehind_ImLeading_NotResponsible)
+{
+    // ws_fwd_gap=-2.0 -> they're behind me -> I'm out front -> not my job.
+    EXPECT_FALSE(avoidance_responsible(-2.0f, 0.6f));
+}
+
+TEST(BikeAIAvoidanceRole, NearSideBySide_BothResponsible_RegardlessOfSign)
+{
+    EXPECT_TRUE(avoidance_responsible(0.1f, 0.6f));
+    EXPECT_TRUE(avoidance_responsible(-0.1f, 0.6f));
+}
+
+TEST(BikeAIAvoidanceRole, ExactlyZeroGap_TreatedAsSideBySide)
+{
+    EXPECT_TRUE(avoidance_responsible(0.f, 0.6f));
+}
+
+TEST(BikeAIAvoidanceRole, AtSideBySideBoundary_TrailingStillResponsible)
+{
+    // Just past the side-by-side threshold but still positive (ahead of me)
+    // -> still my job via the trailing-rider rule, independent of the
+    // side-by-side rule.
+    EXPECT_TRUE(avoidance_responsible(0.61f, 0.6f));
+}
+
+TEST(BikeAIAvoidanceRole, JustPastSideBySideBoundary_LeadingNotResponsible)
+{
+    EXPECT_FALSE(avoidance_responsible(-0.61f, 0.6f));
+}
+
 TEST(BikeAIAvoidance, NeighborToRight_AvoidLeft)
 {
     EXPECT_LT(avoid_direction(0.5f), 0.f);

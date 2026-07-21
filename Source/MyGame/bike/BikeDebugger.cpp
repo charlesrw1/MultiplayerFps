@@ -197,6 +197,13 @@ void BikeDebugger::on_imgui()
 			ImGui::Checkbox("Override lateral position", &selected->ai_override_lateral_enabled);
 			if (selected->ai_override_lateral_enabled)
 				ImGui::SliderFloat("Target lateral", &selected->ai_override_lateral_pos_m, -road_hw, road_hw, "%.2f m");
+
+			ImGui::SeparatorText("Behavior mode (this rider only)");
+			ImGui::Checkbox("Ride 2nd wheel (target group leader)", &selected->ride_2nd_wheel_enabled);
+			ImGui::TextDisabled("Locks cohesion's draft target onto this rider's own group's");
+			ImGui::TextDisabled("leader, at any distance, instead of the nearest sensed rider ahead.");
+			if (selected->ride_2nd_wheel_enabled)
+				ImGui::Text("Group %d, pos_in_group=%.2f", selected->group_id, selected->pos_in_group_norm);
 		} else {
 			ImGui::TextDisabled("Offset/overrides only affect AI riders.");
 		}

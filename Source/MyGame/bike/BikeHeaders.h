@@ -192,10 +192,16 @@ struct BikeAIParams {
 
 	// ---- Avoidance: decentralized — every rider independently detects an
 	// imminent overlap with ANY sensed neighbor (not just the one ahead) and
-	// yields. Both riders in a conflict run this same logic, so whichever has
-	// less room/more urgency ends up yielding — no central coordinator, same
-	// hemisphere-scan/no-array-index rule as cohesion. Computed and applied
-	// entirely in WORLDSPACE, never course-space (course_dist_m/lateral_pos):
+	// yields. NOT symmetric by default: the TRAILING rider (the one catching
+	// up from behind) is the one who yields, matching a real pack — the rider
+	// out front has no reason to react to someone approaching from behind them.
+	// Only once the gap is small enough to call it side-by-side
+	// (avoidance_side_by_side_m below) rather than a clean following
+	// situation do BOTH riders yield, since neither one is unambiguously "in
+	// front." Both riders in a conflict run this same role logic
+	// independently — no central coordinator, same hemisphere-scan/
+	// no-array-index rule as cohesion. Computed and applied entirely in
+	// WORLDSPACE, never course-space (course_dist_m/lateral_pos):
 	// each rider projects a neighbor's offset onto its OWN bike_direction/right
 	// (a real 3D box-overlap test, not a road-tangent-relative one, so it stays
 	// correct through corners where the two frames diverge). Also touches
@@ -223,6 +229,11 @@ struct BikeAIParams {
 	// to full force the instant the hard boundary is crossed.
 	float avoidance_soft_margin_long_m = 1.5f;
 	float avoidance_soft_margin_lat_m  = 0.5f;
+	// Below this worldspace longitudinal gap (full distance, not a half-extent),
+	// neither rider reads as clearly ahead/behind — treat it as side-by-side
+	// and have BOTH yield. Above it, only the trailing rider (conflicting
+	// neighbor is ahead of them) responds.
+	float avoidance_side_by_side_m     = 0.6f;
 	float avoidance_lateral_speed_mps  = 3.5f;  // direct worldspace lateral slide speed at severity=1 (m/s)
 	float avoidance_brake_k            = 0.9f;  // brake_amount at severity=1, applied directly (bypasses speed PID)
 
@@ -291,7 +302,8 @@ struct BikeAIDebugNeighbor {
 	float       lat_gap                   = 0.f;  // +ve = road-right of me
 	bool        is_cohesion_behind_leader = false;  // nearest-ahead neighbor cohesion is pulling behind / speed-matching
 	bool        is_cohesion_closer_member = false;  // included in this tick's "closer" lateral centroid average
-	bool        is_avoidance_conflict     = false;
+	bool        is_avoidance_conflict     = false;  // this neighbor is within the avoidance trigger zone (may or may not be MY responsibility to react — see below)
+	bool        is_avoidance_responsible  = false;  // valid iff is_avoidance_conflict: true if I'M the one who should yield (trailing rider, or side-by-side — see BikeAIParams::avoidance_side_by_side_m). False = they're ahead of me by a clear margin, so THEY yield, not me.
 	float       avoidance_severity        = 0.f;
 };
 
@@ -470,6 +482,17 @@ public:
 	float ai_override_target_speed_ms = 8.f;
 	bool  ai_override_lateral_enabled = false;
 	float ai_override_lateral_pos_m   = 0.f;  // hard target lateral offset — bypasses racing line/magnetism/draft entirely
+
+	// Debug-only per-rider behavior mode (BikeDebugger's Selected Rider panel),
+	// AI-only. Unlike the hard overrides above, this doesn't pin a fixed value —
+	// it changes WHICH rider cohesion's "behind" sub-term targets: instead of
+	// whichever hemisphere-sensed neighbor happens to be nearest ahead, it locks
+	// onto the current LEADER of this rider's own group (group_id/
+	// pos_in_group_norm below, real position not array index), and targets them
+	// regardless of distance/hemisphere — so this rider chases back onto the
+	// leader's wheel even from well outside normal draft range. See
+	// BikeAI::evaluate section 2.
+	bool  ride_2nd_wheel_enabled = false;
 
 	// Group context (written by BikeGameApplication::update_groups each frame)
 	int   group_id           = 0;

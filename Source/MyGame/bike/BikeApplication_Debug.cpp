@@ -200,8 +200,17 @@ void draw_rider_debug_info(BikeObject* bo)
 
 			std::string label;
 			if (dn.is_avoidance_conflict) {
-				label += string_format("AVOID sev=%.2f\n", dn.avoidance_severity);
-				Debug::add_line(my_pos, n_pos, Color32(0xff, 0x20, 0x20, 0xff), -1.f);
+				// Responsible (I'm yielding — trailing rider, or side-by-side):
+				// solid red. Not responsible (they're clearly out front, it's
+				// THEIR conflict to react to, not mine): dim gray, so it's
+				// visually obvious this rider isn't the one moving.
+				if (dn.is_avoidance_responsible) {
+					label += string_format("AVOIDING sev=%.2f\n", dn.avoidance_severity);
+					Debug::add_line(my_pos, n_pos, Color32(0xff, 0x20, 0x20, 0xff), -1.f);
+				} else {
+					label += string_format("conflict sev=%.2f (leading, not yielding)\n", dn.avoidance_severity);
+					Debug::add_line(my_pos, n_pos, Color32(0x90, 0x90, 0x90, 0x80), -1.f);
+				}
 			}
 			if (dn.is_cohesion_behind_leader) {
 				label += "COHESION: behind leader\n";
@@ -282,14 +291,24 @@ void draw_rider_avoidance_box(BikeObject* bo, bool draw_soft_box)
 		debug_draw_oriented_box(my_pos, fwd, right, up, soft_long, soft_lat, hh, Color32(0x00, 0xcc, 0xff, 0x90));
 	}
 
-	// Vector to every neighbor currently being yielded to.
+	// Vector to every conflicting neighbor. Responsible (I'm yielding) in red;
+	// not responsible (they're clearly out front — it's THEIR conflict, not
+	// mine, see BikeAIParams::avoidance_side_by_side_m) in dim gray, so it's
+	// obvious at a glance which riders in a conflict are actually reacting.
 	for (const BikeAIDebugNeighbor& dn : ai->dbg_neighbors) {
 		if (!dn.rider || !dn.is_avoidance_conflict) continue;
 		const glm::vec3 n_pos = dn.rider->get_ws_position();
-		Debug::add_line(my_pos, n_pos, Color32(0xff, 0x00, 0x00, 0xff), -1.f);
-		Debug::add_text_ex(n_pos + glm::vec3(0.f, 2.1f, 0.f),
-			string_format("AVOIDING sev=%.2f", dn.avoidance_severity),
-			Color32(0xff, 0x00, 0x00, 0xff), 0.f, true, true, true);
+		if (dn.is_avoidance_responsible) {
+			Debug::add_line(my_pos, n_pos, Color32(0xff, 0x00, 0x00, 0xff), -1.f);
+			Debug::add_text_ex(n_pos + glm::vec3(0.f, 2.1f, 0.f),
+				string_format("AVOIDING sev=%.2f", dn.avoidance_severity),
+				Color32(0xff, 0x00, 0x00, 0xff), 0.f, true, true, true);
+		} else {
+			Debug::add_line(my_pos, n_pos, Color32(0x90, 0x90, 0x90, 0x80), -1.f);
+			Debug::add_text_ex(n_pos + glm::vec3(0.f, 2.1f, 0.f),
+				string_format("conflict sev=%.2f (leading, not yielding)", dn.avoidance_severity),
+				Color32(0x90, 0x90, 0x90, 0xff), 0.f, true, true, true);
+		}
 	}
 
 	// The actual commanded slide this tick (dbg_avoidance_lateral_vel is the
@@ -417,6 +436,8 @@ static void bike_course_debug()
 		ImGui::TextDisabled("Soft ramp distance OUTSIDE the hard box-overlap boundary:");
 		ImGui::DragFloat("avoidance_soft_margin_long_m", &p.avoidance_soft_margin_long_m, 0.1f,  0.f,  5.f,  "%.2f");
 		ImGui::DragFloat("avoidance_soft_margin_lat_m",  &p.avoidance_soft_margin_lat_m,  0.05f, 0.f,  3.f,  "%.2f");
+		ImGui::TextDisabled("Below this gap, treat as side-by-side -> BOTH riders yield (else only the trailing one):");
+		ImGui::DragFloat("avoidance_side_by_side_m",     &p.avoidance_side_by_side_m,     0.05f, 0.f,  3.f,  "%.2f");
 		ImGui::DragFloat("avoidance_lateral_speed_mps",  &p.avoidance_lateral_speed_mps,  0.1f,  0.f,  10.f, "%.2f");
 		ImGui::DragFloat("avoidance_brake_k",            &p.avoidance_brake_k,            0.02f, 0.f,  1.f,  "%.2f");
 	}
