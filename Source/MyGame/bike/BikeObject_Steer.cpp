@@ -22,6 +22,18 @@ float bar_visual_lean_min   = 1.5f;
 float bar_lean_fade_lo      = 0.0f;
 float bar_lean_fade_hi      = 1.f;
 
+// Roll/lean damping — see tick_steer. Lower = snappier, higher = laggier
+// (damp_dt_independent's "smoothing" factor, not seconds). stand_up is
+// deliberately laggier than lean_in by default: quick to bank into a corner,
+// slower to come back upright, so the exit doesn't read as an instant snap.
+float roll_smooth_lean_in   = 0.01f;
+float roll_smooth_stand_up  = 0.05f;
+// Flips which way the bike banks for a given turn direction — the sign
+// convention was carried over algebraically from the old curvature-based
+// formula rather than verified visually; flip live here if it leans the
+// wrong way instead of editing code.
+float roll_dir_sign         = -1.f;
+
 // Single low-pass on the raw steer input — no build/release asymmetry, no
 // wobble/crosswind/bump-steer noise layers. Same path for player and AI.
 static float steer_smoothing_tau = 0.12f;  // s
@@ -46,14 +58,23 @@ float compute_max_steer_rad(float speed)
 // movement]]). It only low-passes into current_steer, which drives the
 // cosmetic fork/handlebar twist (BikeObject::tick_transform).
 //
-// Visual lean/roll is separate and NOT driven by ci.steer: it banks into
-// corners based on the track's own curvature at the bike's current rail
-// position (central-difference on wp.forward's yaw, same technique as
-// BikeCourse::min_turn_radius_ahead, just signed). This is emergent from
-// actually following the road, so it's correct in every mode — including
-// when ci.lateral_shift/ci.steer are near zero but the bike still corners
-// because course_dist_m (derived from worldspace position) is advancing
-// through a curve. Mirrors real bike lean physics: bank angle ~ atan(v^2 * curvature / g).
+// Visual lean/roll is separate and NOT driven by ci.steer: it banks from the
+// bike's own actual turn rate (heading_turn_rate, one tick stale — same
+// cross-tick convention as every other field in that "written by tick_transform,
+// read next tick" group, see BikeHeaders.h), not from the track's lookahead
+// curvature. Mirrors real bike lean physics: bank angle ~ atan(v * yaw_rate / g).
+//
+// This used to be driven directly off track curvature a few metres ahead,
+// which put lean a step AHEAD of the bike's own (heading-PID-smoothed, real
+// momentum-carrying) turn rate — so the bike stood back up the instant the
+// road geometry straightened, even while heading_turn_rate (and therefore
+// the actual path) was still unwinding through momentum. Tying roll to
+// heading_turn_rate instead means the visual lean can only settle exactly as
+// fast as the bike is actually done turning — it carries out of corners
+// alongside the real heading momentum instead of snapping upright early.
+// Asymmetric damping on top (roll_smooth_lean_in/roll_smooth_stand_up) adds a
+// second, purely cosmetic layer of "it's quicker to lean in than to stand
+// back up" on top of that.
 // ------------------------------------------------------------
 void BikeObject::tick_steer(const ControlInput& ci, float dt)
 {
@@ -64,27 +85,15 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 	current_steer   = damp_dt_independent(steer_input_raw, current_steer, steer_smoothing_tau, dt);
 
 	float target_roll = 0.f;
-	if (course && course->is_built && speed > 0.1f) {
-		// Matches BikeCourse::min_turn_radius_ahead's 6m averaging window, but
-		// signed (curvature > 0 = track curves toward +wp.right ahead).
-		static constexpr float CURVATURE_HALF_M = 3.f;
-		const glm::vec3 fwd_back = course->sample(course_dist_m - CURVATURE_HALF_M).forward;
-		const glm::vec3 fwd_fwd  = course->sample(course_dist_m + CURVATURE_HALF_M).forward;
-		const float yaw_back = std::atan2(fwd_back.x, fwd_back.z);
-		const float yaw_fwd  = std::atan2(fwd_fwd.x, fwd_fwd.z);
-		float dyaw = yaw_fwd - yaw_back;
-		if (dyaw >  glm::pi<float>()) dyaw -= 2.f * glm::pi<float>();
-		if (dyaw < -glm::pi<float>()) dyaw += 2.f * glm::pi<float>();
-		const float curvature = dyaw / (2.f * CURVATURE_HALF_M);  // signed, rad/m
-
-		const float centripetal_accel = speed * speed * glm::abs(curvature);
+	if (speed > 0.1f) {
+		const float centripetal_accel = speed * glm::abs(heading_turn_rate);  // v*omega == v^2/r
 		const float lean_speed_scale  = glm::smoothstep(0.f, 8.f, speed);
 		const float lean_uncapped     = atanf(centripetal_accel / BIKE_GRAVITY) * lean_speed_scale;
-		// Sign derived from the old heading-integration formula (turn_rate =
-		// -d(yaw)/dt, lean sign = sign(turn_rate)): negate curvature's sign.
-		target_roll = -glm::sign(curvature) * glm::min(lean_uncapped, glm::radians(lean_max_deg));
+		target_roll = roll_dir_sign * glm::sign(heading_turn_rate) * glm::min(lean_uncapped, glm::radians(lean_max_deg));
 	}
-	current_roll = damp_dt_independent(target_roll, current_roll, 0.01f, dt);
+	const bool leaning_in = glm::abs(target_roll) > glm::abs(current_roll);
+	current_roll = damp_dt_independent(target_roll, current_roll,
+	                                    leaning_in ? roll_smooth_lean_in : roll_smooth_stand_up, dt);
 }
 
 // ============================================================
@@ -104,6 +113,9 @@ static void bike_steer_debug()
 			ImGui::Text("current max fork angle: %.1f deg  (speed %.1f m/s)",
 			            glm::degrees(compute_max_steer_rad(s_steer_debug->speed)), s_steer_debug->speed);
 		ImGui::DragFloat("lean_max_deg",       &lean_max_deg,       0.5f,   5.f, 50.f);
+		ImGui::DragFloat("roll_smooth_lean_in",  &roll_smooth_lean_in,  0.005f, 0.001f, 0.95f, "%.3f");
+		ImGui::DragFloat("roll_smooth_stand_up", &roll_smooth_stand_up, 0.005f, 0.001f, 0.95f, "%.3f");
+		ImGui::DragFloat("roll_dir_sign",        &roll_dir_sign,        2.f,   -1.f,   1.f);
 		ImGui::SeparatorText("Handlebar Visual");
 		ImGui::DragFloat("bar_scale_lo_steer",  &bar_scale_lo_steer,  0.1f, 0.5f, 12.f);
 		ImGui::DragFloat("bar_scale_hi_steer",  &bar_scale_hi_steer,  0.1f, 0.1f,  6.f);
