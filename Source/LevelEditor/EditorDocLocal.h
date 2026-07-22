@@ -239,6 +239,10 @@ public:
 	void hook_pre_scene_viewport_draw() final;
 	bool wants_scene_viewport_menu_bar() const { return true; }
 
+	bool wants_low_latency_frame() const final {
+		return (selection_mode && selection_mode->dragger.get_is_dragging()) || ed_cam.is_ortho_panning();
+	}
+
 	void tick(float dt) final;
 	void imgui_draw() final;
 	void draw_backup_browser_window();

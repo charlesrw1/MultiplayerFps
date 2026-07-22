@@ -565,4 +565,5 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	print_time("load default bundle");
 
 	sys_print(Info, "execute startup in %f\n", (float)TimeSinceStart());
+
 }

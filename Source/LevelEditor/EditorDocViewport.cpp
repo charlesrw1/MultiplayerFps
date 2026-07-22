@@ -96,11 +96,11 @@ void EditorDoc::imgui_draw() {
 	ed_cam.tick(inputs, eng->get_dt());
 	manipulate->check_input(inputs);
 	handle_dragger->tick(inputs);
+	active_mode->tick(inputs); // selection,foliage, or decal
 	gui->draw(inputs, [&]() {
 		if (active_mode)
 			active_mode->draw_ui();
 	});
-	active_mode->tick(inputs); // selection,foliage, or decal
 	check_inputs();
 	draw_recent_switcher_popup();
 	draw_backup_browser_window();

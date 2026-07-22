@@ -26,12 +26,12 @@ void DragDetector::tick(EditorInputs& inputs) {
 			mouseClickX = Input::get_mouse_pos().x;
 			mouseClickY = Input::get_mouse_pos().y;
 			is_dragging = true;
-			printf("start dragging\n");
+			//printf("start dragging\n");
 		}
 	}
 	end_drag_func(inputs);
 	if (get_is_dragging()) {
-		printf("start actual dragging\n");
+		//printf("start actual dragging\n");
 		inputs.set_focus(this);
 		inputs.eat_mouse_click();
 	}

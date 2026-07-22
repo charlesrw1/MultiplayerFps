@@ -52,6 +52,11 @@ public:
 	// Used by the asset browser's "Select Entities Using This Asset" context-menu action.
 	virtual void select_entities_using_asset(const std::string& asset_gamepath) {}
 
+	// True while the user is in the middle of a latency-critical viewport interaction (drag
+	// box select, camera pan/orbit) -- the main loop relaxes its frame-rate cap while this is
+	// true so mouse tracking feels snappy, instead of always running uncapped just in case.
+	virtual bool wants_low_latency_frame() const { return false; }
+
 protected:
 	// various hooks to add imgui calls
 	virtual void hook_menu_bar_file_menu() {}

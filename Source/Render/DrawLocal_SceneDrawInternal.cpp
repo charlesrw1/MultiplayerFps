@@ -590,6 +590,12 @@ IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInst
 		if (!postProcessMats[i])
 			continue;
 
+		// Materials just created/modified this same frame (e.g. editor tool startup
+		// assigning a default post-process material) can still be sitting in matman's
+		// dirty list with unresolved texture_bindings -- flush is idempotent (no-op if
+		// already clean), matching the self-heal get_texture_id_hash() does elsewhere.
+		matman.flush_dirty_material(postProcessMats[i]);
+
 		RenderPassState pass_setup;
 		auto color_infos = {ColorTargetInfo(renderToTexture)};
 		pass_setup.color_infos = color_infos;

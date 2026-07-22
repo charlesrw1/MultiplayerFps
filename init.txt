@@ -11,8 +11,6 @@ bind B Shift "reload_script"
 
 #ed_physics_shapes_depth_tested 0
 
-r.enable_vsync 1
-
 bind , "toggle g_drawdebugmenu"
 bind . "toggle drawconsole"
 
