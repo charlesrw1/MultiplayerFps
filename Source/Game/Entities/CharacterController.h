@@ -49,6 +49,54 @@ private:
 	glm::vec3 position{}; // internal position
 };
 
+// Alternative to CharacterController: floats the capsule above the ground on a virtual
+// damped spring (downward raycast probe) instead of hard collision response against the
+// ground. Since the capsule never actually touches the floor, small ledges/stairs within
+// max_probe_dist just compress/extend the spring instead of stopping the character or
+// requiring an explicit step-up case. Walls/ceilings still use the normal collide+slide
+// CharacterController internally. Falls back to plain gravity when no ground is within
+// probe range (e.g. jumping, walking off a big ledge).
+class SpringPogoController
+{
+public:
+	SpringPogoController(PhysicsBody* self) : self(self), wall_controller(self) {}
+
+	// velocity_in.y is the character's current vertical velocity; the spring (or gravity,
+	// if airborne) updates it internally. out_velocity is the resulting velocity after both
+	// the spring/gravity integration and wall collision clipping.
+	void move(const glm::vec3& velocity_in, float dt, glm::vec3& out_velocity, int& out_ccfg_flags);
+
+	void set_position(const glm::vec3& v) { wall_controller.set_position(v); }
+	const glm::vec3& get_character_pos() const { return wall_controller.get_character_pos(); }
+	void set_physics_body(PhysicsBody* body) {
+		self = body;
+		wall_controller.set_physics_body(body);
+	}
+	void set_capsule_info(float height, float radius, float skinsize) {
+		wall_controller.capsule_height = height;
+		wall_controller.capsule_radius = radius;
+		wall_controller.skin_size = skinsize;
+	}
+
+	// spring tuning
+	float ride_height = 0.6f;		// rest distance the feet float above the ground
+	float max_probe_dist = 0.5f;	// how far above/below ride_height the spring still reaches (max smooth step height/drop)
+	float spring_strength = 400.f;
+	float spring_damping = 40.f;
+	float gravity = 18.f; // used only while airborne (no ground within probe range)
+
+	// results of the last move(), useful for debug visualization
+	bool grounded = false;
+	float last_ground_dist = -1.f; // raw raycast distance from the probe origin, -1 if no hit
+	float last_compression = 0.f;	// + = spring pushing up, - = spring pulling down, 0 = resting
+	glm::vec3 last_probe_origin{};
+	glm::vec3 last_ground_point{};
+
+private:
+	PhysicsBody* self = nullptr;
+	CharacterController wall_controller;
+};
+
 // component wrapper
 
 class CharacterMovementComponent : public Component

@@ -6,6 +6,7 @@
 #include "../Game/EntityPtr.h"
 #include "../Game/EntityComponent.h"
 #include "../Game/GameplayStatic.h"
+#include <glm/glm.hpp>
 
 #include <memory>
 
@@ -55,6 +56,7 @@ public:
 
 
 class CharacterController;
+class SpringPogoController;
 class CameraComponent;
 
 
@@ -100,6 +102,19 @@ public:
 
 };
 
+// snapshot of the active controller's state, for the third-person debug camera to visualize
+struct fpsPogoDebugInfo {
+	bool enabled = false;	// is the spring pogo controller the active movement controller
+	bool grounded = false;
+	glm::vec3 feet_pos{};
+	glm::vec3 ground_point{};
+	float ride_height = 0.f;
+	float ground_dist = -1.f;
+	float compression = 0.f;
+	float capsule_height = 0.f;
+	float capsule_radius = 0.f;
+};
+
 class fpsPlayer : public Component {
 public:
 	CLASS_BODY(fpsPlayer);
@@ -110,9 +125,16 @@ public:
 
 	void manualtick();
 
-	REF const std::vector<Component*> get_blah_components() const { 
+	REF const std::vector<Component*> get_blah_components() const {
 		return get_owner()->get_components();
 	}
+
+	fpsPogoDebugInfo get_pogo_debug_info();
+
+	// current look direction/eye, same values used by the fps camera - lets an external
+	// (debug) camera mirror where the player is looking without stealing mouse capture.
+	glm::vec3 get_eye_position();
+	glm::vec3 get_view_forward();
 
 	EntityPtr camera;
 
@@ -123,6 +145,7 @@ private:
 
 	std::unique_ptr<fpsInventoryLogic> inventory;
 	std::unique_ptr<CharacterController> controller;
+	std::unique_ptr<SpringPogoController> pogo_controller;
 	glm::vec3 velocity{};
 	float view_pitch = 0.f;
 	float view_yaw = 0.f;

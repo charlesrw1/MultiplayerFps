@@ -103,3 +103,51 @@ void CharacterController::move(const glm::vec3& disp, float dt, float min_dist, 
 	// Debug::add_sphere(current_pos + glm::vec3(0, capsule_radius, 0), capsule_radius, COLOR_PINK, 0);
 	// Debug::add_sphere(current_pos + glm::vec3(0, capsule_height - capsule_radius, 0), capsule_radius, COLOR_PINK, 0);
 }
+
+void SpringPogoController::move(const glm::vec3& velocity_in, float dt, glm::vec3& out_velocity,
+								int& out_ccfg_flags) {
+	glm::vec3 feet_pos = wall_controller.get_character_pos();
+	glm::vec3 velocity = velocity_in;
+
+	// probe from max_probe_dist above the feet, down through ride_height and another
+	// max_probe_dist below it, so ground anywhere in [-max_probe_dist, +max_probe_dist]
+	// around the rest height is detected.
+	glm::vec3 probe_origin = feet_pos + glm::vec3(0, max_probe_dist, 0);
+	float probe_length = max_probe_dist * 2.f + ride_height;
+
+	TraceIgnoreVec ignore;
+	ignore.push_back(self);
+	uint32_t channel_mask = (1 << (int)PL::Default) | (1 << (int)PL::Character);
+
+	world_query_result wqr;
+	bool hit = g_physics.trace_ray(wqr, probe_origin, glm::vec3(0, -1, 0), probe_length, &ignore, channel_mask);
+
+	last_probe_origin = probe_origin;
+
+	if (hit) {
+		float current_gap = wqr.distance - max_probe_dist; // how far the feet currently are above the ground
+		float compression = ride_height - current_gap;		// + = compressed (push up), - = stretched (pull down)
+
+		// don't let the spring's pull-down fight an active upward jump; it still pushes
+		// if something rises up under the character (a step) while ascending.
+		if (velocity.y > 0.f)
+			compression = glm::max(compression, 0.f);
+
+		float spring_accel = spring_strength * compression - spring_damping * velocity.y;
+		velocity.y += spring_accel * dt;
+
+		grounded = true;
+		last_ground_dist = wqr.distance;
+		last_compression = compression;
+		last_ground_point = wqr.hit_pos;
+	} else {
+		velocity.y -= gravity * dt;
+
+		grounded = false;
+		last_ground_dist = -1.f;
+		last_compression = 0.f;
+		last_ground_point = probe_origin + glm::vec3(0, -probe_length, 0);
+	}
+
+	wall_controller.move(velocity * dt, dt, 0.001f, out_ccfg_flags, out_velocity);
+}

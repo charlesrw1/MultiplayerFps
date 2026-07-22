@@ -49,7 +49,7 @@ void fpsGameMgr::update() {
 	playerptr->manualtick();
 
 	// pass game camera entity to debug camera for switching
-	debug_camera.update(playerptr->camera);
+	debug_camera.update(playerptr->camera, playerptr);
 }
 
 void fpsGameMgr::start_level(const std::string& name) {

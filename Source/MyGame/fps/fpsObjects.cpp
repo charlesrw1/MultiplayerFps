@@ -30,6 +30,13 @@ static float jump_impulse = 7.f;
 static float gravity = 18.f;
 static float mouse_sens = 0.15f;
 
+// spring pogo controller
+static bool use_pogo_controller = false;
+static float pogo_ride_height = 0.6f;
+static float pogo_max_probe_dist = 0.5f;
+static float pogo_spring_strength = 400.f;
+static float pogo_spring_damping = 40.f;
+
 static bool is_in_debug_mode() {
 	return g_debugcamera.get_bool();
 }
@@ -45,6 +52,13 @@ static void fps_move_vars_menu() {
 	ImGui::SliderFloat("jump_impulse", &jump_impulse, 0.f, 20.f);
 	ImGui::SliderFloat("gravity", &gravity, 0.f, 40.f);
 	ImGui::SliderFloat("mouse_sens", &mouse_sens, 0.01f, 1.f);
+
+	ImGui::Separator();
+	ImGui::Checkbox("Spring Pogo Controller", &use_pogo_controller);
+	ImGui::SliderFloat("pogo_ride_height", &pogo_ride_height, 0.1f, 1.5f);
+	ImGui::SliderFloat("pogo_max_probe_dist", &pogo_max_probe_dist, 0.05f, 1.5f);
+	ImGui::SliderFloat("pogo_spring_strength", &pogo_spring_strength, 50.f, 2000.f);
+	ImGui::SliderFloat("pogo_spring_damping", &pogo_spring_damping, 0.f, 200.f);
 }
 ADD_TO_DEBUG_MENU(fps_move_vars_menu);
 
@@ -62,6 +76,10 @@ void fpsPlayer::start() {
 	controller->capsule_height = capsule->height;
 	controller->capsule_radius = capsule->radius;
 
+	pogo_controller = std::make_unique<SpringPogoController>(capsule);
+	pogo_controller->set_position(get_ws_position());
+	pogo_controller->set_capsule_info(capsule->height, capsule->radius, 0.05f);
+
 	Entity* cament = GameplayStatic::spawn_entity();
 	cament->create_component<CameraComponent>();
 	this->camera = cament;
@@ -71,6 +89,7 @@ void fpsPlayer::start() {
 
 void fpsPlayer::stop() {
 	controller.reset();
+	pogo_controller.reset();
 }
 
 void fpsPlayer::manualtick() {
@@ -168,24 +187,70 @@ void fpsPlayer::update_movement() {
 	if (has_focus && on_ground && Input::was_key_pressed(SDL_SCANCODE_SPACE))
 		velocity.y = jump_impulse;
 
-	// gravity
-	velocity.y -= gravity * dt;
+	// keep both controllers' internal position in sync in case the mode was toggled
+	// since the last frame (only the active one's move() is called below).
+	vec3 current_pos = get_ws_position();
+	controller->set_position(current_pos);
+	pogo_controller->set_position(current_pos);
 
-	// move via character controller
 	int flags = 0;
 	vec3 out_vel;
-	controller->move(velocity * dt, dt, 0.001f, flags, out_vel);
-	velocity = out_vel;
-	on_ground = (flags & CCCF_BELOW) != 0;
+	vec3 new_pos;
+	if (use_pogo_controller) {
+		pogo_controller->ride_height = pogo_ride_height;
+		pogo_controller->max_probe_dist = pogo_max_probe_dist;
+		pogo_controller->spring_strength = pogo_spring_strength;
+		pogo_controller->spring_damping = pogo_spring_damping;
+		pogo_controller->gravity = gravity;
 
-	get_owner()->set_ws_position(controller->get_character_pos());
+		pogo_controller->move(velocity, dt, out_vel, flags);
+		new_pos = pogo_controller->get_character_pos();
+		on_ground = pogo_controller->grounded;
+	} else {
+		// gravity
+		velocity.y -= gravity * dt;
+
+		controller->move(velocity * dt, dt, 0.001f, flags, out_vel);
+		new_pos = controller->get_character_pos();
+		on_ground = (flags & CCCF_BELOW) != 0;
+	}
+	velocity = out_vel;
+
+	get_owner()->set_ws_position(new_pos);
+}
+
+fpsPogoDebugInfo fpsPlayer::get_pogo_debug_info() {
+	fpsPogoDebugInfo info;
+	info.enabled = use_pogo_controller;
+	info.feet_pos = get_ws_position();
+
+	if (auto* capsule = get_owner()->get_component<CapsuleComponent>()) {
+		info.capsule_height = capsule->height;
+		info.capsule_radius = capsule->radius;
+	}
+	if (pogo_controller) {
+		info.ride_height = pogo_controller->ride_height;
+		info.grounded = pogo_controller->grounded;
+		info.ground_point = pogo_controller->last_ground_point;
+		info.ground_dist = pogo_controller->last_ground_dist;
+		info.compression = pogo_controller->last_compression;
+	}
+	return info;
 }
 
 void fpsPlayer::update_camera() {
-	vec3 eye = get_ws_position() + vec3(0, eye_height, 0);
-	vec3 forward = AnglesToVector(view_pitch, view_yaw);
+	vec3 eye = get_eye_position();
+	vec3 forward = get_view_forward();
 	glm::mat4 view = glm::lookAt(eye, eye + forward, vec3(0, 1, 0));
 	camera->set_ws_transform(glm::inverse(view));
+}
+
+glm::vec3 fpsPlayer::get_eye_position() {
+	return get_ws_position() + vec3(0, eye_height, 0);
+}
+
+glm::vec3 fpsPlayer::get_view_forward() {
+	return AnglesToVector(view_pitch, view_yaw);
 }
 #include "../../Render/Model.h"
 void fpsPropPhysics::editor_start() {
