@@ -151,7 +151,7 @@ enum class BikeHardcodedCourseKind {
 	Twisty      = 1,  // chicanes and alternating-direction bends throughout
 	SharpAngles = 2,  // tight-radius corners at distinct angles (90/45/60 deg), city-block feel
 	Hilly       = 3,  // curvy road over procedural perlin-noise terrain, gradient-limited (see BikeCourseHilly.h)
-	FigureEight = 4,  // two square (90 deg corner) loops sharing one crossing point -- see build_figure_eight
+	FigureEight = 4,  // two squares (90 deg corners) sharing one pinch-point corner -- see build_figure_eight_path
 	Count       = 5,
 };
 inline const char* bike_hardcoded_course_name(BikeHardcodedCourseKind kind) {
@@ -170,10 +170,10 @@ inline const char* bike_hardcoded_course_name(BikeHardcodedCourseKind kind) {
 // than FigureEight) is built as a half-lap (net turning = 180 deg) executed
 // twice — repeating identical relative turtle commands under an exact 180 deg
 // net turn is what makes the loop close on itself to the metre regardless of
-// how the half-lap wiggles. FigureEight instead chains two FULL loops (net
-// +/-360 deg each), which each close on themselves independently at the same
-// shared point/heading, producing the self-crossing "8" — see
-// build_figure_eight_loop in BikeCourseHardcoded.cpp.
+// how the half-lap wiggles. FigureEight instead traces two squares that share
+// one corner (a pinch point revisited twice, never a shared segment) as a
+// single continuous boundary — see build_figure_eight_path in
+// BikeCourseHardcoded.cpp.
 // Fills waypoints, dist_from_start, total_length_m, is_loop/is_built, and runs
 // BikeCourse::compute_racing_line on the result.
 void build_hardcoded_circuit(BikeCourse& course, BikeHardcodedCourseKind kind = BikeHardcodedCourseKind::ClassicLoop);

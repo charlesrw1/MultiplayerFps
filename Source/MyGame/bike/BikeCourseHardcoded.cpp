@@ -73,23 +73,36 @@ void half_lap_sharp_angles(Turtle& t) {
 	t.arc(4.f,   60.f);  // medium-sharp corner
 }
 
-// One full rounded-square loop: 4x (straight + 90 deg corner), net turning
-// +/-360 deg. Unlike the half_lap_* paths above (which need pairing with an
-// identical copy to close a 180 deg loop), a full 360 deg loop closes on
-// itself independently — it returns to the exact position/heading it
-// started from regardless of LEG/RADIUS, since opposite legs of a rounded
-// square always cancel. Chaining a right loop then a left loop therefore
-// produces two loops tangent at that shared start point/heading: the
-// self-crossing "8" shape, with sharp near-square corners per corner_deg
-// (see BikeCourseTurtle.h::arc's MAX_DEG_PER_STEP subdivision for how a big
-// single turn_deg like 90 still comes out as a smooth-but-tight corner, not
-// a single facet).
-void build_figure_eight_loop(Turtle& t, float turn_sign) {
-	static constexpr float LEG    = 20.f;  // straight between corners
-	static constexpr float RADIUS = 5.f;   // near-square, sharp-ish corner
-	for (int i = 0; i < 4; ++i) {
+// Two squares, diagonally adjacent, sharing exactly one corner (a pinch
+// point) — NOT two loops joined by a shared straight (that made an entire
+// leg of the two loops coincide/overlap near the middle). Traced as a
+// single continuous boundary: square A's near corner IS square B's near
+// corner, so the path only ever touches itself at that one point, revisited
+// twice, never overlapping a whole segment:
+//
+//   0,0 ----- S,0
+//    |          |
+//    |  sq A    |
+//    |          |
+//   0,S ----- S,S ----- 2S,S
+//               |          |
+//               |  sq B    |
+//               |          |
+//              S,2S ----- 2S,2S
+//
+// Walking that boundary clockwise, every corner turns -90 (right) EXCEPT the
+// shared pinch corner (S,S) — visited once mid-square-A-exit and once
+// mid-square-B-exit — which turns +90 (left) both times: a pinch is locally
+// concave/reflex relative to the convex corners around it, the opposite
+// turn sign is what makes the two squares bulge away from each other
+// instead of union-ing into one bigger rectangle.
+void build_figure_eight_path(Turtle& t) {
+	static constexpr float LEG    = 40.f;  // square side length
+	static constexpr float RADIUS = 10.f;  // near-square, sharp-ish corner
+	static constexpr float turns_deg[8] = { -90.f, +90.f, -90.f, -90.f, -90.f, +90.f, -90.f, -90.f };
+	for (float turn_deg : turns_deg) {
 		t.straight(LEG);
-		t.arc(RADIUS, turn_sign * 90.f);
+		t.arc(RADIUS, turn_deg);
 	}
 }
 
@@ -187,8 +200,7 @@ void build_hardcoded_circuit(BikeCourse& course, BikeHardcodedCourseKind kind)
 			half_lap_sharp_angles(t);
 			break;
 		case BikeHardcodedCourseKind::FigureEight:
-			build_figure_eight_loop(t, +1.f);  // right-hand loop
-			build_figure_eight_loop(t, -1.f);  // left-hand loop, tangent at the shared start point
+			build_figure_eight_path(t);
 			break;
 		case BikeHardcodedCourseKind::ClassicLoop:
 		default:
