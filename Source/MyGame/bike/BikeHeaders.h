@@ -251,11 +251,13 @@ struct BikeAIParams {
 	float steer_lookahead_time_s = 0.0f;  // scales lookahead with speed above the floor
 
 	// ---- Lateral guidance — converts target lateral offset into ci.lateral_shift ----
-	// Deliberately simple proportional-only: this just sets the setpoint for
-	// BikeObject's own heading PID (bike_heading_gains in BikeObject_Local.h),
-	// which is where the actual feedback control (and its damping) lives now —
-	// two stacked PIDs here was one tunable loop too many. Command is clamped
-	// to [-1,1]; BikeObject::tick_transform maps it onto a heading offset
+	// Deliberately simple proportional-only: this just sets (part of) the
+	// setpoint for BikeObject's own heading PID (bike_heading_gains in
+	// BikeObject_Local.h), which is where the actual feedback control (and
+	// its damping) lives now — two stacked PIDs here was one tunable loop too
+	// many. Command is clamped to [-1,1] independently of heading_shift_kp's
+	// term below (see ci.heading_shift); BikeObject::tick_transform sums both
+	// terms' angles and maps the total onto a heading offset
 	// (bike_heading_max_offset_deg) from the track tangent.
 	float lateral_shift_kp = 0.35f;  // shift command (pre-clamp) per metre of offset error
 
@@ -392,7 +394,8 @@ public:
 	float dbg_cohesion_gap_m      = 0.f;  // actual longitudinal gap to the behind-leader, valid iff dbg_cohesion_behind_lat's leader exists
 	float dbg_target_lat_offset  = 0.f;
 	bool  dbg_clamped            = false;
-	float dbg_lateral_shift      = 0.f;
+	float dbg_lateral_shift      = 0.f;  // ci.lateral_shift this tick — position-error term only
+	float dbg_heading_shift      = 0.f;  // ci.heading_shift this tick — heading-error term only, see dbg_heading_error
 	float dbg_heading_error      = 0.f;  // rad, signed angle from bike_direction to the racing line's own tangent
 	bool  dbg_avoidance_active   = false;
 	float dbg_avoidance_lateral_vel = 0.f;  // signed speed along my own right vector (m/s) — dot(ci.avoidance_lateral_vel, my_right)
@@ -476,7 +479,8 @@ public:
 	struct ControlInput {
 		float aero_coeff = 0.0;	// determied by stance
 		float steer = 0.0;// l,r — cosmetic only (fork angle / lean); never rotates bike_direction, see tick_steer
-		float lateral_shift = 0.0; // -1..1 — the only lateral control: bends bike_direction toward a lateral target (rate-capped turn, see BikeObject::tick_transform)
+		float lateral_shift = 0.0; // -1..1 — offset from the road's own tangent, driven by lateral POSITION error (rate-capped turn, see BikeObject::tick_transform)
+		float heading_shift = 0.0; // -1..1 — a second, independent offset from the road's own tangent, driven directly by HEADING error (e.g. matching the racing line's own tangent through a corner). Summed with lateral_shift's angle rather than blended/clamped together, so neither term dilutes the other.
 		float brake_amount = 0.0;// 0,1
 		float power = 0.0;	// input _watts_ requested
 		glm::vec3 avoidance_lateral_vel = glm::vec3(0.f); // m/s, worldspace vector (already includes direction, e.g. along the yielding bike's own right vector) — a direct positional slide, deliberately NOT routed through bike_direction/heading (see BikeObject::tick_transform). Set by BikeAI's avoidance term only; BikePlayer never sets it.

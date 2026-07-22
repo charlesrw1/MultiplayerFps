@@ -499,11 +499,17 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	                                        glm::dot(my_bike->bike_direction, rl_tangent));
 	dbg_heading_error = heading_error;
 
-	// Cohesion/racing-line only — avoidance never touches this (or heading at
-	// all); it's a direct worldspace lateral slide instead, see section 3.
-	const float lateral_shift = glm::clamp(
-		p.lateral_shift_kp * lat_error + p.heading_shift_kp * heading_error * corner_weight, -1.f, 1.f);
+	// Two independent tweakables, kept separate all the way into
+	// ci.lateral_shift/ci.heading_shift (see BikeHeaders.h) rather than
+	// summed and clamped together here — clamping the sum before it reaches
+	// tick_transform would let a maxed-out lateral correction silently eat
+	// into the heading term's authority (and vice versa). Cohesion/racing-line
+	// only; avoidance never touches either (it's a direct worldspace lateral
+	// slide instead, see section 3).
+	const float lateral_shift = glm::clamp(p.lateral_shift_kp * lat_error, -1.f, 1.f);
+	const float heading_shift = glm::clamp(p.heading_shift_kp * heading_error * corner_weight, -1.f, 1.f);
 	dbg_lateral_shift = lateral_shift;
+	dbg_heading_shift = heading_shift;
 
 	// ci.steer doesn't command heading either — it only drives cosmetic
 	// fork/handlebar twist (BikeObject::tick_steer computes roll/lean from the
@@ -512,7 +518,7 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// opposite handedness of the engine's own cross(bike_direction, up)
 	// "right" the fork-twist math is built on — negating keeps the fork
 	// turned toward the side the bike is actually steering to.
-	dbg_steer_final = -lateral_shift;
+	dbg_steer_final = -(lateral_shift + heading_shift);
 
 	// ============================================================
 	// 4. Corner braking — lookahead safety scan, unrelated to cohesion/avoidance.
@@ -669,8 +675,9 @@ void BikeAI::evaluate(BikeObject* my_bike)
 
 	// ---- Fill ControlInput ----
 	BikeObject::ControlInput ci;
-	ci.steer         = -lateral_shift;  // cosmetic lean only, see note above (sign flipped vs. lateral_shift)
+	ci.steer         = dbg_steer_final;  // cosmetic lean only, see note above (sign flipped vs. lateral_shift+heading_shift)
 	ci.lateral_shift = lateral_shift;
+	ci.heading_shift = heading_shift;
 	ci.brake_amount  = brake_amount;
 	ci.power         = (brake_amount > 0.1f) ? 0.f : power;
 	ci.avoidance_lateral_vel = avoidance_lateral_vel;  // direct worldspace slide, bypasses heading entirely — see section 3

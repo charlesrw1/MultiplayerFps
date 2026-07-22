@@ -261,7 +261,14 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	// BikePlayer::evaluate.
 	const BikeWaypoint wp_here     = course->sample(course_dist_m);
 	const float steer_cmd          = glm::clamp(ci.lateral_shift, -1.f, 1.f);
-	const float heading_offset_rad = steer_cmd * glm::radians(bike_heading_max_offset_deg);
+	const float heading_cmd        = glm::clamp(ci.heading_shift, -1.f, 1.f);
+	// Two independent offsets from the road's own tangent, summed as ANGLES
+	// (not blended/clamped together upstream) so neither dilutes the other:
+	// steer_cmd chases a lateral position, heading_cmd chases a heading
+	// directly (e.g. the racing line's own tangent through a corner). Both
+	// still just set the PID's setpoint below — momentum/rate/curvature caps
+	// apply identically regardless of which term produced the offset.
+	const float heading_offset_rad  = (steer_cmd + heading_cmd) * glm::radians(bike_heading_max_offset_deg);
 	const glm::vec3 desired_heading = glm::normalize(wp_here.forward + wp_here.right * glm::tan(heading_offset_rad));
 
 	// Signed angle (about world up) from bike_direction to desired_heading.
