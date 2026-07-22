@@ -18,7 +18,6 @@ extern vec2 ssr_lum_range;
 extern int lum_adjust_mode;
 extern ConfigVar include_cubemaps;
 extern ConfigVar r_ddgi_halfres;
-extern ConfigVar r_ddgi_halfres_blend;
 
 // ---------------------------------------------------------------------------
 // Probe debug rendering
@@ -179,9 +178,7 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
 // ---------------------------------------------------------------------------
 
 ConfigVar r_ddgi_halfres_blend("r.ddgi_halfres_blend", "0.8", CVAR_FLOAT,
-                               "[0,1] blend input into ddgi temporal accumulation");
-ConfigVar r_ddgi_halfres_sharpness("r.ddgi_halfres_sharpness", "0.0", CVAR_FLOAT,
-                               "DDGI upsample post-blend sharpening strength", 0, 3.0);
+                               "[0,1] how much of history to keep each frame outside a texel's own checkerboard refresh phase");
 
 void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     ASSERT(ssao && shade_fs_halfres != -1);
@@ -227,37 +224,26 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         draw.bind_texture_ptr(3, draw.tex.scene_motion);
         draw.bind_texture_ptr(4, draw.tex.last_scene_motion);
 
-        // FIXME
-        extern ConfigVar r_taa_blend;
-        extern ConfigVar r_taa_flicker_remove;
         extern ConfigVar r_taa_reproject;
-        extern ConfigVar r_taa_dilate_velocity;
-        extern ConfigVar r_taa_adaptive_blend;
-        extern ConfigVar r_taa_motion_blend;
         extern float taa_doc_mult;
         extern float taa_doc_vel_bias;
         extern float taa_doc_bias;
         extern float taa_doc_pow;
 
+        // Simplified checkerboard reconstruction: no neighborhood variance clip or
+        // sharpen anymore, but keeps (1) the per-frame leak toward "current" (amt)
+        // so the 4 phases converge instead of baking in a static checkerboard, and
+        // (2) the motion-vector disocclusion check (see temporal_upsample_ddgi.txt)
+        // so newly-uncovered geometry doesn't wait up to 3 frames for its phase.
         gpu::TemporalParams tp{};
         tp.lastViewProj = draw.last_frame_main_view.viewproj;
         tp.amt = r_ddgi_halfres_blend.get_float();
+        tp.use_reproject = r_taa_reproject.get_bool();
+        tp.halfres_texel_offset = glm::ivec2(texel_offset.x, texel_offset.y);
         tp.doc_mult = taa_doc_mult;
         tp.doc_vel_bias = taa_doc_vel_bias;
         tp.doc_bias = taa_doc_bias;
         tp.doc_pow = taa_doc_pow;
-        tp.remove_flicker = r_taa_flicker_remove.get_bool();
-        tp.use_reproject = r_taa_reproject.get_bool();
-        tp.dilate_velocity = r_taa_dilate_velocity.get_bool();
-        tp.halfres_texel_offset = glm::ivec2(texel_offset.x, texel_offset.y);
-        // reuses the same checkerboard blend factor for both branches; ddgi
-        // updates 1-in-4 texels/frame vs TAA's every-frame, so this ends up
-        // averaging over a much longer effective history than the TAA pass at
-        // the same nominal amt/adaptive settings
-        tp.adaptive_blend = r_taa_adaptive_blend.get_bool();
-        tp.stationary_blending = r_ddgi_halfres_blend.get_float();
-        tp.motion_blending = r_taa_motion_blend.get_float();
-        tp.sharpness = r_ddgi_halfres_sharpness.get_float();
         draw.ubo.temporal_params->upload(&tp, sizeof(tp));
         gfx().bind_uniform_buffer_base(7, draw.ubo.temporal_params);
 
