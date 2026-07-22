@@ -589,6 +589,7 @@ public:
 	float dbg_turn_rate_dps           = 0.f;  // actual heading turn rate applied this tick (deg/s)
 
 	EntityPtr fork_entity;
+	float fork_flick_smoothed = 0.f;  // lightly-smoothed lateral_vel driving the fork "flick" (tick_transform)
 
 	// Pedal visual (crank + shoe pivots) — see BikeObject::tick_transform.
 	// Rest rotations are captured once in start() so the animation composes

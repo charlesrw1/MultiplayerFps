@@ -34,6 +34,14 @@ float roll_smooth_stand_up  = 0.05f;
 // wrong way instead of editing code.
 float roll_dir_sign         = -1.f;
 
+// Fork "flick" — extra bar deflection from how fast the bike is actually
+// moving laterally right now (lateral_vel), on top of the steer-intent
+// angle. See BikeObject::tick_transform.
+float fork_flick_deg_per_mps = 6.f;   // extra fork deg per m/s of lateral_vel
+float fork_flick_max_deg     = 15.f;  // clamp on the flick contribution alone
+float fork_flick_smooth      = 0.01f; // noise-reduction only, keep low so it stays snappy
+float fork_flick_dir_sign    = 1.f;   // flip if the flick turns the wrong way
+
 // Single low-pass on the raw steer input — no build/release asymmetry, no
 // wobble/crosswind/bump-steer noise layers. Same path for player and AI.
 static float steer_smoothing_tau = 0.12f;  // s
@@ -116,6 +124,11 @@ static void bike_steer_debug()
 		ImGui::DragFloat("roll_smooth_lean_in",  &roll_smooth_lean_in,  0.005f, 0.001f, 0.95f, "%.3f");
 		ImGui::DragFloat("roll_smooth_stand_up", &roll_smooth_stand_up, 0.005f, 0.001f, 0.95f, "%.3f");
 		ImGui::DragFloat("roll_dir_sign",        &roll_dir_sign,        2.f,   -1.f,   1.f);
+		ImGui::SeparatorText("Fork Flick");
+		ImGui::DragFloat("fork_flick_deg_per_mps", &fork_flick_deg_per_mps, 0.2f, 0.f, 30.f);
+		ImGui::DragFloat("fork_flick_max_deg",     &fork_flick_max_deg,     0.5f, 0.f, 45.f);
+		ImGui::DragFloat("fork_flick_smooth",      &fork_flick_smooth,      0.005f, 0.001f, 0.5f, "%.3f");
+		ImGui::DragFloat("fork_flick_dir_sign",    &fork_flick_dir_sign,    2.f, -1.f, 1.f);
 		ImGui::SeparatorText("Handlebar Visual");
 		ImGui::DragFloat("bar_scale_lo_steer",  &bar_scale_lo_steer,  0.1f, 0.5f, 12.f);
 		ImGui::DragFloat("bar_scale_hi_steer",  &bar_scale_hi_steer,  0.1f, 0.1f,  6.f);
