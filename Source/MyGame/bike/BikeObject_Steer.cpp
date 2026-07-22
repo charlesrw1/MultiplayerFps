@@ -27,7 +27,7 @@ float bar_lean_fade_hi      = 1.f;
 // deliberately laggier than lean_in by default: quick to bank into a corner,
 // slower to come back upright, so the exit doesn't read as an instant snap.
 float roll_smooth_lean_in   = 0.01f;
-float roll_smooth_stand_up  = 0.05f;
+float roll_smooth_stand_up  = 0.015f;
 // Flips which way the bike banks for a given turn direction — the sign
 // convention was carried over algebraically from the old curvature-based
 // formula rather than verified visually; flip live here if it leans the

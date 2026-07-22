@@ -221,14 +221,14 @@ struct BikeAIParams {
 	// box-overlap test (Minkowski sum): since every rider shares this box, two
 	// riders' boxes touch when the worldspace gap on an axis drops below TWICE
 	// the half-extent — see BikeAI.cpp section 3.
-	float avoidance_box_half_long_m   = 0.65f;   // half-extent, Z (front/back)
-	float avoidance_box_half_lat_m    = 0.25f;  // half-extent, X (left/right)
+	float avoidance_box_half_long_m   = 0.5f;   // half-extent, Z (front/back)
+	float avoidance_box_half_lat_m    = 0.15f;  // half-extent, X (left/right)
 	// Soft reaction zone: severity ramps 0..1 linearly across this extra
 	// distance OUTSIDE the hard box-overlap boundary (severity=1 once boxes
 	// actually touch), so the response builds in smoothly instead of snapping
 	// to full force the instant the hard boundary is crossed.
-	float avoidance_soft_margin_long_m = 0.7f;
-	float avoidance_soft_margin_lat_m  = 0.5f;
+	float avoidance_soft_margin_long_m = 0.3f;
+	float avoidance_soft_margin_lat_m  = 0.3f;
 	// Below this worldspace longitudinal gap (full distance, not a half-extent),
 	// neither rider reads as clearly ahead/behind — treat it as side-by-side
 	// and have BOTH yield. Above it, only the trailing rider (conflicting
@@ -259,7 +259,7 @@ struct BikeAIParams {
 	// term below (see ci.heading_shift); BikeObject::tick_transform sums both
 	// terms' angles and maps the total onto a heading offset
 	// (bike_heading_max_offset_deg) from the track tangent.
-	float lateral_shift_kp = 0.35f;  // shift command (pre-clamp) per metre of offset error
+	float lateral_shift_kp = 0.1f;  // shift command (pre-clamp) per metre of offset error
 
 	// ---- Heading guidance — lateral_shift_kp alone only ever points the bike
 	// at the ROAD's own tangent (wp.forward), offset by a lateral-error angle;
