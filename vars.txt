@@ -16,6 +16,10 @@ gpu.draw_viewmodel 1
 view.tp 0
 dbg.fly 0
 
+r.editor_fast_frame_limit_fps 120
+r.frame_limit_fps 67
+r.enable_vsync 0
+
 # TAA VARS
 r.taa 1
 r.taa_sharpness 0.08

@@ -530,7 +530,7 @@ void GameEngineLocal::loop() {
 					SDL_Delay(200);
 			}
 
-			{
+			if (!is_test_mode()) {
 				CPU_SCOPE("FrameLimiter");
 				int target_fps = r_frame_limit_fps.get_integer();
 #ifdef EDITOR_BUILD
