@@ -235,6 +235,12 @@ public:
 
 	gpu::HBAOData data = {};
 	glm::vec4 random_elements[RANDOM_ELEMENTS];
+
+	// NUM_DIRECTIONS was halved (hbao.txt) to cut samples/pixel; this alternates the
+	// per-direction angle by half a step every other frame so the two frames together
+	// still cover the original angular density, relying on TAA to blend them - see
+	// SSAO_System::render()'s hbao_calc loop.
+	int temporal_frame_index = 0;
 };
 #include <array>
 class SSRSystem

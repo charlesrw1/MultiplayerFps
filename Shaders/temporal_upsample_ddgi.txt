@@ -54,7 +54,8 @@ float linear_depth(float d)
 // source pixel is on the wrong side of a depth discontinuity (avoids light
 // leaking across edges), and falls back to the closest-depth tap when all
 // 4 taps disagree strongly (e.g. thin foreground object over background).
-vec3 bilateral_upsample(vec2 input_uv, float full_linear_depth, vec2 halfres_invsize, vec2 halfres_size)
+vec3 bilateral_upsample(vec2 input_uv, float full_linear_depth, vec2 halfres_invsize, vec2 halfres_size,
+						 out vec3 out_min, out vec3 out_max)
 {
 	const vec2 half_pos = input_uv * halfres_size - vec2(0.5);
 	const vec2 half_base = floor(half_pos);
@@ -64,6 +65,8 @@ vec3 bilateral_upsample(vec2 input_uv, float full_linear_depth, vec2 halfres_inv
 	float wsum = 0.0;
 	vec3 closest_color = vec3(0.0);
 	float closest_depth_diff = 999999.0;
+	out_min = vec3(99999.0);
+	out_max = vec3(-99999.0);
 
 	for (int y = 0; y <= 1; y++) {
 		for (int x = 0; x <= 1; x++) {
@@ -80,6 +83,9 @@ vec3 bilateral_upsample(vec2 input_uv, float full_linear_depth, vec2 halfres_inv
 			const float w = bw*depth_w;
 			sum += tap_color*w;
 			wsum += w;
+
+			out_min = min(out_min, tap_color);
+			out_max = max(out_max, tap_color);
 
 			if (depth_diff < closest_depth_diff) {
 				closest_depth_diff = depth_diff;
@@ -107,7 +113,18 @@ vec3 temporal_upscale()
 	const float weight = (my_texel_offset == params.halfres_texel_offset)? 1.0 : 0.0;
 
 	const float full_linear_depth = linear_depth(texelFetch(sceneDepth,input_texel,0).r);
-	const vec3 current = bilateral_upsample(input_uv, full_linear_depth, halfres_invsize, halfres_size);
+	vec3 neighbor_min, neighbor_max;
+	const vec3 current_blurred = bilateral_upsample(input_uv, full_linear_depth, halfres_invsize, halfres_size,
+													  neighbor_min, neighbor_max);
+
+	// On this pixel's own refresh phase, halfResColor's texel at input_texel/2 was
+	// shaded using THIS exact full-res pixel's gbuffer data (see halfres_texel_offset
+	// in ddgiShadeF.txt: texel_to_fetch = halfres_texel*2 + halfres_texel_offset) - an
+	// exact, unblurred sample, not an approximation. Using bilateral_upsample's blend
+	// across the 2x2 half-res neighborhood here instead would throw that precision
+	// away every single frame, which is why the reconstruction was never actually
+	// converging toward full-res sharpness over time - it was blurring forever.
+	const vec3 current_exact = texelFetch(halfResColor, input_texel/2, 0).rgb;
 
 	vec2 velocity_uv = texelFetch(sceneMotion,input_texel,0).rg;
 	if(length(velocity_uv)<0.00001)
@@ -121,7 +138,15 @@ vec3 temporal_upscale()
 		uv_to_use = reproject_to_last(input_uv);
 	uv_to_use = clamp(uv_to_use,vec2(0.0),vec2(1.0));
 
-	vec3 last = textureLod(lastFullColor,uv_to_use,0).rgb;
+	// Clamp history to the current frame's local half-res neighborhood box. We have
+	// no last-frame depth buffer to do a proper reprojected-depth disocclusion test
+	// (only motion vectors, see below), so this is the cheap fallback that catches
+	// what that check misses - e.g. camera panning past a static silhouette edge,
+	// where both the newly-revealed background and whatever was there last frame
+	// are static, so their motion vectors don't diverge and the motion check never
+	// fires. Clamping pulls a wrong stale sample back toward what's actually here
+	// now instead of letting it sit as a visible wrong-colored checkerboard blob.
+	vec3 last = clamp(textureLod(lastFullColor,uv_to_use,0).rgb, neighbor_min, neighbor_max);
 
 	// Disocclusion check: if the velocity stored at the reprojected history texel
 	// disagrees with this pixel's own velocity, that history sample belongs to a
@@ -143,9 +168,16 @@ vec3 temporal_upscale()
 	// differently, especially on high-frequency detail - without this leak a
 	// held-exactly value never converges toward its neighbors' phases and bakes
 	// in a static checkerboard pattern instead of it fading out over a few frames.
-	const vec3 held = mix(current, last, params.amt);
+	// Uses the blurred estimate here (not current_exact), since this pixel isn't
+	// necessarily on its own phase this frame.
+	const vec3 held = mix(current_blurred, last, params.amt);
 
-	return sanitize(mix(held, current, weight_with_disocclusion));
+	// Only use the precise unblurred sample when this really is this pixel's own
+	// refresh phase (weight > 0.5); a disocclusion-forced full-trust on an off-phase
+	// pixel still only has the blurred estimate available.
+	const vec3 current_for_full_trust = (weight > 0.5) ? current_exact : current_blurred;
+
+	return sanitize(mix(held, current_for_full_trust, weight_with_disocclusion));
 }
 
 void main()

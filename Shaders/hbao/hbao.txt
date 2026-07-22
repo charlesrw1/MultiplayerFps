@@ -51,7 +51,12 @@ layout (binding = 7, std140) uniform SsaoHbaoParamsUbo { SsaoHbaoParams params; 
 
 // tweakables
 const float  NUM_STEPS = 4;
-const float  NUM_DIRECTIONS = 8; // texRandom/g_Jitter initialization depends on this
+// Halved from 8: each frame only samples 4 directions, alternating by a half
+// angular step (params.info.x, set per-frame in Ssao.cpp) so two consecutive
+// frames together cover the original 8-direction angular density. Relies on
+// the scene TAA pass to blend the two frames together instead of doing that
+// blending/reprojection ourselves.
+const float  NUM_DIRECTIONS = 4; // texRandom/g_Jitter initialization depends on this
 
 layout(std140,binding=0) uniform controlBuffer {
   HBAOData   control;
@@ -216,9 +221,14 @@ float ComputeCoarseAO(vec2 FullResUV, float RadiusPixels, vec4 Rand, vec3 ViewPo
   const float Alpha = 2.0 * M_PI / NUM_DIRECTIONS;
   float AO = 0;
 
+  // Half-step rotation, alternated per-frame from the CPU (see Ssao.cpp) - together
+  // with the halved NUM_DIRECTIONS this recreates the original angular sample density
+  // spread across two frames instead of one, and leaves blending them to TAA.
+  float temporal_rotation = params.info.x;
+
   for (float DirectionIndex = 0; DirectionIndex < NUM_DIRECTIONS; ++DirectionIndex)
   {
-    float Angle = Alpha * DirectionIndex;
+    float Angle = Alpha * DirectionIndex + temporal_rotation;
 
     // Compute normalized 2D direction
     vec2 Direction = RotateDirection(vec2(cos(Angle), sin(Angle)), Rand.xy);

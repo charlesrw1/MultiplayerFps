@@ -121,9 +121,8 @@ void main()
 	vec2 uv_to_use = ndc_input * 0.5 + 0.5;
 	uv_to_use = clamp(uv_to_use,vec2(0.0),vec2(1.0));
 
-	vec2 actual_uv = reproject_to_last(input_uv);
 	if(params.use_reproject != 0)
-		uv_to_use = actual_uv;
+		uv_to_use = reproject_to_last(input_uv);
 
 	//vec3 last = SampleTextureCatmullRom5(lastColor,uv_to_use).rgb;
 	vec3 last = sanitize(textureLod(lastColor,uv_to_use,0).rgb);

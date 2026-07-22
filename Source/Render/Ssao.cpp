@@ -38,7 +38,7 @@ void SSAO_System::init() {
 
 	std::mt19937 rmt;
 
-	const float numDir = 8; // keep in sync to glsl
+	const float numDir = 4; // keep in sync to glsl (hbao.txt NUM_DIRECTIONS)
 
 	signed short hbaoRandomShort[RANDOM_ELEMENTS * 4];
 
@@ -237,6 +237,7 @@ void SSAO_System::render() {
 
 	// linearize depth, writes to texture.depthlinear
 	{
+		GPU_SCOPE("ssao_linearize_depth");
 		auto targets = {ColorTargetInfo(texture.depthlinear)};
 		RenderPassState pass;
 		pass.color_infos = targets;
@@ -266,6 +267,7 @@ void SSAO_System::render() {
 
 	// create viewspace normals, writes to texture.viewnormal
 	{
+		GPU_SCOPE("ssao_viewspace_normals");
 		auto targets = {ColorTargetInfo(texture.viewnormal)};
 		RenderPassState pass;
 		pass.color_infos = targets;
@@ -292,6 +294,7 @@ void SSAO_System::render() {
 	// deinterleave, writes to texture.deptharray (each call attaches NUM_MRT
 	// distinct array layers as separate color attachments and one quad fills them all).
 	{
+		GPU_SCOPE("ssao_deinterleave");
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
@@ -327,6 +330,7 @@ void SSAO_System::render() {
 
 	// calculate hbao, writes to texture.resultarray (one layer at a time).
 	{
+		GPU_SCOPE("ssao_hbao_calc");
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
@@ -337,6 +341,14 @@ void SSAO_System::render() {
 		gfx().bind_texture(1, texture.viewnormal);
 		gfx().bind_uniform_buffer_base(0, ubo.data);
 
+		// Alternate the direction sampling pattern by half an angular step every
+		// other frame (NUM_DIRECTIONS in hbao.txt was halved to cut cost) so the two
+		// frames' samples interleave back to the original angular density; TAA blends
+		// them over time instead of us doing our own reprojection/accumulation here.
+		const float half_step_rotation = glm::two_pi<float>() / 8.0f; // half of (2*PI / NUM_DIRECTIONS=4)
+		const float temporal_rotation = (temporal_frame_index % 2) ? half_step_rotation : 0.0f;
+		temporal_frame_index++;
+
 		for (int i = 0; i < RANDOM_ELEMENTS; i++) {
 			auto targets = {ColorTargetInfo(texture.resultarray, i, 0)};
 			RenderPassState pass;
@@ -346,6 +358,7 @@ void SSAO_System::render() {
 			{
 				gpu::SsaoHbaoParams hp{};
 				hp.primitive_id_custom = (uint32_t)i;
+				hp.info.x = temporal_rotation;
 				draw.ubo.ssao_hbao_params->upload(&hp, sizeof(hp));
 				gfx().bind_uniform_buffer_base(7, draw.ubo.ssao_hbao_params);
 			}
@@ -355,6 +368,7 @@ void SSAO_System::render() {
 
 	// reinterleave, writes to texture.result
 	{
+		GPU_SCOPE("ssao_reinterleave");
 		auto targets = {ColorTargetInfo(texture.result)};
 		RenderPassState pass;
 		pass.color_infos = targets;
@@ -372,6 +386,7 @@ void SSAO_System::render() {
 
 	// depth aware blur â€” bounce resultâ†’blurred (horizontal), then blurredâ†’result (vertical).
 	if (r_ssao_blur.get_bool()) {
+		GPU_SCOPE("ssao_blur");
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;

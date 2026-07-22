@@ -1,5 +1,12 @@
 // Build luminance histogram from HDR scene color.
-// Each thread handles one pixel; logs lum and atomicAdds to bin.
+// Each thread handles one pixel; logs lum and bins it into a workgroup-local
+// (shared memory) histogram first, then one atomicAdd per bin per workgroup
+// merges into the global histogram. A naive per-pixel atomicAdd straight into
+// the 256-bin global SSBO serializes hard - neighboring pixels usually land
+// in the same bin, so ~2M threads (at 1080p) end up contending on 256 global
+// locations. Local/shared-memory atomics are on-chip and far cheaper, and this
+// cuts global atomic traffic from one per pixel to one per bin per workgroup
+// (256x fewer at a 16x16 group size).
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
@@ -24,19 +31,33 @@ layout(std140, binding = 8) uniform AutoExposureParamsUBO {
     float ae_pad3;
 } ae;
 
+// 16x16 = 256 threads per workgroup, one-to-one with the 256 histogram bins,
+// so gl_LocalInvocationIndex can double as "which bin this thread merges".
+shared uint local_bins[256];
+
 void main() {
+    uint local_index = gl_LocalInvocationIndex;
+    local_bins[local_index] = 0u;
+    barrier();
+
     ivec2 sz  = textureSize(scene_hdr, 0);
     ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
-    if (pix.x >= sz.x || pix.y >= sz.y) return;
+    if (pix.x < sz.x && pix.y < sz.y) {
+        vec3  hdr = texelFetch(scene_hdr, pix, 0).rgb;
+        float lum = dot(hdr, vec3(0.2126, 0.7152, 0.0722));
+        lum       = max(lum, 0.0001);
 
-    vec3  hdr = texelFetch(scene_hdr, pix, 0).rgb;
-    float lum = dot(hdr, vec3(0.2126, 0.7152, 0.0722));
-    lum       = max(lum, 0.0001);
+        float log_lum = log2(lum);
+        float t       = (log_lum - ae.ae_hist_min_log) /
+                        (ae.ae_hist_max_log - ae.ae_hist_min_log);
+        t = clamp(t, 0.0, 1.0);
+        uint bin = uint(t * 255.0);
+        atomicAdd(local_bins[bin], 1u);
+    }
 
-    float log_lum = log2(lum);
-    float t       = (log_lum - ae.ae_hist_min_log) /
-                    (ae.ae_hist_max_log - ae.ae_hist_min_log);
-    t = clamp(t, 0.0, 1.0);
-    uint bin = uint(t * 255.0);
-    atomicAdd(bins[bin], 1u);
+    barrier();
+
+    uint count = local_bins[local_index];
+    if (count > 0u)
+        atomicAdd(bins[local_index], count);
 }

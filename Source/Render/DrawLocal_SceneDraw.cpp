@@ -352,7 +352,7 @@ void taa_menu() {
 	ImGui::DragFloat("taa_doc_bias", &taa_doc_bias, 0.01, 0.001, 0.2);
 	ImGui::DragFloat("taa_doc_pow", &taa_doc_pow, 0.01, 0, 1);
 }
-//ADD_TO_DEBUG_MENU(taa_menu);
+ADD_TO_DEBUG_MENU(taa_menu);
 static glm::vec3 pp_color_tint = glm::vec3(1.f);
 
 void post_process_menu() {
