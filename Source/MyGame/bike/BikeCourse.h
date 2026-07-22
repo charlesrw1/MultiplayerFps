@@ -151,7 +151,8 @@ enum class BikeHardcodedCourseKind {
 	Twisty      = 1,  // chicanes and alternating-direction bends throughout
 	SharpAngles = 2,  // tight-radius corners at distinct angles (90/45/60 deg), city-block feel
 	Hilly       = 3,  // curvy road over procedural perlin-noise terrain, gradient-limited (see BikeCourseHilly.h)
-	Count       = 4,
+	FigureEight = 4,  // two square (90 deg corner) loops sharing one crossing point -- see build_figure_eight
+	Count       = 5,
 };
 inline const char* bike_hardcoded_course_name(BikeHardcodedCourseKind kind) {
 	switch (kind) {
@@ -159,15 +160,20 @@ inline const char* bike_hardcoded_course_name(BikeHardcodedCourseKind kind) {
 		case BikeHardcodedCourseKind::Twisty:      return "Twisty";
 		case BikeHardcodedCourseKind::SharpAngles: return "Sharp Angles";
 		case BikeHardcodedCourseKind::Hilly:       return "Hilly";
+		case BikeHardcodedCourseKind::FigureEight: return "Figure Eight";
 		default:                                   return "?";
 	}
 }
 
 // Builds a flat, closed-loop test circuit entirely in code (no level spawners,
-// no road network), all at y = 0 + small epsilon. Every turtle path is built
-// as a half-lap (net turning = 180 deg) executed twice — repeating identical
-// relative turtle commands under an exact 180 deg net turn is what makes the
-// loop close on itself to the metre regardless of how the half-lap wiggles.
+// no road network), all at y = 0 + small epsilon. Every turtle path (other
+// than FigureEight) is built as a half-lap (net turning = 180 deg) executed
+// twice — repeating identical relative turtle commands under an exact 180 deg
+// net turn is what makes the loop close on itself to the metre regardless of
+// how the half-lap wiggles. FigureEight instead chains two FULL loops (net
+// +/-360 deg each), which each close on themselves independently at the same
+// shared point/heading, producing the self-crossing "8" — see
+// build_figure_eight_loop in BikeCourseHardcoded.cpp.
 // Fills waypoints, dist_from_start, total_length_m, is_loop/is_built, and runs
 // BikeCourse::compute_racing_line on the result.
 void build_hardcoded_circuit(BikeCourse& course, BikeHardcodedCourseKind kind = BikeHardcodedCourseKind::ClassicLoop);

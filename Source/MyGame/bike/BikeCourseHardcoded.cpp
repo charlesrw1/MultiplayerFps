@@ -73,6 +73,26 @@ void half_lap_sharp_angles(Turtle& t) {
 	t.arc(4.f,   60.f);  // medium-sharp corner
 }
 
+// One full rounded-square loop: 4x (straight + 90 deg corner), net turning
+// +/-360 deg. Unlike the half_lap_* paths above (which need pairing with an
+// identical copy to close a 180 deg loop), a full 360 deg loop closes on
+// itself independently — it returns to the exact position/heading it
+// started from regardless of LEG/RADIUS, since opposite legs of a rounded
+// square always cancel. Chaining a right loop then a left loop therefore
+// produces two loops tangent at that shared start point/heading: the
+// self-crossing "8" shape, with sharp near-square corners per corner_deg
+// (see BikeCourseTurtle.h::arc's MAX_DEG_PER_STEP subdivision for how a big
+// single turn_deg like 90 still comes out as a smooth-but-tight corner, not
+// a single facet).
+void build_figure_eight_loop(Turtle& t, float turn_sign) {
+	static constexpr float LEG    = 20.f;  // straight between corners
+	static constexpr float RADIUS = 5.f;   // near-square, sharp-ish corner
+	for (int i = 0; i < 4; ++i) {
+		t.straight(LEG);
+		t.arc(RADIUS, turn_sign * 90.f);
+	}
+}
+
 // Converts a completed turtle path into course.waypoints (forward/right/
 // dist_from_start), centers it on the origin, and runs the racing line sim.
 // Shared tail end of every build_hardcoded_circuit() variant.
@@ -165,6 +185,10 @@ void build_hardcoded_circuit(BikeCourse& course, BikeHardcodedCourseKind kind)
 		case BikeHardcodedCourseKind::SharpAngles:
 			half_lap_sharp_angles(t);
 			half_lap_sharp_angles(t);
+			break;
+		case BikeHardcodedCourseKind::FigureEight:
+			build_figure_eight_loop(t, +1.f);  // right-hand loop
+			build_figure_eight_loop(t, -1.f);  // left-hand loop, tangent at the shared start point
 			break;
 		case BikeHardcodedCourseKind::ClassicLoop:
 		default:
