@@ -101,6 +101,9 @@ void EditorDoc::imgui_draw() {
 		if (active_mode)
 			active_mode->draw_ui();
 	});
+	// Scene raycast pick runs after label/nav-cube click handling, so it only fires when
+	// the click wasn't already claimed by an on-screen label or the nav cube.
+	active_mode->tick_late(inputs);
 	check_inputs();
 	draw_recent_switcher_popup();
 	draw_backup_browser_window();

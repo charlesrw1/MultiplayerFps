@@ -6,7 +6,6 @@
 void SelectionMode::tick(EditorInputs& inputs) {
 	dragger.tick(inputs);
 
-	const bool mouse1rel = Input::was_mouse_released(0);
 	const bool has_shift = Input::is_shift_down();
 	const bool has_ctrl = Input::is_ctrl_down();
 
@@ -15,11 +14,6 @@ void SelectionMode::tick(EditorInputs& inputs) {
 
 	auto selection_state = doc.selection_state.get();
 	auto command_mgr = doc.command_mgr.get();
-	if (mouse1rel && UiSystem::inst->is_vp_hovered() && inputs.can_use_mouse_click()) {
-		doc.on_mouse_pick();
-		//	ASSERT(!doc.inputs.can_use_mouse_click());
-		// return;
-	}
 
 	if (!UiSystem::inst->is_vp_focused()) {
 		return;
@@ -72,6 +66,19 @@ void SelectionMode::tick(EditorInputs& inputs) {
 		}
 		selection_state->clear_all_selected();
 		selection_state->add_entities_to_selection(selectThese);
+	}
+}
+
+// Runs after EditorUILayout::draw() so entity-label clicks (and the nav cube) get first
+// refusal on a release before it falls through to a scene raycast pick -- see EditorModes.h.
+void SelectionMode::tick_late(EditorInputs& inputs) {
+	const bool mouse1rel = Input::was_mouse_released(0);
+
+	if (inputs.get_focused())
+		return;
+
+	if (mouse1rel && UiSystem::inst->is_vp_hovered() && inputs.can_use_mouse_click()) {
+		doc.on_mouse_pick();
 	}
 }
 

@@ -7,6 +7,11 @@ class IEditorMode
 public:
 	virtual void tick(EditorInputs& inputs) = 0;
 
+	// Runs after EditorUILayout::draw() (entity-label click test / nav cube), so scene
+	// raycast picking never steals a click from an on-screen label or the nav cube.
+	// See SelectionMode's split of on_mouse_pick() out of tick() for why this exists.
+	virtual void tick_late(EditorInputs& inputs) {}
+
 	virtual void draw_ui()  {}
 };
 
@@ -60,6 +65,7 @@ class SelectionMode : public IEditorMode
 public:
 	SelectionMode(EditorDoc& doc);
 	void tick(EditorInputs& inputs);
+	void tick_late(EditorInputs& inputs) final;
 
 	void draw_ui() final;
 
