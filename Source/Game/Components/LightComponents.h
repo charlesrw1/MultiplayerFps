@@ -234,6 +234,11 @@ public:
 	REF float xz_density = 2.0;
 	REF float y_density = 2.0;
 
+	// expands the DDGI sampling-test AABB beyond the probe grid (probe placement is unaffected),
+	// so geometry just past the outermost probes (eg. a floor) still receives extrapolated GI
+	REF float sample_pad_xz = 0.0f;
+	REF float sample_pad_y = 0.0f;
+
 	REF bool override_relocate_dist = false;
 	REF float relocate_max_dist = 0.2;
 	REF float relocate_normal_push = 0.2;

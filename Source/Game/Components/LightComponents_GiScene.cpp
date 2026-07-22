@@ -38,7 +38,7 @@ static const string cubemap_suffix = "_cubemaps.dds";
 static const string irrad_suffix   = "_ddgi_irrad.dds";
 static const string depth_suffix   = "_ddgi_depth.dds";
 static const string baked_gi_suffix = "_baked.gi";
-static const int    gi_saved_version = 1;
+static const int    gi_saved_version = 2; // bumped: DdgiVolumeGpu grew sample_bounds_min/max
 
 ////
 // GameSceneGiUtil

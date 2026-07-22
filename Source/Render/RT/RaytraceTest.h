@@ -33,6 +33,10 @@ struct DdgiVolumeGpu
 	glm::vec4 origin_priority;
 	glm::vec4 density;
 	glm::ivec4 size_offset;
+	// padded sampling-zone AABB (xyz used, w unused): wider than the probe grid extents so
+	// surfaces just outside the outermost probes (eg. a floor) still get extrapolated GI
+	glm::vec4 sample_bounds_min;
+	glm::vec4 sample_bounds_max;
 	int get_num_probes_total() const { return size_offset.x * size_offset.y * size_offset.z; }
 };
 struct DdgiGlobals

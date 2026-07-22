@@ -5,6 +5,10 @@ struct DdgiVolumeGpu {
 	vec4 origin_pri;
 	vec4 density;
 	ivec4 size_offset;
+	// padded sampling-zone AABB (xyz used); wider than the probe grid so surfaces just past
+	// the outermost probes still get extrapolated GI instead of falling back to ambient
+	vec4 sample_bounds_min;
+	vec4 sample_bounds_max;
 };
 struct DdgiGlobals {
 	int atlas_x;
@@ -141,11 +145,7 @@ int find_best_ddgi_volume(vec3 worldpos)
 {
 	const int num_volumes = ddgi_global.num_volumes;
 	for(int v = 0;v<num_volumes;v++) {
-		vec3 volume_origin = volumes[v].origin_pri.xyz;
-		vec3 density = volumes[v].density.xyz;
-		ivec3 size = volumes[v].size_offset.xyz;
-
-		if(is_point_in_aabb(worldpos,volume_origin,volume_origin+(size-ivec3(1))*density)) {
+		if(is_point_in_aabb(worldpos,volumes[v].sample_bounds_min.xyz,volumes[v].sample_bounds_max.xyz)) {
 			return v;
 		}
 	}

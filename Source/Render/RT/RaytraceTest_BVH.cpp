@@ -64,6 +64,12 @@ VolumesAndNumProbes find_volumes() {
         glm::vec3 size = max - min;
         glm::ivec3 probe_size = (glm::ivec3)glm::round(size / glm::vec3(volume.density)) + glm::ivec3(1);
         volume.size_offset = glm::ivec4(probe_size, probes_summation);
+
+        glm::vec3 grid_max = min + glm::vec3(probe_size - glm::ivec3(1)) * glm::vec3(volume.density);
+        glm::vec3 sample_pad = glm::vec3(givol->sample_pad_xz, givol->sample_pad_y, givol->sample_pad_xz);
+        volume.sample_bounds_min = glm::vec4(min - sample_pad, 0);
+        volume.sample_bounds_max = glm::vec4(grid_max + sample_pad, 0);
+
         probes_summation += volume.get_num_probes_total();
         volumes.push_back(volume);
         if (givol->override_relocate_dist) {
