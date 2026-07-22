@@ -19,7 +19,7 @@ public:
 	// rider that might be selected -- selected is a raw BikeObject* with no
 	// lifetime tracking of its own, so leaving it pointed at a destroyed rider
 	// crashes the next on_imgui()/update() call.
-	void deselect() { selected = nullptr; orbiting = false; }
+	void deselect() { selected = nullptr; orbiting = false; behind_cam_initialized = false; }
 	bool has_selection(const BikeObject* rider) const { return selected == rider; }
 
 private:
@@ -33,4 +33,19 @@ private:
 	bool        draw_rider_state_text = false;  // per-rider paceline state + timer, drawn above their head
 	bool        draw_avoidance_box      = false;  // selected rider only — drop-dead box + avoid vectors, see draw_rider_avoidance_box
 	bool        draw_avoidance_soft_box = false;  // selected rider only — also draws the outer soft-reaction boundary, different color
+
+	// Behind camera (3rd person chase cam) — alternative to MMB-orbit while a
+	// rider is selected, same offset math as apply_debug_follow_camera() (see
+	// BikeApplication_Debug.cpp) but smoothed like BikePlayer::update_camera.
+	bool      behind_camera_enabled  = false;
+	float     behind_cam_dist_m      = 3.4f;   // distance behind rider (m)
+	float     behind_cam_height_m    = 1.55f;  // pivot height above rider origin (m)
+	float     behind_cam_pitch_deg   = -20.f;  // camera pitch, negative = looking down at the rider
+	// damp_dt_independent's "smoothing" factor, not seconds — closer to 1 = laggier/smoother,
+	// closer to 0 = snappier. Position and rotation lag independently (see update()).
+	float     behind_cam_pos_smooth_time_s = 0.02f;
+	float     behind_cam_rot_smooth_time_s = 0.05f;
+	glm::vec3 behind_cam_pos{};
+	glm::quat behind_cam_rot{ 1.f, 0.f, 0.f, 0.f };
+	bool      behind_cam_initialized = false;
 };

@@ -9,6 +9,7 @@
 #include "UI/GUISystemPublic.h"
 #include "Debug.h"
 #include "Framework/Util.h"
+#include "Framework/MathLib.h"
 #include "imgui.h"
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -39,7 +40,48 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 	const bool rmb = Input::is_mouse_down(2);
 	const bool mmb = Input::is_mouse_down(1);
 
-	if (orbiting && selected) {
+	if (orbiting && selected && behind_camera_enabled) {
+		// Drive-game style chase cam: same pivot/offset construction as
+		// apply_debug_follow_camera() (BikeApplication_Debug.cpp), but damped
+		// like BikePlayer::update_camera so the view doesn't snap on every
+		// steering/lean twitch. fly_cam/MMB-orbit input is bypassed entirely
+		// while this is active.
+		UiSystem::inst->set_game_capture_mouse(false);
+
+		const glm::vec3 fwd      = glm::normalize(selected->bike_direction);
+		const glm::vec3 world_up = glm::vec3(0, 1, 0);
+		const glm::vec3 pivot    = selected->get_ws_position() + world_up * behind_cam_height_m;
+		const glm::vec3 right    = glm::normalize(glm::cross(fwd, world_up));
+
+		const glm::quat pitch_rot  = glm::angleAxis(glm::radians(behind_cam_pitch_deg), right);
+		const glm::vec3 orbit_dir  = glm::normalize(pitch_rot * (-fwd));
+		const glm::vec3 target_pos = pivot + orbit_dir * behind_cam_dist_m;
+
+		// Target rotation: camera faces the same (pitched-down) direction the
+		// rider is actually heading RIGHT NOW — not a direction reconstructed
+		// from two independently-lagged points, which swims/distorts through
+		// fast turns. The quat itself is what gets smoothed below (slerp), so
+		// the rotation lag is real and decoupled from the position lag.
+		const glm::vec3 cam_fwd_target   = glm::normalize(pitch_rot * fwd);
+		const glm::vec3 cam_right_target = glm::normalize(glm::cross(cam_fwd_target, world_up));
+		const glm::vec3 cam_up_target    = glm::normalize(glm::cross(cam_right_target, cam_fwd_target));
+		const glm::quat target_rot = glm::quat(glm::mat3(cam_right_target, cam_up_target, -cam_fwd_target));
+
+		if (!behind_cam_initialized) {
+			behind_cam_pos = target_pos;
+			behind_cam_rot = target_rot;
+			behind_cam_initialized = true;
+		} else {
+			const float dt = eng->get_dt();
+			behind_cam_pos = damp_dt_independent(target_pos, behind_cam_pos, behind_cam_pos_smooth_time_s, dt);
+			behind_cam_rot = damp_dt_independent(target_rot, behind_cam_rot, behind_cam_rot_smooth_time_s, dt);
+		}
+
+		glm::mat4 xform = glm::mat4_cast(behind_cam_rot);
+		xform[3] = glm::vec4(behind_cam_pos, 1.f);
+		debug_cam_ent->set_ws_transform(xform);
+	} else if (orbiting && selected) {
+		behind_cam_initialized = false;
 		const glm::vec3 new_target = selected->get_ws_position();
 		UiSystem::inst->set_game_capture_mouse(mmb);
 		// Sync position with the target's frame-to-frame delta FIRST, in every
@@ -59,16 +101,19 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 			const float aspect = (float)window_size.x / (float)window_size.y;
 			fly_cam.update_from_input(window_size.x, window_size.y, aspect, glm::radians(cam->fov));
 		}
+
+		debug_cam_ent->set_ws_transform(glm::inverse(fly_cam.get_view_matrix()));
 	} else {
+		behind_cam_initialized = false;
 		UiSystem::inst->set_game_capture_mouse(rmb);
 		if (fly_cam.can_take_input()) {
 			auto window_size = get_app_window_size();
 			const float aspect = (float)window_size.x / (float)window_size.y;
 			fly_cam.update_from_input(window_size.x, window_size.y, aspect, glm::radians(cam->fov));
 		}
-	}
 
-	debug_cam_ent->set_ws_transform(glm::inverse(fly_cam.get_view_matrix()));
+		debug_cam_ent->set_ws_transform(glm::inverse(fly_cam.get_view_matrix()));
+	}
 
 	// Click-to-select (LMB). Ignore clicks the ImGui panel already consumed.
 	if (!ImGui::GetIO().WantCaptureMouse && Input::was_mouse_pressed(0)) {
@@ -177,6 +222,18 @@ void BikeDebugger::on_imgui()
 		if (g_bike_app && g_bike_app->course.is_built)
 			road_hw = g_bike_app->course.sample(selected->course_dist_m).road_half_width;
 		ImGui::SliderFloat("Manual lateral offset", &selected->manual_lateral_offset, -road_hw, road_hw, "%.2f m");
+
+		ImGui::Checkbox("Behind camera (3rd person)", &behind_camera_enabled);
+		if (behind_camera_enabled) {
+			ImGui::TextDisabled("Replaces MMB-orbit while active; click another rider or Clear Selection to exit.");
+			ImGui::DragFloat("Distance behind",  &behind_cam_dist_m,        0.1f, 0.5f, 15.f, "%.2f m");
+			ImGui::DragFloat("Height above",      &behind_cam_height_m,     0.05f, 0.f, 5.f,  "%.2f m");
+			ImGui::DragFloat("Pitch",             &behind_cam_pitch_deg,    0.5f, -80.f, 10.f, "%.1f deg");
+			ImGui::DragFloat("Position smoothing", &behind_cam_pos_smooth_time_s, 0.005f, 0.001f, 0.95f, "%.3f");
+			ImGui::DragFloat("Rotation smoothing", &behind_cam_rot_smooth_time_s, 0.005f, 0.001f, 0.95f, "%.3f");
+			ImGui::TextDisabled("Lower = snappier, higher = laggier/smoother (both, independently).");
+		}
+
 		ImGui::Checkbox("Draw avoidance box + avoid vectors", &draw_avoidance_box);
 		if (draw_avoidance_box) {
 			ImGui::SameLine();

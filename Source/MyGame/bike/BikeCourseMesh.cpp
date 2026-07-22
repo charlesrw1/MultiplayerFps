@@ -15,10 +15,10 @@ namespace {
 // Waypoint height is a gameplay reference (rider projection/physics), not a render
 // height -- lift the visible road mesh a bit further above it so it doesn't z-fight
 // with or sink below the terrain. Mirrors RoadNetworkComponent's ROAD_GROUND_OFFSET.
-constexpr float ROAD_MESH_Y_OFFSET = 0.04f;
+constexpr float ROAD_MESH_Y_OFFSET = 0.01f;
 // Racing line sits on top of the road surface itself, so it needs its own further
 // epsilon above ROAD_MESH_Y_OFFSET to avoid z-fighting with the road mesh.
-constexpr float RACING_LINE_Y_OFFSET = ROAD_MESH_Y_OFFSET + 0.02f;
+constexpr float RACING_LINE_Y_OFFSET = ROAD_MESH_Y_OFFSET + 0.01f;
 
 std::shared_ptr<MaterialInstance> get_road_material() {
 	// MaterialInstance is an asset-database-owned object (never deleted directly); wrap it in a

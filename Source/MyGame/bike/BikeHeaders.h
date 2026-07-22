@@ -590,6 +590,24 @@ public:
 
 	EntityPtr fork_entity;
 
+	// Pedal visual (crank + shoe pivots) — see BikeObject::tick_transform.
+	// Rest rotations are captured once in start() so the animation composes
+	// on top of whatever the artist authored, rather than overwriting it.
+	EntityPtr crank_entity;
+	EntityPtr right_shoe_entity;
+	EntityPtr left_shoe_entity;
+	glm::quat crank_rest_rot{ 1.f, 0.f, 0.f, 0.f };
+	glm::quat right_shoe_rest_rot{ 1.f, 0.f, 0.f, 0.f };
+	glm::quat left_shoe_rest_rot{ 1.f, 0.f, 0.f, 0.f };
+	float right_shoe_phase_offset = 0.f;  // this shoe pivot's baseline angle around the crank circle, from its authored local position (start())
+	float left_shoe_phase_offset  = 0.f;
+	float crank_phase = 0.f;  // rad, advances with cadence; frozen while coasting so freewheeling doesn't spin the legs
+
+	// Head-look (corner anticipation) — see BikeObject::tick_transform.
+	EntityPtr head_entity;
+	glm::quat head_rest_rot{ 1.f, 0.f, 0.f, 0.f };
+	float head_look_smoothed = 0.f;  // rad, damped toward the target yaw each tick
+
 	// Jersey color material — owns the dynamic material applied to the prefab's
 	// "rider_body" mesh in start(); must outlive that mesh's material_override.
 	DynamicMatUniquePtr jersey_mat;

@@ -27,6 +27,24 @@ extern BikeGameApplication* g_bike_app;
 // Gear shift cooldown
 static float bike_gear_shift_cooldown = 3.f;
 
+// Pedal visual — extra ankle tilt applied to a shoe pivot near the top of
+// the crank stroke, on top of the level-compensation rotation (see tick_transform).
+static float pedal_ankle_tilt_deg = 6.f;
+// Shifts WHERE in the stroke the tilt above lands, independent of its size —
+// -90 deg moves it earlier in the cycle so it lands mid-upstroke instead of
+// right at the top.
+static float pedal_ankle_tilt_phase_deg = -90.f;
+
+// Head-look (corner anticipation) — rider turns their head toward an upcoming
+// bend before actually leaning into it, like a real cyclist scanning the road.
+static float head_look_anticipation_s = 1.8f;   // seconds ahead of current speed to sample the course
+static float head_look_ahead_min_m    = 6.f;
+static float head_look_ahead_max_m    = 40.f;
+static float head_look_gain           = 1.5f;   // scales anticipated turn angle -> head yaw, before clamping
+static float head_look_max_deg        = 35.f;   // clamp on head yaw either direction
+static float head_look_smooth_time_s  = 0.35f;  // damping time constant, avoids a twitchy head on choppy road/corners
+static float head_look_dir_sign       = 1.f;    // flips which way the head turns for a given anticipated turn (tune in-editor)
+
 // Worldspace steering — see tick_transform. Declared extern in BikeObject_Local.h.
 // bike_heading_gains is THE steering PID (kp/ki/kd on heading angle error,
 // output = angular acceleration). Defaults reproduce the old fixed damped-
@@ -110,10 +128,32 @@ void BikeObject::start()
 				jersey_mat->set_u8vec_parameter("colorMult", jersey_color);
 				mesh->set_material_override(jersey_mat.get());
 			}
+		} else if (root->get_editor_name() == "rider_head") {
+			head_entity   = root;
+			head_rest_rot = root->get_ls_rotation();
 		} else if (root->get_editor_name() == "frame") {
 			for (Entity* child : root->get_children()) {
 				if (child->get_editor_name() == "fork")
 					fork_entity = child;
+			}
+		} else if (root->get_editor_name() == "crank") {
+			crank_entity   = root;
+			crank_rest_rot = root->get_ls_rotation();
+			for (Entity* child : root->get_children()) {
+				// Baseline angle of the pivot around the crank's rotation circle,
+				// from its authored local position — the two pedals sit ~180 deg
+				// apart on the same rigid crank, and this offset is how tick_transform
+				// tells which one is near the top of the stroke at a given crank_phase.
+				const glm::vec3 p = child->get_ls_position();
+				if (child->get_editor_name() == "right_shoe_pivot") {
+					right_shoe_entity        = child;
+					right_shoe_rest_rot      = child->get_ls_rotation();
+					right_shoe_phase_offset  = glm::atan(p.y, p.x);
+				} else if (child->get_editor_name() == "left_shoe_pivot") {
+					left_shoe_entity        = child;
+					left_shoe_rest_rot      = child->get_ls_rotation();
+					left_shoe_phase_offset  = glm::atan(p.y, p.x);
+				}
 			}
 		}
 	}
@@ -412,6 +452,49 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 		const float fork_visual = fork_angle * bar_scale - current_roll * glm::sin(HEAD_TUBE_RAD);
 		fork_entity->set_ls_euler_rotation(glm::vec3(HEAD_TUBE_RAD, -fork_visual, 0.f));
 	}
+
+	// Pedal visual: crank rotates about its local Z with cadence; each shoe
+	// pivot (child of crank, local X axis) counter-rotates by the same angle
+	// so it stays visually level as the crank swings it around, plus a small
+	// extra tilt near the top of the stroke ("ankling"). Coasting means the
+	// freewheel has decoupled the drivetrain from the wheel, so cadence must
+	// not visually advance even though the bike is still rolling.
+	if (crank_entity) {
+		if (!ci.is_coasting())
+			crank_phase -= cadence * glm::two_pi<float>() * dt;
+		crank_phase = glm::mod(crank_phase, glm::two_pi<float>());
+		crank_entity->set_ls_rotation(crank_rest_rot * glm::angleAxis(crank_phase, glm::vec3(0.f, 0.f, 1.f)));
+
+		const auto animate_shoe = [&](Entity* shoe, const glm::quat& rest_rot, float phase_offset) {
+			if (!shoe) return;
+			// sin (not cos) so the extra tilt is confined to the upstroke half —
+			// it fades to zero exactly at the top of the stroke and stays zero
+			// through the downstroke, instead of straddling top symmetrically.
+			// pedal_ankle_tilt_phase_deg re-times where in that half it peaks.
+			const float rise = glm::max(0.f, glm::sin(crank_phase + phase_offset + glm::radians(pedal_ankle_tilt_phase_deg)));
+			const float shoe_angle = -crank_phase - glm::radians(pedal_ankle_tilt_deg) * rise;
+			shoe->set_ls_rotation(rest_rot * glm::angleAxis(shoe_angle, glm::vec3(1.f, 0.f, 0.f)));
+		};
+		animate_shoe(right_shoe_entity, right_shoe_rest_rot, right_shoe_phase_offset);
+		animate_shoe(left_shoe_entity,  left_shoe_rest_rot,  left_shoe_phase_offset);
+	}
+
+	// Head-look: sample the course a speed-scaled distance ahead and compare
+	// its tangent to the tangent here — a nonzero difference means a bend is
+	// coming, sign gives which way it bends (same atan2(cross,dot) convention
+	// as angle_to_target above: +ve = bends toward wp.right). Smoothed so the
+	// head doesn't snap tick-to-tick on choppy road.
+	if (head_entity) {
+		const BikeWaypoint wp_now = course->sample(course_dist_m);
+		const float ahead_m = glm::clamp(speed * head_look_anticipation_s, head_look_ahead_min_m, head_look_ahead_max_m);
+		const BikeWaypoint wp_ahead = course->sample(course_dist_m + ahead_m);
+		const float bend_angle = std::atan2(glm::dot(glm::vec3(0, 1, 0), glm::cross(wp_now.forward, wp_ahead.forward)),
+		                                     glm::dot(wp_now.forward, wp_ahead.forward));
+		const float target_yaw = head_look_dir_sign *
+		    glm::clamp(bend_angle * head_look_gain, -glm::radians(head_look_max_deg), glm::radians(head_look_max_deg));
+		head_look_smoothed = damp_dt_independent(target_yaw, head_look_smoothed, head_look_smooth_time_s, dt);
+		head_entity->set_ls_rotation(head_rest_rot * glm::angleAxis(head_look_smoothed, glm::vec3(0.f, 1.f, 0.f)));
+	}
 }
 
 float BikeObject::get_wind_along_bike() const
@@ -447,6 +530,25 @@ static void bike_transform_debug()
 				s_bike_debug->cadence,
 				s_bike_debug->gear.current_high_gear,
 				s_bike_debug->gear.current_low_gear);
+	}
+	ImGui::SeparatorText("Pedal Visual");
+	{
+		ImGui::DragFloat("pedal_ankle_tilt_deg", &pedal_ankle_tilt_deg, 0.2f, 0.f, 20.f);
+		ImGui::DragFloat("pedal_ankle_tilt_phase_deg", &pedal_ankle_tilt_phase_deg, 1.f, -180.f, 180.f);
+		if (s_bike_debug)
+			ImGui::Text("crank_phase=%.2f rad", s_bike_debug->crank_phase);
+	}
+	ImGui::SeparatorText("Head Look");
+	{
+		ImGui::DragFloat("head_look_anticipation_s", &head_look_anticipation_s, 0.05f, 0.2f, 5.f);
+		ImGui::DragFloat("head_look_ahead_min_m",    &head_look_ahead_min_m,    0.5f, 0.f,  50.f);
+		ImGui::DragFloat("head_look_ahead_max_m",    &head_look_ahead_max_m,    1.f,  1.f,  100.f);
+		ImGui::DragFloat("head_look_gain",           &head_look_gain,           0.05f, 0.f, 5.f);
+		ImGui::DragFloat("head_look_max_deg",        &head_look_max_deg,        1.f,  0.f,  90.f);
+		ImGui::DragFloat("head_look_smooth_time_s",  &head_look_smooth_time_s,  0.02f, 0.02f, 2.f);
+		ImGui::DragFloat("head_look_dir_sign",       &head_look_dir_sign,       2.f,  -1.f,  1.f);
+		if (s_bike_debug)
+			ImGui::Text("head_look=%.1f deg", glm::degrees(s_bike_debug->head_look_smoothed));
 	}
 	ImGui::SeparatorText("Handlebar Visual");
 	{
