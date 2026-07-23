@@ -44,7 +44,7 @@ std::vector<InstanceInfo> discover_instances() {
 
 void live_check_instances(std::vector<InstanceInfo>& instances, int timeout_seconds) {
 	for (auto& inst : instances) {
-		inst.alive = inst.port != 0 && bridge_ping(inst.port, timeout_seconds);
+		inst.alive = inst.port != 0 && bridge_check_pid(inst.port, inst.pid, timeout_seconds);
 		if (!inst.alive) {
 			std::error_code ec;
 			fs::remove(inst.lockfile_path, ec);

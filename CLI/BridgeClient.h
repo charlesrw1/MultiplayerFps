@@ -19,6 +19,8 @@ struct BridgeResult
 // timeout_seconds bounds both the connect attempt and the response read.
 BridgeResult bridge_call(int port, const std::string& cmd, const nlohmann::json& args, int timeout_seconds);
 
-// Quick liveness check used by Discovery to filter dead lockfiles: true if `ping` gets an ok
-// response back within timeout_seconds.
-bool bridge_ping(int port, int timeout_seconds);
+// Liveness check used by Discovery to filter dead lockfiles. A port responding is not enough -
+// with the default agentbridge.port shared across every project, a stale lockfile's port can be
+// reused by a completely different, newer instance. This confirms the same pid the lockfile
+// recorded is the one actually answering, via `status`.
+bool bridge_check_pid(int port, int expected_pid, int timeout_seconds);

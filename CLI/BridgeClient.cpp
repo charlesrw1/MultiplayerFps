@@ -97,7 +97,9 @@ BridgeResult bridge_call(int port, const std::string& cmd, const nlohmann::json&
 	return result;
 }
 
-bool bridge_ping(int port, int timeout_seconds) {
-	BridgeResult r = bridge_call(port, "ping", nlohmann::json::object(), timeout_seconds);
-	return r.connected && r.response.value("ok", false);
+bool bridge_check_pid(int port, int expected_pid, int timeout_seconds) {
+	BridgeResult r = bridge_call(port, "status", nlohmann::json::object(), timeout_seconds);
+	if (!r.connected || !r.response.value("ok", false))
+		return false;
+	return r.response.value("result", nlohmann::json::object()).value("pid", 0) == expected_pid;
 }
