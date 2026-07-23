@@ -14,6 +14,11 @@
     Block at startup until VS Code attaches (so breakpoints in early-running
     scripts still hit). Equivalent to "--lua_debug_wait"; implies -LuaDebug.
 
+.PARAMETER Project
+    Project name or path forwarded as "--project <value>" (e.g. "DevEngine"
+    resolves to Projects/DevEngine.ini). Default: the startup_project cvar
+    in EngineVars.ini.
+
 .PARAMETER AppArgs
     Remaining arguments are forwarded to App.exe verbatim (after --editor).
 
@@ -28,6 +33,10 @@
 .EXAMPLE
     Scripts/run_editor.ps1 -LuaDebug -LuaDebugWait
     Launch and wait for VS Code's lua-debug to attach before scripts run.
+
+.EXAMPLE
+    Scripts/run_editor.ps1 -Project DevEngine
+    Launch the editor against the DevEngine project.
 #>
 param(
     [ValidateSet("Debug", "Release")]
@@ -39,6 +48,8 @@ param(
 
     [switch]$LuaDebugWait,
 
+    [string]$Project,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AppArgs
 )
@@ -49,5 +60,6 @@ $ErrorActionPreference = "Stop"
 $launchArgs = @("--editor")
 if ($LuaDebug -or $LuaDebugWait) { $launchArgs += "--lua_debug" }
 if ($LuaDebugWait) { $launchArgs += "--lua_debug_wait" }
+if ($Project) { $launchArgs += @("--project", $Project) }
 if ($AppArgs) { $launchArgs += $AppArgs }
 Invoke-AppWithDebugger -Config $Config -AppArgs $launchArgs -WaitForDebugger:$WaitForDebugger
