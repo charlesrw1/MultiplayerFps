@@ -77,6 +77,7 @@ extern ConfigVar g_window_h;
 extern ConfigVar g_project_name;
 extern ConfigVar g_application_class;
 extern ConfigVar developer_mode;
+extern ConfigVar g_startup_project;
 double GetTime();
 double TimeSinceStart();
 
@@ -370,7 +371,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	tick_interval = 1.0 / 60.0;
 	is_hosting_game = false;
 
-	// Loaded before init_sdl_window() so g_render_backend (vars.txt) is known
+	// Loaded before init_sdl_window() so g_render_backend (EngineVars.ini) is known
 	// before window/context creation (DX11 needs no SDL_WINDOW_OPENGL flag or
 	// GL context attribs; OpenGL needs both set up pre-window-creation).
 	Cmd_Manager::inst->set_set_unknown_variables(true);
@@ -380,6 +381,17 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	else
 		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, options.vars_file.c_str());
 	print_time("execute vars file");
+
+	// Project .ini is always applied on top of vars_file, never for --tests runs (those stay
+	// self-contained in the game_test/editor_test sections). --project on the CLI wins over the
+	// `startup_project` cvar that vars_file just set.
+	if (!options.pending_test_runnner) {
+		const std::string project_file =
+			!options.project_file.empty() ? options.project_file : g_startup_project.get_string();
+		if (!project_file.empty())
+			Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, project_file.c_str());
+		print_time("execute project file");
+	}
 
 	init_sdl_window();
 	print_time("init sdl window");
@@ -515,7 +527,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		sys_print(Info, "starting game...\n");
 		Application* a = ClassBase::create_class<Application>(g_application_class.get_string());
 		if (!a) {
-			Fatalf("Engine::init: application class not found %s. set it in vars.txt\n",
+			Fatalf("Engine::init: application class not found %s. set it in EngineVars.ini or the project ini\n",
 				   g_application_class.get_string());
 		}
 		app.reset(a);

@@ -8,7 +8,7 @@
 IGraphicsDevice* g_gfx_instance = nullptr;
 
 // Not CVAR_READONLY: that flag rejects set_string() unconditionally (see
-// Config.cpp), which would prevent vars.txt from ever overriding the
+// Config.cpp), which would prevent EngineVars.ini from ever overriding the
 // "opengl" default. Read once at startup before window creation; setting it
 // afterward has no effect (documented, not enforced).
 ConfigVar g_render_backend("r.render_backend", "opengl", CVAR_DEV,

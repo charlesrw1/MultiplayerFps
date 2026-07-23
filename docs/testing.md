@@ -43,7 +43,7 @@ The runner always prints a parsed XML summary at the end (per-test PASS/FAIL lis
 
 - `Source/App/App.vcxproj` is the only test/runtime executable. It links `Core.lib` and `IntegrationTests.lib` with `/WHOLEARCHIVE` so static-init `TestRegistrar` constructors are kept and tests register themselves at startup.
 - `game_engine_main` (in `Source/EngineMain.cpp`) parses `--tests <mode> [pattern...]` before engine init, configures the vars file section + log file, then constructs a `TestRunner` that the engine loop pumps once per frame.
-- `vars.txt` is sectioned: `[app]` for normal launch, `[game_test]` for `--tests game`, `[editor_test]` for `--tests editor`. Sections are independent — there is no fall-through, so duplicate every var that needs to apply in multiple modes. The engine selects exactly one section via `Cmd_Manager::execute_file_section`.
+- `EngineVars.ini` is sectioned: `[app]` for normal launch, `[game_test]` for `--tests game`, `[editor_test]` for `--tests editor`. Sections are independent — there is no fall-through, so duplicate every var that needs to apply in multiple modes. The engine selects exactly one section via `Cmd_Manager::execute_file_section`. `--tests` runs never load a per-project `.ini` (unlike `[app]`) — `game_test`/`editor_test` set `g_project_base` etc. directly.
 
 ---
 

@@ -812,7 +812,7 @@ void gfx_opengl_enable_debug_output();
 extern IGraphicsDevice* g_gfx_instance;
 
 // Selects the render backend ("opengl" or "dx11"). Read once at startup
-// before window creation (EngineMain_Init.cpp loads vars.txt before
+// before window creation (EngineMain_Init.cpp loads EngineVars.ini before
 // init_sdl_window for this reason) — CVAR_READONLY, not changeable at
 // runtime. Defined in GraphicsDeviceCommon.cpp.
 extern ConfigVar g_render_backend;

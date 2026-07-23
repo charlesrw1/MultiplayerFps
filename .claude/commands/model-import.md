@@ -29,7 +29,7 @@ The asset pipeline compiles `.mis` → `.cmdl` automatically. Reference the asse
 
 ## Asset path convention
 
-`Data/` is the asset root (`g_project_base = "Data"` in vars.txt). Paths in `Model::load()` are relative to it:
+`Data/` is the asset root (`g_project_base = "Data"`, set in the per-project `.ini` under `Projects/`). Paths in `Model::load()` are relative to it:
 
 | File on disk | Model::load() path |
 |---|---|

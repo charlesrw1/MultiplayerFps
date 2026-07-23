@@ -38,7 +38,7 @@ Pipeline compiles `.mis` → `.cmdl` automatically. Reference assets by `.cmdl` 
 
 ## Asset path convention
 
-`Data/` is the asset root (`g_project_base = "Data"` in `vars.txt`). `Model::load()` paths are relative:
+`Data/` is the asset root (`g_project_base = "Data"`, set in the per-project `.ini` under `Projects/`). `Model::load()` paths are relative:
 
 | File on disk | `Model::load()` path |
 |---|---|

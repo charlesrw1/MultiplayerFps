@@ -70,6 +70,22 @@ Debug_Console* Debug_Console::inst = nullptr;
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
+// Whatever project .ini this process actually ended up running with — an explicit
+// `--project <path>` on this process's own command line, else whatever `startup_project`
+// cvar EngineVars.ini set. Used by the editor's "Play" launcher (start_play_process) so the
+// spawned game process uses the same project the editor is running, instead of silently
+// falling back to EngineVars.ini's default.
+extern ConfigVar g_startup_project;
+std::string get_effective_project_file() {
+	const int argc = eng_local.argc;
+	char** argv = eng_local.argv;
+	for (int i = 1; argv && i + 1 < argc; i++) {
+		if (std::string(argv[i]) == "--project")
+			return argv[i + 1];
+	}
+	return g_startup_project.get_string();
+}
+
 std::string get_cli_arg(const std::string& name, const std::string& default_value) {
 	const int argc = eng_local.argc;
 	char** argv = eng_local.argv;
@@ -106,6 +122,8 @@ ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
 ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV,
 						 "the project name of the game, used for save file folders");
+ConfigVar g_startup_project("startup_project", "", CVAR_DEV,
+							"path to the default project .ini, loaded after EngineVars.ini unless overridden by --project");
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 10.0, 110.0);
 ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL, "");
@@ -340,6 +358,17 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 
 	developer_mode
 		.set_bool(true);
+
+	// --project overrides the `startup_project` cvar from vars_file. Not consulted for
+	// --tests runs — game_test/editor_test stay self-contained.
+	if (!test_args.present) {
+		for (int i = 1; i + 1 < argc; ++i) {
+			if (std::string(argv[i]) == "--project") {
+				options.project_file = argv[i + 1];
+				break;
+			}
+		}
+	}
 
 	eng_local.init(options, argc, argv);
 	eng_local.loop();

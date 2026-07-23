@@ -278,7 +278,7 @@ void GameEngineLocal::add_commands() {
 		sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
 	});
 	// @cmd: runs every line of a text file as a console command, immediately (before the next
-	// queued command). Same file lookup convention as vars.txt/init.txt.
+	// queued command). Same file lookup convention as EngineVars.ini/init.txt.
 	// @usage: exec <filename>
 	commands->add("exec", [](const Cmd_Args& args) {
 		if (args.size() < 2) {

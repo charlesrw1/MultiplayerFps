@@ -18,7 +18,8 @@ CsRemake/
   Scripts/            — Python codegen, PS1 build scripts
   docs/               — documentation
   TestFiles/          — test inputs/goldens/outputs (partially gitignored)
-  vars.txt            — runtime config (loaded at startup)
+  EngineVars.ini      — runtime config (loaded at startup)
+  Projects/<Name>.ini — per-project config (data dir, app class), loaded on top
   Core.vcxproj    — main library project (all engine source)
 ```
 
@@ -37,7 +38,7 @@ CsRemake/
 
 ## Configuration (Config_Var / Engine_Cmd)
 
-Quake/Source-style cvars + commands. See `Source/Framework/Config.h`. `vars.txt` and `init.txt` execute in order at engine init — write any var sets or commands.
+Quake/Source-style cvars + commands. See `Source/Framework/Config.h`. `EngineVars.ini`, the per-project `.ini`, and `init.txt` execute in order at engine init — write any var sets or commands.
 
 Key cvars:
 - `g_application_class` — Lua class name to instantiate as Application.
@@ -46,8 +47,11 @@ Key cvars:
 
 Launch flags:
 - `--editor` — open editor UI (default: game mode). Implicit when `--tests editor` is used.
+- `--project <path>` — per-project `.ini` to load (default: `startup_project` cvar set in `EngineVars.ini`). Ignored for `--tests` runs.
 
-`vars.txt` is sectioned: `[app]` runs on a normal launch, `[game_test]` on `App.exe --tests game`, `[editor_test]` on `--tests editor`. Sections are independent; the engine selects exactly one. See [[testing]].
+`EngineVars.ini` is sectioned: `[app]` runs on a normal launch, `[game_test]` on `App.exe --tests game`, `[editor_test]` on `--tests editor`. Sections are independent; the engine selects exactly one. See [[testing]].
+
+`[app]` additionally loads a per-project `.ini` (e.g. `Projects/DevEngine.ini`) on top — project vars win. That's where per-project vars like `g_project_base`, `g_application_class`, `g_project_name`, `g_entry_level` live. `game_test`/`editor_test` never load a project file; they set those vars directly in their own section.
 
 Commands:
 - `map <mapname>` — open for play.

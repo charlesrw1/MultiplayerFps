@@ -9,7 +9,7 @@ Attach VS Code to a running game/editor build and step through `Data/scripts/**/
 
 ## Enabling the debugger
 
-Whether/when to start lua-debug is a launch-time choice, not persistent state, so it's a pair of CLI flags rather than `vars.txt` config vars:
+Whether/when to start lua-debug is a launch-time choice, not persistent state, so it's a pair of CLI flags rather than `EngineVars.ini` config vars:
 
 | flag | meaning |
 |------|---------|

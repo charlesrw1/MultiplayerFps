@@ -20,7 +20,7 @@ class Foo : public ClassBase {
 
 ## Serialization
 
-`Serializer` is abstract; JSON and binary backends exist. `ClassBase::serialize(Serializer&)` virtual drives save/load. `DictParser` / `DictWriter` handle the human-readable key/value format used by `vars.txt` and `init.txt`. `SerializedForDiffing` produces stable output for diff tooling.
+`Serializer` is abstract; JSON and binary backends exist. `ClassBase::serialize(Serializer&)` virtual drives save/load. `DictParser` / `DictWriter` handle the human-readable key/value format used by `EngineVars.ini` and `init.txt`. `SerializedForDiffing` produces stable output for diff tooling.
 
 ## Memory
 
@@ -40,7 +40,7 @@ Fiber-based task scheduling in `Jobs.h`. Submit with `Jobs::run` / `Jobs::run_an
 
 ## Config
 
-`CONFIG_VAR(type, name, default)` declares a runtime variable backed by `vars.txt` / `init.txt`. Read at startup; can be overridden per-level. `g_project_base` must be `"Data"` (relative), not an absolute path, when running game/tests.
+`CONFIG_VAR(type, name, default)` declares a runtime variable backed by `EngineVars.ini` / `init.txt`. Read at startup; can be overridden per-level. `g_project_base` must be `"Data"` (relative), not an absolute path, when running game/tests.
 
 ## UI / Tools
 

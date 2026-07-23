@@ -15,7 +15,7 @@
 #endif
 
 // On by default (loopback only, never reachable off-box); disable with
-// `-agentbridge.enabled 0` on the command line or `agentbridge.enabled 0` in vars.txt.
+// `-agentbridge.enabled 0` on the command line or `agentbridge.enabled 0` in EngineVars.ini.
 ConfigVar g_agentbridge_enabled("agentbridge.enabled", "1", CVAR_BOOL,
 								"enable the local TCP bridge for external tools (Blender export/"
 								"viewer addon, future automation/agent clients) to query the "

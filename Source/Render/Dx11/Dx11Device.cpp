@@ -373,7 +373,7 @@ public:
 									   (UINT)(byte_offset / dx11_index_stride(index_type)), base_vertex, base_instance);
 	}
 	// CPU loop over draw_elements_indirect (M0 indirect-loop path; matches the
-	// r_indirect_loop=1 GL path that vars.txt already forces). DX11 has no
+	// r_indirect_loop=1 GL path that EngineVars.ini already forces). DX11 has no
 	// MultiDrawElementsIndirect equivalent.
 	void multi_draw_elements_indirect(GraphicsPrimitiveType mode, VertexInputIndexType index_type, IGraphicsBuffer* indirect, int byte_offset, int draw_count, int stride, const void* client_ptr) override {
 		ASSERT(indirect != nullptr && "Dx11: client-side MDI fallback not supported (r_indirect_loop required)");

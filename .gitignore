@@ -24,6 +24,8 @@ Source/.generated/
 *.csv
 *.dat
 *.ini
+!EngineVars.ini
+!Projects/*.ini
 *.xml
 *.bat
 *.dmp

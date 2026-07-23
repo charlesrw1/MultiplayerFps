@@ -1,12 +1,12 @@
 # IntegrationTests Module
 
-C++20 coroutine integration test framework. Built as a static lib and `/WHOLEARCHIVE`-linked into `App.exe` so static-init `TestRegistrar` ctors keep tests alive. Running tests / CLI / vars.txt sectioning lives in [[docs/testing.md]] — this file covers what's relevant when editing code *inside* the module.
+C++20 coroutine integration test framework. Built as a static lib and `/WHOLEARCHIVE`-linked into `App.exe` so static-init `TestRegistrar` ctors keep tests alive. Running tests / CLI / EngineVars.ini sectioning lives in [[docs/testing.md]] — this file covers what's relevant when editing code *inside* the module.
 
 ## Architecture
 
 - **Coroutine task model** — Tests are `TestTask` coroutines (custom `promise_type`). `co_await` on an awaitable suspends the test; `TestRunner` resumes it once per frame from inside the engine loop, so tests run in the real runtime with real GPU/level/tick timing — no threads.
 - **Static-init registration** — `GAME_TEST` / `EDITOR_TEST` macros expand to a file-scope `TestRegistrar` whose ctor pushes a `TestEntry` into a global registry. Hence the `/WHOLEARCHIVE` requirement on the App link.
-- **Mode-agnostic runner** — One `TestRunner` implementation. The mode (`Game` / `Editor`) is just a filter over the registry plus a different `vars.txt` section selected by `EngineMain` before engine init.
+- **Mode-agnostic runner** — One `TestRunner` implementation. The mode (`Game` / `Editor`) is just a filter over the registry plus a different `EngineVars.ini` section selected by `EngineMain` before engine init.
 - **Lua phase** — After the C++ phase finishes, the same runner resumes `_lua_run_all_tests` (from `Data/scripts/integration_test_framework.lua`) as a coroutine, ticked per-frame, results merged into the same XML. Glob filters apply to both phases.
 - **Awaitables** — `tick(n)`, `seconds(t)`, `wait_for(delegate)`, `load_level(path)`, `screenshot(name)`. Add new ones as small awaitable types in `TestContext.h`; they only need `await_ready/suspend/resume` plus whatever per-frame state the runner pokes at.
 - **Failure model** — `check()` records and continues; `require()` throws `TestAbortException` which the promise catches and marks the test failed. Per-test `timeout_seconds` enforced by the runner.

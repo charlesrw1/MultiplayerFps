@@ -59,7 +59,7 @@
 
 .PARAMETER Backend
     "opengl" (default), "dx11", or "both". Toggles r.render_backend in the
-    [game_test]/[editor_test] sections of vars.txt for the duration of the
+    [game_test]/[editor_test] sections of EngineVars.ini for the duration of the
     run (restored on exit, even on failure). "both" runs the full requested
     pass set on opengl, then again on dx11. dx11 always forces
     r_indirect_loop 1 (DX11 has no MultiDrawIndirect).
@@ -111,7 +111,7 @@ param(
     [switch]$Debugger,
     # "opengl" (default), "dx11", or "both" (run the full pass set on opengl,
     # then again on dx11). Toggled via r.render_backend in the [game_test] /
-    # [editor_test] sections of vars.txt, restored on exit.
+    # [editor_test] sections of EngineVars.ini, restored on exit.
     [ValidateSet("opengl", "dx11", "both")]
     [string]$Backend = "opengl"
 )
@@ -120,12 +120,12 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $_item = Get-Item $root; if ($_item.LinkType) { $root = $_item.Target.TrimEnd('\') }
 
-# ---- vars.txt backend toggle -----------------------------------------------
+# ---- EngineVars.ini backend toggle ------------------------------------------
 # Sets r.render_backend (and ensures r_indirect_loop 1, required by the DX11
 # backend - it has no MultiDrawIndirect equivalent) inside the [game_test] and
-# [editor_test] sections of vars.txt. Restored verbatim via $origVarsContent
+# [editor_test] sections of EngineVars.ini. Restored verbatim via $origVarsContent
 # in the finally block at the bottom of this script.
-$varsPath = "$root\vars.txt"
+$varsPath = "$root\EngineVars.ini"
 $origVarsContent = Get-Content -Raw $varsPath
 
 function Set-VarsRenderBackend([string]$backend) {

@@ -29,7 +29,7 @@ WHEN USING PYTHON: use powershell.exe to launch "py" alias. DO NOT use python fr
 
 Uses code generation for ClassBase system, similar to Unreal UOBJECTS. The python codegen script is located under Scripts/. It generates MEGA.cpp in Source/ by parsing headers.
 
-vars.txt and init.txt store configuration used at runtime.
+EngineVars.ini and init.txt store configuration used at runtime. EngineVars.ini's [app] section additionally loads a per-project ini on top (project vars win) — Projects/&lt;Name&gt;.ini, selected via `startup_project` in EngineVars.ini or `--project &lt;path&gt;` on the CLI. Project inis hold things like data dir (g_project_base) and application class (g_application_class). --tests runs never load a project ini.
 
 vcpkg is located in ~\source\vcpkg\vcpkg.exe
 

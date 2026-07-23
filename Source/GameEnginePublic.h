@@ -121,3 +121,7 @@ extern GameEnginePublic* eng;
 // Looks up "-<name> <value>" in the process CLI argv. Returns the value, or
 // default_value if the flag is missing or has no following value.
 std::string get_cli_arg(const std::string& name, const std::string& default_value);
+
+// The project .ini this process is actually running with: this process's own
+// `--project <path>` if given, else the `startup_project` cvar EngineVars.ini set.
+std::string get_effective_project_file();

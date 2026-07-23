@@ -73,9 +73,9 @@ CompilerHLSL, SM5.0) -> DXBC (`D3DCompile`).
 
 - `Scripts/integration_test.ps1 -Mode game -Pattern "renderer/*"` — GL path,
   must stay green (current: 16/16 incl. `spirv_hlsl_dxbc`).
-- DX11 boot test: temporarily set `r.render_backend dx11` in `vars.txt`
+- DX11 boot test: temporarily set `r.render_backend dx11` in `EngineVars.ini`
   `[app]`, run `App.exe`, confirm `DX11 device created...` log line, no
-  `[CRASH]`/dump, revert `vars.txt`.
+  `[CRASH]`/dump, revert `EngineVars.ini`.
 - `py Scripts/check_no_dx11_leaks.py` must exit 0.
 
 ---

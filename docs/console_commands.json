@@ -25,7 +25,7 @@
     "usage": "eval_lua {\"code\": \"<lua source, e.g. \\\"1+1\\\" or \\\"return get_player()\\\">\"}"
   },
   "exec": {
-    "description": "runs every line of a text file as a console command, immediately (before the next queued command). Same file lookup convention as vars.txt/init.txt.",
+    "description": "runs every line of a text file as a console command, immediately (before the next queued command). Same file lookup convention as EngineVars.ini/init.txt.",
     "source": "Source/EngineMain_Commands.cpp:283",
     "usage": "exec <filename>"
   },

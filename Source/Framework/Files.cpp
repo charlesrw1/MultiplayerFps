@@ -13,6 +13,7 @@
 #include <fstream>
 #include <direct.h>
 #include "Config.h"
+#include "GameEnginePublic.h"
 
 ConfigVar g_project_base("g_project_base", "Data", CVAR_DEV, "what folder to search for assets in");
 static ConfigVar g_user_save_dir("g_user_save_dir", "User", CVAR_DEV, "what folder to save user config/settings to");
@@ -361,6 +362,11 @@ void start_play_process(const std::string& play_map_path, bool lua_debug, bool c
 		commandLine += " --lua_debug";
 	if (cpp_debug)
 		commandLine += " --wait-for-debugger";
+	// Keep the spawned game process on the same project the editor is running (an explicit
+	// --project on the editor's own CLI, or whatever startup_project EngineVars.ini defaulted to).
+	const std::string project_file = get_effective_project_file();
+	if (!project_file.empty())
+		commandLine += " --project \"" + project_file + "\"";
 
 	STARTUPINFOA startup = {};
 	PROCESS_INFORMATION out = {};

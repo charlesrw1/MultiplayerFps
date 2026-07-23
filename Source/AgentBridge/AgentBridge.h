@@ -12,7 +12,7 @@
 // without affecting anything else. It works in both editor and game builds.
 //
 // Disabled/enabled and configured via ConfigVars (agentbridge.enabled, agentbridge.port), settable
-// in vars.txt or from the command line like any other cvar (e.g. `-agentbridge.enabled 0`).
+// in EngineVars.ini or from the command line like any other cvar (e.g. `-agentbridge.enabled 0`).
 //
 // Wire protocol: client connects, sends one line of JSON `{"cmd":"name","args":{...}}\n`, engine
 // replies with one line of JSON `{"ok":true,"result":{...}}\n` or `{"ok":false,"error":"..."}\n`,
