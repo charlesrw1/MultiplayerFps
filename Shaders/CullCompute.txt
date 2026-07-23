@@ -62,7 +62,9 @@ struct CullData {
 	
 	mat4 view;
 	
-	float cascade_extent;
+	// Real main camera's inv_two_times_tanfov_2 (not the shadow frustum's), so cascade
+	// LOD selection matches what the main view would pick for the same instance.
+	float main_view_inv_two_times_tanfov_2;
 	int padding1;
 	int padding3;
 	int padding4;
@@ -79,15 +81,6 @@ struct CullData {
 layout(binding = 5) uniform CullDataBuffer {
 	CullData cull;
 };
-
-float get_shadow_cascade_percentage_2(vec4 bounding_sphere, float cascade_extent)
-{
-	float texels_per_unit = 1.0 / (cascade_extent);
-
-	float r = bounding_sphere.w * texels_per_unit;
-
-	return r * r;
-}
 
 float get_screen_percentage_2(vec4 bounding_sphere, float inv_two_times_tanfov_2, float camera_dist_2)
 {
@@ -200,7 +193,12 @@ void main()
 			//sample the depth pyramid at that specific level
 			float depth = textureLod(depth_pyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
 
-			float depthSphere = cull.near /  max((vs_center.z - radius-0.1),cull.near);
+			// Slack scaled to the sphere's own radius, not a flat world-unit offset --
+			// a flat bias is negligible for large/far occluders (spanning many pixels,
+			// where Hi-Z mip quantization error is largest) and oversized relative to
+			// small/near ones, so it under-protects the cases that need it most.
+			float depth_bias = radius * 0.05;
+			float depthSphere = cull.near /  max((vs_center.z - radius - depth_bias),cull.near);
 
 			if(depth>depthSphere+1e-5)	// 1e-4 -> 1e-5 epsilon
 				return;	// occluded
@@ -238,7 +236,11 @@ void main()
 
 	// get lod to render
 #ifdef SHADOW_CASCADE
-	const float percentage_2 = get_shadow_cascade_percentage_2(bounding_sphere, cull.cascade_extent);
+	// Same screen-percentage metric the main view uses, evaluated from the real camera's
+	// distance/fov -- so a sun-cascade shadow caster renders the same LOD as the main
+	// view picks for it, instead of a cascade-texel-density-based LOD that can mismatch
+	// the on-screen mesh and cause shadow/silhouette seams or self-shadow acne.
+	const float percentage_2 = get_screen_percentage_2(bounding_sphere, cull.main_view_inv_two_times_tanfov_2, dist_to_main_camera_2);
 #else
 	vec3 to_camera = bounding_sphere.xyz - cull.camera_origin.xyz;
 	const float dist_to_camera_2 = dot(to_camera, to_camera);

@@ -68,7 +68,9 @@ struct CullData
 
 	mat4 view;
 
-	float cascade_extent;
+	// Real main camera's inv_two_times_tanfov_2 (not the shadow frustum's), so cascade
+	// LOD selection matches what the main view would pick -- see CullCompute.txt.
+	float main_view_inv_two_times_tanfov_2;
 	int padding[3];
 
 	vec4 backplane;

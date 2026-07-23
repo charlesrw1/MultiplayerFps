@@ -32,14 +32,6 @@ inline float get_screen_percentage_2(const glm::vec4& bounding_sphere, float inv
 									 float camera_dist_2) {
 	return (bounding_sphere.w * bounding_sphere.w) * inv_two_times_tanfov_2 / camera_dist_2;
 }
-inline float get_shadow_cascade_percentage_2(const glm::vec4& bounding_sphere, float cascade_extent) {
-	float texels_per_unit = 1.0 / (cascade_extent);
-
-	float r = bounding_sphere.w * texels_per_unit;
-
-	return r * r;
-}
-
 inline const int get_lod_to_render(const Model* model, const float percentage) {
 	for (int i = model->get_num_lods() - 1; i > 0; i--) {
 		if (percentage <= model->get_lod(i).end_percentage)
@@ -104,9 +96,13 @@ static void cull_objects(Frustum& frustum, int visible_array_size, uint8_t* out_
 			camera_dist[i] = as_int16;
 
 		} else {
+			// Same screen-percentage metric as the main view (real camera distance/fov),
+			// so a sun-cascade shadow caster picks the same LOD the main view would --
+			// see CullCompute.txt for the matching GPU-path rationale.
 			const glm::vec3 to_camera = center - vs.origin;
+			const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
 			const float percentage_2 =
-				get_shadow_cascade_percentage_2(obj.bounding_sphere_and_radius, frustum.ortho_max_extent);
+				get_screen_percentage_2(obj.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
 			if (!obj.proxy.model)
 				want_lod = 0;
 			else if (force_lod != -1) {

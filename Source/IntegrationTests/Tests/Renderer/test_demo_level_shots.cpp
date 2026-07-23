@@ -67,6 +67,7 @@ static TestTask test_demo_level_1_shots(TestContext& t)
 		{ "inside_shadows_test",       0,  false,  -1, -1.f   },
 		{ "occlusion_cull_mode_test",  12, false,  -1, -1.f   },
 		{ "debug_csm_test",            0,  true,   -1, -1.f   },
+						  {"compact_instances", 0, false, 60, 0.0046f}
 	};
 
 	for (const Shot& s : shots) {

@@ -145,6 +145,13 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 		cull.camera_origin = glm::vec4(origin, 1);
 		// Real camera position regardless of pass -- see CullData::main_view_origin.
 		cull.main_view_origin = glm::vec4(draw.current_frame_view.origin, 1);
+		// Real main camera fov regardless of pass, so cascade LOD selection matches the
+		// main view's LOD (not the light frustum's fov, which is meaningless for a
+		// directional light) -- see CullData::main_view_inv_two_times_tanfov_2.
+		{
+			const float main_inv_two_times_tanfov = 1.0f / tan(draw.get_current_frame_vs().fov * 0.5f);
+			cull.main_view_inv_two_times_tanfov_2 = main_inv_two_times_tanfov * main_inv_two_times_tanfov;
+		}
 
 		cull.frustum_up = frustum.top_plane;
 		cull.frustum_down = frustum.bot_plane;
@@ -170,7 +177,6 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 				cull.view = vs.view; // in pass 2, use current view
 			}
 		}
-		cull.cascade_extent = frustum.ortho_max_extent * 2.0;
 		cull_data->upload(&cull, sizeof(CullData));
 	}
 
