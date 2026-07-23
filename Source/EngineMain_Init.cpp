@@ -78,6 +78,7 @@ extern ConfigVar g_project_name;
 extern ConfigVar g_application_class;
 extern ConfigVar developer_mode;
 extern ConfigVar g_startup_project;
+extern ConfigVar g_editor_cfg_folder;
 double GetTime();
 double TimeSinceStart();
 
@@ -477,6 +478,12 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	TIMESTAMP("init everything");
 
 	ImGui::SetCurrentContext(imgui_context);
+	// io.IniFilename is stored as a raw pointer (not copied), so this needs to outlive the
+	// context; static is fine since there's exactly one imgui context for the app's lifetime.
+	static const std::string imgui_ini_path =
+		FileSys::get_full_path_from_relative(std::string(g_editor_cfg_folder.get_string()) + "/imgui.ini",
+											 FileSys::ENGINE_DIR);
+	ImGui::GetIO().IniFilename = imgui_ini_path.c_str();
 	gfx().imgui_init();
 	print_time("imgui init");
 
