@@ -344,6 +344,10 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 
 	FileSys::init();
 
+	// log_file/dumps live under Logs/ (see EngineMain.h) — must exist before the Logger opens
+	// its file below.
+	FileSys::create_directory("Logs", FileSys::ENGINE_DIR);
+
 	Logger::inst = Logger::make_logger(options.log_file, options.no_console_print);
 
 	sys_print(Debug, "%s\n", append_strings(argc, argv).c_str());

@@ -105,6 +105,7 @@ Logger* Logger::inst = nullptr;
 Logger* Logger::make_logger(std::string log_file, bool no_console_print)
 {
 	auto* log = new Logger;
+	log->log_path = log_file;
 	log->add_sink(std::make_shared<FileSink>(log_file));
 	if (!no_console_print) {
 		log->add_sink(std::make_shared<ConsoleSink>());

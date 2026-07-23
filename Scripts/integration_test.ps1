@@ -12,14 +12,15 @@
     Pattern matching uses globs (`*` matches any sequence) and applies to both
     C++ and Lua test names. See docs/testing.md for the pattern reference.
 
-    App.exe also writes test_<mode>_output.log next to the working directory
-    with the full uncoloured engine log (every line is prefixed with [Error],
-    [Warning], [Debug] or [Info]). Console stdout/stderr carries the
-    test-runner sentinel lines (`[TEST] ...`) plus any [CRASH]/[Error]/[Fatal]
-    lines and stack frames so unhandled SEH exceptions are visible inline.
-    On a non-zero pass exit, the tail of test_<mode>_output.log is also
+    App.exe also writes Logs/test_<mode>_output.log with the full uncoloured
+    engine log (every line is prefixed with [Error], [Warning], [Debug] or
+    [Info]). Console stdout/stderr carries the test-runner sentinel lines
+    (`[TEST] ...`) plus any [CRASH]/[Error]/[Fatal] lines and stack frames so
+    unhandled SEH exceptions are visible inline.
+    On a non-zero pass exit, the tail of Logs/test_<mode>_output.log is also
     dumped to the host so agents see the full crash context without having
-    to know to read the log file.
+    to know to read the log file. It's also fetchable live from a running
+    instance via `cscli log` (AgentBridge's get_log command).
 
 .PARAMETER Config
     Build configuration. Defaults to "Debug". Use "Release" for release builds.
@@ -47,14 +48,14 @@
     Forward App.exe's full engine output (init logs, GL warnings, asset
     chatter) to the host. Default behaviour is to forward only the test-runner
     sentinel lines (`[TEST] ...`); the full uncoloured log is always written
-    to test_<mode>_output.log regardless.
+    to Logs/test_<mode>_output.log regardless.
 
 .PARAMETER Debugger
     Attach Visual Studio 2026 to App.exe at the start of each pass. Uses DTE
     to attach to an already-running VS instance (whichever one is registered
     in the ROT); falls back to vsjitdebugger.exe if no VS is running. In this
     mode App.exe runs as a child process with stdout/stderr streamed directly
-    to the console (filtering is bypassed - read test_<mode>_output.log for
+    to the console (filtering is bypassed - read Logs/test_<mode>_output.log for
     the structured log).
 
 .PARAMETER Backend
@@ -237,8 +238,8 @@ function Run-Pass([string]$mode) {
     # write_results_xml() runs, a stale XML from a previous successful run
     # would make Print-XmlSummary report "N/N passed" for a run that crashed.
     Remove-Item -Force -ErrorAction SilentlyContinue `
-        "$root\test_${mode}_output.dmp", `
-        "$root\test_${mode}_output.log", `
+        "$root\Logs\test_${mode}_output.dmp", `
+        "$root\Logs\test_${mode}_output.log", `
         "$root\TestFiles\integration_${mode}_results.xml"
     Get-ChildItem -Path $root -Filter "crash_*.dmp" -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
@@ -253,7 +254,7 @@ function Run-Pass([string]$mode) {
     if ($Debugger) {
         # Launch as a separate process so we can grab its PID and attach VS
         # before user-code-of-interest runs. Output filtering is dropped here -
-        # the full engine log is still on disk via test_<mode>_output.log.
+        # the full engine log is still on disk via Logs/test_<mode>_output.log.
         $proc = Start-Process -FilePath $exe -ArgumentList $args -PassThru -NoNewWindow
         Attach-VSDebugger $proc.Id
         $proc.WaitForExit()
@@ -287,7 +288,7 @@ function Analyze-Dump([string]$mode) {
     # The SEH filter writes test_<mode>_output.dmp next to the log on an
     # unhandled exception. Print a first-look summary via dbg.ps1; the AI can
     # run further queries against the dump itself for deeper inspection.
-    $dump = "$root\test_${mode}_output.dmp"
+    $dump = "$root\Logs\test_${mode}_output.dmp"
     if (-not (Test-Path $dump)) { return }
     Write-Host "`n=== $mode minidump: $dump ===" -ForegroundColor Yellow
     Write-Host "--- stack (kP 30) ---" -ForegroundColor DarkYellow
@@ -298,7 +299,7 @@ function Analyze-Dump([string]$mode) {
 }
 
 function Dump-LogTail([string]$mode) {
-    $log = "$root\test_${mode}_output.log"
+    $log = "$root\Logs\test_${mode}_output.log"
     if (-not (Test-Path $log)) {
         Write-Host "  (no log file at $log)" -ForegroundColor DarkYellow
         return
@@ -377,7 +378,7 @@ try {
     Set-Content -Path $varsPath -Value $origVarsContent -NoNewline
 }
 
-Write-Host "`n  log files: test_<mode>_output.log (uncoloured, [Error]/[Warning]/... tagged)" -ForegroundColor DarkGray
+Write-Host "`n  log files: Logs/test_<mode>_output.log (uncoloured, [Error]/[Warning]/... tagged)" -ForegroundColor DarkGray
 
 if ($anyFailed) {
     Write-Host "`nINTEGRATION TESTS FAILED ($($failedCodes -join ' '))" -ForegroundColor Red

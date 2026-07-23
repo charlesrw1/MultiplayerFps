@@ -16,7 +16,7 @@
   },
   "describe_command": {
     "description": "describes a single console command/cvar by exact name (name, is_command, description, usage).",
-    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:274",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:325",
     "usage": "describe_command {\"name\": \"<exact command or cvar name>\"}"
   },
   "eval_lua": {
@@ -31,12 +31,17 @@
   },
   "export_tmap": {
     "description": "exports a .tmap/.tprefab's MeshComponents to a standalone .gltf, with baked world-space transforms, for external tools (e.g. the Blender viewer addon). Reads the asset directly without spawning a Level, so it never touches any level currently open in the editor.",
-    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:258",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:303",
     "usage": "export_tmap {\"tmap\": \"<game-relative .tmap/.tprefab path>\", \"output\": \"<absolute output .gltf path>\"}"
+  },
+  "get_log": {
+    "description": "returns the tail of this process's engine log (Logs/output.log or Logs/test_<mode>_output.log), as a list of lines, newest last. Lets an agent watching over cscli see recent [Error]/[Warning]/[Debug]/[Info] output without knowing the log path or polling the file itself.",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:318",
+    "usage": "get_log {\"lines\": <optional int, default 200>}"
   },
   "list_commands": {
     "description": "lists registered console commands and cvars (optionally substring-filtered), each with whatever description/usage docs/console_commands.json has for it.",
-    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:271",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:322",
     "usage": "list_commands {\"filter\": \"<optional substring, empty = everything>\"}"
   },
   "open-editor": {
@@ -46,7 +51,7 @@
   },
   "ping": {
     "description": "connectivity check - returns {\"pong\": true} if the bridge is alive.",
-    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:260",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:305",
     "usage": ""
   },
   "quit": {
@@ -56,12 +61,12 @@
   },
   "run_command": {
     "description": "runs a console command line exactly as if typed at the in-game console, and returns everything it printed. `had_error` is true if any part of the line logged at Error level.",
-    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:267",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:312",
     "usage": "run_command {\"command\": \"<command line, e.g. \\\"give_weapon rifle 30\\\">\"}"
   },
   "status": {
     "description": "reports which process (editor or game), pid, project base, and agent bridge port this bridge instance belongs to. Used by `cscli status`/`cscli instances` to identify a connection.",
-    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:263",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:308",
     "usage": ""
   }
 }

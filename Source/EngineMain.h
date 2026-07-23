@@ -18,7 +18,7 @@ struct MainConfigurationOptions {
 	// the command line. Not consulted for --tests runs (game_test/editor_test
 	// stay self-contained in vars_file).
 	std::string project_file;
-	std::string log_file = "output.log";
+	std::string log_file = "Logs/output.log";
 
 	std::unique_ptr<ITestRunner> pending_test_runnner;
 	bool skip_swap = false;

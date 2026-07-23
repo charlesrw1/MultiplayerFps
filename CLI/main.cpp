@@ -17,6 +17,7 @@ Subcommands:
   eval "<lua code>"          Execute Lua against the running instance's Lua state
   command [name] [args...]   Run a console command; omit name to list all; add --help to describe one
   instances                  List cscli-discoverable running instances (editor and/or game)
+  log [--lines N]            Print the tail of the connected instance's engine log (default 200)
 
 Global options:
   --format <human|json|tsv|ndjson>  Output format (default: human)
@@ -35,6 +36,7 @@ Examples:
   cscli command give_weapon --help
   cscli command
   cscli instances
+  cscli log --lines 50
 )";
 }
 
@@ -123,6 +125,15 @@ int main(int argc, char** argv) {
 
 	if (sub == "instances") {
 		return cmd_instances(g);
+	}
+
+	if (sub == "log") {
+		int lines = 200;
+		for (size_t j = 0; j < sub_args.size(); j++) {
+			if ((sub_args[j] == "--lines" || sub_args[j] == "-n") && j + 1 < sub_args.size())
+				lines = std::atoi(sub_args[++j].c_str());
+		}
+		return cmd_log(g, lines);
 	}
 
 	std::cerr << "cscli: unknown subcommand '" << sub << "' (see 'cscli --help')\n";

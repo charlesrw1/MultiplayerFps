@@ -22,3 +22,5 @@ int cmd_eval(GlobalOptions& g, const std::string& code);
 // joining name and args into one command line exactly like typing it at the console.
 int cmd_command(GlobalOptions& g, const std::string& name, bool help, const std::vector<std::string>& args);
 int cmd_instances(GlobalOptions& g);
+// Tail of the connected instance's engine log (Logs/output.log or Logs/test_<mode>_output.log).
+int cmd_log(GlobalOptions& g, int lines);

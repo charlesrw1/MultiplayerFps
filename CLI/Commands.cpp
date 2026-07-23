@@ -139,6 +139,21 @@ int cmd_command(GlobalOptions& g, const std::string& name, bool help, const std:
 				[](const nlohmann::json& result) { std::cout << result.value("output", std::string()); });
 }
 
+int cmd_log(GlobalOptions& g, int lines) {
+	int port = 0;
+	if (!resolve_instance(g.port_filter, g.pid_filter, g.mode_filter, g.timeout, g.quiet, port))
+		return 3;
+
+	nlohmann::json a;
+	a["lines"] = lines;
+	BridgeResult r = bridge_call(port, "get_log", a, g.timeout);
+	return emit(r, g, false, [&](const nlohmann::json& result) {
+		nlohmann::json log_lines = result.value("lines", nlohmann::json::array());
+		for (auto& line : log_lines)
+			std::cout << line.get<std::string>() << "\n";
+	});
+}
+
 int cmd_instances(GlobalOptions& g) {
 	auto instances = discover_instances();
 	live_check_instances(instances, g.timeout);

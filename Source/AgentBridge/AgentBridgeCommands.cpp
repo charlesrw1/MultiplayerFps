@@ -11,12 +11,15 @@
 #include "AssetCompile/GltfExport.h"
 #include "Framework/Config.h"
 #include "GameEnginePublic.h"
+#include "Logging.h"
+#include "Framework/Files.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <stdexcept>
 #include <fstream>
 #include <unordered_map>
+#include <vector>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -210,6 +213,48 @@ nlohmann::json status_cmd(const nlohmann::json&) {
 	return r;
 }
 
+nlohmann::json get_log_cmd(const nlohmann::json& args) {
+	if (!Logger::inst)
+		throw std::runtime_error("no logger active");
+
+	int max_lines = 200;
+	if (args.contains("lines") && args["lines"].is_number_integer())
+		max_lines = args["lines"].get<int>();
+
+	const std::string path =
+		FileSys::get_full_path_from_relative(Logger::inst->get_log_path(), FileSys::ENGINE_DIR);
+	std::ifstream file(path, std::ios::binary);
+	if (!file)
+		throw std::runtime_error("could not open log file: " + path);
+
+	// Only the tail: read at most the last 256KB instead of files that can grow to many MB
+	// over a long editor session.
+	file.seekg(0, std::ios::end);
+	const std::streamoff size = file.tellg();
+	const std::streamoff read_from = size > 256 * 1024 ? size - 256 * 1024 : 0;
+	file.seekg(read_from);
+	std::string chunk((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+	std::vector<std::string> lines;
+	size_t start = 0;
+	for (size_t i = 0; i < chunk.size(); ++i) {
+		if (chunk[i] == '\n') {
+			lines.push_back(chunk.substr(start, i - start));
+			start = i + 1;
+		}
+	}
+	if (start < chunk.size())
+		lines.push_back(chunk.substr(start));
+
+	if ((int)lines.size() > max_lines)
+		lines.erase(lines.begin(), lines.end() - max_lines);
+
+	nlohmann::json r;
+	r["path"] = path;
+	r["lines"] = lines;
+	return r;
+}
+
 nlohmann::json run_command_cmd(const nlohmann::json& args) {
 	if (!args.contains("command") || !args["command"].is_string())
 		throw std::runtime_error("run_command requires a string 'command' arg");
@@ -265,6 +310,12 @@ AGENT_BRIDGE_COMMAND(status, status_cmd);
 // everything it printed. `had_error` is true if any part of the line logged at Error level.
 // @usage: run_command {"command": "<command line, e.g. \"give_weapon rifle 30\">"}
 AGENT_BRIDGE_COMMAND(run_command, run_command_cmd);
+// @cmd: returns the tail of this process's engine log (Logs/output.log or
+// Logs/test_<mode>_output.log), as a list of lines, newest last. Lets an agent watching over
+// cscli see recent [Error]/[Warning]/[Debug]/[Info] output without knowing the log path or
+// polling the file itself.
+// @usage: get_log {"lines": <optional int, default 200>}
+AGENT_BRIDGE_COMMAND(get_log, get_log_cmd);
 // @cmd: lists registered console commands and cvars (optionally substring-filtered), each with
 // whatever description/usage docs/console_commands.json has for it.
 // @usage: list_commands {"filter": "<optional substring, empty = everything>"}
