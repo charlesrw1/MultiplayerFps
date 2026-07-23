@@ -154,7 +154,7 @@ void ModelMan::create_default_models() {
 
 	error_model = g_assets.find<Model>("cube1m.cmdl").get();
 	if (!error_model)
-		Fatalf("couldnt load error model (question.cmdl)\n");
+		Fatalf("couldnt load error model (cube1m.cmdl)\n");
 	defaultPlane = g_assets.find<Model>("eng/plane.cmdl").get();
 	if (!defaultPlane)
 		Fatalf("couldnt load defaultPlane model\n");
