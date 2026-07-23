@@ -125,3 +125,8 @@ std::string get_cli_arg(const std::string& name, const std::string& default_valu
 // The project .ini this process is actually running with: this process's own
 // `--project <path>` if given, else the `startup_project` cvar EngineVars.ini set.
 std::string get_effective_project_file();
+
+// Resolves a project name or path to a project .ini path. A bare name (no path
+// separator) resolves against Projects/, adding .ini if missing; anything with a
+// separator is assumed to already be a full path and is returned unchanged.
+std::string resolve_project_ini(const std::string& name_or_path);

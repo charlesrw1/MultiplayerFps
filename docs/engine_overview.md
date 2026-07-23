@@ -47,7 +47,7 @@ Key cvars:
 
 Launch flags:
 - `--editor` — open editor UI (default: game mode). Implicit when `--tests editor` is used.
-- `--project <path>` — per-project `.ini` to load (default: `startup_project` cvar set in `EngineVars.ini`). Ignored for `--tests` runs.
+- `--project <name|path>` — per-project `.ini` to load (default: `startup_project` cvar set in `EngineVars.ini`). A bare name (`DevEngine`) resolves to `Projects/DevEngine.ini`. Ignored for `--tests` runs.
 
 `EngineVars.ini` is sectioned: `[app]` runs on a normal launch, `[game_test]` on `App.exe --tests game`, `[editor_test]` on `--tests editor`. Sections are independent; the engine selects exactly one. See [[testing]].
 

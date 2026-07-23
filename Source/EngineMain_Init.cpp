@@ -386,8 +386,8 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	// self-contained in the game_test/editor_test sections). --project on the CLI wins over the
 	// `startup_project` cvar that vars_file just set.
 	if (!options.pending_test_runnner) {
-		const std::string project_file =
-			!options.project_file.empty() ? options.project_file : g_startup_project.get_string();
+		const std::string project_file = resolve_project_ini(
+			!options.project_file.empty() ? options.project_file : g_startup_project.get_string());
 		if (!project_file.empty())
 			Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, project_file.c_str());
 		print_time("execute project file");

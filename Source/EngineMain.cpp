@@ -70,6 +70,18 @@ Debug_Console* Debug_Console::inst = nullptr;
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
+// Lets `--project DevEngine` / `startup_project DevEngine` stand in for
+// `Projects/DevEngine.ini`: a bare name (no path separator) resolves against
+// Projects/, adding .ini if missing. Anything containing a path separator is
+// assumed to already be a full path and is returned unchanged.
+std::string resolve_project_ini(const std::string& name_or_path) {
+	if (name_or_path.empty()) return name_or_path;
+	if (name_or_path.find('/') != std::string::npos || name_or_path.find('\\') != std::string::npos)
+		return name_or_path;
+	const bool has_ini_ext = name_or_path.size() >= 4 && name_or_path.compare(name_or_path.size() - 4, 4, ".ini") == 0;
+	return "Projects/" + name_or_path + (has_ini_ext ? "" : ".ini");
+}
+
 // Whatever project .ini this process actually ended up running with — an explicit
 // `--project <path>` on this process's own command line, else whatever `startup_project`
 // cvar EngineVars.ini set. Used by the editor's "Play" launcher (start_play_process) so the
@@ -81,9 +93,9 @@ std::string get_effective_project_file() {
 	char** argv = eng_local.argv;
 	for (int i = 1; argv && i + 1 < argc; i++) {
 		if (std::string(argv[i]) == "--project")
-			return argv[i + 1];
+			return resolve_project_ini(argv[i + 1]);
 	}
-	return g_startup_project.get_string();
+	return resolve_project_ini(g_startup_project.get_string());
 }
 
 std::string get_cli_arg(const std::string& name, const std::string& default_value) {
