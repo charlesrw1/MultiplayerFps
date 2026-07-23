@@ -15,6 +15,8 @@ If you see error code c0000135, then it most likely means NO DLLs were copied to
 
 D:/Data is the path to the data directory for assets (g_project_base) used in editor and game. ./TestFilesData/ is used for the test files used during integration tests.
 
+Use cscli.exe for a CLI that lets you run commands and eval lua code on a running editor or game instance. 
+
 Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
 
 When a test crashes, use `Scripts/dbg.ps1 <dump> '<cdb cmd>'` to inspect locals/pointers/stack frames/etc.. See [[docs/debugging/crash_dumps.md]] for commands.

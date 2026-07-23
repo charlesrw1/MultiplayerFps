@@ -37,6 +37,11 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="AgentBridge\AgentBridgeLua.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Animation\AnimationSeqAsset.cpp" />
     <ClCompile Include="Animation\AnimationTypes.cpp" />
     <ClCompile Include="Animation\AnimationUtil.cpp" />
@@ -857,4 +862,16 @@
     <CodegenExcludeExtra>$(ProjectDir)MyGame\**</CodegenExcludeExtra>
   </PropertyGroup>
   <Import Project="$(SolutionDir)Scripts\GameProjectCodegen.targets" />
+  <!-- Regenerates docs/console_commands.json from `@cmd:`/`@usage:` comments above console
+       command / AgentBridge command registrations. Inputs/Outputs (not a PreBuildEvent/wildcard)
+       for the same FileTracker incremental-build reason as GenerateMEGA above - see
+       Scripts/GameProjectCodegen.targets' header comment. -->
+  <ItemGroup>
+    <_CmdDocsInputSource Include="$(ProjectDir)**\*.cpp" Exclude="$(ProjectDir).generated\**;$(ProjectDir)External\**" />
+    <_CmdDocsScript Include="$(SolutionDir)Scripts\gen_command_docs.py" />
+  </ItemGroup>
+  <Target Name="GenerateCommandDocs" BeforeTargets="ClCompile" Inputs="@(_CmdDocsInputSource);@(_CmdDocsScript)" Outputs="$(SolutionDir)docs\console_commands.json">
+    <Message Text="Regenerating docs/console_commands.json (inputs changed)..." Importance="high" />
+    <Exec Command="py &quot;$(SolutionDir)Scripts\gen_command_docs.py&quot;" WorkingDirectory="$(SolutionDir)" />
+  </Target>
 </Project>

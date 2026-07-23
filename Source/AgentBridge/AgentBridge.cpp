@@ -1,8 +1,12 @@
 #include "AgentBridge.h"
 #include "Framework/Config.h"
 #include "Framework/SysPrint.h"
+#include "GameEnginePublic.h"
 #include <unordered_map>
 #include <string>
+#include <filesystem>
+#include <fstream>
+#include <chrono>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -19,6 +23,8 @@ ConfigVar g_agentbridge_enabled("agentbridge.enabled", "1", CVAR_BOOL,
 ConfigVar g_agentbridge_port("agentbridge.port", "23456", CVAR_INTEGER,
 							 "TCP port the local agent bridge listens on (127.0.0.1 only)", 0, 65535);
 
+extern ConfigVar g_project_base;
+
 namespace {
 
 std::unordered_map<std::string, AgentBridgeHandler>& registry() {
@@ -32,6 +38,45 @@ SOCKET client_sock = INVALID_SOCKET;
 std::string recv_buf;
 bool wsa_started = false;
 bool attempted_listen = false;
+std::filesystem::path instance_lockfile_path;
+
+// One small JSON file per running instance under a shared temp dir, so `cscli` can discover
+// which port(s) are alive without guessing. Written once we know we're actually listening;
+// removed on clean shutdown. A stale file left behind by a crash is harmless - cscli verifies
+// liveness itself (connect + ping) before trusting any entry it finds here.
+void write_instance_lockfile() {
+	std::error_code ec;
+	std::filesystem::path dir = std::filesystem::temp_directory_path(ec) / "cscli_instances";
+	if (ec)
+		return;
+	std::filesystem::create_directories(dir, ec);
+	if (ec)
+		return;
+
+	const unsigned long pid = GetCurrentProcessId();
+	instance_lockfile_path = dir / (std::to_string(pid) + ".json");
+
+	nlohmann::json info;
+	info["pid"] = (int)pid;
+	info["port"] = g_agentbridge_port.get_integer();
+	info["mode"] = (eng && eng->is_editor_app()) ? "editor" : "game";
+	info["project_base"] = g_project_base.get_string();
+	info["started_at"] = (int64_t)std::chrono::duration_cast<std::chrono::seconds>(
+							  std::chrono::system_clock::now().time_since_epoch())
+							  .count();
+
+	std::ofstream f(instance_lockfile_path, std::ios::trunc);
+	if (f)
+		f << info.dump();
+}
+
+void remove_instance_lockfile() {
+	if (instance_lockfile_path.empty())
+		return;
+	std::error_code ec;
+	std::filesystem::remove(instance_lockfile_path, ec);
+	instance_lockfile_path.clear();
+}
 
 void set_nonblocking(SOCKET s) {
 	u_long mode = 1;
@@ -76,6 +121,7 @@ void start_listening() {
 	}
 	set_nonblocking(listen_sock);
 	sys_print(Info, "agent_bridge: listening on 127.0.0.1:%d\n", g_agentbridge_port.get_integer());
+	write_instance_lockfile();
 }
 #endif
 
@@ -181,6 +227,7 @@ void agent_bridge_update() {
 void agent_bridge_shutdown() {
 #ifdef _WIN32
 	close_client();
+	remove_instance_lockfile();
 	if (listen_sock != INVALID_SOCKET) {
 		closesocket(listen_sock);
 		listen_sock = INVALID_SOCKET;

@@ -1,0 +1,67 @@
+{
+  "bake_nav": {
+    "description": "bakes all navmesh volumes for the current level. Does not save to disk - follow with save_baked_nav to persist.",
+    "source": "Source/EngineMain_Commands.cpp:237",
+    "usage": ""
+  },
+  "bake_probes": {
+    "description": "bakes all static GI cubemap probes for the current level. Does not save to disk - follow with save_baked_gi to persist.",
+    "source": "Source/EngineMain_Commands.cpp:226",
+    "usage": ""
+  },
+  "create-map": {
+    "description": "creates a new empty .tmap at a game-relative path. Fails if the file already exists.",
+    "source": "Source/EngineMain_Commands.cpp:295",
+    "usage": "create-map <game-relative path, e.g. \"maps/foo.tmap\">"
+  },
+  "describe_command": {
+    "description": "describes a single console command/cvar by exact name (name, is_command, description, usage).",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:274",
+    "usage": "describe_command {\"name\": \"<exact command or cvar name>\"}"
+  },
+  "eval_lua": {
+    "description": "executes Lua source against the running engine's Lua state and returns its value as JSON. Tries the code as an expression first (`return <code>`), falling back to running it verbatim for statements/blocks. Errors (syntax or runtime) come back as a normal bridge error.",
+    "source": "Source/AgentBridge/AgentBridgeLua.cpp:142",
+    "usage": "eval_lua {\"code\": \"<lua source, e.g. \\\"1+1\\\" or \\\"return get_player()\\\">\"}"
+  },
+  "exec": {
+    "description": "runs every line of a text file as a console command, immediately (before the next queued command). Same file lookup convention as vars.txt/init.txt.",
+    "source": "Source/EngineMain_Commands.cpp:283",
+    "usage": "exec <filename>"
+  },
+  "export_tmap": {
+    "description": "exports a .tmap/.tprefab's MeshComponents to a standalone .gltf, with baked world-space transforms, for external tools (e.g. the Blender viewer addon). Reads the asset directly without spawning a Level, so it never touches any level currently open in the editor.",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:258",
+    "usage": "export_tmap {\"tmap\": \"<game-relative .tmap/.tprefab path>\", \"output\": \"<absolute output .gltf path>\"}"
+  },
+  "list_commands": {
+    "description": "lists registered console commands and cvars (optionally substring-filtered), each with whatever description/usage docs/console_commands.json has for it.",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:271",
+    "usage": "list_commands {\"filter\": \"<optional substring, empty = everything>\"}"
+  },
+  "open-editor": {
+    "description": "opens (or switches to) the level editor tool, optionally loading a map. Requires the process to have been launched with --editor; a no-op error otherwise.",
+    "source": "Source/EngineMain_Commands.cpp:308",
+    "usage": "open-editor [game-relative .tmap/.tprefab path, omit for an empty scene]"
+  },
+  "ping": {
+    "description": "connectivity check - returns {\"pong\": true} if the bridge is alive.",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:260",
+    "usage": ""
+  },
+  "quit": {
+    "description": "exits the process immediately.",
+    "source": "Source/EngineMain_Commands.cpp:291",
+    "usage": ""
+  },
+  "run_command": {
+    "description": "runs a console command line exactly as if typed at the in-game console, and returns everything it printed. `had_error` is true if any part of the line logged at Error level.",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:267",
+    "usage": "run_command {\"command\": \"<command line, e.g. \\\"give_weapon rifle 30\\\">\"}"
+  },
+  "status": {
+    "description": "reports which process (editor or game), pid, project base, and agent bridge port this bridge instance belongs to. Used by `cscli status`/`cscli instances` to identify a connection.",
+    "source": "Source/AgentBridge/AgentBridgeCommands.cpp:263",
+    "usage": ""
+  }
+}

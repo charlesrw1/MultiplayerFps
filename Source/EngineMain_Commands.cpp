@@ -221,6 +221,8 @@ void GameEngineLocal::add_commands() {
 		blah += 1;
 	});
 	commands->add("save_baked_gi", [](const Cmd_Args&) { GameSceneGiUtil::save_to_disk(); });
+	// @cmd: bakes all static GI cubemap probes for the current level. Does not save to disk -
+	// follow with save_baked_gi to persist.
 	commands->add("bake_probes", [](const Cmd_Args&) { GameSceneGiUtil::bake_all_cubemaps(); });
 	// Mirrors the "refresh" button in the DDGI debug menu (RaytraceTest.cpp).
 	commands->add("bake_ddgi", [](const Cmd_Args&) {
@@ -230,6 +232,8 @@ void GameEngineLocal::add_commands() {
 		}
 		draw.ddgi->execute();
 	});
+	// @cmd: bakes all navmesh volumes for the current level. Does not save to disk -
+	// follow with save_baked_nav to persist.
 	commands->add("bake_nav", [](const Cmd_Args&) { LevelNavUtil::bake_all_volumes(); });
 	commands->add("save_baked_nav", [](const Cmd_Args&) { LevelNavUtil::save_to_disk(); });
 	// commands->add("close_ed", close_editor);
@@ -273,6 +277,9 @@ void GameEngineLocal::add_commands() {
 		var->set_bool(!var->get_bool());
 		sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
 	});
+	// @cmd: runs every line of a text file as a console command, immediately (before the next
+	// queued command). Same file lookup convention as vars.txt/init.txt.
+	// @usage: exec <filename>
 	commands->add("exec", [](const Cmd_Args& args) {
 		if (args.size() < 2) {
 			sys_print(Info, "usage: exec <exec filename>");
@@ -280,8 +287,11 @@ void GameEngineLocal::add_commands() {
 		}
 		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, args.at(1));
 	});
+	// @cmd: exits the process immediately.
 	commands->add("quit", [](const Cmd_Args& args) { Quit(); });
 
+	// @cmd: creates a new empty .tmap at a game-relative path. Fails if the file already exists.
+	// @usage: create-map <game-relative path, e.g. "maps/foo.tmap">
 	commands->add("create-map", [](const Cmd_Args& args) {
 		auto existing = FileSys::open_read_game(args.at(1));
 		if (!existing) {
@@ -292,6 +302,9 @@ void GameEngineLocal::add_commands() {
 			sys_print(Error, "cant make new map, already exists\n");
 		}
 	});
+	// @cmd: opens (or switches to) the level editor tool, optionally loading a map. Requires the
+	// process to have been launched with --editor; a no-op error otherwise.
+	// @usage: open-editor [game-relative .tmap/.tprefab path, omit for an empty scene]
 	commands->add("open-editor", [&](const Cmd_Args& args) {
 		sys_print(Debug, "OpenEditorToolCommand::execute\n");
 

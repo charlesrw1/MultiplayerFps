@@ -146,6 +146,13 @@ public:
 
 	virtual void append_cmd(uptr<SystemCommand> command) = 0;
 
+	// Runs command_string exactly like execute(NOW, ...) (same tokenizing/`|`-piping rules), but
+	// captures ALL of its printed output (every segment, not just piped ones) and returns it
+	// instead of leaving it in the log. out_had_error, if non-null, is set true if any segment
+	// logged at Error level (Cmd_Args::get_did_err()). Used by AgentBridge's run_command so a
+	// remote caller gets the same text a human would see typing the command at the console.
+	virtual std::string execute_capture(const char* command_string, bool* out_had_error = nullptr) = 0;
+
 	virtual void execute_file(Cmd_Execute_Mode mode, const char* path) = 0;
 	// Execute only lines under [section] in the given file. Lines outside any
 	// section header (and lines under other section headers) are skipped.

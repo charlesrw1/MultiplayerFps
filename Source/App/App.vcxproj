@@ -193,7 +193,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shell32.lib</AdditionalDependencies>
+      <AdditionalDependencies>Shell32.lib;lua.lib</AdditionalDependencies>
       <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -213,7 +213,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shell32.lib</AdditionalDependencies>
+      <AdditionalDependencies>Shell32.lib;lua.lib</AdditionalDependencies>
       <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -233,7 +233,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shell32.lib</AdditionalDependencies>
+      <AdditionalDependencies>Shell32.lib;lua.lib</AdditionalDependencies>
       <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>

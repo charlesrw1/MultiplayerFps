@@ -461,6 +461,52 @@ public:
 		execute_tokens(start_index, toks.size(), false);
 	}
 
+	std::string execute_capture(const char* command_string, bool* out_had_error) final {
+		std::string command = command_string;
+		std::vector<string> toks = tokenize_string(command);
+
+		std::string captured;
+		bool had_err = false;
+		if (toks.empty()) {
+			if (out_had_error)
+				*out_had_error = false;
+			return captured;
+		}
+
+		std::string carry;
+		auto run_segment = [&](int start, int end) {
+			Cmd_Args args;
+			std::string seg_output;
+			args.set_output_pipe(&seg_output);
+			const int count = end - start;
+			for (int i = 0; i < count; i++) {
+				const int idx = start + i;
+				args.add_arg(toks.at(idx).c_str(), toks.at(idx).size());
+			}
+			if (!carry.empty())
+				args.add_arg(carry.c_str(), carry.size());
+
+			actually_execute(args);
+
+			had_err = had_err || args.get_did_err();
+			carry = seg_output;
+			captured += seg_output;
+		};
+
+		int start_index = 0;
+		for (int i = 0; i < (int)toks.size(); i++) {
+			if (toks.at(i) == "|") {
+				run_segment(start_index, i);
+				start_index = i + 1;
+			}
+		}
+		run_segment(start_index, (int)toks.size());
+
+		if (out_had_error)
+			*out_had_error = had_err;
+		return captured;
+	}
+
 	void execute(Cmd_Execute_Mode mode, const char* command_string) {
 
 		if (mode == Cmd_Execute_Mode::NOW)
