@@ -56,3 +56,5 @@ tlog_*.txt
 TestFiles/coverage/*.html
 
 TestFilesData/
+
+docs_site/
