@@ -127,7 +127,7 @@ public:
 
 	ThumbnailManager thumbnails;
 
-	enum class CreateAssetType { None, Map, Particle, MasterMaterial, MaterialInstance, Prefab, ScriptableObject };
+	enum class CreateAssetType { None, Map, Particle, MasterMaterial, MaterialInstance, Prefab, ScriptableObject, AnimTree };
 	CreateAssetType create_asset_type = CreateAssetType::None;
 	char create_asset_name[128] = {};
 	int create_mm_domain = 0;

@@ -480,6 +480,11 @@ static void draw_create_new_menu_items(AssetBrowser* b, const std::string& folde
 			b->create_folder_override = folder;
 			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
 		}
+		if (ImGui::MenuItem("AnimTree")) {
+			b->create_asset_type = AssetBrowser::CreateAssetType::AnimTree;
+			b->create_folder_override = folder;
+			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+		}
 		// Lists every concrete (non-abstract) ScriptableObject subclass currently registered
 		// with ClassBase — both C++-defined and any Lua-defined ones loaded so far. Unlike the
 		// fixed entries above, this list is built dynamically since new subclasses can be
@@ -1290,7 +1295,7 @@ void AssetBrowser::draw_create_asset_popup() {
 	if (create_asset_type == CreateAssetType::None)
 		return;
 
-	const char* titles[] = {"", "Create Map", "Create Particle", "Create Master Material", "Create Material Instance", "Create Prefab", "Create Scriptable Object"};
+	const char* titles[] = {"", "Create Map", "Create Particle", "Create Master Material", "Create Material Instance", "Create Prefab", "Create Scriptable Object", "Create AnimTree"};
 	const char* title = titles[(int)create_asset_type];
 
 	ImGui::OpenPopup(title);
@@ -1341,6 +1346,9 @@ void AssetBrowser::draw_create_asset_popup() {
 				break;
 			case CreateAssetType::Prefab:
 				result = AssetTemplates::create_empty_prefab(create_folder_override, create_asset_name);
+				break;
+			case CreateAssetType::AnimTree:
+				result = AssetTemplates::create_empty_animtree(create_folder_override, create_asset_name);
 				break;
 			case CreateAssetType::ScriptableObject:
 				result = AssetTemplates::create_scriptable_object(create_folder_override, create_asset_name, create_sobj_classname);

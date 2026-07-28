@@ -132,6 +132,18 @@
     <ClCompile Include="Animation\AnimSidecarFile.cpp">
       <Filter>Animation</Filter>
     </ClCompile>
+    <ClCompile Include="Animation\AnimTreeAsset.cpp">
+      <Filter>Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation\AnimTreeBuild.cpp">
+      <Filter>Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation\Editor\AnimTreeEditor.cpp">
+      <Filter>Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation\Editor\BoneMaskEditor.cpp">
+      <Filter>Animation</Filter>
+    </ClCompile>
     <ClCompile Include="Animation\Runtime\Animation.cpp">
       <Filter>Animation\Runtime</Filter>
     </ClCompile>
@@ -853,6 +865,18 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Animation\AnimationSeqAsset.h">
+      <Filter>Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Animation\AnimTreeAsset.h">
+      <Filter>Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Animation\AnimTreeBuild.h">
+      <Filter>Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Animation\Editor\AnimTreeEditor.h">
+      <Filter>Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Animation\Editor\BoneMaskEditor.h">
       <Filter>Animation</Filter>
     </ClInclude>
     <ClInclude Include="Animation\AnimationTypes.h">

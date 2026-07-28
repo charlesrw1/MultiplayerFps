@@ -21,6 +21,8 @@ namespace AssetTemplates {
 
     std::optional<std::string> create_empty_prefab(const std::string& dir, const std::string& name);
 
+    std::optional<std::string> create_empty_animtree(const std::string& dir, const std::string& name);
+
     // Create a .sobj file in dir holding an empty (default-constructed) instance of the given
     // ScriptableObject subclass classname.
     std::optional<std::string> create_scriptable_object(const std::string& dir, const std::string& name,

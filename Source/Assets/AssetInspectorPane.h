@@ -17,6 +17,7 @@ struct SoundEditorState;
 class AnimSeqEditor;
 class SkeletonEditor;
 class SoundPlayer;
+class AnimTreeEditor;
 
 // Separate dockable ImGui window showing per-asset settings.
 // Call imgui_draw() every frame; it opens its own Begin/End.
@@ -35,6 +36,7 @@ private:
     void draw_scriptable_object(const std::string& gamepath);
     void draw_anim_seq_editor(const std::string& asset_path);
     void draw_skeleton_section(const std::string& cmdl_path);
+    void draw_anim_tree_editor(const std::string& asset_path);
     void draw_sound_settings(const std::string& gamepath);
 
     void load_for(const AssetOnDisk& selected);
@@ -60,6 +62,8 @@ private:
     std::unique_ptr<AnimSeqEditor> anim_seq_editor_;
     // Owns skeleton viewer (active when a .cmdl/.mis model with a skeleton is selected).
     std::unique_ptr<SkeletonEditor> skeleton_editor_;
+    // Owns the AnimTree editor (active when an AnimTreeAsset (.animtree) is selected).
+    std::unique_ptr<AnimTreeEditor> animtree_editor_;
 
     // Preview player for the sound settings panel -- registered/released as the selection
     // changes (see load_for()) and on pane destruction. Never auto-plays; starts paused.

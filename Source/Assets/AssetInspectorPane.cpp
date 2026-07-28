@@ -483,6 +483,16 @@ void AssetInspectorPane::draw_skeleton_section(const std::string& cmdl_path) {
     skeleton_editor_->imgui_draw();
 }
 
+#include "Animation/Editor/AnimTreeEditor.h"
+#include "Animation/AnimTreeAsset.h"
+void AssetInspectorPane::draw_anim_tree_editor(const std::string& asset_path) {
+    if (!animtree_editor_ || animtree_editor_->get_asset_path() != asset_path) {
+        animtree_editor_ = std::make_unique<AnimTreeEditor>();
+        animtree_editor_->set_asset(asset_path);
+    }
+    animtree_editor_->imgui_draw();
+}
+
 void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     last_selected = selected;
     settings_dirty = false;
@@ -492,6 +502,7 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     sound_state_.reset();
     anim_seq_editor_.reset();
     skeleton_editor_.reset();
+    animtree_editor_.reset();
     active_tis_path_.clear();
     active_ais_path_.clear();
 
@@ -1198,6 +1209,9 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
     else if (selected.type &&
              selected.type->get_asset_class_type() == &AnimationSeqAsset::StaticType)
         draw_anim_seq_editor(selected.filename);
+    else if (selected.type &&
+             selected.type->get_asset_class_type() == &AnimTreeAsset::StaticType)
+        draw_anim_tree_editor(selected.filename);
     else if (ext == "ais") draw_sound_settings(selected.filename);
     else if (ext == "csnd" || ext == "wav") draw_sound_settings(active_ais_path_.empty() ? strip_extension(selected.filename) + ".ais" : active_ais_path_);
     else if (ext == "mm") draw_material_text(selected.filename);

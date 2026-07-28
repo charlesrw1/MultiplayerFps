@@ -200,6 +200,7 @@
     <ClCompile Include="legacy_gl_calls_test.cpp" />
     <ClCompile Include="twobone_ik_test.cpp" />
     <ClCompile Include="blend_space_math_test.cpp" />
+    <ClCompile Include="anim_tree_test.cpp" />
     <ClCompile Include="stringname_test.cpp" />
     <ClCompile Include="ragdoll_util_test.cpp" />
     <ClCompile Include="compact_instance_pack_test.cpp" />

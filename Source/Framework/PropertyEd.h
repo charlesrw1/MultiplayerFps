@@ -6,6 +6,7 @@
 #include <memory>
 #include "Framework/Util.h"
 #include "Framework/ReflectionProp.h"
+#include "Framework/StringName.h"
 
 // Property editor system, took some of the code structure from https://github.com/BobbyAnguelov/Esoterica
 
@@ -237,6 +238,21 @@ public:
 
 	virtual bool can_reset() override;
 	virtual void reset_value() override;
+};
+
+class StringNameEditor : public IPropertyEditor
+{
+public:
+	StringNameEditor(void* inst, PropertyInfo* prop) {
+		this->instance = inst;
+		this->prop = prop;
+	}
+	// Inherited via IPropertyEditor
+	virtual bool internal_update() override;
+
+private:
+	bool init_ = false;
+	char buf_[128] = {};
 };
 
 class FloatEditor : public IPropertyEditor

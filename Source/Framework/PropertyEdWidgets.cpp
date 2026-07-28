@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "Framework/MathLib.h"
 #include "FnFactory.h"
+#include <cstring>
 
 // ---- primitive property editor widgets ----
 
@@ -33,6 +34,22 @@ void StringEditor::reset_value() {
 
 	auto str = (std::string*)prop->get_ptr(instance);
 	*str = prop->range_hint;
+}
+
+bool StringNameEditor::internal_update() {
+	ASSERT(prop->type == core_type_id::StringName);
+
+	auto* v = (StringName*)prop->get_ptr(instance);
+	if (!init_) {
+		const char* s = v->get_c_str();
+		std::strncpy(buf_, s ? s : "", sizeof(buf_) - 1);
+		buf_[sizeof(buf_) - 1] = 0;
+		init_ = true;
+	}
+	bool changed = ImGui::InputText("##input_stringname", buf_, sizeof(buf_));
+	if (changed)
+		*v = StringName(buf_);
+	return changed;
 }
 
 bool FloatEditor::internal_update() {
@@ -184,6 +201,8 @@ IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& factory, P
 		return new EnumEditor(instance, prop);
 	case core_type_id::StdString:
 		return new StringEditor(instance, prop);
+	case core_type_id::StringName:
+		return new StringNameEditor(instance, prop);
 	case core_type_id::Float:
 		return new FloatEditor(instance, prop);
 	case core_type_id::Int8:

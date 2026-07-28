@@ -204,6 +204,28 @@ std::optional<std::string> create_empty_prefab(const std::string& dir, const std
     return path;
 }
 
+std::optional<std::string> create_empty_animtree(const std::string& dir, const std::string& name) {
+    auto base = strip_name(name);
+    std::string path = dir.empty() ? (base + ".animtree") : (dir + "/" + base + ".animtree");
+
+    if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
+        return std::nullopt;
+
+    std::string text =
+        "{\n"
+        "  \"skeleton\": \"\",\n"
+        "  \"root\": { \"name\": \"\", \"kind\": \"BindPose\", \"params\": {}, \"children\": [] },\n"
+        "  \"cached_pose_roots\": []\n"
+        "}\n";
+
+    auto f = FileSys::open_write_game(path);
+    if (!f) return std::nullopt;
+    f->write(text.data(), text.size());
+    f->close();
+
+    return path;
+}
+
 std::optional<std::string> create_scriptable_object(const std::string& dir, const std::string& name,
     const std::string& classname) {
     auto base = strip_name(name);

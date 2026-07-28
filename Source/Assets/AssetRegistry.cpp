@@ -161,6 +161,7 @@ void AssetRegistrySystem::init() {
 #include "Render/PostProcessSettings.h"
 #include "Game/Prefab.h"
 #include "Assets/ScriptableObject.h"
+#include "Animation/AnimTreeAsset.h"
 #ifdef EDITOR_BUILD
 #include "Assets/AssetBrowser.h"
 #endif
@@ -219,6 +220,7 @@ void AssetRegistrySystem::update() {
 	auto* particleMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ParticleAsset"));
 	auto* ppsetMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("PostProcessSettings"));
 	auto* sobjMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ScriptableObject"));
+	auto* animTreeMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("AnimTreeAsset"));
 	assert(prefabMeta);
 
 	bool tree_dirty = false;
@@ -331,6 +333,11 @@ void AssetRegistrySystem::update() {
 				auto asset = g_assets.find<ScriptableObject>(rel_path);
 				g_assets.reload<ScriptableObject>(asset);
 			}
+		} else if (ext == "animtree") {
+			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
+				auto asset = g_assets.find<AnimTreeAsset>(rel_path);
+				g_assets.reload<AnimTreeAsset>(asset);
+			}
 		}
 
 		// Incremental tree update: resolve to the canonical asset entry.
@@ -377,6 +384,8 @@ void AssetRegistrySystem::update() {
 			aod.type = ppsetMeta;
 		else if (ext == "sobj")
 			aod.type = sobjMeta;
+		else if (ext == "animtree")
+			aod.type = animTreeMeta;
 		else if (ext == "ais") {
 			StringUtils::remove_extension(aod.filename);
 			aod.filename += ".csnd";
@@ -459,6 +468,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 	auto* particleMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ParticleAsset"));
 	auto* ppsetMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("PostProcessSettings"));
 	auto* sobjMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ScriptableObject"));
+	auto* animTreeMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("AnimTreeAsset"));
 	assert(prefabMeta);
 
 	// Use a set to deduplicate model entries: both .cmdl and .mis map to the same .cmdl asset.
@@ -525,6 +535,8 @@ void AssetRegistrySystem::reindex_all_assets() {
 			aod.type = ppsetMeta;
 		else if (ext == "sobj")
 			aod.type = sobjMeta;
+		else if (ext == "animtree")
+			aod.type = animTreeMeta;
 		else
 			continue;
 

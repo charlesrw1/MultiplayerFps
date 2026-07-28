@@ -48,6 +48,10 @@
     <ClCompile Include="Animation\AnimSidecarFile.cpp" />
     <ClCompile Include="Animation\AnimSeqEditor.cpp" />
     <ClCompile Include="Animation\SkeletonEditor.cpp" />
+    <ClCompile Include="Animation\AnimTreeAsset.cpp" />
+    <ClCompile Include="Animation\AnimTreeBuild.cpp" />
+    <ClCompile Include="Animation\Editor\AnimTreeEditor.cpp" />
+    <ClCompile Include="Animation\Editor\BoneMaskEditor.cpp" />
     <ClCompile Include="Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Animation\Runtime\RuntimeNodesNew2.cpp" />
@@ -334,6 +338,10 @@
     <ClInclude Include="Animation\Runtime\Percentage.h" />
     <ClInclude Include="Animation\Runtime\SyncTime.h" />
     <ClInclude Include="Animation\AnimationSeqAsset.h" />
+    <ClInclude Include="Animation\AnimTreeAsset.h" />
+    <ClInclude Include="Animation\AnimTreeBuild.h" />
+    <ClInclude Include="Animation\Editor\AnimTreeEditor.h" />
+    <ClInclude Include="Animation\Editor\BoneMaskEditor.h" />
     <ClInclude Include="AssetCompile\Compiliers.h" />
     <ClInclude Include="AssetCompile\GltfExport.h" />
     <ClInclude Include="AgentBridge\AgentBridge.h" />
