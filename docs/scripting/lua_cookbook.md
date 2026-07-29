@@ -1,13 +1,12 @@
 # Lua Cookbook
 
-`REF`/`CLASS_BODY` C++ methods are exposed to Lua directly: `Type.static_method()` for statics,
+- **IMPORTANT** See all Lua functions available in `lua_stubs.lua` `transform_lua_stubs.lua` `vec_quat_lua_stubs.lua` and other `*_lua_stubs.lua`
+- `REF`/`CLASS_BODY` C++ methods are exposed to Lua directly: `Type.static_method()` for statics,
 `obj:method()` for instance methods. Reflected static classes act as namespaces (`GameplayStatic`,
 `lInput`).
 
-- Test/example scripts referenced below: `TestFilesData/scripts/**`. Real projects use
-  `g_project_base/scripts/`.
-- Entity/component snippets below work identically from `cscli eval` against a running editor.
-- RmlUI: see `docs/ui/rmlui_agent_guide.md` (not covered here).
+- See example scripts in: `D:/Data/scripts/**` or `TestFilesData/scripts/***`.
+- Lua snippets below work identically from `cscli eval` against a running engine instance.
 
 ## Entities
 
@@ -73,11 +72,8 @@ function MyComponent:on_collider_hit(other, position, normal, impulse) end
 
 Full example: `TestFilesData/scripts/shooter/fp_player.lua` (mouse look, WASD via capsule body, firing a bullet entity).
 
-### `---editor` / `init_in_editor` tags
-
-- `editor_start()` always runs in the editor (edit mode), regardless of any flag — use it for
-  editor-only setup (gizmos, preview meshes). `Source/Game/EntityComponent.h:35`
-- `start()`/`stop()` do **not** run in plain edit mode by default — only when actually playing.
+- `editor_start()` always runs in the editor
+- `start()`/`stop()` do **not** run in plain edit mode by default (only play mode by default)
 - A comment tag right after `---@class` controls both editor visibility and this behavior:
 
 ```lua
@@ -90,10 +86,7 @@ FpDoor = { hp = 100 }
   to a C++ component calling `set_call_init_in_editor(true)` in its constructor).
 - Tag must literally start with `---editor` (`---editorial note` does not match); re-parsed on
   every script reload.
-- Refs: `Source/Scripting/ScriptManager.h:29-37,70-80`, `Source/Scripting/ScriptLoadingUtil.cpp:87-94`,
-  tests at `Source/UnitTests/scripting_lua_component_reflection_test.cpp:68-114`, `docs/gotchas.md:3`.
-- C++ equivalent (no tag parsing there): call `set_call_init_in_editor(true)` in the ctor. Gating
-  logic: `Source/Game/EntityComponent.cpp:130-156` — `start()`/`stop()` run when
+-  Gating logic:`start()`/`stop()` run when
   `!is_editor_level() || get_call_init_in_editor()`.
 
 ## Physics
@@ -166,6 +159,8 @@ GameplayStatic.get_time()      -- game time
 GameplayStatic.is_editor()     -- true if in the editor's play/edit level
 GameplayStatic.change_level("maps/next.tmap")
 GameplayStatic.get_current_level_name()
+-- array of every instance of a type in the loaded level, e.g. for i, c in ipairs(...) do ... end
+GameplayStatic.find_components(MeshComponent)
 ```
 `Source/Game/GameplayStatic.h:62-70,100`
 

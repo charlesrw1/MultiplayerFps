@@ -1,13 +1,10 @@
-This is a game engine project. Uses C++ VS2026 , OpenGL, SDL2, vcpkg. No CMAKE.
+This is a game engine project. Uses C++ 20 VS2026 , modern OpenGL 4.7, SDL2, vcpkg. No CMAKE.
 
 path to compiler: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\MSBuild.exe" OR use msbuild.cmd which is in PATH.
 
-CRITICAL: ALWAYS use the 64-bit MSBuild under `Bin\amd64\` (NOT the 32-bit `Bin\MSBuild.exe`).
-The VS 2026 IDE is 64-bit; building from the CLI with the 32-bit MSBuild corrupts the
-FileTracker .tlog state and makes the IDE full-rebuild everything on every build,
-persistently, until the tlogs are wiped. See docs/gotchas.md. Prefer the wrapper scripts
+CRITICAL: ALWAYS use the 64-bit MSBuild under `Bin\amd64\` (NEVER the 32-bit `Bin\MSBuild.exe`). Prefer the wrapper scripts
 (build_and_test.ps1 / integration_test.ps1 / run_editor.ps1 / run_game.ps1 / msbuild.cmd),
-which already select the 64-bit engine. Never invoke `...\Bin\MSBuild.exe` (32-bit) directly.
+which already select the 64-bit engine.
 
 NEVER use VS compiler under "C:\Program Files (x86)\...", that is old compiler.
 
@@ -15,7 +12,9 @@ If you see error code c0000135, then it most likely means NO DLLs were copied to
 
 D:/Data is the path to the data directory for assets (g_project_base) used in editor and game. ./TestFilesData/ is used for the test files used during integration tests.
 
-Use cscli.exe for a CLI that lets you run commands and eval lua code on a running editor or game instance. 
+Use cscli.exe for a CLI that lets you run commands and `eval` lua code on a running editor or game instance. 
+
+Uses Lua for scripting, see [[docs/scripting/lua_cookbook.md]] for examples.
 
 Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
 
