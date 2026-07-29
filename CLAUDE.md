@@ -33,13 +33,15 @@ EngineVars.ini and init.txt store configuration used at runtime. EngineVars.ini'
 
 vcpkg is located in ~\source\vcpkg\vcpkg.exe
 
-_NEVER_ read source files in External/ _unless_ given permission. ONLY read AGENTS.md in External/ for summary.
+NEVER read source files in External/ unless given permission. ONLY read AGENTS.md in External/ for summary.
 
-Limit the source files you read to the module you are working on. Be brief, spare tokens.
+Limit the source files you read to the module you are working on.
+
+Dont write long comments explaining your code, be brief. If you feel the need to write long, multi-line comment blocks to document a "hack" you wrote in code, step back and try to find a better way.
 
 Use ASSERTS() liberaly, documenting its preconditions and invariants. 
 
-Follow DRY, SOLID principles. SELF DOCUMENTING code. Single Responsiblity Principle!
+Follow DRY, SOLID principles. SELF DOCUMENTING code. Single Responsiblity Principle
 
 Uses RmlUI for the gameplay UI framework, a C++/lua UI framework that is very similar to Css/Html/Js (using .rml files for layout and .rcss for styling). Includes the lua plugin for it. See '..vcpkg\buildtrees\rmlui\src\6.2-203a9587f9.clean\' for the source files for it. Also see 'D:\Data\scripts\rmlui_lua_stubs.lua' for a list of callable functions from the lua api. Look at '...rmlui\src\6.2-203a9587f9.clean\Samples' for samples of using rmlui and lua. See 'https://mikke89.github.io/RmlUiDoc/index.html' for documentation about RmlUI in general. 
 Note that rmlui script operates in the same enviorment as the rest of the engine's lua. So you can call the same ClassBase REF'd functions, or lua global variables, and such. You can attach scripts by using inline <script> or by doing 'onclick=' etc.
@@ -50,7 +52,7 @@ Engine uses depth buffer is reverse-Z, standard perspective projection matrix is
 
 ## Documentation
 
-Project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases.  Quick index at [[README]].
+Some limited project documentation lives under `docs/`. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases. 
 
 ## Feature Workflow (GitHub Issues)
 

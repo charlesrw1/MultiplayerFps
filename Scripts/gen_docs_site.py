@@ -2,12 +2,15 @@
 """Static site generator for docs/ -> docs_site/<theme>/.
 
 Parses [[wikilink]] / [[wikilink#Header]] / [[wikilink#Header|text]] syntax used
-across docs/*.md, builds a nav tree from docs/README.md's structure, and renders
-themed HTML pages with pygments code highlighting.
+across docs/*.md, builds a nav tree from the docs/ folder structure (each
+directory may carry an index.toml for {title, order, hidden}; each page may
+carry a `+++ ... +++` TOML frontmatter block for {title, order, hidden}), and
+renders themed HTML pages with pygments code highlighting.
 """
 import argparse
 import re
 import shutil
+import tomllib
 from pathlib import Path
 
 import markdown
@@ -19,6 +22,10 @@ OUT_ROOT = ROOT / "docs_site"
 THEMES_DIR = Path(__file__).resolve().parent / "docs_site_themes"
 
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+FRONTMATTER_RE = re.compile(r"\A\+\+\+\r?\n(.*?\r?\n)\+\+\+\r?\n?", re.S)
+
+TOPLEVEL_KEY = ""  # virtual section for .md files directly under docs/
+SKIP_DIRS = {"images"}
 
 
 def slugify(text: str) -> str:
@@ -26,10 +33,34 @@ def slugify(text: str) -> str:
     return re.sub(r"[\s_]+", "-", s)
 
 
+def prettify(name: str) -> str:
+    return name.replace("_", " ").replace("-", " ").title()
+
+
+def load_toml(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    with path.open("rb") as f:
+        return tomllib.load(f)
+
+
+def extract_frontmatter(md_text: str) -> tuple[dict, str]:
+    m = FRONTMATTER_RE.match(md_text)
+    if not m:
+        return {}, md_text
+    try:
+        meta = tomllib.loads(m.group(1))
+    except tomllib.TOMLDecodeError:
+        meta = {}
+    return meta, md_text[m.end():]
+
+
 def discover_docs() -> dict[str, list[Path]]:
     """basename (no ext) -> list of matching rel Paths, for wikilink basename fallback resolution."""
     by_basename: dict[str, list[Path]] = {}
     for p in DOCS.rglob("*.md"):
+        if p.name == "index.md":
+            continue
         rel = p.relative_to(DOCS).with_suffix("")
         by_basename.setdefault(p.stem, []).append(rel)
     return by_basename
@@ -93,29 +124,59 @@ def preprocess_wikilinks(text: str, current_rel: Path, by_basename: dict) -> str
     return "".join(parts)
 
 
-def parse_readme_nav() -> list[dict]:
-    """Parse docs/README.md '## Section' + '- [[link]] — desc' into a nav tree."""
-    text = (DOCS / "README.md").read_text(encoding="utf-8")
-    sections: list[dict] = []
-    current = None
-    for line in text.splitlines():
-        h2 = re.match(r"^##\s+(.*)", line)
-        item = re.match(r"^-\s+\[\[([^\]]+)\]\]\s*(?:—|--|-)?\s*(.*)", line)
-        if h2:
-            current = {"title": h2.group(1).strip(), "items": []}
-            sections.append(current)
-        elif item and current is not None:
-            link_body = item.group(1)
-            desc = item.group(2).strip()
-            file_part = link_body.split("#")[0].split("|")[0]
-            current["items"].append({
-                "rel": file_part,
-                "desc": desc,
-            })
-    return sections
+class NavFile:
+    def __init__(self, rel: Path, title: str, order: float, hidden: bool):
+        self.rel = rel
+        self.title = title
+        self.order = order
+        self.hidden = hidden
 
 
-def render_markdown(md_text: str, rel: Path, by_basename: dict) -> tuple[str, str]:
+class NavFolder:
+    def __init__(self, key: str, title: str, order: float, hidden: bool):
+        self.key = key  # top-level dir name, "" for the virtual root section
+        self.title = title
+        self.order = order
+        self.hidden = hidden
+        self.files: list[NavFile] = []
+
+    def sorted_files(self) -> list[NavFile]:
+        return sorted(self.files, key=lambda f: (f.order, f.title.lower()))
+
+
+def build_nav_tree(pages_meta: dict[Path, dict]) -> list[NavFolder]:
+    """pages_meta: rel path -> {"title":, "order":, "hidden":} for every page."""
+    root_cfg = load_toml(DOCS / "index.toml")
+    sections: dict[str, NavFolder] = {
+        TOPLEVEL_KEY: NavFolder(
+            TOPLEVEL_KEY,
+            root_cfg.get("title", "Top-level"),
+            root_cfg.get("order", -100),
+            False,
+        )
+    }
+
+    for d in sorted(p for p in DOCS.iterdir() if p.is_dir() and p.name not in SKIP_DIRS):
+        cfg = load_toml(d / "index.toml")
+        sections[d.name] = NavFolder(
+            d.name,
+            cfg.get("title", prettify(d.name)),
+            cfg.get("order", 0),
+            cfg.get("hidden", False),
+        )
+
+    for rel, meta in pages_meta.items():
+        key = rel.parts[0] if len(rel.parts) > 1 else TOPLEVEL_KEY
+        sec = sections.setdefault(key, NavFolder(key, prettify(key), 0, False))
+        sec.files.append(NavFile(rel, meta["title"], meta["order"], meta["hidden"]))
+
+    return sorted(
+        (s for s in sections.values() if s.files),
+        key=lambda s: (s.order, s.title.lower()),
+    )
+
+
+def render_markdown(md_text: str, rel: Path, by_basename: dict) -> tuple[str, str, list]:
     md_text = preprocess_wikilinks(md_text, rel, by_basename)
     md = markdown.Markdown(extensions=[
         "fenced_code", "tables", "sane_lists", "attr_list",
@@ -125,7 +186,36 @@ def render_markdown(md_text: str, rel: Path, by_basename: dict) -> tuple[str, st
     html = md.convert(md_text)
     title_match = re.search(r"<h1[^>]*>(.*?)</h1>", html)
     title = re.sub(r"<[^>]+>", "", title_match.group(1)) if title_match else rel.name
-    return html, title
+    return html, title, md.toc_tokens
+
+
+def render_toc_box(toc_tokens: list) -> str:
+    """MediaWiki-style 'Contents' box, collapsible, listing h2/h3 headings."""
+    # python-markdown's toc nests everything under the page's own h1; that's
+    # already shown as the page title, so descend past it.
+    while len(toc_tokens) == 1 and toc_tokens[0]["level"] == 1:
+        toc_tokens = toc_tokens[0]["children"]
+    top = [t for t in toc_tokens if t["level"] <= 3]
+    if len(top) < 2:
+        return ""
+
+    def render_items(tokens: list) -> str:
+        out = ['<ol>']
+        for t in tokens:
+            out.append(f'<li><a href="#{t["id"]}">{t["name"]}</a>')
+            children = [c for c in t.get("children", []) if c["level"] <= 3]
+            if children:
+                out.append(render_items(children))
+            out.append("</li>")
+        out.append("</ol>")
+        return "".join(out)
+
+    return (
+        '<details class="page-toc" open>'
+        '<summary>Contents</summary>'
+        f'{render_items(top)}'
+        '</details>'
+    )
 
 
 def build(theme: str):
@@ -151,49 +241,49 @@ def build(theme: str):
         shutil.copytree(DOCS / "images", out_dir / "images")
 
     by_basename = discover_docs()
-    nav = parse_readme_nav()
-    nav_rels = {item["rel"] for sec in nav for item in sec["items"]}
 
-    md_files = sorted(DOCS.rglob("*.md"))
-    all_rels = []
+    md_files = sorted(p for p in DOCS.rglob("*.md") if p.name != "README.md")
+
+    pages = []  # (rel, title, body_html, meta)
+    pages_meta: dict[Path, dict] = {}
     for p in md_files:
         rel = p.relative_to(DOCS).with_suffix("")
-        all_rels.append(rel)
+        raw = p.read_text(encoding="utf-8")
+        meta, md_text = extract_frontmatter(raw)
+        body_html, h1_title, toc_tokens = render_markdown(md_text, rel, by_basename)
+        title = meta.get("title") or h1_title
+        order = meta.get("order", 0)
+        hidden = meta.get("hidden", False)
+        pages_meta[rel] = {"title": title, "order": order, "hidden": hidden}
+        toc_html = render_toc_box(toc_tokens)
+        if toc_html:
+            body_html = re.sub(r"(</h1>)", r"\1" + toc_html.replace("\\", "\\\\"), body_html, count=1)
+        pages.append((rel, title, body_html))
+
+    nav = build_nav_tree(pages_meta)
 
     def nav_html(current_rel: Path) -> str:
-        out = []
+        current_key = current_rel.parts[0] if len(current_rel.parts) > 1 else TOPLEVEL_KEY
+        out = ['<div class="nav-tree">']
         for sec in nav:
-            out.append(f'<div class="nav-section"><h3>{sec["title"]}</h3><ul>')
-            for it in sec["items"]:
-                rel = it["rel"]
-                href = "/" + rel + ".html"
-                active = " class=\"active\"" if rel == str(current_rel).replace("\\", "/") else ""
-                out.append(f'<li><a href="{href}"{active}>{Path(rel).name}</a></li>')
-            out.append("</ul></div>")
-        # unlisted docs (not referenced from README)
-        unlisted = [r for r in all_rels if str(r).replace("\\", "/") not in nav_rels]
-        if unlisted:
-            out.append('<div class="nav-section"><h3>Other</h3><ul>')
-            for rel in unlisted:
-                href = "/" + str(rel).replace("\\", "/") + ".html"
-                active = " class=\"active\"" if rel == current_rel else ""
-                out.append(f'<li><a href="{href}"{active}>{rel.name}</a></li>')
-            out.append("</ul></div>")
+            if sec.hidden:
+                continue
+            is_open = " open" if sec.key == current_key else ""
+            out.append(f'<details class="nav-folder"{is_open}><summary>{sec.title}</summary><ul>')
+            for f in sec.sorted_files():
+                if f.hidden:
+                    continue
+                href = "/" + str(f.rel).replace("\\", "/") + ".html"
+                active = " class=\"active\"" if f.rel == current_rel else ""
+                out.append(f'<li><a href="{href}"{active}>{f.title}</a></li>')
+            out.append("</ul></details>")
+        out.append("</div>")
         return "".join(out)
-
-    pages = []
-    for p in md_files:
-        rel = p.relative_to(DOCS).with_suffix("")
-        md_text = p.read_text(encoding="utf-8")
-        body_html, title = render_markdown(md_text, rel, by_basename)
-        pages.append((rel, title, body_html))
 
     def breadcrumb_html(rel: Path, title: str) -> str:
         crumbs = ['<a href="/index.html">Docs Home</a>']
         parts = rel.parts[:-1]
-        acc = []
         for part in parts:
-            acc.append(part)
             crumbs.append(f'<span class="sep">&gt;</span> <span class="crumb-dir">{part.replace("_", " ").title()}</span>')
         crumbs.append(f'<span class="sep">&gt;</span> <span class="crumb-here">{title}</span>')
         return " ".join(crumbs)
@@ -211,10 +301,12 @@ def build(theme: str):
         out_file.parent.mkdir(parents=True, exist_ok=True)
         out_file.write_text(page_html, encoding="utf-8")
 
-    # index.html = README rendered, plus redirect-friendly copy
+    # index.html = curated landing page (docs/README.md content), full nav tree in sidebar
     readme_rel = Path("README")
-    readme_html, _ = render_markdown((DOCS / "README.md").read_text(encoding="utf-8"), readme_rel, by_basename)
-    index_html = render_page("Documentation", nav_html(readme_rel), readme_html, readme_rel)
+    readme_raw = (DOCS / "README.md").read_text(encoding="utf-8")
+    _, readme_md = extract_frontmatter(readme_raw)
+    readme_html, _, _ = render_markdown(readme_md, readme_rel, by_basename)
+    index_html = render_page("Documentation", nav_html(Path()), readme_html, readme_rel)
     (out_dir / "index.html").write_text(index_html, encoding="utf-8")
 
     print(f"[{theme}] built {len(pages)} pages -> {out_dir}")

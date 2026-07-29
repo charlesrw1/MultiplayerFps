@@ -1,4 +1,4 @@
-# `asset_cli` — asset-aware REPL
+# Asset CLI/REPL
 
 Interactive shell for browsing/editing the asset tree under `Data/`. Understands **asset groups** (a logical asset = all sibling files sharing a stem, e.g. `rock.glb` + `rock.cmdl` + `rock.dds` + `rock.tis`) and rewrites references on rename/move.
 

@@ -1,51 +1,81 @@
 # Documentation
 
-All project documentation lives here. Validated by `docs.exe` (see [[tooling/docs-cli]]).
+![Screenshot 1](images/screenshot_1824.png)
 
-## Top-level
+## Index 
 
-- [[engine_overview]] — engine architecture, build system, ECS, application lifecycle
-- [[testing]] — running unit + integration tests, framework details
-- [[scripting_system]] — Lua / C++ scriptable class system
-- [[reflection_macros]] — every `REFLECT(...)` flag the codegen accepts (min/max/category/readonly/no_nil/...)
+- [[scripting/lua_cookbook|Lua Cookbook Examples]] — Examples/Overview of using Lua to write gameplay/editor code. Also useful for `cscli eval` commands.
 
-## Rendering & Assets
-
-- [[asset_tools]] — AssetTools static lib: compiler, diagnostics, file ops (mv/rm/cp), asset templates
 - [[rendering/texture_pipeline]] — .tis/.dds/.png flow: compile, nearest_filtering, UI textures, inspector
-- [[rendering/materials]] — `.mm` / `.mi` authoring + material system internals
-- [[rendering/decals]] — decal materials, write flags, parallax occlusion mapping
-- [[rendering/model_importing]] — `.glb` import, `.mis` settings, `.cmdl` paths
-- [[rendering/skeleton_armature_bake]] — how armature root transforms are baked into skeleton/animations at compile time
-- [[rendering/ddgi_baking]] — DDGI probe-volume + global bias parameters for baking
-- [[rendering/gfx_abstraction]] — IGraphicsDevice migration plan (wrap → redesign → DX11/DX12 backends)
-- [[rendering/gfx_abstraction_changelog]] — per-sub-phase status entries for Phase 1 + Phase 2 (as-landed notes split from the design doc)
-- [[rendering/gfx_abstraction_nextsteps]] — DX11 backend (M1) status / punch list
 
-## UI
+- [[rendering/materials]] — `.mm` / `.mi` authoring + material system internals
+
+- [[rendering/decals]] — decal materials, write flags, parallax occlusion mapping
+
+- [[rendering/model_importing]] — `.glb` import, `.mis` settings, `.cmdl` paths
 
 - [[ui/rmlui_agent_guide]] — RmlUi integration: RCSS vs CSS gotchas, data-binding attrs, Lua API, known v1 limitations
 
-## Bike Demo
-
-- [[bike/sign_conventions]] — DO NOT get these wrong (axes, steer sign, lateral_pos)
-
-## Physics
-
 - [[physics/transforms]] — PhysicsBody transform ownership model (who drives whom), teleport_to/move_to vs set_transform, body types, Unity/Unreal name map, trigger rules & gotchas
-
-## AI
 
 - [[navigation]] — Recast/Detour navmesh system: components, baker, sidecar format, debug cvars
 
-## Debugging
-
-- [[debugging/crash_dumps]] — minidump capture on SEH crashes + `analyze_dump.ps1` for cdb-driven inspection
 - [[scripting/vscode_debugger]] — attach VS Code (EmmyLuaDebugger) to a running build to step Lua scripts
 
-## Tooling
 
-- [[tooling/docs-cli]] — the `docs` CLI: validate links, locate sections, find inbound refs
-- [[tooling/asset-cli]] — `asset_cli.py` REPL: asset-group aware mv/cp/trash + reference rewriting, single-step undo
-- [[tooling/lua-check]] — `lua_check.ps1`: run sumneko lua-language-server `--check` from CLI, shares `.luarc.json` with VSCode
-- [[tooling/run-scripts]] — `run_game.ps1` / `run_editor.ps1`: build App.exe + launch with VS 2026 debugger attached
+## new documetnation pages:
+
+### general documentation
+
+### model importing
+- manual
+- asset inspector settings
+- animations
+	
+### animation
+- animation tree
+- 	node types, summary of their paramters
+- example map of testing nodes
+- animation seq inspector
+	
+### editor page
+- how to use
+- asset browser etc
+
+### materials
+- material types
+- parameters
+
+### textures
+- import settings
+	
+### tooling
+- making new project
+- Scripts/
+- cscli.exe
+- type check
+- codegen script
+- integration_test.ps1
+- run_editor.ps1
+- run_game.ps1
+	
+### sounds
+- importing, compression types
+- playing a sound
+	
+### console commands
+	
+### Rendering features
+- rendering features.
+- culling.
+- ddgi.
+- compact instances path
+
+Entity lifecycle and Component types
+	- meshcomponents,lightcomponents
+
+testing
+
+scripting
+
+RMLUI

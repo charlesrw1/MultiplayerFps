@@ -1,4 +1,4 @@
-# `lua_check.ps1` — Lua type checking CLI
+# Lua Type Check
 
 Wraps sumneko's `lua-language-server` in `--check` mode so agents can validate Lua diagnostics from the command line. Shares config with the VSCode Lua LSP via `.luarc.json` at repo root.
 
