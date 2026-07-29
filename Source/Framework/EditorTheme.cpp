@@ -6,37 +6,37 @@ ImFont* g_prop_regular_font = nullptr;
 
 // Colour palette — edit these to retune the whole UI at once
 namespace theme {
-    // Bases
-    static constexpr ImVec4 bg_deep    = {0.10f, 0.10f, 0.10f, 1.f}; // #1a1a1a  deepest bg
-    static constexpr ImVec4 bg_panel   = {0.145f,0.145f,0.148f,1.f}; // #252526  panel / window
-    static constexpr ImVec4 bg_widget  = {0.12f, 0.12f, 0.12f, 1.f}; // #1e1e1e  input / frame bg
-    static constexpr ImVec4 bg_popup   = {0.176f,0.176f,0.188f,1.f}; // #2d2d30  popup / menu bg
-    static constexpr ImVec4 bg_header  = {0.176f,0.176f,0.188f,1.f}; // #2d2d30  collapsing header
-    static constexpr ImVec4 bg_row_alt = {0.00f, 0.00f, 0.00f,0.10f};// faint zebra stripe
+    // Bases — blue-tinted slate charcoal (Autodesk Revit dark mode)
+    static constexpr ImVec4 bg_deep    = {0.086f,0.094f,0.110f,1.f}; // #16181c  deepest bg / canvas
+    static constexpr ImVec4 bg_panel   = {0.188f,0.200f,0.227f,1.f}; // #30333a  panel / window
+    static constexpr ImVec4 bg_widget  = {0.133f,0.141f,0.161f,1.f}; // #22242a  input / frame bg
+    static constexpr ImVec4 bg_popup   = {0.227f,0.239f,0.267f,1.f}; // #3a3d44  popup / menu bg
+    static constexpr ImVec4 bg_header  = {0.227f,0.239f,0.267f,1.f}; // #3a3d44  collapsing header
+    static constexpr ImVec4 bg_row_alt = {1.00f, 1.00f, 1.00f,0.04f};// faint zebra stripe
 
     // Borders
-    static constexpr ImVec4 border     = {0.24f, 0.24f, 0.24f, 1.f}; // #3d3d3d
+    static constexpr ImVec4 border     = {0.290f,0.306f,0.337f,1.f}; // #4a4e56
 
     // Text
-    static constexpr ImVec4 text       = {0.784f,0.784f,0.784f,1.f}; // #c8c8c8  body
-    static constexpr ImVec4 text_dim   = {0.502f,0.502f,0.502f,1.f}; // #808080  disabled
+    static constexpr ImVec4 text       = {0.831f,0.839f,0.851f,1.f}; // #d4d6d9  body
+    static constexpr ImVec4 text_dim   = {0.549f,0.561f,0.580f,1.f}; // #8c8f94  disabled
 
-    // Accent — VS Code blue.  Change to {0.957f,0.639f,0.137f,1.f} for Unreal orange.
-    static constexpr ImVec4 accent      = {0.000f,0.478f,0.800f,1.f}; // #007ACC
-    static constexpr ImVec4 accent_dim  = {0.149f,0.290f,0.467f,1.f}; // #264F78  selection bg
-    static constexpr ImVec4 accent_hot  = {0.196f,0.478f,0.824f,1.f}; // #3279D2  hover
+    // Accent — Revit selection/highlight sky-blue.
+    static constexpr ImVec4 accent      = {0.239f,0.647f,0.851f,1.f}; // #3DA5D9
+    static constexpr ImVec4 accent_dim  = {0.122f,0.290f,0.388f,1.f}; // #1F4A63  selection bg
+    static constexpr ImVec4 accent_hot  = {0.357f,0.722f,0.910f,1.f}; // #5BB8E8  hover
 
     // Hover / active deltas applied to panel bg
-    static constexpr ImVec4 hover   = {0.243f,0.243f,0.259f,1.f};    // #3e3e42
-    static constexpr ImVec4 active  = {0.000f,0.478f,0.800f,1.f};    // == accent
+    static constexpr ImVec4 hover   = {0.286f,0.302f,0.333f,1.f};    // #494d55
+    static constexpr ImVec4 active  = {0.239f,0.647f,0.851f,1.f};    // == accent
 
     // Scrollbar
-    static constexpr ImVec4 scroll_grab        = {0.259f,0.259f,0.259f,1.f};
-    static constexpr ImVec4 scroll_grab_hover  = {0.322f,0.322f,0.322f,1.f};
-    static constexpr ImVec4 scroll_grab_active = {0.388f,0.388f,0.388f,1.f};
+    static constexpr ImVec4 scroll_grab        = {0.322f,0.337f,0.365f,1.f};
+    static constexpr ImVec4 scroll_grab_hover  = {0.384f,0.400f,0.427f,1.f};
+    static constexpr ImVec4 scroll_grab_active = {0.447f,0.463f,0.490f,1.f};
 
-    // Teal check / plot colour
-    static constexpr ImVec4 teal = {0.306f,0.788f,0.690f,1.f};       // #4EC9B0
+    // Check / plot colour — reuse accent family (Revit has no separate teal)
+    static constexpr ImVec4 teal = {0.357f,0.722f,0.910f,1.f};       // == accent_hot
 }
 
 void apply_editor_dark_theme() {

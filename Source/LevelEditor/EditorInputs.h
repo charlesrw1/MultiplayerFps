@@ -25,7 +25,7 @@ public:
 	void reset_keyboard_and_mouse() { keyboard = mouse_click = true; }
 	void set_focus(IInputReciever* recieve) {
 		if (focused_item != recieve) {
-			printf("set focus: %s\n", (recieve) ? recieve->get_name().c_str() : "<null>");
+			sys_print(Debug,"set focus: %s\n", (recieve) ? recieve->get_name().c_str() : "<null>");
 		}
 
 		focused_item = recieve;

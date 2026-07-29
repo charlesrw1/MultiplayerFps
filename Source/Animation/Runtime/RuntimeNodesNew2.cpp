@@ -1076,7 +1076,7 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx) {
 		if (curTransitionTime >= curTransitionDuration) {
 			g_pose_pool.free(blendingOut);
 			blendingOut = nullptr;
-			sys_print(Debug, "agStatemachineBase: transition end\n");
+			//sys_print(Debug, "agStatemachineBase: transition end\n");
 		} else {
 			curTransitionTime += ctx.dt;
 		}
@@ -1088,9 +1088,9 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx) {
 		curTime = 0.0;
 		curTransitionTime = 0.0;
 		currentTree->reset();
-		sys_print(Debug, "agStatemachineBase: transition\n");
+		//sys_print(Debug, "agStatemachineBase: transition\n");
 		if (blendingOut) {
-			sys_print(Debug, "agStatemachineBase: transition interrupted\n");
+		//	sys_print(Debug, "agStatemachineBase: transition interrupted\n");
 		} else {
 			blendingOut = g_pose_pool.allocate();
 		}

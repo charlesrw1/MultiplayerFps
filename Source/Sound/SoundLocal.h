@@ -140,7 +140,7 @@ public:
 		MIX_SetTrackFrequencyRatio(track, glm::max(spi->pitch_multiply, 0.001f));
 		low_pass_mods[index].init(spi->lowpass_filter);
 		MIX_PlayTrack(track, 0);
-		sys_print(Debug, "playchannel");
+		//sys_print(Debug, "playchannel");
 	}
 
 	void end_sound_object_play(SoundPlayerInternal* spi) {

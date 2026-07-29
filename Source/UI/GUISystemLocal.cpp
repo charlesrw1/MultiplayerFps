@@ -65,8 +65,6 @@ void UiSystem::draw_imgui_interfaces(IEditorTool* edState) {
 }
 void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 	CPU_SCOPE("imgui_draw");
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({51, 51, 51}));
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({35, 35, 35}));
 
 	EditorPopupManager::inst->draw_popups();
 
@@ -157,8 +155,6 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 
 	if (g_drawimguidemo.get_bool())
 		ImGui::ShowDemoWindow();
-
-	ImGui::PopStyleColor(2); // framebg
 
 	set_focus_to_viewport_next_tick = false;
 }
