@@ -506,8 +506,34 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// into the heading term's authority (and vice versa). Cohesion/racing-line
 	// only; avoidance never touches either (it's a direct worldspace lateral
 	// slide instead, see section 3).
-	const float lateral_shift = glm::clamp(p.lateral_shift_kp * lat_error, -1.f, 1.f);
-	const float heading_shift = glm::clamp(p.heading_shift_kp * heading_error * corner_weight, -1.f, 1.f);
+	float lateral_shift = glm::clamp(p.lateral_shift_kp * lat_error, -1.f, 1.f);
+	float heading_shift = glm::clamp(p.heading_shift_kp * heading_error * corner_weight, -1.f, 1.f);
+	if (manual_control) {
+		// Stick-active easing: ceiling drops to magnetism_active_mult while the
+		// player is actively steering, back to full while idle -- smoothed so
+		// gripping/releasing the stick doesn't snap the blend weight. Shared
+		// with the power blend below (same stick, same feel).
+		const float magnetism_target_mult = manual_stick_active ? magnetism_active_mult : 1.f;
+		magnetism_smoothed = damp_dt_independent(magnetism_target_mult, magnetism_smoothed, magnetism_smooth_time_s, dt);
+
+		// Distance falloff: a real magnet, not a spring -- pull is strongest
+		// right at the AI's own target (lat_error near 0) and fades out over
+		// magnetism_falloff_range_m, rather than growing with distance like the
+		// proportional lateral_shift term above does on its own.
+		const float lateral_falloff = glm::clamp(
+			1.f - glm::abs(lat_error) / glm::max(magnetism_falloff_range_m, 0.01f), 0.f, 1.f);
+
+		const float effective_lateral_k = glm::clamp(magnetism_lateral_k * magnetism_smoothed * lateral_falloff, 0.f, 1.f);
+
+		// Player steer replaces the racing-line/cohesion target directly (scaled
+		// down to roughly the AI's own operating range, see manual_steer_sensitivity);
+		// effective_lateral_k blends back in how much of the AI's own computed
+		// correction (draft pull + racing line + corner heading assist) still
+		// applies on top of it.
+		const float scaled_manual_steer = manual_steer_input * manual_steer_sensitivity;
+		lateral_shift = glm::clamp(glm::mix(scaled_manual_steer, lateral_shift, effective_lateral_k), -1.f, 1.f);
+		heading_shift *= effective_lateral_k;
+	}
 	dbg_lateral_shift = lateral_shift;
 	dbg_heading_shift = heading_shift;
 
@@ -626,7 +652,23 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	}
 
 	float power;
-	if (sprinting_to_front) {
+	if (manual_control) {
+		// Player sets wattage directly; magnetism_speed_k blends in the AI's own
+		// speed target (cohesion follow-gap match, or base cruise power if none
+		// sensed). Same stick-active easing (magnetism_smoothed) as the lateral
+		// blend above, plus its own distance falloff -- strongest right at the
+		// target speed, fading out over magnetism_speed_falloff_ms.
+		front_abreast_speed_integral   = 0.f;
+		front_abreast_speed_prev_error = 0.f;
+		const float ai_power = have_speed_target
+			? run_speed_pid(target_speed, speed_integral, speed_prev_error)
+			: p.base_power_w;
+		const float speed_error   = have_speed_target ? (target_speed - speed) : 0.f;
+		const float speed_falloff = glm::clamp(
+			1.f - glm::abs(speed_error) / glm::max(magnetism_speed_falloff_ms, 0.01f), 0.f, 1.f);
+		const float effective_speed_k = glm::clamp(magnetism_speed_k * magnetism_smoothed * speed_falloff, 0.f, 1.f);
+		power = glm::mix(manual_power_w, ai_power, effective_speed_k);
+	} else if (sprinting_to_front) {
 		// Full-effort sprint: bypass the speed PID entirely — there's no fixed
 		// speed to converge on, the goal is "get to the front", not "hold a
 		// speed". Corner braking (section 4) and avoidance still apply normally

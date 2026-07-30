@@ -18,12 +18,19 @@ public:
 	// Clears the current selection/orbit (if any). Call before destroying any
 	// rider that might be selected -- selected is a raw BikeObject* with no
 	// lifetime tracking of its own, so leaving it pointed at a destroyed rider
-	// crashes the next on_imgui()/update() call.
-	void deselect() { selected = nullptr; orbiting = false; behind_cam_initialized = false; }
+	// crashes the next on_imgui()/update() call. Also hands manual control
+	// (if active on the outgoing rider) back to the AI -- see revert_manual_control.
+	void deselect();
 	bool has_selection(const BikeObject* rider) const { return selected == rider; }
 
 private:
 	BikeObject* pick_rider_under_cursor(const std::vector<BikeObject*>& riders) const;
+
+	// Reverts a rider's BikeAI::manual_control flag back to false (no-op if the
+	// rider isn't AI-controlled or already off) -- called whenever selection
+	// moves away from it, so a player-driven rider never stays stuck off of AI
+	// control just because the debugger looked elsewhere.
+	static void revert_manual_control(BikeObject* rider);
 
 	User_Camera fly_cam;
 	EntityPtr   debug_cam_ent;

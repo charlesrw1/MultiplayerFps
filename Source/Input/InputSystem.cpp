@@ -76,7 +76,8 @@ void Input::handle_event(const SDL_Event& event) {
 	} break;
 	case SDL_EVENT_KEY_DOWN: {
 		recieved_input_from_this = -1;
-		keyPressedReleasedState.at(event.key.scancode).is_pressed = true;
+		if (!event.key.repeat)
+			keyPressedReleasedState.at(event.key.scancode).is_pressed = true;
 	} break;
 	case SDL_EVENT_KEY_UP: {
 		keyPressedReleasedState.at(event.key.scancode).is_released = true;
@@ -151,7 +152,7 @@ void Input::tick() {
 	const SDL_MouseButtonFlags mouseState = SDL_GetMouseState(&mx, &my);
 	mouseX = (int)mx;
 	mouseY = (int)my;
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < mouseButtonsState.size(); i++) {
 		const bool is_down_this_tick = (mouseState & SDL_BUTTON_MASK(i + 1)) != 0;
 		mouseButtonsState[i].is_down = is_down_this_tick;
 	}

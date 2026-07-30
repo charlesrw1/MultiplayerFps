@@ -15,6 +15,27 @@
 
 extern BikeGameApplication* g_bike_app;
 
+// Gamepad steer stick shaping for manual rider control (BikeAI::manual_control,
+// see BikeDebugger::update). >1 compresses small deflections for finer control
+// near center, same idea as BikePlayer's steer_expo. Keyboard steer is already
+// binary (+-1) so this only ever applies to the analog stick.
+static float manual_gp_steer_expo = 1.5f;
+
+void BikeDebugger::revert_manual_control(BikeObject* rider)
+{
+	if (!rider) return;
+	if (BikeAI* ai = dynamic_cast<BikeAI*>(rider->input.get()))
+		ai->manual_control = false;
+}
+
+void BikeDebugger::deselect()
+{
+	revert_manual_control(selected);
+	selected = nullptr;
+	orbiting = false;
+	behind_cam_initialized = false;
+}
+
 void BikeDebugger::init()
 {
 	debug_cam_ent = GameplayStatic::spawn_entity();
@@ -119,6 +140,11 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 	if (!ImGui::GetIO().WantCaptureMouse && Input::was_mouse_pressed(0)) {
 		BikeObject* picked = pick_rider_under_cursor(riders);
 		if (picked) {
+			// Switching to a different rider hands manual control (if active)
+			// back to whichever one we're leaving -- only ever one player-driven
+			// rider at a time.
+			if (selected != picked)
+				revert_manual_control(selected);
 			selected = picked;
 			orbiting = true;
 			fly_cam.set_orbit_target(selected->get_ws_position(), 2.f);
@@ -128,8 +154,56 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 			fly_cam.distance = glm::length(fly_cam.orbit_target - fly_cam.position);
 			fly_cam.orbit_mode = true;
 		} else if (orbiting) {
+			// Clicked empty space away from the selected rider -- stop orbiting
+			// and hand manual control back to AI.
+			revert_manual_control(selected);
 			orbiting = false;
 			fly_cam.orbit_mode = false;
+		}
+	}
+
+	// Manual control of the selected AI rider (Selected Rider panel, BikeAI::manual_control).
+	// Read every frame regardless of whether the ImGui window is open, same as
+	// the click-to-select handling above.
+	if (selected) {
+		if (BikeAI* ai = dynamic_cast<BikeAI*>(selected->input.get())) {
+			if (ai->manual_control) {
+				const bool left  = Input::is_key_down(SDL_SCANCODE_A) || Input::is_key_down(SDL_SCANCODE_LEFT);
+				const bool right = Input::is_key_down(SDL_SCANCODE_D) || Input::is_key_down(SDL_SCANCODE_RIGHT);
+				// Sign matches BikeAI's own lateral_shift/wp.right convention (see
+				// BikeObject::tick_transform) with A/left = negative = bike-left --
+				// note this is inverted vs. BikePlayer::evaluate's kb_left/kb_right,
+				// which feeds a differently-signed steer_combined.
+				float steer = 0.f;
+				if (left)  steer += 1.f;
+				if (right) steer -= 1.f;
+
+				// Gamepad: left stick X. SDL's axis is negative when pushed left,
+				// positive when pushed right -- opposite of the keyboard convention
+				// above, so negate. Deadzone cuts drift; expo curve (rescaled onto
+				// the post-deadzone range) compresses small deflections for finer
+				// control near center without losing full deflection at the edge.
+				const float gp_axis = (float)Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
+				constexpr float GP_DEADZONE = 0.15f;
+				if (glm::abs(gp_axis) > GP_DEADZONE) {
+					const float mag_raw = (glm::abs(gp_axis) - GP_DEADZONE) / (1.f - GP_DEADZONE);
+					const float mag_shaped = glm::pow(mag_raw, manual_gp_steer_expo);
+					steer += -glm::sign(gp_axis) * mag_shaped;
+				}
+
+				ai->manual_steer_input  = glm::clamp(steer, -1.f, 1.f);
+				// Feeds BikeAI's stick-active magnetism easing (see BikeAI::evaluate) --
+				// a small threshold so stick drift/keyboard release doesn't flicker it.
+				ai->manual_stick_active = glm::abs(steer) > 0.05f;
+
+				// Gamepad: DPAD up/down nudges wattage in fixed steps -- coexists
+				// with the ImGui power slider, which still works independently.
+				static constexpr float POWER_STEP_W = 25.f;
+				if (Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_DPAD_UP))
+					ai->manual_power_w = glm::clamp(ai->manual_power_w + POWER_STEP_W, 0.f, 1000.f);
+				if (Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_DPAD_DOWN))
+					ai->manual_power_w = glm::clamp(ai->manual_power_w - POWER_STEP_W, 0.f, 1000.f);
+			}
 		}
 	}
 
@@ -202,6 +276,7 @@ BikeObject* BikeDebugger::pick_rider_under_cursor(const std::vector<BikeObject*>
 
 void BikeDebugger::on_imgui()
 {
+	ImGui::SetNextWindowBgAlpha(0.5f);
 	if (!ImGui::Begin("Bike Debugger")) {
 		ImGui::End();
 		return;
@@ -283,6 +358,32 @@ void BikeDebugger::on_imgui()
 			if (ImGui::Button(staying_at_front ? "Stop staying at front" : "Stay at front of group (abreast)"))
 				selected->ai_behavior_state = staying_at_front ? BikeAIBehaviorState::Default : BikeAIBehaviorState::StayingAtFront;
 
+			ImGui::SeparatorText("Player Control (this rider only)");
+			if (ImGui::Checkbox("Manual control (A/D or Left/Right to steer)", &ai->manual_control)) {
+				if (!ai->manual_control) ai->manual_steer_input = 0.f;
+			}
+			if (ai->manual_control) {
+				ImGui::TextDisabled("Click another rider or Clear Selection to hand back to AI.");
+				ImGui::SliderFloat("Steer sensitivity", &ai->manual_steer_sensitivity, 0.05f, 1.f, "%.2f");
+				ImGui::TextDisabled("Scales full-stick down to roughly the AI's own correction range -- lower");
+				ImGui::TextDisabled("if small pushes are leaning the bike much harder than the AI ever does.");
+				ImGui::SliderFloat("Player power", &ai->manual_power_w, 0.f, 1000.f, "%.0f W");
+				ImGui::SliderFloat("Magnetism: steering assist (ceiling)", &ai->magnetism_lateral_k, 0.f, 1.f, "%.2f");
+				ImGui::SliderFloat("Magnetism: speed assist (ceiling)",    &ai->magnetism_speed_k,   0.f, 1.f, "%.2f");
+				ImGui::TextDisabled("0 = fully manual, 1 = fully AI (draft/cohesion/racing line) right at the target.");
+				ImGui::SliderFloat("Magnetism: active-stick multiplier", &ai->magnetism_active_mult, 0.f, 1.f, "%.2f");
+				ImGui::TextDisabled("Ceiling above is multiplied by this while the stick is held -- eases assist");
+				ImGui::TextDisabled("off so it doesn't fight manual input; back to full ceiling once released.");
+				ImGui::SliderFloat("Magnetism: ease smoothing", &ai->magnetism_smooth_time_s, 0.01f, 1.f, "%.2f s");
+				ImGui::TextDisabled("How long it takes to relax back to the full ceiling after releasing the stick.");
+				ImGui::SliderFloat("Magnetism: lateral range", &ai->magnetism_falloff_range_m, 0.2f, 10.f, "%.1f m");
+				ImGui::SliderFloat("Magnetism: speed range",   &ai->magnetism_speed_falloff_ms, 0.2f, 10.f, "%.1f m/s");
+				ImGui::TextDisabled("A magnet, not a spring: pull is strongest right at the AI's target and fades");
+				ImGui::TextDisabled("to zero over this distance/speed-error, instead of growing the further off you are.");
+				ImGui::SliderFloat("Gamepad stick expo", &manual_gp_steer_expo, 1.f, 4.f, "%.2f");
+				ImGui::TextDisabled("Higher = finer control near center of the left stick (keyboard unaffected).");
+			}
+
 			if (moving_to_front)
 				ImGui::TextColored(ImVec4(1.f, 0.6f, 0.1f, 1.f), "State: MOVING TO FRONT (group %d, pos_in_group=%.2f)",
 					selected->group_id, selected->pos_in_group_norm);
@@ -296,8 +397,7 @@ void BikeDebugger::on_imgui()
 		}
 
 		if (ImGui::Button("Clear Selection")) {
-			selected = nullptr;
-			orbiting = false;
+			deselect();
 			fly_cam.orbit_mode = false;
 		}
 	} else {

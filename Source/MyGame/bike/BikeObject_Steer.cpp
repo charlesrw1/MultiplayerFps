@@ -16,11 +16,6 @@ float steer_max_deg_hi      = 4.f;
 float steer_ref_speed       = 2.5f;
 float steer_speed_power     = 2.0f;
 float lean_max_deg          = 32.f;
-float bar_scale_lo_steer    = 1.5f;
-float bar_scale_hi_steer    = 1.0f;
-float bar_visual_lean_min   = 1.5f;
-float bar_lean_fade_lo      = 0.0f;
-float bar_lean_fade_hi      = 1.f;
 
 // Roll/lean damping — see tick_steer. Lower = snappier, higher = laggier
 // (damp_dt_independent's "smoothing" factor, not seconds). stand_up is
@@ -33,14 +28,6 @@ float roll_smooth_stand_up  = 0.015f;
 // formula rather than verified visually; flip live here if it leans the
 // wrong way instead of editing code.
 float roll_dir_sign         = -1.f;
-
-// Fork "flick" — extra bar deflection from how fast the bike is actually
-// moving laterally right now (lateral_vel), on top of the steer-intent
-// angle. See BikeObject::tick_transform.
-float fork_flick_deg_per_mps = 6.f;   // extra fork deg per m/s of lateral_vel
-float fork_flick_max_deg     = 15.f;  // clamp on the flick contribution alone
-float fork_flick_smooth      = 0.01f; // noise-reduction only, keep low so it stays snappy
-float fork_flick_dir_sign    = 1.f;   // flip if the flick turns the wrong way
 
 // Single low-pass on the raw steer input — no build/release asymmetry, no
 // wobble/crosswind/bump-steer noise layers. Same path for player and AI.
@@ -124,17 +111,6 @@ static void bike_steer_debug()
 		ImGui::DragFloat("roll_smooth_lean_in",  &roll_smooth_lean_in,  0.005f, 0.001f, 0.95f, "%.3f");
 		ImGui::DragFloat("roll_smooth_stand_up", &roll_smooth_stand_up, 0.005f, 0.001f, 0.95f, "%.3f");
 		ImGui::DragFloat("roll_dir_sign",        &roll_dir_sign,        2.f,   -1.f,   1.f);
-		ImGui::SeparatorText("Fork Flick");
-		ImGui::DragFloat("fork_flick_deg_per_mps", &fork_flick_deg_per_mps, 0.2f, 0.f, 30.f);
-		ImGui::DragFloat("fork_flick_max_deg",     &fork_flick_max_deg,     0.5f, 0.f, 45.f);
-		ImGui::DragFloat("fork_flick_smooth",      &fork_flick_smooth,      0.005f, 0.001f, 0.5f, "%.3f");
-		ImGui::DragFloat("fork_flick_dir_sign",    &fork_flick_dir_sign,    2.f, -1.f, 1.f);
-		ImGui::SeparatorText("Handlebar Visual");
-		ImGui::DragFloat("bar_scale_lo_steer",  &bar_scale_lo_steer,  0.1f, 0.5f, 12.f);
-		ImGui::DragFloat("bar_scale_hi_steer",  &bar_scale_hi_steer,  0.1f, 0.1f,  6.f);
-		ImGui::DragFloat("bar_visual_lean_min", &bar_visual_lean_min, 0.02f, 0.f,  1.f);
-		ImGui::DragFloat("bar_lean_fade_lo",    &bar_lean_fade_lo,    0.01f, 0.f,  1.f);
-		ImGui::DragFloat("bar_lean_fade_hi",    &bar_lean_fade_hi,    0.01f, 0.f,  1.f);
 	}
 }
 ADD_TO_DEBUG_MENU(bike_steer_debug);

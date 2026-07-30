@@ -444,34 +444,16 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 
 	get_owner()->set_ws_position_rotation(pos, orient);
 
-	// Fork steer rotation
+	// Fork steer rotation. current_steer is already in this file's own yaw
+	// convention (tick_transform's callers negate ci.lateral_shift into
+	// ci.steer for exactly this reason — see BikeObject_Steer.cpp), so it's
+	// used directly for the yaw euler below with no extra sign flip.
 	if (fork_entity) {
 		static constexpr float HEAD_TUBE_RAD = glm::radians(17.77f);
 		const float max_steer_rad = compute_max_steer_rad(speed);
 		const float fork_angle    = current_steer * max_steer_rad;
-		// Non-linear steer response: large amplification at small steer, smaller at full steer.
-		// Then lean fade reduces bars further toward neutral at full lean.
-		const float steer_abs  = glm::abs(current_steer);
-		const float steer_scale = glm::mix(bar_scale_lo_steer, bar_scale_hi_steer, steer_abs);
-		const float lean_frac  = glm::clamp(glm::abs(current_roll) / glm::radians(lean_max_deg), 0.f, 1.f);
-		const float lean_fade  = glm::smoothstep(bar_lean_fade_lo, bar_lean_fade_hi, lean_frac);
-		const float bar_scale  = glm::mix(steer_scale, bar_visual_lean_min, lean_fade);
-
-		// Flick: extra fork deflection proportional to how fast the bike is
-		// actually moving laterally right now (lateral_vel), not just the
-		// AI's steer intent — a quick sideways correction snaps the bars
-		// noticeably even when current_steer itself is still small/settled,
-		// like a rider flicking the bars to initiate a fast line change.
-		// Lightly smoothed to kill single-tick lateral_vel noise from the
-		// course projection without losing the "flick" character (it decays
-		// back to zero as soon as the lateral motion itself stops).
-		fork_flick_smoothed = damp_dt_independent(lateral_vel, fork_flick_smoothed, fork_flick_smooth, dt);
-		const float flick_rad = fork_flick_dir_sign * glm::clamp(
-			fork_flick_smoothed * glm::radians(fork_flick_deg_per_mps),
-			-glm::radians(fork_flick_max_deg), glm::radians(fork_flick_max_deg));
-
-		const float fork_visual = fork_angle * bar_scale - current_roll * glm::sin(HEAD_TUBE_RAD) + flick_rad;
-		fork_entity->set_ls_euler_rotation(glm::vec3(HEAD_TUBE_RAD, -fork_visual, 0.f));
+		const float fork_visual   = fork_angle - current_roll * glm::sin(HEAD_TUBE_RAD);
+		fork_entity->set_ls_euler_rotation(glm::vec3(HEAD_TUBE_RAD, fork_visual, 0.f));
 	}
 
 	// Pedal visual: crank rotates about its local Z with cadence; each shoe
@@ -570,14 +552,6 @@ static void bike_transform_debug()
 		ImGui::DragFloat("head_look_dir_sign",       &head_look_dir_sign,       2.f,  -1.f,  1.f);
 		if (s_bike_debug)
 			ImGui::Text("head_look=%.1f deg", glm::degrees(s_bike_debug->head_look_smoothed));
-	}
-	ImGui::SeparatorText("Handlebar Visual");
-	{
-		ImGui::DragFloat("bar_scale_lo_steer",  &bar_scale_lo_steer,  0.1f, 0.5f, 12.f);
-		ImGui::DragFloat("bar_scale_hi_steer",  &bar_scale_hi_steer,  0.1f, 0.1f,  6.f);
-		ImGui::DragFloat("bar_visual_lean_min", &bar_visual_lean_min, 0.02f, 0.f,  1.f);
-		ImGui::DragFloat("bar_lean_fade_lo",    &bar_lean_fade_lo,    0.01f, 0.f,  1.f);
-		ImGui::DragFloat("bar_lean_fade_hi",    &bar_lean_fade_hi,    0.01f, 0.f,  1.f);
 	}
 	ImGui::SeparatorText("Worldspace Steering — the steering PID");
 	{

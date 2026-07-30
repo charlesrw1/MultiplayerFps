@@ -8,7 +8,7 @@ template <typename T> struct hash_map_iterator
 	hash_map_iterator(const hash_map<T>* p, uint64_t i);
 	hash_map_iterator(uint64_t i) : index(i) {}
 
-	bool operator!=(const hash_map_iterator& other) { return index < other.index; }
+	bool operator!=(const hash_map_iterator& other) { return index != other.index; }
 	T operator*();
 	hash_map_iterator<T>& operator++() {
 		index++;
@@ -97,20 +97,29 @@ public:
 		uint64_t index = std::hash<uint64_t>()(handle);
 		index = index & mask;
 		uint64_t count = items.size();
+		// A tombstone does NOT terminate the probe chain — the real entry (if any) may sit
+		// further along it. Keep scanning until a truly empty slot or a match is found, and
+		// remember the first reusable (tombstone) slot along the way so we don't have to
+		// rescan to place a genuinely new entry.
+		uint64_t first_free = count; // sentinel: none found yet
 		for (uint64_t i = 0; i < count; i++) {
 			uint64_t actual_index = (index + i) & mask;
-			if (items[actual_index].handle == handle) {
+			uint64_t existing = items[actual_index].handle;
+			if (existing == handle) {
 				// Update existing entry — do not bump num_used
 				items[actual_index].data = dataToAdd;
 				return;
 			}
-			if (items[actual_index].handle == 0 || items[actual_index].handle == TOMBSTONE) {
-				num_tombstones -= items[actual_index].handle == TOMBSTONE;
+			if (existing == 0) {
+				uint64_t target = (first_free != count) ? first_free : actual_index;
+				num_tombstones -= items[target].handle == TOMBSTONE;
 				num_used++;
-				items[actual_index].data = dataToAdd;
-				items[actual_index].handle = handle;
+				items[target].data = dataToAdd;
+				items[target].handle = handle;
 				return;
 			}
+			if (existing == TOMBSTONE && first_free == count)
+				first_free = actual_index;
 		}
 		assert(!"hash table didnt update size");
 	}

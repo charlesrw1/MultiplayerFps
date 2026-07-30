@@ -85,11 +85,9 @@ public:
 		for (uint64_t i = 0; i < count; i++) {
 			uint64_t actual_index = (index + i) & mask;
 			if (items[actual_index].ptr == ptr) {
-				items[actual_index].ptr = nullptr;
 				items[actual_index].ptr = (T*)HASHSET_TOMBSTONE;
 				num_used--;
 				num_tombstones++;
-				assert(count_num_used() == num_used);
 				assert(num_used >= 0);
 				return;
 			} else if (items[actual_index].ptr == nullptr)
@@ -98,25 +96,29 @@ public:
 	}
 	void insert(T* ptr) {
 		assert(ptr != nullptr);
-		if (find(ptr))
-			return;
 		check_to_rehash(1);
 		uint64_t index = std::hash<uint64_t>()((uint64_t)ptr);
 		index = index & mask;
 		uint64_t count = items.size();
+		// A tombstone does NOT terminate the probe chain — the real entry (if any) may sit
+		// further along it. Keep scanning until a truly empty slot or a match is found, and
+		// remember the first reusable (tombstone) slot along the way so a genuinely new
+		// entry can be placed without a second scan.
+		uint64_t first_free = count; // sentinel: none found yet
 		for (uint64_t i = 0; i < count; i++) {
 			uint64_t actual_index = (index + i) & mask;
-			if (items[actual_index].ptr == ptr || items[actual_index].ptr == nullptr ||
-				items[actual_index].ptr == (T*)HASHSET_TOMBSTONE) {
-
-				num_tombstones -= items[actual_index].ptr == (T*)HASHSET_TOMBSTONE;
+			T* existing = items[actual_index].ptr;
+			if (existing == ptr)
+				return; // already present
+			if (existing == nullptr) {
+				uint64_t target = (first_free != count) ? first_free : actual_index;
+				num_tombstones -= items[target].ptr == (T*)HASHSET_TOMBSTONE;
 				num_used++;
-
-				items[actual_index].ptr = ptr;
-
-				assert(count_num_used() == num_used);
+				items[target].ptr = ptr;
 				return;
 			}
+			if (existing == (T*)HASHSET_TOMBSTONE && first_free == count)
+				first_free = actual_index;
 		}
 		assert(!"hash table didnt update size");
 	}

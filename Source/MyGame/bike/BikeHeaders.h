@@ -402,6 +402,46 @@ public:
 	float dbg_avoidance_brake    = 0.f;  // extra brake_amount from an unavoidable conflict (0..1)
 	glm::vec3 dbg_cohesion_centroid_pt{};  // world-space point at the "closer" centroid lateral offset, valid iff dbg_cohesion_closer_lat != 0
 	std::vector<BikeAIDebugNeighbor> dbg_neighbors;  // rebuilt every evaluate() — see BikeAIDebugNeighbor
+
+	// ---- Manual/player control (BikeDebugger's Selected Rider panel) ----
+	// When true, evaluate() still runs the full sense/cohesion/avoidance/braking
+	// pipeline above (so drafting, collision avoidance, and corner braking all
+	// keep working), but blends its own computed lateral_shift/heading_shift and
+	// speed-PID power with player-supplied manual_steer_input/manual_power_w.
+	// The blend weight (see effective magnetism computed in BikeAI::evaluate) is
+	// NOT the flat magnetism_lateral_k/magnetism_speed_k below on its own —
+	// those are the base/ceiling values, scaled down further by two things:
+	//   1. manual_stick_active (set by BikeDebugger each frame) eases the
+	//      assist off by magnetism_active_mult while the player is actively
+	//      pushing the stick, smoothed by magnetism_smoothed so releasing/
+	//      re-gripping doesn't snap the blend instantly.
+	//   2. Distance from the AI's own target (lat_error / speed error): the
+	//      pull is strongest right at the target and fades out over
+	//      magnetism_falloff_range_m / magnetism_speed_falloff_ms — a real
+	//      magnet, not a spring that yanks harder the further off you are.
+	// 0 is pure manual (raw steer, fixed wattage) at any distance/stick state,
+	// 1 is unchanged AI behavior right at the target with the stick idle.
+	// Reverted to false by BikeDebugger whenever selection moves off this
+	// rider (see BikeDebugger::revert_manual_control).
+	bool  manual_control      = false;
+	float manual_steer_input  = 0.f;   // -1..1, left/right — set by BikeDebugger from keyboard/gamepad each frame while active
+	bool  manual_stick_active = false; // true while the player is actively pushing the steer stick — set by BikeDebugger
+	// manual_steer_input is raw ±1 full-stick range, but the AI's own lateral_shift
+	// (p.lateral_shift_kp * lat_error) almost never gets anywhere near ±1 in normal
+	// riding -- a 2m lateral error is only ~0.2. Fed in unscaled, even a small manual
+	// push commands several times more heading-PID correction (and therefore lean,
+	// which scales off actual turn rate) than the AI ever does. This scales
+	// manual_steer_input down before use so full stick roughly matches the AI's own
+	// operating range instead of slamming the heading PID.
+	float manual_steer_sensitivity = 0.35f;
+	float manual_power_w      = 250.f; // watts — set by BikeDebugger's slider while active
+	float magnetism_lateral_k = 0.6f;  // ceiling: 0=pure manual steer, 1=fully AI lateral/heading correction
+	float magnetism_speed_k   = 0.6f;  // ceiling: 0=pure manual wattage, 1=fully AI speed-match/cruise power
+	float magnetism_active_mult      = 0.4f;  // multiplies the ceiling above while manual_stick_active (eases off so manual input isn't fighting a heavy assist)
+	float magnetism_falloff_range_m  = 2.5f;  // lateral_shift pull fades from full strength at lat_error=0 to ~0 at this many metres off the AI's target
+	float magnetism_speed_falloff_ms = 3.f;   // power pull fades from full strength at 0 speed error to ~0 at this many m/s off the AI's target speed
+	float magnetism_smooth_time_s    = 0.15f; // damp_dt_independent time constant for magnetism_smoothed easing in/out of magnetism_active_mult
+	float magnetism_smoothed  = 1.f;   // runtime state: damped stick-active multiplier, persists tick to tick — see effective magnetism above
 };
 
 class BikePlayer : public IBikeInput {
@@ -593,7 +633,6 @@ public:
 	float dbg_turn_rate_dps           = 0.f;  // actual heading turn rate applied this tick (deg/s)
 
 	EntityPtr fork_entity;
-	float fork_flick_smoothed = 0.f;  // lightly-smoothed lateral_vel driving the fork "flick" (tick_transform)
 
 	// Pedal visual (crank + shoe pivots) — see BikeObject::tick_transform.
 	// Rest rotations are captured once in start() so the animation composes
