@@ -30,6 +30,7 @@
 
 #include "Framework/ConsoleCmdGroup.h"
 #include "Render/PPManager.h"
+#include "Render/Canvas2dBackendLocal.h"
 #include <array>
 #include "IGraphicsDevice.h"
 
@@ -336,6 +337,13 @@ public:
 
 	Render_Stats stats;
 
+	// Canvas2d's notion of "the main window" render target/size -- used both to resolve
+	// Canvas2d::set_target_window() and to decide whether a depth-tested Canvas2d batch
+	// gets a real depth attachment (see Canvas2dBackendLocal::set_depth_texture).
+	IGraphicsTexture* get_ui_composite_target() const { return tex.output_composite; }
+	glm::ivec2 get_ui_composite_size() const { return {cur_w, cur_h}; }
+	Canvas2dBackendLocal* get_canvas2d_drawer() const { return canvas2dDrawer; }
+
 	Program_Manager& get_prog_man() { return prog_man; }
 	// Transitional shim — the OpenGL state cache used to live on a separate
 	// OpenglRenderDevice class; Phase 2c folded it into the IGraphicsDevice
@@ -352,6 +360,7 @@ public:
 
 private:
 	RenderWindowBackendLocal* windowDrawer = nullptr;
+	Canvas2dBackendLocal* canvas2dDrawer = nullptr;
 #ifdef EDITOR_BUILD
 	std::unique_ptr<ThumbnailRenderer> thumbnailRenderer;
 #endif

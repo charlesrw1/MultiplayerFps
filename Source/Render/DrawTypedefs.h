@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "Framework/EnumDefReflection.h"
 
 typedef uint32_t texhandle;
 typedef uint32_t fbohandle;
@@ -14,8 +15,7 @@ typedef int program_handle;
 // Pipeline blend modes. Lives here (not MaterialLocal.h) so IGraphicsDevice.h
 // can reference it without pulling material internals.
 #undef OPAQUE // windows header leaking
-enum class BlendState : int8_t
-{
+NEWENUM(BlendState, int8_t){
 	OPAQUE,
 	BLEND,
 	ADD,

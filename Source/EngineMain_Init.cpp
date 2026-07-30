@@ -40,6 +40,7 @@
 #include "UI/BaseGUI.h"
 #include "UI/OnScreenLogGui.h"
 #include "UI/GUISystemPublic.h"
+#include "UI/Canvas2d.h"
 #include "UI/RmlUi/RmlUiSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Input/InputSystem.h"
@@ -461,6 +462,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	SchemaManager::get().init();
 	Input::inst = new Input();
 	UiSystem::inst = new UiSystem();
+	Canvas2d::init();
 	EditorPopupManager::inst = new EditorPopupManager();
 
 	g_physics.init();

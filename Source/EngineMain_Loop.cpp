@@ -33,6 +33,7 @@
 #include "UI/BaseGUI.h"
 #include "UI/OnScreenLogGui.h"
 #include "UI/GUISystemPublic.h"
+#include "UI/Canvas2d.h"
 #include "UI/RmlUi/RmlUiSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Input/InputSystem.h"
@@ -345,6 +346,7 @@ void GameEngineLocal::loop() {
 		}
 		Input::inst->tick();
 		UiSystem::inst->update();
+		Canvas2d::update();
 		// Update the messsage queue! does level changing etc.
 		Cmd_Manager::inst->execute_buffer();
 
@@ -467,6 +469,7 @@ void GameEngineLocal::loop() {
 		if (get_level())
 			get_level()->sync_level_render_data();
 		UiSystem::inst->sync_to_renderer();
+		Canvas2d::sync_to_renderer();
 		g_physics.sync_render_data();
 		idraw->sync_update();
 	};

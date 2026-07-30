@@ -283,6 +283,7 @@ void Renderer::init() {
 	BuildSceneData_CpuFast::inst = new BuildSceneData_CpuFast;
 	windowDrawer = new RenderWindowBackendLocal();
 	RenderWindowBackend::inst = windowDrawer;
+	canvas2dDrawer = new Canvas2dBackendLocal();
 
 	mem_arena.init("RenderTemp", renderer_memory_arena_size.get_integer());
 	// Init scene draw buffers

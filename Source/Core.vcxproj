@@ -93,6 +93,7 @@
     <ClCompile Include="Framework\Config.cpp" />
     <ClCompile Include="Framework\CurveEditorImgui.cpp" />
     <ClCompile Include="Framework\GradientEditorImgui.cpp" />
+    <ClCompile Include="Framework\NodeCanvasImgui.cpp" />
     <ClCompile Include="Framework\CurveEditorImgui_Curves.cpp" />
     <ClCompile Include="Framework\CurveEditorImgui_Events.cpp" />
     <ClCompile Include="Framework\CurveEditorImgui_Grid.cpp" />
@@ -291,6 +292,11 @@
     <ClCompile Include="Render\RenderExtra_SSR.cpp" />
     <ClCompile Include="Render\RenderGiManager.cpp" />
     <ClCompile Include="Render\RenderScene.cpp" />
+    <ClCompile Include="Render\Canvas2dTypes.cpp" />
+    <ClCompile Include="Render\Canvas2dGpuMesh.cpp" />
+    <ClCompile Include="Render\Canvas2dRecorder.cpp" />
+    <ClCompile Include="Render\Canvas2dVertexArray.cpp" />
+    <ClCompile Include="Render\Canvas2dBackendLocal.cpp" />
     <ClCompile Include="Render\RenderWindow.cpp" />
     <ClCompile Include="Render\RT\RaytraceTest.cpp" />
     <ClCompile Include="Render\RT\RaytraceTest_BVH.cpp" />
@@ -313,6 +319,7 @@
     <ClCompile Include="Scripting\ScriptLoadingUtil.cpp" />
     <ClCompile Include="Scripting\LuaClassTypeInfo.cpp" />
     <ClCompile Include="UI\BaseGUI.cpp" />
+    <ClCompile Include="UI\Canvas2d.cpp" />
     <ClCompile Include="UI\GUISystemLocal.cpp" />
     <ClCompile Include="UI\Gui.cpp" />
     <ClCompile Include="UI\GUISystemPublic.cpp" />
@@ -511,6 +518,7 @@
     <ClInclude Include="Framework\Config.h" />
     <ClInclude Include="Framework\Curve.h" />
     <ClInclude Include="Framework\CurveEditorImgui.h" />
+    <ClInclude Include="Framework\NodeCanvasImgui.h" />
     <ClInclude Include="Framework\DictParser.h" />
     <ClInclude Include="Framework\DictWriter.h" />
     <ClInclude Include="Framework\EnumDefReflection.h" />
@@ -561,6 +569,12 @@
     <ClInclude Include="Scripting\ScriptManager.h" />
     <ClInclude Include="Sound\SoundComponent.h" />
     <ClInclude Include="Testheader.h" />
+    <ClInclude Include="Render\Canvas2dTypes.h" />
+    <ClInclude Include="Render\Canvas2dGpuMesh.h" />
+    <ClInclude Include="Render\Canvas2dRecorder.h" />
+    <ClInclude Include="Render\Canvas2dVertexArray.h" />
+    <ClInclude Include="Render\Canvas2dBackendLocal.h" />
+    <ClInclude Include="UI\Canvas2d.h" />
     <ClInclude Include="UI\OnScreenLogGui.h" />
     <ClInclude Include="UI\RmlUi\RmlUiSystem.h" />
     <ClInclude Include="UI\RmlUi\RmlUiSystemInterface.h" />
