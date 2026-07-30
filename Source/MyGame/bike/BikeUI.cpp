@@ -1,11 +1,22 @@
 #include "BikeHeaders.h"
-#include "UI/Gui.h"
+#include "UI/Canvas2d.h"
 #include "Render/Texture.h"
 #include "Framework/Util.h"
 
 // ============================================================
 // Power-zone meter HUD (horizontal, lower-center)
 // ============================================================
+
+namespace {
+lColor col(float r, float g, float b, float a = 1.f) {
+	lColor c;
+	c.r = (int)(glm::clamp(r, 0.f, 1.f) * 255);
+	c.g = (int)(glm::clamp(g, 0.f, 1.f) * 255);
+	c.b = (int)(glm::clamp(b, 0.f, 1.f) * 255);
+	c.a = (int)(glm::clamp(a, 0.f, 1.f) * 255);
+	return c;
+}
+} // namespace
 
 void BikePlayer::draw_power_meter(float current_watts, int power_idx, bool coasting, bool speed_hold, float speed_hold_watts, float actual_watts, float power_ceiling)
 {
@@ -30,7 +41,7 @@ void BikePlayer::draw_power_meter(float current_watts, int power_idx, bool coast
 		return zone_colors[z];
 	};
 
-	const lRect screen = Gui::get_screen_size();
+	const lRect screen = Canvas2d::get_screen_size();
 	const int sw = screen.w;
 	const int sh = screen.h;
 
@@ -45,20 +56,20 @@ void BikePlayer::draw_power_meter(float current_watts, int power_idx, bool coast
 	// Draw left (low power) to right (high power)
 
 
-	Gui::set_color(0, 0, 0, 0.5);
-	Gui::rectangle(bar_x - 2, bar_y - 2, bar_total_w + 4, SEG_H + 4);
+	Canvas2d::rectangle(bar_x - 2, bar_y - 2, bar_total_w + 4, SEG_H + 4, col(0, 0, 0, 0.5));
 	for (int i = 0; i < BIKE_NUM_POWER_LEVELS; ++i) {
 		const int x    = bar_x + i * (SEG_W + GAP);
 		const bool lit = !coasting && i <= power_idx;
 		const ZoneColor& zc = zone_for_watts(BIKE_POWER_LEVELS[i]);
-		
+
+		lColor seg_color;
 		if(lit&&i==power_idx)
-			Gui::set_color(zc.r_lit*1.2, zc.g_lit*1.2, zc.b_lit*1.2, 0.92f);
+			seg_color = col(zc.r_lit*1.2, zc.g_lit*1.2, zc.b_lit*1.2, 0.92f);
 		else if (lit)
-			Gui::set_color(zc.r_lit, zc.g_lit, zc.b_lit, 0.92f);
+			seg_color = col(zc.r_lit, zc.g_lit, zc.b_lit, 0.92f);
 		else
-			Gui::set_color(zc.r_dim, zc.g_dim, zc.b_dim, 0.75f);
-		Gui::rectangle(x, bar_y, SEG_W, SEG_H);
+			seg_color = col(zc.r_dim, zc.g_dim, zc.b_dim, 0.75f);
+		Canvas2d::rectangle(x, bar_y, SEG_W, SEG_H, seg_color);
 
 	}
 
@@ -68,8 +79,7 @@ void BikePlayer::draw_power_meter(float current_watts, int power_idx, bool coast
 		for (int i = 0; i < BIKE_NUM_POWER_LEVELS; ++i)
 			if (BIKE_POWER_LEVELS[i] <= (int)speed_hold_watts) sh_idx = i;
 		const int marker_x = bar_x + sh_idx * (SEG_W + GAP);
-		Gui::set_color(1.f, 1.f, 1.f, 0.9f);
-		Gui::rectangle(marker_x, bar_y - 4, SEG_W, 3);
+		Canvas2d::rectangle(marker_x, bar_y - 4, SEG_W, 3, col(1.f, 1.f, 1.f, 0.9f));
 	}
 
 	// Power ceiling line: vertical line at the interpolated watt position
@@ -91,35 +101,28 @@ void BikePlayer::draw_power_meter(float current_watts, int power_idx, bool coast
 		};
 
 		const int ceil_x = watts_to_x(power_ceiling);
-		Gui::set_color(0.f, 0.f, 0.f, 0.6f);
-		Gui::line(ceil_x + 1, bar_y - 1, ceil_x + 1, bar_y + SEG_H + 1, 2);
-		Gui::set_color(1.f, 0.55f, 0.05f, 1.f);
-		Gui::line(ceil_x, bar_y - 1, ceil_x, bar_y + SEG_H + 1, 2);
+		Canvas2d::line(ceil_x + 1, bar_y - 1, ceil_x + 1, bar_y + SEG_H + 1, 2, col(0.f, 0.f, 0.f, 0.6f));
+		Canvas2d::line(ceil_x, bar_y - 1, ceil_x, bar_y + SEG_H + 1, 2, col(1.f, 0.55f, 0.05f, 1.f));
 	}
 
 	// Watt readout centred above the bar
 	if (is_clamped) {
 		const auto actual_str    = string_format("%.0fW", actual_watts);
 		const auto requested_str = string_format("/%.0fW", current_watts);
-		const lRect actual_sz    = Gui::measure_text(actual_str);
-		const lRect req_sz       = Gui::measure_text(requested_str);
+		const lRect actual_sz    = Canvas2d::measure_text(actual_str, nullptr);
+		const lRect req_sz       = Canvas2d::measure_text(requested_str, nullptr);
 		const int   combined_w   = actual_sz.w + req_sz.w;
 		const int   label_x      = (sw - combined_w) / 2;
 		const int   label_y      = bar_y - 12 - 1;
-		Gui::set_color(0.f, 0.f, 0.f, 1.f);
-		Gui::print(actual_str, label_x + 1, label_y + 1);
-		Gui::set_color(1.f, 0.55f, 0.05f, 1.f);
-		Gui::print(actual_str, label_x, label_y);
-		Gui::set_color(0.5f, 0.5f, 0.5f, 0.7f);
-		Gui::print(requested_str, label_x + actual_sz.w, label_y);
+		Canvas2d::draw_text(actual_str, label_x + 1, label_y + 1, col(0.f, 0.f, 0.f, 1.f), nullptr, guiAnchor::TopLeft);
+		Canvas2d::draw_text(actual_str, label_x, label_y, col(1.f, 0.55f, 0.05f, 1.f), nullptr, guiAnchor::TopLeft);
+		Canvas2d::draw_text(requested_str, label_x + actual_sz.w, label_y, col(0.5f, 0.5f, 0.5f, 0.7f), nullptr, guiAnchor::TopLeft);
 	} else {
 		const auto  watt_str = string_format("%.0fW", current_watts);
-		const lRect watt_sz  = Gui::measure_text(watt_str);
+		const lRect watt_sz  = Canvas2d::measure_text(watt_str, nullptr);
 		const int   label_x  = (sw - watt_sz.w) / 2;
 		const int   label_y  = bar_y - 12 - 1;
-		Gui::set_color(0.f, 0.f, 0.f, 1.f);
-		Gui::print(watt_str, label_x + 1, label_y + 1);
-		Gui::set_color(1.f, 1.f, 1.f, 1.f);
-		Gui::print(watt_str, label_x, label_y);
+		Canvas2d::draw_text(watt_str, label_x + 1, label_y + 1, col(0.f, 0.f, 0.f, 1.f), nullptr, guiAnchor::TopLeft);
+		Canvas2d::draw_text(watt_str, label_x, label_y, col(1.f, 1.f, 1.f, 1.f), nullptr, guiAnchor::TopLeft);
 	}
 }
