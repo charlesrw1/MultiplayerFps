@@ -459,9 +459,6 @@
     <ClCompile Include="Game\GameEventBus.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Game\GameModes\MainMenuMode.cpp">
-      <Filter>Game\GameModes</Filter>
-    </ClCompile>
     <ClCompile Include="Game\LevelAssets.cpp">
       <Filter>Game</Filter>
     </ClCompile>
@@ -1366,9 +1363,6 @@
     </ClInclude>
     <ClInclude Include="Game\GameEventBus.h">
       <Filter>Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Game\GameModes\MainMenuMode.h">
-      <Filter>Game\GameModes</Filter>
     </ClInclude>
     <ClInclude Include="Game\GameplayStatic.h">
       <Filter>Game</Filter>

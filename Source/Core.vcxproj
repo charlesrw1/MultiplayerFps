@@ -547,7 +547,6 @@
     <ClInclude Include="Game\GameEventBus.h" />
     <ClInclude Include="Game\EntityComponent.h" />
     <ClInclude Include="Game\EditorAddMenu.h" />
-    <ClInclude Include="Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Game\Entities\Player.h" />
     <ClInclude Include="Game\Entities\PlayerAnimDriver.h" />
     <ClInclude Include="GameEngineLocal.h" />
@@ -625,7 +624,6 @@
     <ClCompile Include="AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Framework\Hashset.cpp" />
     <ClCompile Include="Framework\Tests\Containers.cpp" />
-    <ClCompile Include="Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="IEditorTool.cpp" />
     <ClCompile Include="Input\InputSystem.cpp" />
     <ClCompile Include="Level.cpp" />
