@@ -247,24 +247,17 @@ void AnimatorObject::set_quat_variable(StringName name, const glm::quat& q) {
 }
 
 #include "Assets/AssetDatabase.h"
-#include "UI/UILoader.h"
-#include "Render/RenderWindow.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/FontAsset.h"
+#include "UI/Canvas2d.h"
 void AnimatorObject::debug_print(int start_y) {
-	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+	auto font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 	int start = start_y;
 	auto draw_text = [&](const char* s) {
 		string str = s;
-		TextShape shape;
-		Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
-		shape.rect.x = 20;
-		shape.rect.y = start + size.h;
-		shape.font = font;
-		shape.color = COLOR_WHITE;
-		shape.with_drop_shadow = true;
-		shape.drop_shadow_ofs = 1;
-		shape.text = str;
-		UiSystem::inst->window.draw(shape);
+		Rect2d size = FontAsset::calc_text_size(std::string_view(str), font);
+		const int tx = 20, ty = start + size.h;
+		Canvas2d::draw_text(str, tx + 1, ty + 1, lColor{0, 0, 0, 255}, (FontAsset*)font, guiAnchor::TopLeft);
+		Canvas2d::draw_text(str, tx, ty, lColor{255, 255, 255, 255}, (FontAsset*)font, guiAnchor::TopLeft);
 		start += size.h;
 	};
 	for (auto& msg : debug_output_messages)

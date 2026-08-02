@@ -276,7 +276,7 @@ EDITOR_TEST("editor/lua_component_property_grid_rows", 30.f, test_property_grid_
 //    imgui_draw() tick dereferences garbage during update().
 //
 //    Drives the real editor pipeline (selection_state -> on_selection_changed
-//    -> EdPropertyGrid::draw via UiSystem::draw_imgui_internal) so the failure
+//    -> EdPropertyGrid::draw via ViewportSystem::draw_imgui_internal) so the failure
 //    mode exactly matches what the user sees. On crash, the SEH handler in
 //    Source/Framework/Util.cpp writes a minidump next to the test log
 //    (test_editor_output.dmp); inspect with `Scripts/dbg.ps1 <dump> "kP 30"`.

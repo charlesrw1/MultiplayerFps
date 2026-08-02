@@ -1,9 +1,7 @@
 #pragma once
-#include "UI/BaseGUI.h"
 #include <vector>
 #include <glm/glm.hpp>
 class Texture;
-class RenderWindow;
 #include "Animation/Runtime/Easing.h"
 class guiCubeTransform
 {
@@ -41,7 +39,7 @@ public:
 	guiEditorCube();
 
 	// mouse_pos is viewport-local (subtract vp_rect.get_pos() from window mouse pos before passing)
-	void draw(RenderWindow& window, float dt, glm::ivec2 mouse_pos);
+	void draw(float dt, glm::ivec2 mouse_pos);
 
 	struct CubeClickResult {
 		bool hit = false;

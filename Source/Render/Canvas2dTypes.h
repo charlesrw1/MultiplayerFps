@@ -6,14 +6,14 @@
 #include "Framework/Util.h"
 #include "Framework/Rect2d.h"
 #include "Render/DrawTypedefs.h"
-#include "UI/BaseGUI.h" // guiAnchor -- moves to UI/UiAnchor.h in the FontAsset-rename pass
+#include "UI/UiAnchor.h"
 
 class MaterialInstance;
 class Texture;
 class IGraphicsTexture;
 class Canvas2dGpuMesh;
 class MeshBuilder;
-class GuiFont; // renamed FontAsset in a later build-order step
+class FontAsset;
 
 // Per-draw-call GPU state. Two draws only batch together if every field here matches
 // (plus contiguity/transform rules -- see Canvas2dRecorder).
@@ -30,7 +30,7 @@ struct DrawSettings
 // at record time (see Canvas2dRecorder::submit) -- never sorted.
 struct Canvas2dBatch
 {
-	IGraphicsTexture* target = nullptr;
+	Texture* target = nullptr;
 	Rect2d viewport{};
 	glm::mat4 view_proj{1.f};
 	bool scissor_enabled = false;
@@ -66,10 +66,15 @@ namespace Canvas2dGeometry {
 	void build_sprite_transformed(MeshBuilder& mb, glm::vec2 size, glm::vec2 uv_ul, glm::vec2 uv_size, Color32 color,
 								  glm::mat4 transform, float z);
 	// returns the measured (unanchored) text rect, in the same units as calc_text_size
-	Rect2d build_text(MeshBuilder& mb, std::string_view text, glm::vec2 pos, const GuiFont* font, Color32 color,
+	Rect2d build_text(MeshBuilder& mb, std::string_view text, glm::vec2 pos, const FontAsset* font, Color32 color,
 					   guiAnchor anchor, float z);
 	void build_triangle(MeshBuilder& mb, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color32 color, float z);
 	void build_quad(MeshBuilder& mb, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, Color32 color, float z);
+	// Arbitrary (non-axis-aligned) textured quad with per-corner UVs -- for geometry that
+	// can't be expressed as an affine transform of a rect (e.g. a perspective-projected
+	// gizmo face). p0..p3/uv0..uv3 must be given in matching winding order.
+	void build_quad_textured(MeshBuilder& mb, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, glm::vec2 uv0,
+							  glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, Color32 color, float z);
 	void build_circle(MeshBuilder& mb, glm::vec2 center, float radius, int segments, Color32 color, float z);
 	void build_polygon(MeshBuilder& mb, std::span<const glm::vec2> points, Color32 color, float z);
 	void build_line(MeshBuilder& mb, glm::vec2 start, glm::vec2 end, float thickness, Color32 color, float z);

@@ -27,7 +27,7 @@ public:
 	handle<MeshBuilder_Object> editor_mb_handle;
 	MeshBuilder mb;
 };
-class GuiFont;
+class FontAsset;
 using std::string;
 struct Particle_Object;
 #include "Render/DynamicMaterialPtr.h"
@@ -45,6 +45,6 @@ public:
 	DynamicMatUniquePtr font_mat;
 	handle<Particle_Object> editor_mb_handle;
 	MeshBuilder mb;
-	REF GuiFont* font = nullptr;
+	REF FontAsset* font = nullptr;
 	REF string text;
 };

@@ -4,7 +4,7 @@
 #include "../../Game/Components/CameraComponent.h"
 #include "../../Game/Components/PhysicsComponents.h"
 #include "Input/InputSystem.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Framework/MathLib.h"
 #include "Debug.h"
 #include "imgui.h"
@@ -84,7 +84,7 @@ void fpsPlayer::start() {
 	cament->create_component<CameraComponent>();
 	this->camera = cament;
 
-	UiSystem::inst->set_game_capture_mouse(true);
+	ViewportSystem::set_game_capture_mouse(true);
 }
 
 void fpsPlayer::stop() {
@@ -102,14 +102,14 @@ void fpsPlayer::update_look() {
 	if (is_in_debug_mode())
 		return;
 
-	if (!UiSystem::inst->is_game_capturing_mouse()) {
-		if (Input::was_mouse_pressed(0) && !UiSystem::inst->blocking_mouse_inputs())
-			UiSystem::inst->set_game_capture_mouse(true);
+	if (!ViewportSystem::is_game_capturing_mouse()) {
+		if (Input::was_mouse_pressed(0) && !ViewportSystem::blocking_mouse_inputs())
+			ViewportSystem::set_game_capture_mouse(true);
 		return;
 	}
 
 	if (Input::was_key_pressed(SDL_SCANCODE_ESCAPE)) {
-		UiSystem::inst->set_game_capture_mouse(false);
+		ViewportSystem::set_game_capture_mouse(false);
 		return;
 	}
 
@@ -125,7 +125,7 @@ void fpsPlayer::update_look() {
 
 void fpsPlayer::update_movement() {
 	float dt = (float)eng->get_dt();
-	const bool has_focus = UiSystem::inst->is_game_capturing_mouse() && !is_in_debug_mode();
+	const bool has_focus = ViewportSystem::is_game_capturing_mouse() && !is_in_debug_mode();
 
 	// input (only when mouse is captured)
 	vec2 input_dir{};

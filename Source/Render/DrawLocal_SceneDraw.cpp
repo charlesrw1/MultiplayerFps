@@ -11,12 +11,12 @@
 #include "Animation/Runtime/Animation.h"
 #include "Debug.h"
 #include <SDL3/SDL.h>
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
+#include "UI/Canvas2d.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
-#include "Render/RenderWindow.h"
 #include "Render/TaaManager.h"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
@@ -193,21 +193,16 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view) {
 	if (r_print_light_tiles.get_bool()) {
 		auto& counts = lightListCuller->get_counts();
 		if (!counts.empty()) {
-			const float height = Canvas::calc_text_size("0").h;
+			const float height = Canvas2d::measure_text("0", nullptr).h;
 			for (int y = 0; y < light_frustum_size_y; y++) {
 				for (int x = 0; x < light_frustum_size_x; x++) {
 					int count = counts.at(y * light_frustum_size_x + x);
 					float ypos = y * (cur_h / float(light_frustum_size_y));
 					float xpos = x * (cur_w / float(light_frustum_size_x));
 					auto str = std::to_string(count);
-					TextShape text;
-					text.with_drop_shadow = true;
-					text.color = COLOR_WHITE;
-					text.rect.x = xpos;
-					text.rect.y = ypos + height;
-					text.text = str;
-					text.drop_shadow_ofs = 1;
-					UiSystem::inst->window.draw(text);
+					const int tx = (int)xpos, ty = (int)(ypos + height);
+					Canvas2d::draw_text(str, tx + 1, ty + 1, lColor{0, 0, 0, 255}, nullptr, guiAnchor::TopLeft);
+					Canvas2d::draw_text(str, tx, ty, lColor{255, 255, 255, 255}, nullptr, guiAnchor::TopLeft);
 				}
 			}
 		}

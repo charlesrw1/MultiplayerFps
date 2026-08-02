@@ -1,6 +1,6 @@
 #include "RmlUiSystem.h"
 #include "RmlUiRenderHook.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "GameEnginePublic.h"
 #include "Framework/Log.h"
 #include "Scripting/ScriptManager.h"
@@ -84,7 +84,7 @@ void RmlUiSystem::init() {
 	const bool ok = Rml::Initialise();
 	ASSERT(ok && "Rml::Initialise failed");
 
-	Rect2d vp = UiSystem::inst->get_vp_rect();
+	Rect2d vp = ViewportSystem::get_vp_rect();
 	last_vp_w = vp.w > 0 ? vp.w : 1;
 	last_vp_h = vp.h > 0 ? vp.h : 1;
 	context = Rml::CreateContext("main", Rml::Vector2i(last_vp_w, last_vp_h));
@@ -115,7 +115,7 @@ void RmlUiSystem::init() {
 #endif
 
 	// RmlUi's (freetype) font engine needs real .ttf/.otf files - the
-	// engine's own GuiFont bitmap-font format (Data/eng/fonts/*.fnt) used by
+	// engine's own FontAsset bitmap-font format (Data/eng/fonts/*.fnt) used by
 	// Gui::/Canvas:: is a different, incompatible format. Load every
 	// .ttf/.otf under Data/ui/fonts/ if any exist; if none are present yet,
 	// RmlUi documents still lay out but render no glyphs (see
@@ -152,7 +152,7 @@ void RmlUiSystem::shutdown() {
 
 void RmlUiSystem::update() {
 	ASSERT(context);
-	Rect2d vp = UiSystem::inst->get_vp_rect();
+	Rect2d vp = ViewportSystem::get_vp_rect();
 	const int w = vp.w > 0 ? vp.w : 1;
 	const int h = vp.h > 0 ? vp.h : 1;
 	if (w != last_vp_w || h != last_vp_h) {

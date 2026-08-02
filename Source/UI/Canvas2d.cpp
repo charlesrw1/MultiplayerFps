@@ -6,8 +6,8 @@
 #include "Render/DrawLocal.h"
 #include "Render/Texture.h"
 #include "Render/MaterialPublic.h"
-#include "UI/UILoader.h" // GuiFont -- renamed FontAsset in a later build-order step
-#include "UI/GUISystemPublic.h" // UiSystem::inst -- removed once ViewportSystem lands (build-order step 6)
+#include "UI/FontAsset.h"
+#include "UI/ViewportSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "GameEnginePublic.h"
 #include <glm/gtc/matrix_transform.hpp>
@@ -18,8 +18,13 @@ namespace {
 Canvas2dRecorder g_recorder;
 const MaterialInstance* g_default_ui_mat = nullptr;
 const MaterialInstance* g_default_font_mat = nullptr;
-const GuiFont* g_default_font = nullptr;
+const FontAsset* g_default_font = nullptr;
 IGraphicsTexture* g_depth_texture = nullptr;
+// Freed one resize later than g_depth_texture is replaced: the render backend's
+// depth pointer is set by sync_to_renderer() but only consumed by the *next*
+// loop iteration's scene_draw (see EngineMain_Loop's overlapped update), so the
+// texture live when a resize happens must survive through that pending render.
+IGraphicsTexture* g_depth_texture_pending_free = nullptr;
 
 DrawSettings make_default_settings(BlendState blend, float z) {
 	DrawSettings s;
@@ -34,7 +39,7 @@ void Canvas2d::init() {
 	g_default_ui_mat = g_assets.find<MaterialInstance>("eng/uiDefault.mm").get();
 	if (!g_default_ui_mat)
 		Fatalf("Couldnt find default ui material");
-	g_default_font = g_assets.find<GuiFont>("eng/sengo24.fnt");
+	g_default_font = g_assets.find<FontAsset>("eng/sengo24.fnt");
 	if (!g_default_font)
 		Fatalf("couldnt load default font");
 	g_default_font_mat = g_assets.find<MaterialInstance>("eng/fontDefault.mm");
@@ -46,8 +51,11 @@ void Canvas2d::init() {
 }
 
 void Canvas2d::on_resize(int w, int h) {
-	if (g_depth_texture)
-		safe_release(g_depth_texture);
+	if (g_depth_texture_pending_free)
+		safe_release(g_depth_texture_pending_free);
+	g_depth_texture_pending_free = g_depth_texture;
+	g_depth_texture = nullptr;
+
 	CreateTextureArgs args;
 	args.type = GraphicsTextureType::t2D;
 	args.format = GraphicsTextureFormat::depth24f;
@@ -72,18 +80,21 @@ void Canvas2d::update() {
 
 void Canvas2d::sync_to_renderer() {
 	g_recorder.get_transient_gpu_mesh().upload_from(g_recorder.get_transient_arena());
-	draw.get_canvas2d_drawer()->set_depth_texture(g_depth_texture, draw.get_ui_composite_target());
+	draw.get_canvas2d_drawer()->set_depth_texture(g_depth_texture);
 	draw.get_canvas2d_drawer()->update(std::move(g_recorder.get_batches()));
 }
 
 void Canvas2d::set_target_window() {
 	auto sz = draw.get_ui_composite_size();
-	g_recorder.set_target(draw.get_ui_composite_target(), sz);
+	g_recorder.set_target(nullptr, sz);
+	g_recorder.set_viewport(Rect2d(0, 0, (int16_t)sz.x, (int16_t)sz.y));
 }
 
 void Canvas2d::set_target_texture(Texture* render_texture) {
 	ASSERT(render_texture);
-	g_recorder.set_target(render_texture->gpu_ptr, render_texture->get_size());
+	auto sz = render_texture->get_size();
+	g_recorder.set_target(render_texture, sz);
+	g_recorder.set_viewport(Rect2d(0, 0, (int16_t)sz.x, (int16_t)sz.y));
 }
 
 void Canvas2d::set_clear(bool clear_color, lColor color, bool clear_depth) {
@@ -125,9 +136,9 @@ void Canvas2d::draw_sprite_ex(float x, float y, float w, float h, Texture* tex, 
 	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
 }
 
-void Canvas2d::draw_text(std::string text, int x, int y, lColor color, GuiFont* font, guiAnchor anchor) {
+void Canvas2d::draw_text(std::string text, int x, int y, lColor color, FontAsset* font, guiAnchor anchor) {
 	if (!font)
-		font = (GuiFont*)g_default_font;
+		font = (FontAsset*)g_default_font;
 	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
 	settings.custom_shader = g_default_font_mat;
 	settings.texture = font->font_texture.get();
@@ -138,9 +149,9 @@ void Canvas2d::draw_text(std::string text, int x, int y, lColor color, GuiFont* 
 	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
 }
 
-lRect Canvas2d::measure_text(std::string text, GuiFont* font) {
+lRect Canvas2d::measure_text(std::string text, FontAsset* font) {
 	if (!font)
-		font = (GuiFont*)g_default_font;
+		font = (FontAsset*)g_default_font;
 	int x = 0;
 	int y = -font->base;
 	for (char c : text) {
@@ -204,12 +215,23 @@ void Canvas2d::draw_vertex_array(Canvas2dVertexArray& arr, int index_offset, int
 	g_recorder.submit(&arr.gpu_mesh, index_offset, index_count, settings, transform, true);
 }
 
+void Canvas2d::draw_quad_textured(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, glm::vec2 uv0,
+								   glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, Texture* tex, lColor color, float z) {
+	DrawSettings settings = make_default_settings(BlendState::BLEND, z);
+	settings.texture = tex;
+	int start = (int)g_recorder.get_transient_arena().get_i().size();
+	Canvas2dGeometry::build_quad_textured(g_recorder.get_transient_arena(), p0, p1, p2, p3, uv0, uv1, uv2, uv3,
+										   color.to_color32(), z);
+	int count = (int)g_recorder.get_transient_arena().get_i().size() - start;
+	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
+}
+
 void Canvas2d::set_window_fullscreen(bool is_fullscreen) { SDL_SetWindowFullscreen(eng->get_os_window(), is_fullscreen); }
 
 void Canvas2d::set_window_title(std::string name) { SDL_SetWindowTitle(eng->get_os_window(), name.c_str()); }
 
 void Canvas2d::set_window_capture_mouse(bool capturing_mouse) {
-	UiSystem::inst->set_game_capture_mouse(capturing_mouse);
+	ViewportSystem::set_game_capture_mouse(capturing_mouse);
 }
 
-const GuiFont* Canvas2d::get_default_font() { return g_default_font; }
+const FontAsset* Canvas2d::get_default_font() { return g_default_font; }

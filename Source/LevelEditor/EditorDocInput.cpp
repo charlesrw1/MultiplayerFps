@@ -7,7 +7,7 @@
 #include "Framework/Files.h"
 #include "Input/InputSystem.h"
 #include "Render/DrawPublic.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "LevelEditor/Commands.h"
 #include "Debug.h"
 #include <SDL3/SDL_timer.h>
@@ -90,7 +90,7 @@ void EditorDoc::on_mouse_pick() {
 		return;
 
 	auto pos = Input::get_mouse_pos();
-	const auto screen_pos = UiSystem::inst->get_vp_rect().get_pos();
+	const auto screen_pos = ViewportSystem::get_vp_rect().get_pos();
 	pos = pos - screen_pos;
 
 	if (pos.x >= 0 && pos.y >= 0) {
@@ -128,7 +128,7 @@ void EditorDoc::on_mouse_drag(int x, int y) {}
 // the scene context menu; a right-click-drag is the existing fly-camera behavior and must not open
 // it. Movement is measured via accumulated relative motion (Input::get_mouse_delta()), not absolute
 // screen position: while the fly camera is held it captures the mouse (relative/warped mode, see
-// UiSystem::set_game_capture_mouse in EditorCamera::tick), so the OS cursor position barely changes
+// ViewportSystem::set_game_capture_mouse in EditorCamera::tick), so the OS cursor position barely changes
 // even during a big look-around drag -- only the relative deltas reflect the real movement. Runs
 // every frame independent of EditorInputs focus, since the camera grabs focus unconditionally on
 // right-mouse-down (see EditorCamera::tick in LevelEditorCamera.cpp) and releases it again before
@@ -140,7 +140,7 @@ void EditorDoc::check_scene_context_menu_input() {
 		// If the manipulate tool just used this same right-click to cancel a forced (G/R/S) transform
 		// and reset it back (Blender-style), don't also treat it as a context-menu click.
 		const bool used_by_manipulate = manipulate && manipulate->consume_right_click_cancel_flag();
-		rmb_press_tracking = !used_by_manipulate && UiSystem::inst->is_vp_hovered();
+		rmb_press_tracking = !used_by_manipulate && ViewportSystem::is_vp_hovered();
 		rmb_press_time_ms = SDL_GetTicks();
 		rmb_drag_accum_px = glm::ivec2(0, 0);
 	}
@@ -159,7 +159,7 @@ void EditorDoc::check_scene_context_menu_input() {
 		if (held_still && was_quick) {
 			// Same raycast-to-world logic as the asset drag-drop drop point (hook_scene_viewport_draw).
 			const glm::ivec2 release_pos = Input::get_mouse_pos();
-			const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
+			const auto vp_pos = ViewportSystem::get_vp_rect().get_pos();
 			const float scene_depth =
 				idraw->get_scene_depth_for_editor(release_pos.x - vp_pos.x, release_pos.y - vp_pos.y);
 			const glm::vec3 dir = unproject_mouse_to_ray(release_pos.x, release_pos.y).dir;
@@ -216,7 +216,7 @@ void EditorDoc::check_inputs() {
 	// Mouse-driven, not keyboard: must run even while a text field elsewhere has keyboard focus.
 	check_scene_context_menu_input();
 
-	const bool is_keyboard_blocked = UiSystem::inst->blocking_keyboard_inputs();
+	const bool is_keyboard_blocked = ViewportSystem::blocking_keyboard_inputs();
 	if (is_keyboard_blocked)
 		return;
 

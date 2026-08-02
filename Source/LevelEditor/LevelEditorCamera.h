@@ -72,7 +72,7 @@ public:
 		ASSERT(get_is_using_ortho());
 		Bounds aabb;
 		auto to_worldspace = [&](int x, int y) {
-			auto rect = UiSystem::inst->get_vp_rect();
+			auto rect = ViewportSystem::get_vp_rect();
 			glm::vec2 normalized(x / float(rect.w), y / float(rect.h));
 			normalized = normalized * 2.0f - glm::vec2(1.0);
 			float w = ortho_camera.width;

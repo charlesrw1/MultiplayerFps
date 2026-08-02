@@ -5,11 +5,11 @@
 #include "Framework/LuaColor.h"
 #include "Framework/Rect2d.h"
 #include "Render/DrawTypedefs.h"
-#include "UI/BaseGUI.h" // guiAnchor -- moves to UI/UiAnchor.h in the FontAsset-rename pass
+#include "UI/UiAnchor.h"
 #include <glm/glm.hpp>
 
 class Texture;
-class GuiFont; // renamed FontAsset in a later build-order step
+class FontAsset;
 class MaterialInstance;
 class Canvas2dVertexArray;
 struct DrawSettings;
@@ -59,8 +59,8 @@ public:
 	// Lua-exposed REF functions can't carry C++ default argument values (the codegen
 	// parser has no support for it) -- pass nullptr/guiAnchor::TopLeft explicitly for the
 	// old defaults instead of omitting the args.
-	REF static void draw_text(std::string text, int x, int y, lColor color, GuiFont* font, guiAnchor anchor);
-	REF static lRect measure_text(std::string text, GuiFont* font);
+	REF static void draw_text(std::string text, int x, int y, lColor color, FontAsset* font, guiAnchor anchor);
+	REF static lRect measure_text(std::string text, FontAsset* font);
 	REF static lRect get_screen_size(); // always the main window, regardless of current target
 	REF static lRect get_target_size(); // the currently active set_target_* target
 
@@ -73,11 +73,18 @@ public:
 	static void draw_vertex_array(Canvas2dVertexArray& arr, int index_offset, int index_count,
 								   const DrawSettings& settings, glm::mat4 transform = glm::mat4(1.f));
 
+	// Arbitrary (non-axis-aligned) textured quad with per-corner UVs -- non-REF, C++-only.
+	// For geometry that can't be expressed as an affine transform of a rect (e.g. a
+	// perspective-projected gizmo face like the editor nav cube).
+	static void draw_quad_textured(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, glm::vec2 uv0,
+									glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, Texture* tex, lColor color,
+									float z = 0.f);
+
 	// Canvas:: parity -- these have nothing to do with ViewportSystem's surviving
 	// responsibilities, so they fold into Canvas2d instead
 	REF static void set_window_fullscreen(bool is_fullscreen);
 	REF static void set_window_title(std::string name);
 	REF static void set_window_capture_mouse(bool capturing_mouse);
 
-	static const GuiFont* get_default_font();
+	static const FontAsset* get_default_font();
 };

@@ -33,10 +33,10 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
 #include "Framework/EditorTheme.h"
-#include "UI/UILoader.h"
-#include "UI/BaseGUI.h"
+#include "UI/FontAsset.h"
+#include "UI/UiAnchor.h"
 #include "UI/OnScreenLogGui.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Input/InputSystem.h"
 #include "Render/RenderObj.h"
@@ -402,13 +402,13 @@ void GameEngineLocal::set_tick_rate(float tick_rate) {
 // ---------------------------------------------------------------------------
 
 void GameEngineLocal::key_event(SDL_Event event) {
-	ASSERT(UiSystem::inst && Debug_Console::inst && EditorPopupManager::inst);
+	ASSERT(Debug_Console::inst && EditorPopupManager::inst);
 
 	if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_GRAVE) {
 		show_console = !show_console;
 
-		if (!UiSystem::inst->is_vp_focused() && Debug_Console::inst->get_is_console_focused()) {
-			UiSystem::inst->set_focus_to_viewport();
+		if (!ViewportSystem::is_vp_focused() && Debug_Console::inst->get_is_console_focused()) {
+			ViewportSystem::set_focus_to_viewport();
 		} else {
 			Debug_Console::inst->toggle_set_focus();
 		}

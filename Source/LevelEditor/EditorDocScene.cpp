@@ -5,7 +5,7 @@
 #include "imgui.h"
 #include "Input/InputSystem.h"
 #include "Render/DrawPublic.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Game/EntityComponent.h"
 #include "Game/Components/LightComponents.h"
 #include "Game/Components/DecalComponent.h"

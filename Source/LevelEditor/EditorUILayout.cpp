@@ -2,7 +2,9 @@
 #include "EditorDocLocal.h"
 #include "Game/Components/SpawnerComponenth.h"
 
-#include "UI/UILoader.h"
+#include "UI/FontAsset.h"
+#include "UI/Canvas2d.h"
+#include "UI/ViewportSystem.h"
 
 ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
 ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
@@ -18,12 +20,11 @@ EditorUILayout::EditorUILayout(IEditorApi2& doc) : doc(doc) {
 bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_window) {
 	const float dt = eng->get_dt();
 
-	RenderWindow& window = UiSystem::inst->window;
 	cube.rotation.set_current((glm::mat3)doc.camera()->get_view_setup().view);
 	cube.is_ortho = doc.camera()->is_ortho();
 	// cube coords are viewport-local; subtract vp origin before passing mouse pos
-	const glm::ivec2 vp_mouse = Input::get_mouse_pos() - UiSystem::inst->get_vp_rect().get_pos();
-	cube.draw(window, dt, vp_mouse);
+	const glm::ivec2 vp_mouse = Input::get_mouse_pos() - ViewportSystem::get_vp_rect().get_pos();
+	cube.draw(dt, vp_mouse);
 	// paint
 
 	// if (doc->active_mode)
@@ -31,13 +32,13 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 	draw_window();
 
 	bool do_mouse_click =
-		Input::was_mouse_released(0) && UiSystem::inst->is_vp_hovered(); // && !doc->dragger.get_is_dragging();
+		Input::was_mouse_released(0) && ViewportSystem::is_vp_hovered(); // && !doc->dragger.get_is_dragging();
 	int x = Input::get_mouse_pos().x;
 	int y = Input::get_mouse_pos().y;
 
 	// Nav cube click: cube coords are viewport-local, so convert mouse before testing
 	if (do_mouse_click) {
-		const glm::ivec2 vp_origin = UiSystem::inst->get_vp_rect().get_pos();
+		const glm::ivec2 vp_origin = ViewportSystem::get_vp_rect().get_pos();
 		auto result = cube.test_click({x - vp_origin.x, y - vp_origin.y});
 		if (result.hit) {
 			inputs.eat_mouse_click();
@@ -53,9 +54,9 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 		return false;
 	const bool show_all_labels = editor_draw_name_text.get_bool();
 
-	const GuiFont* font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+	const FontAsset* font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 	if (!font)
-		font = UiSystem::inst->defaultFont;
+		font = Canvas2d::get_default_font();
 	auto objs = get_objs();
 	std::sort(objs.begin(), objs.end(), [](const obj& a, const obj& b) -> bool { return a.pos.z < b.pos.z; });
 	const Entity* clicked = nullptr;
@@ -86,7 +87,7 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 		if (!(found_script || show_all_labels || is_spawner))
 			continue;
 
-		auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
+		auto size = FontAsset::calc_text_size_no_wrap(name, font);
 
 		const int text_offset = (icon_size + 1) * icons.size();
 		size.w += text_offset;
@@ -95,7 +96,7 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 		const auto coordx = coord.x - size.w / 2;
 		const auto coordy = coord.y - size.h / 2;
 
-		const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
+		const auto vp_pos = ViewportSystem::get_vp_rect().get_pos();
 
 		Color32 color = {50, 50, 50, (uint8_t)editor_draw_name_text_alpha.get_integer()};
 		if (o.e->get_selected_in_editor())
@@ -110,30 +111,20 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 		}
 		glm::ivec2 textofs = {0, font->base};
 
-		RectangleShape shape;
-		shape.rect = Rect2d({coordx - 3, coordy - 3}, {size.w + 6, size.h + 6});
-		shape.color = color;
-		window.draw(shape);
+		Canvas2d::rectangle(coordx - 3, coordy - 3, size.w + 6, size.h + 6, lColor{color.r, color.g, color.b, color.a});
 
-		// builder.draw_solid_rect({ coordx - 3,coordy - 3 }, { size.w + 6,size.h + 6 }, color);
 		for (int i = 0; i < icons.size(); i++) {
 			const int ofs = (i) * (icon_size + 1);
-
-			shape.rect = Rect2d({coordx + ofs, coordy}, {icon_size, icon_size});
-			shape.texture = icons[i];
-			shape.color = COLOR_WHITE;
-			window.draw(shape);
+			Canvas2d::draw_sprite((float)(coordx + ofs), (float)coordy, (float)icon_size, (float)icon_size, icons[i],
+								   lColor{255, 255, 255, 255});
 		}
 
-		TextShape tshape;
-		tshape.rect = Rect2d(glm::ivec2{coordx + 1 + text_offset, coordy + 1} + textofs, {});
-		tshape.font = font;
-		tshape.text = name;
-		tshape.color = COLOR_BLACK;
-		window.draw(shape);
-		tshape.rect = Rect2d(glm::ivec2{coordx + text_offset, coordy} + textofs, {});
-		tshape.color = COLOR_WHITE;
-		window.draw(tshape);
+		glm::ivec2 shadow_pos = glm::ivec2{coordx + 1 + text_offset, coordy + 1} + textofs;
+		glm::ivec2 text_pos = glm::ivec2{coordx + text_offset, coordy} + textofs;
+		Canvas2d::draw_text(name, shadow_pos.x, shadow_pos.y, lColor{0, 0, 0, 255}, (FontAsset*)font,
+							 guiAnchor::TopLeft);
+		Canvas2d::draw_text(name, text_pos.x, text_pos.y, lColor{255, 255, 255, 255}, (FontAsset*)font,
+							 guiAnchor::TopLeft);
 	}
 	if (clicked) {
 		inputs.eat_mouse_click();
@@ -160,8 +151,8 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 
 	auto objs = get_objs();
 
-	const auto vp_size = UiSystem::inst->get_vp_rect().get_size();
-	const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
+	const auto vp_size = ViewportSystem::get_vp_rect().get_size();
+	const auto vp_pos = ViewportSystem::get_vp_rect().get_pos();
 
 	area.x -= vp_pos.x;
 	area.y -= vp_pos.y;
@@ -184,9 +175,9 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 		if (!*name) {
 			name = o.e->get_type().classname;
 		}
-		const GuiFont* font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+		const FontAsset* font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 		if (!font)
-			font = UiSystem::inst->defaultFont;
+			font = Canvas2d::get_default_font();
 		const int icon_size = 16;
 		InlineVec<Texture*, 6> icons;
 		auto e = o.e;
@@ -206,7 +197,7 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 			icons.push_back(tex.get());
 		}
 
-		auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
+		auto size = FontAsset::calc_text_size_no_wrap(name, font);
 
 		const int text_offset = (icon_size + 1) * icons.size();
 		size.w += text_offset;

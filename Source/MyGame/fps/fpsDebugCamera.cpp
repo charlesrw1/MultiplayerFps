@@ -4,7 +4,7 @@
 #include "Game/Components/CameraComponent.h"
 #include "Game/Components/MeshComponent.h"
 #include "Input/InputSystem.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Debug.h"
 #include "imgui.h"
 #include "fpsObjects.h"
@@ -65,7 +65,7 @@ void fpsDebugCamera::update(EntityPtr game_camera_ent, fpsPlayer* player) {
 	if (freefly) {
 		// free-fly cam only takes input while RMB is held, to leave the mouse free otherwise.
 		bool rmb = Input::is_mouse_down(2);
-		UiSystem::inst->set_game_capture_mouse(rmb);
+		ViewportSystem::set_game_capture_mouse(rmb);
 
 		if (rmb) {
 			auto window_size = get_app_window_size();

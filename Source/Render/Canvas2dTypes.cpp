@@ -1,11 +1,11 @@
 #include "Render/Canvas2dTypes.h"
 #include "Framework/MeshBuilder.h"
-#include "UI/UILoader.h" // GuiFont -- renamed FontAsset in a later build-order step
+#include "UI/FontAsset.h"
 #include "Render/Texture.h"
 #include <glm/gtc/constants.hpp>
 
 namespace {
-void get_glyph_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int h, const GuiFont* f) {
+void get_glyph_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int h, const FontAsset* f) {
 	auto size = f->font_texture->get_size();
 	const float tw = (float)size.x;
 	const float th = (float)size.y;
@@ -13,8 +13,8 @@ void get_glyph_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int 
 	sz = {w / tw, h / th};
 }
 
-// no-wrap single-line measurement, matches GuiHelpers::calc_text_size_no_wrap
-Rect2d measure_no_wrap(std::string_view sv, const GuiFont* font) {
+// no-wrap single-line measurement, matches FontAsset::calc_text_size_no_wrap
+Rect2d measure_no_wrap(std::string_view sv, const FontAsset* font) {
 	int x = 0;
 	int y = -font->base;
 	for (char c : sv) {
@@ -66,7 +66,7 @@ void Canvas2dGeometry::build_sprite_transformed(MeshBuilder& mb, glm::vec2 size,
 	mb.AddTriangle(start + 3, start + 2, start + 0);
 }
 
-Rect2d Canvas2dGeometry::build_text(MeshBuilder& mb, std::string_view text, glm::vec2 pos, const GuiFont* font,
+Rect2d Canvas2dGeometry::build_text(MeshBuilder& mb, std::string_view text, glm::vec2 pos, const FontAsset* font,
 									 Color32 color, guiAnchor anchor, float z) {
 	Rect2d measured = measure_no_wrap(text, font);
 	glm::vec2 anchor_vec = UIAnchorPos::get_anchor_vec(anchor);
@@ -106,6 +106,22 @@ void Canvas2dGeometry::build_quad(MeshBuilder& mb, glm::vec2 p0, glm::vec2 p1, g
 	mb.AddVertex(MbVertex(glm::vec3(p1, z), color));
 	mb.AddVertex(MbVertex(glm::vec3(p2, z), color));
 	mb.AddVertex(MbVertex(glm::vec3(p3, z), color));
+	mb.AddQuad(start, start + 1, start + 2, start + 3);
+}
+
+void Canvas2dGeometry::build_quad_textured(MeshBuilder& mb, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3,
+											glm::vec2 uv0, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, Color32 color,
+											float z) {
+	int start = mb.GetBaseVertex();
+	const glm::vec2 corners[4] = {p0, p1, p2, p3};
+	const glm::vec2 uvs[4] = {uv0, uv1, uv2, uv3};
+	for (int i = 0; i < 4; i++) {
+		MbVertex v;
+		v.position = glm::vec3(corners[i], z);
+		v.uv = uvs[i];
+		v.color = color;
+		mb.AddVertex(v);
+	}
 	mb.AddQuad(start, start + 1, start + 2, start + 3);
 }
 

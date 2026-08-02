@@ -22,7 +22,7 @@ void DragDetector::tick(EditorInputs& inputs) {
 	const bool can_start = inputs.can_use_mouse_click();
 
 	if (Input::was_mouse_pressed(0)) {
-		if (can_start && !is_dragging && UiSystem::inst->is_vp_hovered()) {
+		if (can_start && !is_dragging && ViewportSystem::is_vp_hovered()) {
 			mouseClickX = Input::get_mouse_pos().x;
 			mouseClickY = Input::get_mouse_pos().y;
 			is_dragging = true;

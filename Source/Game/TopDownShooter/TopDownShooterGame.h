@@ -22,7 +22,7 @@
 #include "Physics/Physics2.h"
 
 #include "Game/EntityComponent.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 
 class TopDownGameManager : public Component
 {
@@ -200,7 +200,7 @@ public:
 	static glm::vec3 unproject_mouse_to_ray(const View_Setup& vs, const int mx, const int my) {
 		Ray r;
 
-		auto size = UiSystem::inst->get_vp_rect().get_size();
+		auto size = ViewportSystem::get_vp_rect().get_size();
 
 		glm::vec3 ndc = glm::vec3(float(mx) / size.x, float(my) / size.y, 0);
 		ndc = ndc * 2.f - 1.f;

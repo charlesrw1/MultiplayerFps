@@ -1,12 +1,12 @@
 #include "User_Camera.h"
 #include <glm/gtc/matrix_transform.hpp>
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Input/InputSystem.h"
 glm::mat4 User_Camera::get_view_matrix() const {
 	return glm::lookAt(position, position + front, up);
 }
 bool User_Camera::can_take_input() const {
-	return orbit_mode || UiSystem::inst->is_game_capturing_mouse() || Input::last_recieved_input_from_con();
+	return orbit_mode || ViewportSystem::is_game_capturing_mouse() || Input::last_recieved_input_from_con();
 }
 
 void User_Camera::set_orbit_target(glm::vec3 target, float object_size) {

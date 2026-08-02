@@ -158,8 +158,8 @@ void ManipulateTransformTool::update(EditorInputs& inputs) {
 
 	ImGuizmo::SetImGuiContext(eng->get_imgui_context());
 	ImGuizmo::SetDrawlist();
-	const auto s_pos = UiSystem::inst->get_vp_rect().get_pos();
-	const auto s_sz = UiSystem::inst->get_vp_rect().get_size();
+	const auto s_pos = ViewportSystem::get_vp_rect().get_pos();
+	const auto s_sz = ViewportSystem::get_vp_rect().get_size();
 	const bool using_ortho = ed_doc.ed_cam.get_is_using_ortho();
 	ImGuizmo::SetRect(s_pos.x, s_pos.y, s_sz.x, s_sz.y);
 	ImGuizmo::Enable(true);
@@ -209,7 +209,7 @@ void ManipulateTransformTool::update(EditorInputs& inputs) {
 		return out;
 	};
 
-	const auto window_sz = UiSystem::inst->get_vp_rect().get_size();
+	const auto window_sz = ViewportSystem::get_vp_rect().get_size();
 	const float aratio = (float)window_sz.y / window_sz.x;
 	const float* const view = glm::value_ptr(ed_doc.vs_setup.view);
 	const glm::mat4 friendly_proj_matrix = ed_doc.ed_cam.make_friendly_imguizmo_matrix();
@@ -247,12 +247,12 @@ void ManipulateTransformTool::update(EditorInputs& inputs) {
 		inputs.set_focus(this);
 }
 void ManipulateTransformTool::check_input(EditorInputs& inputs) {
-	const bool is_keyboard_blocked = UiSystem::inst->blocking_keyboard_inputs();
-	if (is_keyboard_blocked || UiSystem::inst->is_game_capturing_mouse() || !ed_doc.selection_state->has_any_selected())
+	const bool is_keyboard_blocked = ViewportSystem::blocking_keyboard_inputs();
+	if (is_keyboard_blocked || ViewportSystem::is_game_capturing_mouse() || !ed_doc.selection_state->has_any_selected())
 		return;
-	if (!UiSystem::inst->is_vp_hovered())
+	if (!ViewportSystem::is_vp_hovered())
 		return;
-	// if (UiSystem::inst->blocking_keyboard_inputs())
+	// if (ViewportSystem::blocking_keyboard_inputs())
 	//	return;
 
 	if (inputs.get_focused() && inputs.get_focused() != this)

@@ -11,7 +11,7 @@
 #include "Game/Components/CameraComponent.h"
 #include "Sound/SoundPublic.h"
 #include "imgui.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Framework/SysPrint.h"
 #include "IEditorTool.h"
 
@@ -34,8 +34,7 @@ ConfigVar ed_force_viewport_h("ed.force_viewport_h", "0", CVAR_INTEGER | CVAR_DE
 // ---------------------------------------------------------------------------
 
 bool GameEngineLocal::is_drawing_to_window_viewport() const {
-	ASSERT(UiSystem::inst);
-	return !UiSystem::inst->is_drawing_to_screen();
+	return !ViewportSystem::is_drawing_to_screen();
 }
 
 // ---------------------------------------------------------------------------
@@ -50,15 +49,13 @@ void GameEngineLocal::draw_any_imgui_interfaces() {}
 // ---------------------------------------------------------------------------
 
 void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& setup) {
-	ASSERT(UiSystem::inst);
-
 	const float time_to_use = (disable_render_time_tick.get_bool()) ? 0 : time;
 
 	params = SceneDrawParamsEx(time_to_use, frame_time);
-	params.output_to_screen = UiSystem::inst->is_drawing_to_screen();
+	params.output_to_screen = ViewportSystem::is_drawing_to_screen();
 
 	View_Setup vs_for_gui;
-	auto viewport = UiSystem::inst->get_vp_rect().get_size();
+	auto viewport = ViewportSystem::get_vp_rect().get_size();
 	vs_for_gui.width = viewport.x;
 	vs_for_gui.height = viewport.y;
 
@@ -85,9 +82,9 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 #endif
 	{
 		params = SceneDrawParamsEx(time_to_use, frame_time);
-		params.output_to_screen = UiSystem::inst->is_drawing_to_screen();
+		params.output_to_screen = ViewportSystem::is_drawing_to_screen();
 		View_Setup vs_for_gui2;
-		auto viewport2 = UiSystem::inst->get_vp_rect().get_size();
+		auto viewport2 = ViewportSystem::get_vp_rect().get_size();
 		vs_for_gui2.width = viewport2.x;
 		vs_for_gui2.height = viewport2.y;
 

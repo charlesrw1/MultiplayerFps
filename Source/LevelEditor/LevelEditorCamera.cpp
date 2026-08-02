@@ -12,8 +12,8 @@ Ray EditorCamera::unproject_mouse(int mx, int my) const {
 	Ray r;
 	// get ui size
 
-	const auto viewport_size = UiSystem::inst->get_vp_rect().get_size();
-	const auto viewport_pos = UiSystem::inst->get_vp_rect().get_pos();
+	const auto viewport_size = ViewportSystem::get_vp_rect().get_size();
+	const auto viewport_pos = ViewportSystem::get_vp_rect().get_pos();
 
 	const auto size = viewport_pos;
 	const int wx = viewport_size.x;
@@ -99,7 +99,7 @@ View_Setup EditorCamera::make_view() const {
 	return vs_setup;
 }
 glm::mat4 EditorCamera::make_friendly_imguizmo_matrix() {
-	auto window_sz = UiSystem::inst->get_vp_rect().get_size();
+	auto window_sz = ViewportSystem::get_vp_rect().get_size();
 	const float aratio = (float)window_sz.y / window_sz.x;
 	return (get_is_using_ortho()) ? ortho_camera.get_friendly_proj_matrix(aratio)
 		: vs_setup.make_opengl_perspective_with_near_far();
@@ -181,11 +181,11 @@ void EditorCamera::on_focused_tick(EditorInputs& inputs) {
 }
 void EditorCamera::tick(EditorInputs& inputs, float dt) {
 
-	auto window_sz = UiSystem::inst->get_vp_rect().get_size();
+	auto window_sz = ViewportSystem::get_vp_rect().get_size();
 	float aratio = (float)window_sz.y / window_sz.x;
 	float fov = glm::radians(g_fov.get_float());
 
-	if (inputs.can_use_mouse_click() && UiSystem::inst->is_vp_hovered()) {
+	if (inputs.can_use_mouse_click() && ViewportSystem::is_vp_hovered()) {
 		// Set do_update_flag immediately (not just via on_focused_tick next frame) so the
 		// very first frame of a drag isn't dropped, waiting a frame is what made ortho pan
 		// and orbit feel a beat behind the cursor when starting a drag.
@@ -194,7 +194,7 @@ void EditorCamera::tick(EditorInputs& inputs, float dt) {
 			do_update_flag = true;
 		}
 		else if (!get_is_using_ortho() && Input::is_mouse_down(2)) {
-			UiSystem::inst->set_game_capture_mouse(true);
+			ViewportSystem::set_game_capture_mouse(true);
 			inputs.set_focus(this);
 			do_update_flag = true;
 		}
@@ -209,7 +209,7 @@ void EditorCamera::tick(EditorInputs& inputs, float dt) {
 
 	if (do_update_flag) {
 
-		auto window_sz = UiSystem::inst->get_vp_rect().get_size();
+		auto window_sz = ViewportSystem::get_vp_rect().get_size();
 		float aratio = (float)window_sz.y / window_sz.x;
 		float fov = glm::radians(g_fov.get_float());
 
@@ -224,18 +224,18 @@ void EditorCamera::tick(EditorInputs& inputs, float dt) {
 
 			if (!ortho_camera.can_take_input()) {
 				inputs.set_focus(nullptr); // release focus
-				UiSystem::inst->set_game_capture_mouse(false); // defensive: ortho never wants captured mouse
+				ViewportSystem::set_game_capture_mouse(false); // defensive: ortho never wants captured mouse
 			}
 		}
 		else {
-			camera.orbit_mode = (Input::is_mouse_down(1) && UiSystem::inst->is_vp_hovered()) ||
-				Input::last_recieved_input_from_con(); // && !UiSystem::inst->is_game_capturing_mouse();
+			camera.orbit_mode = (Input::is_mouse_down(1) && ViewportSystem::is_vp_hovered()) ||
+				Input::last_recieved_input_from_con(); // && !ViewportSystem::is_game_capturing_mouse();
 
 			camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
 
 			if (!Input::is_mouse_down(1) && !Input::is_mouse_down(2)) {
 				inputs.set_focus(nullptr); // relase focus
-				UiSystem::inst->set_game_capture_mouse(false);
+				ViewportSystem::set_game_capture_mouse(false);
 			}
 		}
 		do_update_flag = false;

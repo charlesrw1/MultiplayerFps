@@ -1,8 +1,8 @@
 #pragma once
 // Core RmlUi singleton: owns the Rml::Context, the engine-side System/File
 // interfaces, document lifecycle, and (editor builds) hot reload. Mirrors
-// UiSystem/imgui in shape - constructed after gfx().rmlui_init() installs
-// the render interface, ticked from the main loop next to UiSystem/ImGui.
+// ViewportSystem/imgui in shape - constructed after gfx().rmlui_init() installs
+// the render interface, ticked from the main loop next to ViewportSystem/ImGui.
 #include "RmlUiSystemInterface.h"
 #include <unordered_map>
 #include <string>
@@ -40,7 +40,7 @@ public:
 
 	// Mirrors ImGui's WantCaptureMouse/WantTextInput: true when the mouse is
 	// over an interactive RmlUi element / a text-editable element has focus,
-	// so game code (UiSystem::blocking_mouse_inputs/blocking_keyboard_inputs)
+	// so game code (ViewportSystem::blocking_mouse_inputs/blocking_keyboard_inputs)
 	// knows to withhold that input from gameplay.
 	bool wants_mouse_capture() const;
 	bool wants_keyboard_capture() const;

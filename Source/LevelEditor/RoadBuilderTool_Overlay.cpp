@@ -3,7 +3,7 @@
 #include "EditorDocLocal.h"
 #include "Game/Components/RoadNetworkComponent.h"
 #include "Input/InputSystem.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "GameEnginePublic.h"
 #include "Level.h"
 #include <vector>

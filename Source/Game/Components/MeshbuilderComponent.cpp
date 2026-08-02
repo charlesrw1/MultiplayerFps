@@ -43,27 +43,23 @@ void WorldTextComponent::stop() {
 void WorldTextComponent::on_changed_transform() {
 	sync_render_data();
 }
-#include "Render/RenderWindow.h"
-#include "UI/GUISystemPublic.h"
-#include "UI/UILoader.h"
+#include "Render/Canvas2dTypes.h"
+#include "UI/Canvas2d.h"
+#include "UI/FontAsset.h"
 void WorldTextComponent::on_sync_render_data() {
 	if (!font_mat)
 		return;
 
+	const FontAsset* use_font = font ? (const FontAsset*)font : Canvas2d::get_default_font();
+
 	mb.Begin();
-	TextShape shape;
-	shape.text = text;
-	shape.color = COLOR_WHITE;
-	shape.font = UiSystem::inst->defaultFont;
-	if (font)
-		shape.font = font;
-	TextShape::draw_text_to_meshbuilder(shape, mb);
+	Canvas2dGeometry::build_text(mb, text, glm::vec2(0, 0), use_font, COLOR_WHITE, guiAnchor::TopLeft, 0.f);
 	mb.End();
 
 	if (!editor_mb_handle.is_valid())
 		editor_mb_handle = idraw->get_scene()->register_particle_obj();
 
-	font_mat->set_tex_parameter("Image", shape.font->font_texture.get());
+	font_mat->set_tex_parameter("Image", use_font->font_texture.get());
 
 	Particle_Object po;
 	po.meshbuilder = &mb;

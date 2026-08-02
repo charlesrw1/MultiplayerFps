@@ -214,7 +214,7 @@ void AssetRegistrySystem::update() {
 	auto* modelMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Model"));
 	auto* matMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("MaterialInstance"));
 	auto* soundMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SoundFile"));
-	auto* fontMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
+	auto* fontMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("FontAsset"));
 	auto* mapMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
 	auto* prefabMeta = (AssetMetadata*)find_type("Prefab");
 	auto* particleMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ParticleAsset"));
@@ -463,7 +463,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 	auto* matMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("MaterialInstance"));
 	auto* mapMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
 	auto* soundMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SoundFile"));
-	auto* fontMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
+	auto* fontMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("FontAsset"));
 	auto* prefabMeta = (AssetMetadata*)find_type("Prefab");
 	auto* particleMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ParticleAsset"));
 	auto* ppsetMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("PostProcessSettings"));

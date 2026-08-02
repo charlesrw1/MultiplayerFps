@@ -228,6 +228,7 @@ struct AnimTreeNode
 	AnimTreeNodeKind kind = AnimTreeNodeKind::Clip;
 	AnimTreeParams params = AnimTreeClipParams{};
 	std::vector<std::unique_ptr<AnimTreeNode>> children;
+	glm::vec2 editor_pos = glm::vec2(0.f); // graph-editor node position; unused at runtime
 
 	AnimTreeNode() = default;
 	explicit AnimTreeNode(AnimTreeNodeKind k) : kind(k), params(make_default_params_for_kind(k)) {}
@@ -257,4 +258,9 @@ public:
 	std::unique_ptr<AnimTreeNode> root = std::make_unique<AnimTreeNode>(AnimTreeNodeKind::BindPose);
 	// name -> root, mirrors agSaveCachedPose roots registered via agBuilder::add_cached_pose_root.
 	std::vector<std::pair<std::string, std::unique_ptr<AnimTreeNode>>> cached_pose_roots;
+	// Nodes created in the graph editor but not yet attached under any root/cached-pose-root --
+	// parked here so they aren't lost between edit sessions. AnimTreeBuild never sees these since
+	// it only walks from root/cached_pose_roots; a node (and its subtree) only affects playback
+	// once it's dragged into an actual parent's slot.
+	std::vector<std::unique_ptr<AnimTreeNode>> orphans;
 };

@@ -1,11 +1,8 @@
 #include "EditorCube.h"
-#include "UI/UIBuilder.h"
-#include "Framework/MeshBuilder.h"
-#include "Render/RenderWindow.h"
 #include "Debug.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/Texture.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/Canvas2d.h"
 #include "Framework/Config.h"
 ConfigVar editorcube("editorcube", "0", CVAR_BOOL, "");
 
@@ -67,8 +64,7 @@ guiEditorCube::guiEditorCube() {
 	}
 }
 
-void guiEditorCube::draw(RenderWindow& builder, float dt, glm::ivec2 mouse_pos) {
-	auto& mb = builder.meshbuilder;
+void guiEditorCube::draw(float dt, glm::ivec2 mouse_pos) {
 	auto transform_to_screen = [&](glm::vec3 in_clip) {
 		return glm::vec3((in_clip.x + 1) * ws_sz.x * 0.5 + ws_position.x,
 						 (in_clip.y + 1) * ws_sz.y * 0.5 + ws_position.y, 0.0);
@@ -139,30 +135,21 @@ void guiEditorCube::draw(RenderWindow& builder, float dt, glm::ivec2 mouse_pos) 
 
 	// ── Draw faces ───────────────────────────────────────────────────────────
 	for (int i = 0; i < 6; i++) {
-		const int start  = mb.GetBaseVertex();
-		const int starti = mb.get_i().size();
 		// Tint face if hovered (only when no edge is hovered — edge takes visual priority)
-		Color32 tint = (i == hover.face && hover.edge < 0)
-			? Color32{255, 230, 100, 255}
-			: Color32{255, 255, 255, 255};
-		for (int j = 0; j < 6; j++) {
-			MbVertex vert;
-			vert.position = corners[i * 6 + j];
-			vert.uv       = uvs[i * 6 + j];
-			vert.color    = tint;
-			mb.AddVertex(vert);
-		}
-		mb.AddTriangle(start + 2, start, start + 1);
-		mb.AddTriangle(start + 5, start + 3, start + 4);
-		builder.add_draw_call(UiSystem::inst->get_default_ui_mat(), starti, textures.at(i));
+		lColor tint = (i == hover.face && hover.edge < 0) ? lColor{255, 230, 100, 255} : lColor{255, 255, 255, 255};
+		// Quad winding for this face is corners 0,1,2,5 (see corners[]/uvs[] layout above --
+		// two triangles (0,1,2) and (3,4,5) share edge 0-2, so the quad is 0,1,2,5).
+		Canvas2d::draw_quad_textured(glm::vec2(corners[i * 6 + 0]), glm::vec2(corners[i * 6 + 1]),
+									  glm::vec2(corners[i * 6 + 2]), glm::vec2(corners[i * 6 + 5]), uvs[i * 6 + 0],
+									  uvs[i * 6 + 1], uvs[i * 6 + 2], uvs[i * 6 + 5], (Texture*)textures.at(i), tint);
 	}
 
 	// ── Draw hovered edge highlight (ortho mode only) ─────────────────────
 	if (hover.edge >= 0) {
 		const glm::ivec2 pa(corner_screen_pts[k_edges[hover.edge].corner_a]);
 		const glm::ivec2 pb(corner_screen_pts[k_edges[hover.edge].corner_b]);
-		builder.draw(LineShape{pa, pb, 5, {255, 255, 255, 220}});  // white glow
-		builder.draw(LineShape{pa, pb, 3, {255, 160,   0, 255}});  // orange core
+		Canvas2d::line(pa.x, pa.y, pb.x, pb.y, 5, lColor{255, 255, 255, 220}); // white glow
+		Canvas2d::line(pa.x, pa.y, pb.x, pb.y, 3, lColor{255, 160, 0, 255});  // orange core
 	}
 }
 

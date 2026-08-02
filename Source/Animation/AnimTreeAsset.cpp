@@ -99,6 +99,7 @@ std::unique_ptr<AnimTreeNode> AnimTreeNode::clone() const {
 	out->name = name;
 	out->kind = kind;
 	out->params = params;
+	out->editor_pos = editor_pos;
 	out->children.reserve(children.size());
 	for (auto& c : children)
 		out->children.push_back(c->clone());
@@ -294,6 +295,7 @@ void to_json(nlohmann::json& j, const AnimTreeNode& node) {
 	nlohmann::json params_j;
 	params_to_json(params_j, node.kind, node.params);
 	j["params"] = params_j;
+	j["editor_pos"] = vec3_to_json(glm::vec3(node.editor_pos, 0.f));
 	auto& arr = j["children"] = nlohmann::json::array();
 	for (auto& c : node.children) {
 		nlohmann::json cj;
@@ -308,6 +310,10 @@ void from_json(const nlohmann::json& j, AnimTreeNode& node) {
 		params_from_json(j.at("params"), node.kind, node.params);
 	else
 		node.params = make_default_params_for_kind(node.kind);
+	if (j.contains("editor_pos")) {
+		glm::vec3 p = vec3_from_json(j.at("editor_pos"));
+		node.editor_pos = glm::vec2(p.x, p.y);
+	}
 	node.children.clear();
 	if (j.contains("children")) {
 		for (auto& cj : j.at("children")) {
@@ -349,6 +355,15 @@ bool AnimTreeAsset::load_asset() {
 				cached_pose_roots.emplace_back(cpj.value("name", std::string()), std::move(node));
 			}
 		}
+
+		orphans.clear();
+		if (j.contains("orphans")) {
+			for (auto& oj : j.at("orphans")) {
+				auto node = std::make_unique<AnimTreeNode>();
+				from_json(oj, *node);
+				orphans.push_back(std::move(node));
+			}
+		}
 	}
 	catch (const nlohmann::json::exception& e) {
 		sys_print(Warning, "AnimTreeAsset: JSON parse error in %s: %s\n", get_name().c_str(), e.what());
@@ -362,6 +377,7 @@ void AnimTreeAsset::post_load() {}
 void AnimTreeAsset::uninstall() {
 	root = std::make_unique<AnimTreeNode>(AnimTreeNodeKind::BindPose);
 	cached_pose_roots.clear();
+	orphans.clear();
 	skeleton = AssetPtr<Model>{};
 }
 
@@ -379,6 +395,12 @@ void AnimTreeAsset::save_to_disk() {
 		to_json(rj, *entry.second);
 		cpj["root"] = rj;
 		arr.push_back(std::move(cpj));
+	}
+	auto& orphans_arr = j["orphans"] = nlohmann::json::array();
+	for (auto& o : orphans) {
+		nlohmann::json oj;
+		to_json(oj, *o);
+		orphans_arr.push_back(std::move(oj));
 	}
 
 	std::string text = j.dump(2);

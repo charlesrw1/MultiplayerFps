@@ -5,6 +5,8 @@
 #include "Input/InputSystem.h"
 #include "EditorInputs.h"
 #include "EditorDocLocal.h"
+#include "UI/Canvas2d.h"
+#include "UI/ViewportSystem.h"
 
 extern ConfigVar ed_has_snap;
 extern ConfigVar ed_translation_snap;
@@ -312,7 +314,7 @@ void EViewportHandles::tick(EditorInputs& inputs) {
 	int64_t hover_item = -1;
 	int hover_sub = -1;
 	Texture* texture = Texture::load("circle.png");
-	auto mpos = Input::get_mouse_pos() - UiSystem::inst->get_vp_rect().get_pos();
+	auto mpos = Input::get_mouse_pos() - ViewportSystem::get_vp_rect().get_pos();
 
 	struct HandleDraw {
 		int64_t key;
@@ -372,16 +374,15 @@ void EViewportHandles::tick(EditorInputs& inputs) {
 
 	for (auto& h : visible_handles) {
 		const int size = 14;
-		RectangleShape rect;
-		rect.rect = Rect2d(h.sc.x - size / 2, h.sc.y - size / 2, size, size);
+		lColor color;
 		if (h.is_dragged)
-			rect.color = Color32(50, 200, 255);
+			color = lColor{50, 200, 255, 255};
 		else if (h.key == hover_item && h.index == hover_sub)
-			rect.color = Color32(130, 220, 255);
+			color = lColor{130, 220, 255, 255};
 		else
-			rect.color = (h.mode == BoxHandleMode::Edge) ? Color32(255, 220, 80) : COLOR_WHITE;
-		rect.texture = texture;
-		UiSystem::inst->window.draw(rect);
+			color = (h.mode == BoxHandleMode::Edge) ? lColor{255, 220, 80, 255} : lColor{255, 255, 255, 255};
+		Canvas2d::draw_sprite((float)(h.sc.x - size / 2), (float)(h.sc.y - size / 2), (float)size, (float)size,
+							   texture, color);
 	}
 
 	// Start drag
@@ -445,11 +446,7 @@ void EViewportHandles::draw_drag_info_text() {
 		label = string_format("%+8.3f  %+8.3f", dragging_state.display_delta[0], dragging_state.display_delta[1]);
 	}
 
-	TextShape text;
-	text.text = label;
-	text.color = COLOR_WHITE;
-	text.with_drop_shadow = true;
-	text.drop_shadow_ofs = 1;
-	text.rect = Rect2d(sc.x + 16, sc.y - 8, 0, 0);
-	UiSystem::inst->window.draw(text);
+	const int tx = sc.x + 16, ty = sc.y - 8;
+	Canvas2d::draw_text(label, tx + 1, ty + 1, lColor{0, 0, 0, 255}, nullptr, guiAnchor::TopLeft);
+	Canvas2d::draw_text(label, tx, ty, lColor{255, 255, 255, 255}, nullptr, guiAnchor::TopLeft);
 }

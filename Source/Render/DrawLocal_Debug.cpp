@@ -10,12 +10,11 @@
 #include "Animation/Runtime/Animation.h"
 #include "Debug.h"
 #include <SDL3/SDL.h>
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
-#include "Render/RenderWindow.h"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"

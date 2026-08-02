@@ -16,6 +16,7 @@ void Canvas2dBackendLocal::render() {
 	if (batches.empty())
 		return;
 
+	ASSERT(main_window_target);
 	gfx().bind_uniform_buffer_base(0, draw.ubo.current_frame);
 	auto& device = draw.get_device();
 
@@ -23,9 +24,10 @@ void Canvas2dBackendLocal::render() {
 
 	size_t i = 0;
 	while (i < batches.size()) {
-		IGraphicsTexture* group_target = batches[i].target;
+		Texture* const target_tex = batches[i].target;
+		IGraphicsTexture* const group_target = target_tex ? target_tex->gpu_ptr : main_window_target;
 		size_t j = i;
-		while (j < batches.size() && batches[j].target == group_target)
+		while (j < batches.size() && batches[j].target == target_tex)
 			j++;
 
 		bool clear_color = false;

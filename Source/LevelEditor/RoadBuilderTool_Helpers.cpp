@@ -3,7 +3,7 @@
 #include "EditorDocLocal.h"
 #include "Game/Components/RoadNetworkComponent.h"
 #include "Input/InputSystem.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Physics/Physics2.h"
 #include "GameEnginePublic.h"
 #include "Game/Entity.h"
@@ -51,7 +51,6 @@ RoadNetworkComponent* RoadBuilderTool::get_or_create_component()
 
 ImVec2 RoadBuilderTool::world_to_screen(glm::vec3 world) const
 {
-    ASSERT(UiSystem::inst);
     const View_Setup* vs = doc.get_vs();
     if (!vs) return { -99999.f, -99999.f };
 
@@ -59,7 +58,7 @@ ImVec2 RoadBuilderTool::world_to_screen(glm::vec3 world) const
     if (clip.w < 0.001f) return { -99999.f, -99999.f };
 
     glm::vec3 ndc = glm::vec3(clip) / clip.w;
-    Rect2d vp = UiSystem::inst->get_vp_rect();
+    Rect2d vp = ViewportSystem::get_vp_rect();
 
     float sx = (ndc.x * 0.5f + 0.5f) * float(vp.w) + float(vp.x);
     float sy = (1.f - (ndc.y * 0.5f + 0.5f)) * float(vp.h) + float(vp.y);

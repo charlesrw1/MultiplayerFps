@@ -17,8 +17,10 @@
 #include "Assets/AssetSizeViewer.h"
 #include "AssetTools/DiagnosticsWindow.h"
 #include "Framework/ProfilerUI.h"
-#include "UI/GUISystemPublic.h"
-#include "UI/BaseGUI.h"
+#include "UI/ViewportSystem.h"
+#include "UI/Canvas2d.h"
+#include "UI/UiAnchor.h"
+#include "UI/FontAsset.h"
 #include "Game/LevelAssets.h"
 #include "LevelEditor/Commands.h"
 #include "Framework/Rect2d.h"
@@ -47,13 +49,12 @@ ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL, "")
 // ---------------------------------------------------------------------------
 
 glm::ivec2 ndc_to_screen_coord(glm::vec3 ndc) {
-	ASSERT(UiSystem::inst);
 	ndc.y *= -1;
 	auto coordx = ndc.x * 0.5 + 0.5;
 	auto coordy = ndc.y * 0.5 + 0.5;
 
-	const auto vp_size = UiSystem::inst->get_vp_rect().get_size();
-	const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
+	const auto vp_size = ViewportSystem::get_vp_rect().get_size();
+	const auto vp_pos = ViewportSystem::get_vp_rect().get_pos();
 
 	coordx *= vp_size.x;
 	coordy *= vp_size.y;
@@ -112,19 +113,14 @@ void EditorDoc::imgui_draw() {
 
 	int text_ofs = 0;
 	auto draw_text = [&](const char* str) {
-		TextShape shape;
-		shape.text = str;
-		shape.color = {200, 200, 200};
-		shape.with_drop_shadow = true;
-		shape.drop_shadow_ofs = 1;
-		shape.font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+		const FontAsset* font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 		// center it
-		Rect2d size = GuiHelpers::calc_text_size(shape.text, nullptr);
+		Rect2d size = FontAsset::calc_text_size(str, font);
 		glm::ivec2 pos = {-size.w / 2, size.h + text_ofs};
-		glm::ivec2 ofs = GuiHelpers::calc_layout(pos, guiAnchor::Top, UiSystem::inst->get_vp_rect());
-		shape.rect = Rect2d(ofs, {});
+		glm::ivec2 ofs = calc_layout(pos, guiAnchor::Top, ViewportSystem::get_vp_rect());
 
-		UiSystem::inst->window.draw(shape);
+		Canvas2d::draw_text(str, ofs.x + 1, ofs.y + 1, lColor{0, 0, 0, 255}, (FontAsset*)font, guiAnchor::TopLeft);
+		Canvas2d::draw_text(str, ofs.x, ofs.y, lColor{200, 200, 200, 255}, (FontAsset*)font, guiAnchor::TopLeft);
 
 		text_ofs += size.h;
 	};
@@ -166,12 +162,12 @@ void EditorDoc::imgui_draw() {
 
 	drag_drop_preview->tick();
 
-	if (draw_coords_under_mouse.get_bool() && UiSystem::inst->is_vp_hovered()) {
+	if (draw_coords_under_mouse.get_bool() && ViewportSystem::is_vp_hovered()) {
 		float mxf = 0.f, myf = 0.f;
 		SDL_GetMouseState(&mxf, &myf);
 		int x = (int)mxf, y = (int)myf;
 
-		auto size = UiSystem::inst->get_vp_rect().get_pos();
+		auto size = ViewportSystem::get_vp_rect().get_pos();
 
 		const float scene_depth = idraw->get_scene_depth_for_editor(x - size.x, y - size.y);
 		if (abs(scene_depth) <= 300 || ed_cam.get_is_using_ortho()) {
@@ -180,20 +176,12 @@ void EditorDoc::imgui_draw() {
 			if (ed_cam.get_is_using_ortho())
 				pos = dir.pos;
 
-			auto& win = UiSystem::inst->window;
-			const GuiFont* font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
-
-			TextShape text;
-			text.font = font;
-			text.with_drop_shadow = true;
-			text.color = COLOR_WHITE;
+			const FontAsset* font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 
 			std::string str = string_format("%.1f %.1f %.1f", pos.x, pos.y, pos.z);
-			text.text = str.c_str();
-			text.rect.x = x - size.x;
-			text.rect.y = y - size.y;
-
-			win.draw(text);
+			const int tx = x - size.x, ty = y - size.y;
+			Canvas2d::draw_text(str, tx + 1, ty + 1, lColor{0, 0, 0, 255}, (FontAsset*)font, guiAnchor::TopLeft);
+			Canvas2d::draw_text(str, tx, ty, lColor{255, 255, 255, 255}, (FontAsset*)font, guiAnchor::TopLeft);
 		}
 	}
 }
@@ -588,7 +576,7 @@ void EditorDoc::hook_scene_viewport_draw() {
 			float mxf = 0.f, myf = 0.f;
 			SDL_GetMouseState(&mxf, &myf);
 			int x = (int)mxf, y = (int)myf;
-			auto size = UiSystem::inst->get_vp_rect().get_pos();
+			auto size = ViewportSystem::get_vp_rect().get_pos();
 			const float scene_depth = idraw->get_scene_depth_for_editor(x - size.x, y - size.y);
 
 			glm::vec3 dir = unproject_mouse_to_ray(x, y).dir;

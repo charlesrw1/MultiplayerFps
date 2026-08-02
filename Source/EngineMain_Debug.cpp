@@ -19,9 +19,9 @@
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
-#include "UI/GUISystemPublic.h"
-#include "UI/UILoader.h"
-#include "UI/UIBuilder.h"
+#include "UI/ViewportSystem.h"
+#include "UI/Canvas2d.h"
+#include "UI/FontAsset.h"
 #include "DebugConsole.h"
 #include "EditorPopups.h"
 #include "Framework/Util.h"
@@ -91,8 +91,8 @@ struct Debug_Text
 	bool anchor_bottom = false;
 };
 // Projects world-space debug text to screen every frame and draws it through the same
-// immediate-mode UI window regular HUD text uses (RenderWindow), so it's automatically
-// screen-space (no depth test) and gets flushed by the normal UI sync each frame.
+// immediate-mode recorder regular HUD text uses (Canvas2d), so it's automatically
+// screen-space (no depth test) and gets flushed by the normal Canvas2d sync each frame.
 class DebugTextCtx
 {
 public:
@@ -106,7 +106,7 @@ public:
 		else
 			texts.push_back(std::move(text));
 	}
-	void draw_and_tick(float dt);
+	void draw_and_tick(float dt, const View_Setup& upcoming_vs);
 	void fixed_update_start() { one_frame_fixedupdate.clear(); }
 
 private:
@@ -114,10 +114,10 @@ private:
 	std::vector<Debug_Text> one_frame_fixedupdate;
 };
 
-void DebugTextCtx::draw_and_tick(float dt) {
-	const View_Setup& vs = draw.get_current_frame_vs();
-	const Rect2d vp = UiSystem::inst->get_vp_rect();
-	const GuiFont* mono_font = GuiFont::load("eng/fonts/monospace12.fnt");
+void DebugTextCtx::draw_and_tick(float dt, const View_Setup& upcoming_vs) {
+	const View_Setup& vs = upcoming_vs;
+	const Rect2d vp = ViewportSystem::get_vp_rect();
+	const FontAsset* mono_font = FontAsset::load("eng/fonts/monospace12.fnt");
 
 	// Distance (meters) over which text fades from fully opaque to invisible.
 	const float fade_start = 4.f;
@@ -136,13 +136,12 @@ void DebugTextCtx::draw_and_tick(float dt) {
 		if (fade <= 0.01f)
 			return;
 
-		TextShape shape;
-		shape.font  = mono_font;
-		shape.color = t.color;
-		shape.color.a = (uint8_t)(shape.color.a * fade);
-		// RenderWindow's ortho projection (UiSystem::update(), GUISystemLocal.cpp) is built
-		// from get_vp_rect().get_size() only, no offset -- window.draw() rects are
-		// viewport-local (0,0 = viewport top-left), NOT window-local. Do not add vp.x/vp.y.
+		Color32 color = t.color;
+		color.a = (uint8_t)(color.a * fade);
+		const lColor lcolor{color.r, color.g, color.b, color.a};
+		// Canvas2d's ortho projection (Canvas2d::update()) is built from get_vp_rect().get_size()
+		// only, no offset -- draw_text coords are viewport-local (0,0 = viewport top-left), NOT
+		// window-local. Do not add vp.x/vp.y.
 		const int16_t x = (int16_t)((ndc.x * 0.5f + 0.5f) * vp.w);
 		int16_t y = (int16_t)((1.f - (ndc.y * 0.5f + 0.5f)) * vp.h);
 		const int line_height = mono_font ? mono_font->lineHeight : 12;
@@ -152,18 +151,17 @@ void DebugTextCtx::draw_and_tick(float dt) {
 			y -= (int16_t)(line_height * (num_lines - 1));
 		}
 
-		// draw_text_to_meshbuilder treats '\n' as an unknown glyph rather than a line
-		// break, so split multi-line text into one TextShape per line here.
+		// Canvas2d::draw_text treats '\n' as an unknown glyph rather than a line break, so
+		// split multi-line text into one draw call per line here.
 		size_t start = 0;
 		while (start <= t.text.size()) {
 			size_t nl = t.text.find('\n', start);
 			size_t end = (nl == std::string::npos) ? t.text.size() : nl;
-			shape.text = std::string_view(t.text).substr(start, end - start);
-			shape.rect.x = x;
+			std::string_view line = std::string_view(t.text).substr(start, end - start);
+			int16_t x_pos = x;
 			if (t.center_horizontal)
-				shape.rect.x -= (int16_t)(GuiHelpers::calc_text_size_no_wrap(shape.text, mono_font).w / 2);
-			shape.rect.y = y;
-			UiSystem::inst->window.draw(shape);
+				x_pos -= (int16_t)(FontAsset::calc_text_size_no_wrap(line, mono_font).w / 2);
+			Canvas2d::draw_text(std::string(line), x_pos, y, lcolor, (FontAsset*)mono_font, guiAnchor::TopLeft);
 			y += (int16_t)line_height;
 			if (nl == std::string::npos)
 				break;
@@ -183,9 +181,9 @@ void DebugTextCtx::draw_and_tick(float dt) {
 }
 
 // Free functions used by EngineMain_Loop.cpp and other translation units
-void debug_shape_ctx_update(float dt) {
+void debug_shape_ctx_update(float dt, const View_Setup& upcoming_vs) {
 	DebugShapeCtx::get().update(dt);
-	DebugTextCtx::get().draw_and_tick(dt);
+	DebugTextCtx::get().draw_and_tick(dt, upcoming_vs);
 }
 void debug_shape_ctx_fixed_update_start() {
 	DebugShapeCtx::get().fixed_update_start();

@@ -10,13 +10,11 @@
 #include "Animation/Runtime/Animation.h"
 #include "Debug.h"
 #include <SDL3/SDL.h>
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
-#include "Render/RenderWindow.h"
-#include "Render/RenderWindowLocal.h"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
@@ -79,9 +77,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		pass_state.color_infos = color_infos;
 		gfx().set_render_pass(pass_state);
 
-		// draw_ui_local.render();
-
-		windowDrawer->render();
+		canvas2dDrawer->set_main_window_target(tex.output_composite);
 		canvas2dDrawer->render();
 		gfx().rmlui_render(cur_w, cur_h, tex.output_composite);
 
@@ -558,7 +554,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	auto do_ui_draw = [&]() {
 		// UI
 		if (params.draw_ui && !r_force_hide_ui.get_bool()) {
-			windowDrawer->render();
+			canvas2dDrawer->set_main_window_target(read_from_texture);
 			canvas2dDrawer->render();
 			gfx().rmlui_render(cur_w, cur_h, read_from_texture);
 		}

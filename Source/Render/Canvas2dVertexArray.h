@@ -5,9 +5,9 @@
 #include "Framework/Util.h"
 #include "Framework/MeshBuilder.h"
 #include "Render/Canvas2dGpuMesh.h"
-#include "UI/BaseGUI.h" // guiAnchor -- moves to UI/UiAnchor.h in the FontAsset-rename pass
+#include "UI/UiAnchor.h"
 
-class GuiFont; // renamed FontAsset in a later build-order step
+class FontAsset;
 
 // User-facing persistent 2d geometry buffer (tilemaps, etc.) -- CPU accumulation via
 // `cpu`, uploaded to the GPU only on an explicit upload() call, never implicitly by
@@ -23,7 +23,7 @@ public:
 	void add_sprite(glm::vec2 pos, glm::vec2 size, glm::vec2 uv_ul, glm::vec2 uv_size, Color32 color, float z = 0.f);
 	void add_sprite_transformed(glm::vec2 size, glm::vec2 uv_ul, glm::vec2 uv_size, Color32 color,
 								glm::mat4 transform, float z = 0.f);
-	void add_text(std::string_view text, glm::vec2 pos, const GuiFont* font, Color32 color,
+	void add_text(std::string_view text, glm::vec2 pos, const FontAsset* font, Color32 color,
 				  guiAnchor anchor = guiAnchor::TopLeft, float z = 0.f);
 	void add_triangle(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, Color32 color, float z = 0.f);
 	void add_quad(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, Color32 color,

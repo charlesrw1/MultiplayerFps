@@ -1,9 +1,6 @@
-#include "GUISystemPublic.h"
+#include "ViewportSystem.h"
 #include "UI/RmlUi/RmlUiSystem.h"
-#include "BaseGUI.h"
-#include "UIBuilder.h"
 #include <algorithm>
-#include "Render/MaterialPublic.h"
 #include "imgui.h"
 #include "Render/IGraphicsDevice.h"
 #include "EditorPopups.h"
@@ -14,21 +11,22 @@
 #include "Assets/AssetReferenceViewer.h"
 #include "GameEnginePublic.h"
 #include "Render/DrawPublic.h"
-#include "Assets/AssetDatabase.h"
 #include "DebugConsole.h"
 #include <SDL3/SDL.h>
-UiSystem::UiSystem() {
-	ui_default = g_assets.find<MaterialInstance>("eng/uiDefault.mm").get();
-	if (!ui_default)
-		Fatalf("Couldnt find default ui material");
-	defaultFont = g_assets.find<GuiFont>("eng/sengo24.fnt");
-	if (!defaultFont)
-		Fatalf("couldnt load default font");
-	fontDefaultMat = g_assets.find<MaterialInstance>("eng/fontDefault.mm");
-	if (!fontDefaultMat)
-		Fatalf("couldnt load default font material");
-}
-UiSystem* UiSystem::inst = nullptr;
+#include "IEditorTool.h"
+
+namespace {
+bool is_viewport_focused = false;
+bool is_viewport_hovered = false;
+Rect2d viewportRect = Rect2d(0, 0, 1, 1);
+bool game_capturing_mouse = false;
+// when game goes into focus mode, the mouse position is saved so it can be reset when exiting focus mode
+int saved_mouse_x = 0, saved_mouse_y = 0;
+// focused = mouse is captured, assumes relative inputs are being taken, otherwise cursor is shown
+bool game_focused = false;
+bool drawing_to_screen = true;
+bool set_focus_to_viewport_next_tick = false;
+} // namespace
 
 static void enable_imgui_docking() {
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -39,10 +37,10 @@ static void disable_imgui_docking() {
 
 extern ConfigVar g_drawdebugmenu;
 extern ConfigVar g_drawconsole;
-void UiSystem::pre_events() {}
-void UiSystem::handle_event(const SDL_Event& event) {}
+void ViewportSystem::pre_events() {}
+void ViewportSystem::handle_event(const SDL_Event& event) {}
 
-void UiSystem::draw_imgui_interfaces(IEditorTool* edState) {
+void ViewportSystem::draw_imgui_interfaces(IEditorTool* edState) {
 
 	drawing_to_screen = true;
 #ifdef EDITOR_BUILD
@@ -63,7 +61,7 @@ void UiSystem::draw_imgui_interfaces(IEditorTool* edState) {
 #endif
 	draw_imgui_internal(edState);
 }
-void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
+void ViewportSystem::draw_imgui_internal(IEditorTool* editorState) {
 	CPU_SCOPE("imgui_draw");
 
 	EditorPopupManager::inst->draw_popups();
@@ -106,7 +104,7 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 
 		if (ImGui::Begin("Scene viewport", nullptr, flags)) {
 
-			if (set_focus_to_viewport_next_tick || UiSystem::inst->is_game_capturing_mouse()) {
+			if (set_focus_to_viewport_next_tick || ViewportSystem::is_game_capturing_mouse()) {
 				ImGui::SetWindowFocus();
 				set_focus_to_viewport_next_tick = false;
 			}
@@ -159,42 +157,37 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 	set_focus_to_viewport_next_tick = false;
 }
 
-void UiSystem::update() {
+void ViewportSystem::update() {
 	// reset cursor if in relative mode
 	if (is_game_capturing_mouse()) {
 		SDL_WarpMouseInWindow(eng->get_os_window(), (float)saved_mouse_x, (float)saved_mouse_y);
 	}
-	window.clear(); // clear the window
-	auto rect = get_vp_rect();
-	auto mat = glm::orthoZO(0.f, (float)rect.get_size().x, (float)rect.get_size().y, 0.f, -1.f, 1.f);
-	window.view_mat = mat;
-	window.reset_verticies();
 }
 
 void ui_state_debug() {
-	ImGui::Text("is_vp_focused: %d\n", (int)UiSystem::inst->is_vp_focused());
-	ImGui::Text("is_vp_hovered: %d\n", (int)UiSystem::inst->is_vp_hovered());
-	ImGui::Text("is_game_capturing_mouse: %d\n", (int)UiSystem::inst->is_game_capturing_mouse());
+	ImGui::Text("is_vp_focused: %d\n", (int)ViewportSystem::is_vp_focused());
+	ImGui::Text("is_vp_hovered: %d\n", (int)ViewportSystem::is_vp_hovered());
+	ImGui::Text("is_game_capturing_mouse: %d\n", (int)ViewportSystem::is_game_capturing_mouse());
 }
 
 //ADD_TO_DEBUG_MENU(ui_state_debug);
 
-void UiSystem::sync_to_renderer() {
-	RenderWindowBackend::inst->update_window({1}, window);
-}
-bool UiSystem::is_drawing_to_screen() const {
+bool ViewportSystem::is_drawing_to_screen() {
 	return drawing_to_screen;
 }
-bool UiSystem::is_vp_hovered() const {
+bool ViewportSystem::is_vp_hovered() {
 	return is_viewport_hovered;
 }
-bool UiSystem::is_vp_focused() const {
+bool ViewportSystem::is_vp_focused() {
 	return is_viewport_focused;
 }
-glm::ivec2 UiSystem::convert_screen_to_vp(glm::ivec2 screen) const {
+Rect2d ViewportSystem::get_vp_rect() {
+	return viewportRect;
+}
+glm::ivec2 ViewportSystem::convert_screen_to_vp(glm::ivec2 screen) {
 	return screen - get_vp_rect().get_pos();
 }
-void UiSystem::set_game_capture_mouse(bool b) {
+void ViewportSystem::set_game_capture_mouse(bool b) {
 	if (b == game_focused)
 		return;
 	game_focused = b;
@@ -210,20 +203,20 @@ void UiSystem::set_game_capture_mouse(bool b) {
 		SDL_SetWindowRelativeMouseMode(eng->get_os_window(), false);
 	}
 }
-bool UiSystem::is_game_capturing_mouse() const {
+bool ViewportSystem::is_game_capturing_mouse() {
 	return game_focused;
 }
 
-void UiSystem::set_focus_to_viewport() {
+void ViewportSystem::set_focus_to_viewport() {
 	set_focus_to_viewport_next_tick = true;
 }
 
-bool UiSystem::blocking_keyboard_inputs() const {
+bool ViewportSystem::blocking_keyboard_inputs() {
 	// keep it for text input, not keyboard input. imgui *always* seems to want keyboard capture (for navigation or
 	// whatever) which is annoying but i really do want it blocking for text input
 	return ImGui::GetIO().WantTextInput || (RmlUiSystem::inst && RmlUiSystem::inst->wants_keyboard_capture());
 }
 
-bool UiSystem::blocking_mouse_inputs() const {
+bool ViewportSystem::blocking_mouse_inputs() {
 	return ImGui::GetIO().WantCaptureMouse || (RmlUiSystem::inst && RmlUiSystem::inst->wants_mouse_capture());
 }

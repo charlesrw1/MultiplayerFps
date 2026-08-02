@@ -1,11 +1,11 @@
 #include "OrthoCamera.h"
 #include "Framework/Config.h"
 #include "Input/InputSystem.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 
 ConfigVar ortho_cam_scroll_amt("ortho_cam_scroll_amt", "0.25", CVAR_FLOAT | CVAR_UNBOUNDED, "");
 bool OrthoCamera::can_take_input() const {
-	return Input::is_mouse_down(1) && UiSystem::inst->is_vp_focused() && Input::is_shift_down();
+	return Input::is_mouse_down(1) && ViewportSystem::is_vp_focused() && Input::is_shift_down();
 }
 void OrthoCamera::set_position_and_front(glm::vec3 position, glm::vec3 front) {
 	this->position = position;
@@ -38,14 +38,14 @@ glm::mat4 OrthoCamera::get_friendly_proj_matrix(float aspect_ratio) const {
 void OrthoCamera::update_from_input(float aspectratio) {
 	if (can_take_input()) {
 		auto mouseDelta = Input::get_mouse_delta();
-		auto rect = UiSystem::inst->get_vp_rect();
+		auto rect = ViewportSystem::get_vp_rect();
 		float world_delta_x = (mouseDelta.x / float(rect.w)) * width * 2;
 		float world_delta_y = (mouseDelta.y / float(rect.h)) * width * aspectratio * 2;
 
 		position += side * world_delta_x;
 		position += up * world_delta_y;
 	}
-	if (UiSystem::inst->is_vp_hovered()) {
+	if (ViewportSystem::is_vp_hovered()) {
 		scroll_callback(Input::get_mouse_scroll());
 	}
 }

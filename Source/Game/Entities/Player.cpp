@@ -22,8 +22,8 @@
 
 #include "Input/InputSystem.h"
 
-#include "UI/GUISystemPublic.h"
-#include "UI/BaseGUI.h"
+#include "UI/ViewportSystem.h"
+#include "UI/UiAnchor.h"
 
 #include <SDL3/SDL_events.h>
 
@@ -330,7 +330,7 @@ void Player::on_foot_update() {
 void Player::start() {
 	ASSERT(get_owner());
 
-	UiSystem::inst->set_game_capture_mouse(true);
+	ViewportSystem::set_game_capture_mouse(true);
 
 	//
 	//	 {

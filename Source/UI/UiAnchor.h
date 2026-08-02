@@ -1,24 +1,9 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include <unordered_map>
-#include <memory>
-#include <vector>
-#include "Framework/ClassBase.h"
-#include "Framework/StringUtil.h" // string view
-#include "Framework/Util.h"
 #include "Framework/Rect2d.h"
-#include "Game/EntityComponent.h"
-#include "Framework/InlineVec.h"
 #include "Framework/EnumDefReflection.h"
-template <typename... Args> class MulticastDelegate;
 
-struct SDL_KeyboardEvent;
-struct SDL_MouseWheelEvent;
-class GuiSystemLocal;
-class UIBuilder;
-
-NEWENUM(guiAlignment, uint8_t){Left, Center, Right, Fill};
 NEWENUM(guiAnchor, uint8_t){
 	TopLeft,  // (0,0)
 	TopRight, // (1,0)
@@ -61,3 +46,7 @@ struct UIAnchorPos
 	static UIAnchorPos anchor_from_enum(guiAnchor a);
 	static glm::vec2 get_anchor_vec(guiAnchor e);
 };
+
+// in_pos = what you are trying to layout
+// anchor = what position on screen. like top left, center, etc.
+glm::ivec2 calc_layout(glm::ivec2 in_pos, guiAnchor anchor, Rect2d viewport);

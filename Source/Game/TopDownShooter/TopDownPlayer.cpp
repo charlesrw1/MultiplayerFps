@@ -1,5 +1,8 @@
 #include "TopDownPlayer.h"
-#include "UI/UILoader.h"
+#include "UI/FontAsset.h"
+#include "UI/UiAnchor.h"
+#include "UI/Canvas2d.h"
+#include "UI/ViewportSystem.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
 #include "Animation/Runtime/Animation.h"
 
@@ -210,22 +213,16 @@ void TopDownPlayer::update() {
 	glm::vec3 displacement = (move_front * move.y + move_side * move.x) * move_speed * dt;
 	ccontroller->move(displacement, dt, 0.005f, flags, outvel);
 
-	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+	auto font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 	int start = 10;
 	auto draw_text = [&](const char* s) {
 		string str = s;
-		TextShape shape;
-		Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
-		glm::ivec2 ofs = GuiHelpers::calc_layout({-100, -10}, guiAnchor::Center, UiSystem::inst->get_vp_rect());
+		Rect2d size = FontAsset::calc_text_size(std::string_view(str), font);
+		glm::ivec2 ofs = calc_layout({-100, -10}, guiAnchor::Center, ViewportSystem::get_vp_rect());
 
-		shape.rect.x = ofs.x;
-		shape.rect.y = ofs.y + size.h + start;
-		shape.font = font;
-		shape.color = COLOR_WHITE;
-		shape.with_drop_shadow = true;
-		shape.drop_shadow_ofs = 1;
-		shape.text = str;
-		UiSystem::inst->window.draw(shape);
+		const int tx = ofs.x, ty = ofs.y + size.h + start;
+		Canvas2d::draw_text(str, tx + 1, ty + 1, lColor{0, 0, 0, 255}, (FontAsset*)font, guiAnchor::TopLeft);
+		Canvas2d::draw_text(str, tx, ty, lColor{255, 255, 255, 255}, (FontAsset*)font, guiAnchor::TopLeft);
 		start += size.h;
 	};
 	draw_text(string_format("move= %f %f", move.x, move.y));

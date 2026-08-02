@@ -297,7 +297,6 @@
     <ClCompile Include="Render\Canvas2dRecorder.cpp" />
     <ClCompile Include="Render\Canvas2dVertexArray.cpp" />
     <ClCompile Include="Render\Canvas2dBackendLocal.cpp" />
-    <ClCompile Include="Render\RenderWindow.cpp" />
     <ClCompile Include="Render\RT\RaytraceTest.cpp" />
     <ClCompile Include="Render\RT\RaytraceTest_BVH.cpp" />
     <ClCompile Include="Render\RT\RaytraceTest_Probe.cpp" />
@@ -318,13 +317,10 @@
     <ClCompile Include="Scripting\ScriptManager.cpp" />
     <ClCompile Include="Scripting\ScriptLoadingUtil.cpp" />
     <ClCompile Include="Scripting\LuaClassTypeInfo.cpp" />
-    <ClCompile Include="UI\BaseGUI.cpp" />
     <ClCompile Include="UI\Canvas2d.cpp" />
-    <ClCompile Include="UI\GUISystemLocal.cpp" />
-    <ClCompile Include="UI\Gui.cpp" />
-    <ClCompile Include="UI\GUISystemPublic.cpp" />
-    <ClCompile Include="UI\UIBuilder.cpp" />
-    <ClCompile Include="UI\UILoader.cpp" />
+    <ClCompile Include="UI\FontAsset.cpp" />
+    <ClCompile Include="UI\ViewportSystem.cpp" />
+    <ClCompile Include="UI\UiAnchor.cpp" />
     <ClCompile Include="UI\Widgets\EditorCube.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiSystem.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiSystemInterface.cpp" />
@@ -454,7 +450,6 @@
     <ClInclude Include="Render\RectPackerUtil.h" />
     <ClInclude Include="Render\RenderConfigVars.h" />
     <ClInclude Include="Render\RenderGiManager.h" />
-    <ClInclude Include="Render\RenderWindow.h" />
     <ClInclude Include="Render\RT\RaytraceTest.h" />
     <ClInclude Include="Framework\Hashmap.h" />
     <ClInclude Include="Framework\Hashset.h" />
@@ -604,11 +599,9 @@
     <ClInclude Include="Render\Texture.h" />
     <ClInclude Include="Sound\SoundPublic.h" />
     <ClInclude Include="User_Camera.h" />
-    <ClInclude Include="UI\BaseGUI.h" />
-    <ClInclude Include="UI\Gui.h" />
-    <ClInclude Include="UI\GUISystemPublic.h" />
-    <ClInclude Include="UI\UIBuilder.h" />
-    <ClInclude Include="UI\UILoader.h" />
+    <ClInclude Include="UI\FontAsset.h" />
+    <ClInclude Include="UI\ViewportSystem.h" />
+    <ClInclude Include="UI\UiAnchor.h" />
     <ClInclude Include="UI\Widgets\EditorCube.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>

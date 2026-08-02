@@ -6,9 +6,33 @@
 #include "Animation/SkeletonData.h"
 #include "Framework/FnFactory.h"
 #include "AssetCompile/Someutils.h"
+#include "LevelEditor/Commands.h"
 #include "imgui.h"
+#include <algorithm>
 #include <cstring>
 #include <type_traits>
+
+// Routes AnimTree edits through the same Command/UndoRedoSystem the level editor uses (see
+// AnimTreeEditor::command_mgr_ in the header for why this editor owns its own instance). One
+// session's worth of edits (see imgui_draw()) becomes one of these, holding the tree state from
+// before the session started. execute() is a deliberate no-op: by construction the live state
+// already equals what the session produced (that's *why* the session just closed), and reapplying
+// it via restore_snapshot() would wrongly clear the current selection (restore_snapshot() clears it
+// because undo genuinely swaps in fresh node pointers -- here nothing actually changed). undo() is
+// only ever called once per instance (UndoRedoSystem's ring buffer is single-use per slot, no
+// redo), so moving `before` out in undo() is safe.
+class AnimTreeEditCommand : public Command {
+public:
+	AnimTreeEditCommand(AnimTreeEditor& editor, AnimTreeEditor::UndoSnapshot before)
+		: editor(editor), before(std::move(before)) {}
+	void execute() final {}
+	void undo() final { editor.restore_snapshot(std::move(before)); }
+	std::string to_string() final { return "Edit AnimTree"; }
+
+private:
+	AnimTreeEditor& editor;
+	AnimTreeEditor::UndoSnapshot before;
+};
 
 // ---- manual (non-reflected) param widgets ----
 // The AnimTree property panel is hand-written per node kind instead of going through the
@@ -327,15 +351,49 @@ void draw_overview_table(const char* id, const char* header, std::vector<Overvie
 		ImGui::TextDisabled("(none)");
 }
 
+// Titlebar tint by rough node role, so the graph reads at a glance without having to read every
+// label: pose sources/sinks (data in/out), bone manipulators (per-bone edits), and blends/mixers
+// (everything that combines or selects between poses).
+ImU32 category_color_for_kind(AnimTreeNodeKind kind) {
+	switch (kind) {
+	case AnimTreeNodeKind::Clip:
+	case AnimTreeNodeKind::BindPose:
+	case AnimTreeNodeKind::SaveCachedPose:
+	case AnimTreeNodeKind::UseCachedPose:
+		return IM_COL32(70, 110, 80, 255); // pose sources/sinks
+	case AnimTreeNodeKind::IK:
+	case AnimTreeNodeKind::ModifyBone:
+	case AnimTreeNodeKind::CopyBone:
+		return IM_COL32(150, 95, 60, 255); // per-bone manipulators
+	case AnimTreeNodeKind::Blend:
+	case AnimTreeNodeKind::BlendMasked:
+	case AnimTreeNodeKind::Add:
+	case AnimTreeNodeKind::MakeAdditive:
+	case AnimTreeNodeKind::BlendByInt:
+	case AnimTreeNodeKind::Slot:
+		return IM_COL32(70, 95, 140, 255); // blends/mixers
+	}
+	return IM_COL32(60, 60, 66, 255);
+}
+
 } // namespace
 
-AnimTreeEditor::AnimTreeEditor() = default;
+AnimTreeEditor::AnimTreeEditor() : command_mgr_(std::make_unique<UndoRedoSystem>()) {}
 AnimTreeEditor::~AnimTreeEditor() = default;
 
 void AnimTreeEditor::set_asset(const std::string& asset_path) {
 	asset_path_ = asset_path;
 	asset_ = g_assets.find<AnimTreeAsset>(asset_path).get();
 	revert_from_disk();
+}
+
+int AnimTreeEditor::id_for(const AnimTreeNode* node) {
+	auto it = node_ids_.find(node);
+	if (it != node_ids_.end())
+		return it->second;
+	int id = next_node_id_++;
+	node_ids_[node] = id;
+	return id;
 }
 
 AnimTreeNode* AnimTreeEditor::active_root() const {
@@ -349,12 +407,17 @@ AnimTreeNode* AnimTreeEditor::active_root() const {
 void AnimTreeEditor::revert_from_disk() {
 	selected_ = nullptr;
 	clip_pg_owner_ = nullptr;
-	collapsed_.clear();
+	node_ids_.clear();
 	active_root_index_ = -1;
+	// Reverting/reloading swaps out the whole editable state from under any recorded history, so
+	// there's nothing left for those commands to meaningfully undo back to -- start fresh.
+	command_mgr_->clear_all();
+	edit_session_active_ = false;
 
 	if (!asset_) {
 		working_root_ = std::make_unique<AnimTreeNode>(AnimTreeNodeKind::BindPose);
 		working_cached_roots_.clear();
+		working_orphans_.clear();
 		working_skeleton_ = AssetPtr<Model>{};
 		dirty_ = false;
 		return;
@@ -363,8 +426,37 @@ void AnimTreeEditor::revert_from_disk() {
 	working_cached_roots_.clear();
 	for (auto& e : asset_->cached_pose_roots)
 		working_cached_roots_.emplace_back(e.first, e.second->clone());
+	working_orphans_.clear();
+	for (auto& o : asset_->orphans)
+		working_orphans_.push_back(o->clone());
 	working_skeleton_ = asset_->skeleton;
 	dirty_ = false;
+}
+
+AnimTreeEditor::UndoSnapshot AnimTreeEditor::capture_snapshot() const {
+	UndoSnapshot snap;
+	snap.root = working_root_ ? working_root_->clone() : nullptr;
+	for (auto& e : working_cached_roots_)
+		snap.cached_roots.emplace_back(e.first, e.second ? e.second->clone() : nullptr);
+	for (auto& o : working_orphans_)
+		snap.orphans.push_back(o->clone());
+	snap.skeleton = working_skeleton_;
+	snap.active_root_index = active_root_index_;
+	return snap;
+}
+
+void AnimTreeEditor::restore_snapshot(UndoSnapshot&& snap) {
+	working_root_ = std::move(snap.root);
+	working_cached_roots_ = std::move(snap.cached_roots);
+	working_orphans_ = std::move(snap.orphans);
+	working_skeleton_ = snap.skeleton;
+	active_root_index_ = snap.active_root_index;
+	// Node pointers changed (fresh clones) -- stale canvas ids/selection would otherwise misattach
+	// to whatever ends up at the same address.
+	selected_ = nullptr;
+	clip_pg_owner_ = nullptr;
+	node_ids_.clear();
+	dirty_ = true;
 }
 
 void AnimTreeEditor::apply_to_disk() {
@@ -374,6 +466,9 @@ void AnimTreeEditor::apply_to_disk() {
 	asset_->cached_pose_roots.clear();
 	for (auto& e : working_cached_roots_)
 		asset_->cached_pose_roots.emplace_back(e.first, e.second->clone());
+	asset_->orphans.clear();
+	for (auto& o : working_orphans_)
+		asset_->orphans.push_back(o->clone());
 	asset_->skeleton = working_skeleton_;
 	asset_->save_to_disk();
 	dirty_ = false;
@@ -451,88 +546,16 @@ std::string AnimTreeEditor::format_node_label(const AnimTreeNode& node) const {
 	return label;
 }
 
-void AnimTreeEditor::move_node_before(AnimTreeNode* dragged, AnimTreeNode* new_parent, AnimTreeNode* before_node) {
-	AnimTreeNode* root = active_root();
-	AnimTreeNode* old_parent = nullptr;
-	int old_index = -1;
-	if (!find_parent(root, dragged, old_parent, old_index))
-		return; // dragged is the active root itself -- it has no siblings to reorder among
-
-	// dragged is about to leave old_parent's list, so when reordering within the same parent,
-	// its own slot doesn't count against the capacity check.
-	int effective_count = (int)new_parent->children.size() - (old_parent == new_parent ? 1 : 0);
-	int arity = get_arity_for_kind(new_parent->kind);
-	if (arity >= 0 && effective_count >= arity)
-		return;
-
-	std::unique_ptr<AnimTreeNode> moved = std::move(old_parent->children[old_index]);
-	old_parent->children.erase(old_parent->children.begin() + old_index);
-
-	int insert_at = (int)new_parent->children.size();
-	for (int i = 0; i < (int)new_parent->children.size(); i++) {
-		if (new_parent->children[i].get() == before_node) {
-			insert_at = i;
-			break;
-		}
-	}
-	new_parent->children.insert(new_parent->children.begin() + insert_at, std::move(moved));
-	mark_dirty();
-}
-
-void AnimTreeEditor::draw_reorder_gap(AnimTreeNode* before_node, AnimTreeNode* parent) {
-	ImGui::PushID("gap");
-	ImGui::InvisibleButton("##reorder_gap", ImVec2(-1, 6.f));
-	bool dragging_over = ImGui::BeginDragDropTarget();
-	if (dragging_over) {
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AnimTreeNodeDrag")) {
-			AnimTreeNode* dragged = *(AnimTreeNode**)payload->Data;
-			if (dragged && dragged != before_node && !is_descendant(dragged, before_node))
-				move_node_before(dragged, parent, before_node);
-		}
-		ImGui::EndDragDropTarget();
-	}
-	if (dragging_over) {
-		ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
-		float mid_y = (mn.y + mx.y) * 0.5f;
-		ImGui::GetWindowDrawList()->AddLine(ImVec2(mn.x, mid_y), ImVec2(mx.x, mid_y), IM_COL32(90, 170, 255, 255), 2.5f);
-	}
-	ImGui::PopID();
-}
-
-void AnimTreeEditor::draw_nest_drop_target(AnimTreeNode* node) {
-	if (!ImGui::BeginDragDropTarget())
-		return;
-	if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AnimTreeNodeDrag")) {
-		AnimTreeNode* dragged = *(AnimTreeNode**)payload->Data;
-		if (dragged && dragged != node && !is_descendant(dragged, node)) {
-			AnimTreeNode* root = active_root();
-			AnimTreeNode* old_parent = nullptr;
-			int old_index = -1;
-			if (find_parent(root, dragged, old_parent, old_index)) {
-				int arity = get_arity_for_kind(node->kind);
-				if (arity < 0 || (int)node->children.size() < arity) {
-					std::unique_ptr<AnimTreeNode> moved = std::move(old_parent->children[old_index]);
-					old_parent->children.erase(old_parent->children.begin() + old_index);
-					node->children.push_back(std::move(moved));
-					mark_dirty();
-				}
-			}
-		}
-	}
-	ImGui::EndDragDropTarget();
-}
-
-void AnimTreeEditor::draw_context_menu(AnimTreeNode* node, AnimTreeNode* parent) {
-	if (!ImGui::BeginPopupContextItem("##node_ctx"))
-		return;
-
+void AnimTreeEditor::draw_context_menu(AnimTreeNode* node, AnimTreeNode* parent, bool is_orphan) {
 	int arity = get_arity_for_kind(node->kind);
 	bool can_add = (arity < 0) || ((int)node->children.size() < arity);
 	if (ImGui::BeginMenu("Add Child", can_add)) {
 		for (int k = 0; k <= (int)AnimTreeNodeKind::UseCachedPose; k++) {
 			auto kind = (AnimTreeNodeKind)k;
 			if (ImGui::MenuItem(get_kind_display_name(kind))) {
-				node->children.push_back(std::make_unique<AnimTreeNode>(kind));
+				auto child = std::make_unique<AnimTreeNode>(kind);
+				child->editor_pos = node->editor_pos + glm::vec2(240.f, 80.f * (float)node->children.size());
+				node->children.push_back(std::move(child));
 				mark_dirty();
 			}
 		}
@@ -552,11 +575,8 @@ void AnimTreeEditor::draw_context_menu(AnimTreeNode* node, AnimTreeNode* parent)
 				node->kind = kind;
 				node->params = make_default_params_for_kind(kind);
 				int new_arity = get_arity_for_kind(kind);
-				if (new_arity >= 0 && (int)node->children.size() > new_arity) {
-					for (size_t i = new_arity; i < node->children.size(); i++)
-						collapsed_.erase(node->children[i].get());
+				if (new_arity >= 0 && (int)node->children.size() > new_arity)
 					node->children.resize(new_arity);
-				}
 				if (selected_ == node)
 					clip_pg_owner_ = nullptr;
 				mark_dirty();
@@ -574,36 +594,43 @@ void AnimTreeEditor::draw_context_menu(AnimTreeNode* node, AnimTreeNode* parent)
 			if (get_arity_for_kind(kind) == 0)
 				continue;
 			if (ImGui::MenuItem(get_kind_display_name(kind))) {
-				insert_parent_above(node, parent, kind);
+				insert_parent_above(node, parent, is_orphan, kind);
 			}
 		}
 		ImGui::EndMenu();
 	}
 
-	bool has_parent = parent != nullptr;
-	if (ImGui::MenuItem("Duplicate", nullptr, false, has_parent)) {
-		int p_arity = get_arity_for_kind(parent->kind);
-		if (p_arity < 0 || (int)parent->children.size() < p_arity) {
-			for (int i = 0; i < (int)parent->children.size(); i++) {
-				if (parent->children[i].get() == node) {
-					parent->children.insert(parent->children.begin() + i + 1, node->clone());
-					break;
-				}
-			}
+	// Delete/Duplicate are unavailable only for the active root itself (parent == nullptr and not
+	// an orphan) -- there's nowhere to remove it *from*. Orphans have parent == nullptr too but are
+	// top-level entries of working_orphans_, so they can be deleted/duplicated like any other node.
+	bool can_remove = (parent != nullptr) || is_orphan;
+	if (ImGui::MenuItem("Duplicate", nullptr, false, can_remove)) {
+		if (is_orphan) {
+			auto dup = node->clone();
+			dup->editor_pos = node->editor_pos + glm::vec2(40.f, 40.f);
+			working_orphans_.push_back(std::move(dup));
 			mark_dirty();
+		} else {
+			int p_arity = get_arity_for_kind(parent->kind);
+			if (p_arity < 0 || (int)parent->children.size() < p_arity) {
+				for (int i = 0; i < (int)parent->children.size(); i++) {
+					if (parent->children[i].get() == node) {
+						auto dup = node->clone();
+						dup->editor_pos = node->editor_pos + glm::vec2(40.f, 40.f);
+						parent->children.insert(parent->children.begin() + i + 1, std::move(dup));
+						break;
+					}
+				}
+				mark_dirty();
+			}
 		}
 	}
-	if (ImGui::MenuItem("Delete", nullptr, false, has_parent)) {
-		for (int i = 0; i < (int)parent->children.size(); i++) {
-			if (parent->children[i].get() == node) {
-				if (selected_ == node) { selected_ = nullptr; clip_pg_owner_ = nullptr; }
-				collapsed_.erase(node);
-				parent->children.erase(parent->children.begin() + i);
-				break;
-			}
-		}
+	// Deletes only `node` itself -- its children are promoted to top-level orphans rather than
+	// destroyed along with it, so detaching a subtree's root doesn't take the rest of it out too.
+	if (ImGui::MenuItem("Delete", nullptr, false, can_remove)) {
+		delete_node_unparent_children(node);
 		mark_dirty();
-		ImGui::EndPopup();
+		ImGui::CloseCurrentPopup();
 		return;
 	}
 
@@ -616,15 +643,23 @@ void AnimTreeEditor::draw_context_menu(AnimTreeNode* node, AnimTreeNode* parent)
 		mark_dirty();
 		ImGui::CloseCurrentPopup();
 	}
-
-	ImGui::EndPopup();
 }
 
-void AnimTreeEditor::insert_parent_above(AnimTreeNode* node, AnimTreeNode* parent, AnimTreeNodeKind new_kind) {
+void AnimTreeEditor::insert_parent_above(AnimTreeNode* node, AnimTreeNode* parent, bool is_orphan, AnimTreeNodeKind new_kind,
+										  const glm::vec2* pos_override) {
 	auto new_node = std::make_unique<AnimTreeNode>(new_kind);
-	if (!parent) {
-		// node is the active root: draw_tree() only ever calls draw_node_row(root, nullptr, 0),
-		// so parent == nullptr implies node == active_root().
+	new_node->editor_pos = pos_override ? *pos_override : node->editor_pos - glm::vec2(240.f, 0.f);
+	if (is_orphan) {
+		for (auto& o : working_orphans_) {
+			if (o.get() == node) {
+				new_node->children.push_back(std::move(o));
+				o = std::move(new_node);
+				break;
+			}
+		}
+	} else if (!parent) {
+		// node is the active root: draw_graph_canvas() only ever calls draw_canvas_node(root, nullptr, false, ...),
+		// so parent == nullptr && !is_orphan implies node == active_root().
 		if (active_root_index_ < 0) {
 			new_node->children.push_back(std::move(working_root_));
 			working_root_ = std::move(new_node);
@@ -645,77 +680,264 @@ void AnimTreeEditor::insert_parent_above(AnimTreeNode* node, AnimTreeNode* paren
 	mark_dirty();
 }
 
-void AnimTreeEditor::draw_node_row(AnimTreeNode* node, AnimTreeNode* parent, int depth) {
-	bool has_children = !node->children.empty();
-	bool row_collapsed = collapsed_.count(node) != 0;
-
-	ImGui::TableNextRow();
-	ImGui::TableNextColumn();
-	ImGui::PushID(node);
-
-	// Reorder target: drop above this row to make the dragged node its immediately preceding
-	// sibling. Root has no siblings, so it gets no gap.
-	if (parent)
-		draw_reorder_gap(node, parent);
-
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow;
-	if (!has_children)
-		flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-	if (selected_ == node)
-		flags |= ImGuiTreeNodeFlags_Selected;
-	if (has_children)
-		ImGui::SetNextItemOpen(!row_collapsed, ImGuiCond_Always);
-
-	bool open = ImGui::TreeNodeEx(format_node_label(*node).c_str(), flags);
-	if (has_children && ImGui::IsItemToggledOpen()) {
-		if (row_collapsed)
-			collapsed_.erase(node);
-		else
-			collapsed_.insert(node);
-		row_collapsed = !row_collapsed;
+bool AnimTreeEditor::find_owner(AnimTreeNode* child, AnimTreeNode*& out_parent, int& out_index) {
+	AnimTreeNode* root = active_root();
+	if (root && find_parent(root, child, out_parent, out_index))
+		return true;
+	for (auto& o : working_orphans_) {
+		if (find_parent(o.get(), child, out_parent, out_index))
+			return true;
 	}
-	if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
-		selected_ = node;
+	return false;
+}
 
-	if (parent && ImGui::BeginDragDropSource()) {
-		ImGui::SetDragDropPayload("AnimTreeNodeDrag", &node, sizeof(AnimTreeNode*));
-		ImGui::TextUnformatted(format_node_label(*node).c_str());
-		ImGui::EndDragDropSource();
+bool AnimTreeEditor::is_top_level_orphan(AnimTreeNode* node, int* out_index) {
+	for (int i = 0; i < (int)working_orphans_.size(); i++) {
+		if (working_orphans_[i].get() == node) {
+			if (out_index) *out_index = i;
+			return true;
+		}
 	}
-	// Dropping on the row body itself reparents the dragged node as this node's last child
-	// (as opposed to draw_reorder_gap above, which reorders it as a sibling).
-	draw_nest_drop_target(node);
-	draw_context_menu(node, parent);
+	return false;
+}
 
-	ImGui::TableNextColumn();
-	ImGui::TextDisabled("%d", depth);
+void AnimTreeEditor::delete_node_unparent_children(AnimTreeNode* node) {
+	if (selected_ == node) { selected_ = nullptr; clip_pg_owner_ = nullptr; }
 
-	ImGui::PopID();
+	for (auto& c : node->children)
+		working_orphans_.push_back(std::move(c));
+	node->children.clear();
 
-	// TreeNodeEx only pushes an ID-stack entry when it returns true (open); with
-	// ImGuiTreeNodeFlags_OpenOnArrow a collapsed/leaf row returns false and pushes nothing, so a
-	// matching TreePop() would pop a frame that was never pushed.
-	if (has_children && open) {
-		for (auto& c : node->children)
-			draw_node_row(c.get(), node, depth + 1);
-		ImGui::TreePop();
+	int orphan_index = -1;
+	if (is_top_level_orphan(node, &orphan_index)) {
+		working_orphans_.erase(working_orphans_.begin() + orphan_index);
+		return;
+	}
+	AnimTreeNode* owner_parent = nullptr;
+	int owner_index = -1;
+	if (find_owner(node, owner_parent, owner_index))
+		owner_parent->children.erase(owner_parent->children.begin() + owner_index);
+}
+
+void AnimTreeEditor::draw_canvas_node(AnimTreeNode* node, AnimTreeNode* parent, bool is_orphan, std::vector<LinkToDraw>& out_links) {
+	int nid = id_for(node);
+	int arity = get_arity_for_kind(node->kind);
+	int child_count = (int)node->children.size();
+	bool extra_slot = (arity < 0) || (child_count < arity);
+	int input_pins = std::max(child_count + (extra_slot ? 1 : 0), 0);
+
+	ImVec2 size(190.f, 34.f + std::max(input_pins, 1) * 20.f);
+	ImVec2 pos_im(node->editor_pos.x, node->editor_pos.y);
+
+	canvas_.begin_node(nid, pos_im, size, format_node_label(*node).c_str(), category_color_for_kind(node->kind));
+	node->editor_pos = glm::vec2(pos_im.x, pos_im.y);
+
+	if (canvas_.is_last_node_hovered()) {
+		if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			selected_ = node;
+		if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+			// draw_context_menu gates Duplicate/Delete on can_remove, so the active root (the only
+			// node with parent == nullptr that isn't an orphan) still gets Add Child / Change Kind /
+			// Rename from the same popup, just without Duplicate/Delete.
+			context_menu_node_ = node;
+			context_menu_parent_ = parent;
+			context_menu_is_orphan_ = is_orphan;
+			ImGui::OpenPopup("##at_node_ctx");
+		}
+	}
+
+	// output pin: this node's produced pose, consumed by whichever node's input pin it's linked to
+	canvas_.pin(nid * 1000, true, "");
+	pin_lookup_[nid * 1000] = PinRef{node, true, -1};
+
+	for (int i = 0; i < input_pins; i++) {
+		bool is_empty_slot = (i >= child_count);
+		int pin_id = nid * 1000 + 1 + i;
+		canvas_.pin(pin_id, false, is_empty_slot ? "+" : "", is_empty_slot ? IM_COL32(120, 200, 120, 255) : IM_COL32(210, 210, 210, 255));
+		pin_lookup_[pin_id] = PinRef{node, false, i};
+	}
+
+	canvas_.end_node();
+
+	for (int i = 0; i < child_count; i++) {
+		AnimTreeNode* c = node->children[i].get();
+		int cid = id_for(c);
+		out_links.push_back(LinkToDraw{cid * 1000, cid * 1000, nid * 1000 + 1 + i});
+		draw_canvas_node(c, node, false, out_links);
 	}
 }
 
-void AnimTreeEditor::draw_tree() {
+void AnimTreeEditor::draw_graph_canvas() {
 	AnimTreeNode* root = active_root();
 	if (!root)
 		return;
 
-	ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
-							ImGuiTableFlags_ScrollY;
-	if (ImGui::BeginTable("##at_node_table", 2, flags)) {
-		ImGui::TableSetupColumn("Node", ImGuiTableColumnFlags_WidthStretch);
-		ImGui::TableSetupColumn("Depth", ImGuiTableColumnFlags_WidthFixed, 55.f);
-		ImGui::TableSetupScrollFreeze(0, 1);
-		ImGui::TableHeadersRow();
-		draw_node_row(root, nullptr, 0);
-		ImGui::EndTable();
+	pin_lookup_.clear();
+
+	canvas_.begin_canvas("##at_canvas", ImVec2(0, 0));
+	std::vector<LinkToDraw> links;
+	draw_canvas_node(root, nullptr, false, links);
+	for (auto& o : working_orphans_)
+		draw_canvas_node(o.get(), nullptr, true, links);
+	for (auto& l : links)
+		canvas_.link(l.link_id, l.start_pin, l.end_pin);
+
+	canvas_.end_canvas();
+
+	// must read after end_canvas(): that's where the background-right-click event is resolved.
+	ImVec2 bg_click_pos;
+	bool bg_right_clicked = canvas_.is_background_right_clicked(&bg_click_pos);
+
+	// Right-click on empty canvas space: pick a kind, spawns a new free-floating node at that
+	// position in working_orphans_ -- drag its output pin onto some node's empty input slot to
+	// attach it, or leave it floating (Apply preserves unattached nodes across sessions).
+	if (bg_right_clicked) {
+		show_add_node_popup_ = true;
+		add_node_popup_pos_ = glm::vec2(bg_click_pos.x, bg_click_pos.y);
+	}
+	if (show_add_node_popup_) {
+		ImGui::OpenPopup("##at_add_node");
+		show_add_node_popup_ = false;
+	}
+	if (ImGui::BeginPopup("##at_add_node")) {
+		for (int k = 0; k <= (int)AnimTreeNodeKind::UseCachedPose; k++) {
+			auto kind = (AnimTreeNodeKind)k;
+			if (ImGui::MenuItem(get_kind_display_name(kind))) {
+				auto node = std::make_unique<AnimTreeNode>(kind);
+				node->editor_pos = add_node_popup_pos_;
+				working_orphans_.push_back(std::move(node));
+				mark_dirty();
+			}
+		}
+		ImGui::EndPopup();
+	}
+
+	// Drag a link out of a pin and release over empty canvas: pick a kind, spawns a new node at the
+	// drop position and auto-connects it to the pin the drag started from -- dropping from an
+	// output pin wraps the dragged node in a new parent (like "Parent to New Node" but drag-driven);
+	// dropping from an empty input slot attaches the new node directly into that slot.
+	int dropped_pin;
+	ImVec2 dropped_pos;
+	if (canvas_.is_link_dropped_on_empty(&dropped_pin, &dropped_pos)) {
+		auto it = pin_lookup_.find(dropped_pin);
+		if (it != pin_lookup_.end() && (it->second.is_output || it->second.slot_index == (int)it->second.node->children.size())) {
+			show_drop_add_node_popup_ = true;
+			drop_add_node_pin_ = it->second;
+			drop_add_node_pos_ = glm::vec2(dropped_pos.x, dropped_pos.y);
+		}
+	}
+	if (show_drop_add_node_popup_) {
+		ImGui::OpenPopup("##at_drop_add_node");
+		show_drop_add_node_popup_ = false;
+	}
+	if (ImGui::BeginPopup("##at_drop_add_node")) {
+		for (int k = 0; k <= (int)AnimTreeNodeKind::UseCachedPose; k++) {
+			auto kind = (AnimTreeNodeKind)k;
+			bool enabled = drop_add_node_pin_.is_output ? (get_arity_for_kind(kind) != 0) : true;
+			if (ImGui::MenuItem(get_kind_display_name(kind), nullptr, false, enabled)) {
+				if (drop_add_node_pin_.is_output) {
+					AnimTreeNode* dragged = drop_add_node_pin_.node;
+					AnimTreeNode* owner_parent = nullptr;
+					int owner_index = -1;
+					int orphan_index = -1;
+					bool is_orph = false;
+					if (!find_owner(dragged, owner_parent, owner_index))
+						is_orph = is_top_level_orphan(dragged, &orphan_index);
+					insert_parent_above(dragged, owner_parent, is_orph, kind, &drop_add_node_pos_);
+				} else {
+					AnimTreeNode* parent = drop_add_node_pin_.node;
+					int arity = get_arity_for_kind(parent->kind);
+					if (arity < 0 || (int)parent->children.size() < arity) {
+						auto node = std::make_unique<AnimTreeNode>(kind);
+						node->editor_pos = drop_add_node_pos_;
+						parent->children.push_back(std::move(node));
+						mark_dirty();
+					}
+				}
+			}
+		}
+		ImGui::EndPopup();
+	}
+
+	if (ImGui::BeginPopup("##at_node_ctx")) {
+		if (context_menu_node_)
+			draw_context_menu(context_menu_node_, context_menu_parent_, context_menu_is_orphan_);
+		ImGui::EndPopup();
+	}
+
+	// Del/Backspace deletes every canvas-selected node -- guarded by WantTextInput so it doesn't eat
+	// keystrokes while renaming/editing a field in the property panel. The active root can't be
+	// deleted (nothing to remove it from). Each selected node deletes just itself, promoting its
+	// own children to orphans (delete_node_unparent_children) -- safe to do independently per
+	// selected node, including ancestor+descendant pairs, since a deleted node's children survive
+	// as orphans rather than being destroyed with it.
+	if (!ImGui::GetIO().WantTextInput && !canvas_.get_selected_nodes().empty() &&
+		(ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace))) {
+		std::vector<AnimTreeNode*> selected_ptrs;
+		for (int nid : canvas_.get_selected_nodes()) {
+			auto it = pin_lookup_.find(nid * 1000);
+			if (it != pin_lookup_.end() && it->second.node != root)
+				selected_ptrs.push_back(it->second.node);
+		}
+		for (AnimTreeNode* n : selected_ptrs) {
+			delete_node_unparent_children(n);
+			mark_dirty();
+		}
+	}
+
+	int start_pin, end_pin;
+	if (canvas_.is_link_created(&start_pin, &end_pin)) {
+		auto it_s = pin_lookup_.find(start_pin);
+		auto it_e = pin_lookup_.find(end_pin);
+		if (it_s != pin_lookup_.end() && it_e != pin_lookup_.end()) {
+			AnimTreeNode* child = it_s->second.node;
+			AnimTreeNode* new_parent = it_e->second.node;
+			// only accept drops onto the trailing empty slot -- occupied slots are rejected so a
+			// drag can't silently clobber an existing child.
+			if (it_e->second.slot_index == (int)new_parent->children.size() &&
+				child != new_parent && !is_descendant(child, new_parent)) {
+				int arity = get_arity_for_kind(new_parent->kind);
+				if (arity < 0 || (int)new_parent->children.size() < arity) {
+					// Check the target slot's capacity before touching the source so a rejected
+					// drop can't leave the node detached nowhere.
+					std::unique_ptr<AnimTreeNode> moved;
+					AnimTreeNode* old_parent = nullptr;
+					int old_index = -1;
+					int orphan_index = -1;
+					if (find_owner(child, old_parent, old_index)) {
+						moved = std::move(old_parent->children[old_index]);
+						old_parent->children.erase(old_parent->children.begin() + old_index);
+					} else if (is_top_level_orphan(child, &orphan_index)) {
+						moved = std::move(working_orphans_[orphan_index]);
+						working_orphans_.erase(working_orphans_.begin() + orphan_index);
+					}
+					if (moved) {
+						new_parent->children.push_back(std::move(moved));
+						mark_dirty();
+					}
+				}
+			}
+		}
+	}
+
+	int destroyed_link;
+	if (canvas_.is_link_destroyed(&destroyed_link)) {
+		// link_id == the child's own output pin id (see draw_canvas_node), so it uniquely
+		// identifies the one edge feeding that child's (single) parent. Detaching parks the
+		// subtree in working_orphans_ instead of destroying it -- drag its output pin onto another
+		// node's empty slot to reattach, or delete it explicitly via its own context menu.
+		auto it = pin_lookup_.find(destroyed_link);
+		if (it != pin_lookup_.end()) {
+			AnimTreeNode* child = it->second.node;
+			AnimTreeNode* old_parent = nullptr;
+			int old_index = -1;
+			if (find_owner(child, old_parent, old_index)) {
+				std::unique_ptr<AnimTreeNode> detached = std::move(old_parent->children[old_index]);
+				old_parent->children.erase(old_parent->children.begin() + old_index);
+				working_orphans_.push_back(std::move(detached));
+				mark_dirty();
+			}
+		}
 	}
 }
 
@@ -909,10 +1131,25 @@ void AnimTreeEditor::draw_graph_tab() {
 	draw_toolbar();
 	ImGui::Separator();
 	float avail_h = ImGui::GetContentRegionAvail().y;
-	ImGui::BeginChild("##at_tree_region", ImVec2(0, avail_h * 0.55f), true);
-	draw_tree();
+	float avail_w = ImGui::GetContentRegionAvail().x;
+	const float splitter_w = 6.f;
+	prop_panel_width_ = std::clamp(prop_panel_width_, 260.f, std::max(260.f, avail_w - 200.f - splitter_w));
+
+	ImGui::BeginChild("##at_canvas_region", ImVec2(avail_w - prop_panel_width_ - splitter_w, avail_h), true);
+	draw_graph_canvas();
 	ImGui::EndChild();
-	ImGui::BeginChild("##at_prop_region", ImVec2(0, 0), true);
+	ImGui::SameLine();
+
+	ImGui::PushID("##at_splitter");
+	ImGui::InvisibleButton("##split", ImVec2(splitter_w, avail_h));
+	if (ImGui::IsItemActive())
+		prop_panel_width_ -= ImGui::GetIO().MouseDelta.x;
+	if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+	ImGui::PopID();
+	ImGui::SameLine();
+
+	ImGui::BeginChild("##at_prop_region", ImVec2(0, avail_h), true);
 	draw_property_panel();
 	ImGui::EndChild();
 }
@@ -924,9 +1161,12 @@ void AnimTreeEditor::draw_overview_tab() {
 	for (auto& e : working_cached_roots_)
 		if (e.second)
 			collect_from_node(*e.second, vars, slots, syncgroups);
+	for (auto& o : working_orphans_)
+		if (o)
+			collect_from_node(*o, vars, slots, syncgroups);
 
 	ImGui::TextWrapped("Cross-reference of every variable/slot/sync-group name used across the whole "
-						"tree (main root + all cached pose roots) -- a typo'd name shows up as its own "
+						"tree (main root + all cached pose roots + unattached nodes) -- a typo'd name shows up as its own "
 						"row instead of silently merging with the intended one.");
 	ImGui::Spacing();
 	draw_overview_table("##ov_vars", "Variables", vars, true);
@@ -935,6 +1175,17 @@ void AnimTreeEditor::draw_overview_tab() {
 }
 
 void AnimTreeEditor::imgui_draw() {
+	// Snapshot "before" state at the start of every frame that isn't already mid-edit-session --
+	// this is what makes it "before" rather than "after": it's taken before any of this frame's
+	// widgets have had a chance to mutate anything. If nothing ends up changing this frame, it's
+	// simply overwritten by the next idle frame's snapshot, cheaply.
+	if (!edit_session_active_)
+		session_before_snapshot_ = capture_snapshot();
+
+	ImGuiIO& io = ImGui::GetIO();
+	if (!io.WantTextInput && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+		command_mgr_->undo();
+
 	if (ImGui::BeginTabBar("##animtree_tabs")) {
 		if (ImGui::BeginTabItem("Graph")) {
 			draw_graph_tab();
@@ -945,6 +1196,15 @@ void AnimTreeEditor::imgui_draw() {
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();
+	}
+
+	// Close the session once nothing's still being interacted with (mouse released, no item has
+	// keyboard focus) -- so a whole drag or a burst of typing lands as one undo step instead of one
+	// per frame. Mirrors EdPropertyGrid.cpp's before/after session capture for entity properties.
+	if (edit_session_active_ && !ImGui::IsAnyMouseDown() && !ImGui::IsAnyItemActive()) {
+		command_mgr_->add_command(new AnimTreeEditCommand(*this, std::move(session_before_snapshot_)));
+		command_mgr_->execute_queued_commands();
+		edit_session_active_ = false;
 	}
 }
 #endif

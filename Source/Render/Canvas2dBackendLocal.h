@@ -20,9 +20,16 @@ public:
 	// "the main window" this frame -- depth-tested batches only get a real depth
 	// attachment when their target is that texture (see design doc: offscreen
 	// depth_test targets are out of scope for v1).
-	void set_depth_texture(IGraphicsTexture* depth, IGraphicsTexture* main_window_render_target) {
+	void set_depth_texture(IGraphicsTexture* depth) {
 		depth_texture = depth;
-		main_window_target = main_window_render_target;
+	}
+
+	// Must be called every frame before render() with whichever texture is
+	// actually going to reach the screen this frame (post-process ping-pong
+	// means that isn't always the same texture) -- batches with target==nullptr
+	// (the common case, drawn via set_target_window()) land here.
+	void set_main_window_target(IGraphicsTexture* target) {
+		main_window_target = target;
 	}
 
 	void render();

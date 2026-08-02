@@ -36,10 +36,10 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "Framework/EditorTheme.h"
-#include "UI/UILoader.h"
-#include "UI/BaseGUI.h"
+#include "UI/FontAsset.h"
+#include "UI/UiAnchor.h"
 #include "UI/OnScreenLogGui.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "UI/Canvas2d.h"
 #include "UI/RmlUi/RmlUiSystem.h"
 #include "Assets/AssetDatabase.h"
@@ -461,7 +461,6 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 
 	SchemaManager::get().init();
 	Input::inst = new Input();
-	UiSystem::inst = new UiSystem();
 	Canvas2d::init();
 	EditorPopupManager::inst = new EditorPopupManager();
 

@@ -70,16 +70,10 @@ const std::string& DecalComponent::get_material_path() const {
 	return raw->get_name();
 }
 
-#include "UI/GUISystemPublic.h"
 class DecalComponentEditorUi : public IComponentEditorUi
 {
 public:
 	DecalComponentEditorUi(DecalComponent* decal) : decal(decal) {}
 	DecalComponent* decal = nullptr;
-	bool draw() final {
-		auto& window = UiSystem::inst->window;
-		// window.draw()
-
-		return false;
-	}
+	bool draw() final { return false; }
 };

@@ -3,7 +3,7 @@
 #include "EditorDocLocal.h"
 #include "Game/Components/RoadNetworkComponent.h"
 #include "Input/InputSystem.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "GameEnginePublic.h"
 #include "Level.h"
 #include <SDL3/SDL_scancode.h>
@@ -18,7 +18,7 @@ void RoadBuilderTool::tick(EditorInputs& inputs)
     if (course_preview.is_built)
         course_preview.debug_draw();
 
-    if (!UiSystem::inst->is_vp_hovered()) return;
+    if (!ViewportSystem::is_vp_hovered()) return;
 
     auto* net = get_or_create_component();
     draw_overlay(net);

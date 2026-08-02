@@ -1,22 +1,21 @@
 #pragma once
-#include "GUISystemPublic.h"
-
+#include "Framework/Config.h"
 #include <deque>
 #include <string>
 
 #include "Framework/Util.h"
-#include "UILoader.h"
+#include "FontAsset.h"
+#include "UI/Canvas2d.h"
 #include "Assets/AssetDatabase.h"
-#include "UI/UIBuilder.h"
 extern ConfigVar ui_disable_screen_log;
 class OnScreenLog
 {
 public:
-	void draw(RenderWindow& b) {
+	void draw() {
 		if (ui_disable_screen_log.get_bool())
 			return;
 
-		auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+		auto font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 
 		float time_now = GetTime();
 		float total_time = time_at_full_opacity + time_to_fade;
@@ -29,8 +28,6 @@ public:
 		int height = 0;
 		for (auto it = items.rbegin(); it != items.rend(); ++it) {
 			const auto& item_text = (*it).text;
-
-			std::string_view sv(item_text.c_str(), item_text.size());
 
 			Color32 color = it->color;
 
@@ -52,17 +49,11 @@ public:
 			glm::ivec2 texoffset = {0, font->base};
 			offset.x += 10;
 			offset.y += 10;
-			// Drawing::draw_text()
 
-			TextShape text;
-			text.rect = Rect2d(offset + texoffset, {0, 0});
-			text.font = font;
-			text.text = sv;
-			text.color = color;
-			b.draw(text);
+			glm::ivec2 pos = offset + texoffset;
+			Canvas2d::draw_text(item_text, pos.x, pos.y, lColor{color.r, color.g, color.b, color.a},
+								 (FontAsset*)font, guiAnchor::TopLeft);
 
-			// b.draw(ws_position + glm::ivec2{ 1,1 } + offset+ texoffset, ws_size, font, sv, { 0,0,0,color.a });
-			// b.draw_text(ws_position+offset+ texoffset, ws_size, font, sv, color);
 			height++;
 		}
 	}

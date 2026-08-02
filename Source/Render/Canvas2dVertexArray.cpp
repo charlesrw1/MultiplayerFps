@@ -11,7 +11,7 @@ void Canvas2dVertexArray::add_sprite_transformed(glm::vec2 size, glm::vec2 uv_ul
 	Canvas2dGeometry::build_sprite_transformed(cpu, size, uv_ul, uv_size, color, transform, z);
 }
 
-void Canvas2dVertexArray::add_text(std::string_view text, glm::vec2 pos, const GuiFont* font, Color32 color,
+void Canvas2dVertexArray::add_text(std::string_view text, glm::vec2 pos, const FontAsset* font, Color32 color,
 									guiAnchor anchor, float z) {
 	Canvas2dGeometry::build_text(cpu, text, pos, font, color, anchor, z);
 }

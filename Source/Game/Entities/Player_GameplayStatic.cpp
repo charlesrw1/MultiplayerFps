@@ -15,13 +15,15 @@
 #include "Physics/Physics2.h"
 #include "Physics/ChannelsAndPresets.h"
 
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
+#include "UI/Canvas2d.h"
 
 #include "Game/GameplayStatic.h"
 #include "Game/Components/MeshComponent.h"
 #include "Game/Components/PhysicsComponents.h"
 
-#include "UI/UILoader.h"
+#include "UI/FontAsset.h"
+#include "UI/UiAnchor.h"
 
 #include "Game/Components/SpawnerComponenth.h"
 #include "Game/Components/ParticleSystemComponent.h"
@@ -61,21 +63,15 @@ void GameplayStatic::reset_debug_text_height() {
 }
 
 void GameplayStatic::debug_text(string text) {
-	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+	auto font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 	auto draw_text = [&](const char* s) {
 		string str = s;
-		TextShape shape;
-		Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
-		glm::ivec2 ofs = GuiHelpers::calc_layout({-100, -10}, guiAnchor::Center, UiSystem::inst->get_vp_rect());
+		Rect2d size = FontAsset::calc_text_size(std::string_view(str), font);
+		glm::ivec2 ofs = calc_layout({-100, -10}, guiAnchor::Center, ViewportSystem::get_vp_rect());
 
-		shape.rect.x = ofs.x;
-		shape.rect.y = ofs.y + size.h + GameplayStatic_debug_text_start;
-		shape.font = font;
-		shape.color = COLOR_WHITE;
-		shape.with_drop_shadow = true;
-		shape.drop_shadow_ofs = 1;
-		shape.text = str;
-		UiSystem::inst->window.draw(shape);
+		const int tx = ofs.x, ty = ofs.y + size.h + GameplayStatic_debug_text_start;
+		Canvas2d::draw_text(str, tx + 1, ty + 1, lColor{0, 0, 0, 255}, (FontAsset*)font, guiAnchor::TopLeft);
+		Canvas2d::draw_text(str, tx, ty, lColor{255, 255, 255, 255}, (FontAsset*)font, guiAnchor::TopLeft);
 		GameplayStatic_debug_text_start += size.h;
 	};
 	draw_text(text.c_str());

@@ -6,7 +6,7 @@
 #include "Game/Components/PhysicsComponents.h"
 #include "Physics/Physics2.h"
 #include "Input/InputSystem.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Debug.h"
 #include "Framework/Util.h"
 #include "Framework/MathLib.h"
@@ -67,7 +67,7 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 		// like BikePlayer::update_camera so the view doesn't snap on every
 		// steering/lean twitch. fly_cam/MMB-orbit input is bypassed entirely
 		// while this is active.
-		UiSystem::inst->set_game_capture_mouse(false);
+		ViewportSystem::set_game_capture_mouse(false);
 
 		const glm::vec3 fwd      = glm::normalize(selected->bike_direction);
 		const glm::vec3 world_up = glm::vec3(0, 1, 0);
@@ -104,7 +104,7 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 	} else if (orbiting && selected) {
 		behind_cam_initialized = false;
 		const glm::vec3 new_target = selected->get_ws_position();
-		UiSystem::inst->set_game_capture_mouse(mmb);
+		ViewportSystem::set_game_capture_mouse(mmb);
 		// Sync position with the target's frame-to-frame delta FIRST, in every
 		// case (MMB held or not). User_Camera::update_from_input's orbit branch
 		// recomputes `distance = length(orbit_target - position)` on every call —
@@ -126,7 +126,7 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 		debug_cam_ent->set_ws_transform(glm::inverse(fly_cam.get_view_matrix()));
 	} else {
 		behind_cam_initialized = false;
-		UiSystem::inst->set_game_capture_mouse(rmb);
+		ViewportSystem::set_game_capture_mouse(rmb);
 		if (fly_cam.can_take_input()) {
 			auto window_size = get_app_window_size();
 			const float aspect = (float)window_size.x / (float)window_size.y;
@@ -225,7 +225,7 @@ void BikeDebugger::update(const std::vector<BikeObject*>& riders)
 				ai->dbg_clamped ? " CLAMPED" : "",
 				state_suffix);
 
-			Debug::add_text_ex(r->get_ws_position() + glm::vec3(0.f, 1.5f, 0.f), text, COLOR_WHITE, 0.f,true,true, true);
+			Debug::add_text_ex(r->get_ws_position() + glm::vec3(0.f, 1.5f, 0.f), text, COLOR_WHITE, 0.f, true, true, false);
 		}
 	}
 }

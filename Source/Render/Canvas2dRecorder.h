@@ -22,7 +22,8 @@ public:
 	// actual frame defaults right after -- this only guarantees nothing leaks forward.
 	void begin_frame();
 
-	void set_target(IGraphicsTexture* new_target, glm::ivec2 new_target_size);
+	// set nullptr if using UI composite texture, default
+	void set_target(Texture* new_target, glm::ivec2 new_target_size);
 	void set_clear(bool clear_color, Color32 color, bool clear_depth);
 	void set_viewport(Rect2d new_viewport);
 	void set_view_matrix(glm::mat4 view);
@@ -30,7 +31,7 @@ public:
 	void push_scissor(Rect2d rect);
 	void pop_scissor();
 
-	IGraphicsTexture* get_target() const { return target; }
+	Texture* get_target() const { return target; }
 	glm::ivec2 get_target_size() const { return target_size; }
 	Rect2d get_viewport() const { return viewport; }
 	glm::mat4 get_view_proj() const;
@@ -48,7 +49,7 @@ public:
 	std::vector<Canvas2dBatch>& get_batches() { return batches; }
 
 private:
-	IGraphicsTexture* target = nullptr;
+	Texture* target = nullptr;
 	glm::ivec2 target_size{0, 0};
 	Rect2d viewport{};
 	glm::mat4 view_matrix{1.f};

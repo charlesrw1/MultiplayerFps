@@ -40,10 +40,10 @@
 
 #include "Framework/FnFactory.h"
 #include "Framework/ConsoleCmdGroup.h"
-#include "UI/BaseGUI.h"
+#include "UI/UiAnchor.h"
 #include "Input/InputSystem.h"
 #include <variant>
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "LevelSerialization/SerializeNew.h"
 #include "DragDropPreview.h"
 #include "DragDetector.h"
@@ -86,7 +86,7 @@ EditorCamera
 
 */
 
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "UI/Widgets/EditorCube.h"
 
 #include "Render/DrawPublic.h"

@@ -366,7 +366,8 @@ static bool projectSphere(vec3 C, float r, float znear, float P00, float P11, ve
 
 	return true;
 }
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
+#include "UI/Canvas2d.h"
 void GpuCullingTest::downsample_depth() {
 	GPU_SCOPE("downsample");
 
@@ -418,14 +419,9 @@ void GpuCullingTest::downsample_depth() {
 			float width = (aabb.z - aabb.x);
 			float height = (aabb.w - aabb.y);
 
-			RectangleShape shape;
 			auto& vs = draw.get_current_frame_vs();
-			shape.rect.w = vs.width * width;
-			shape.rect.h = vs.height * height;
-			shape.rect.x = aabb.x * vs.width;
-			shape.rect.y = aabb.y * vs.height;
-
-			UiSystem::inst->window.draw(shape);
+			Canvas2d::rectangle((int)(aabb.x * vs.width), (int)(aabb.y * vs.height), (int)(vs.width * width),
+								 (int)(vs.height * height), lColor{255, 255, 255, 255});
 		}
 	}
 }

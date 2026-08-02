@@ -29,10 +29,10 @@
 #include "imgui.h"
 #include "imgui_internal.h" // ErrorCheckEndFrameRecover -- see lua_error_loop
 #include "Render/IGraphicsDevice.h"
-#include "UI/UILoader.h"
-#include "UI/BaseGUI.h"
+#include "UI/FontAsset.h"
+#include "UI/UiAnchor.h"
 #include "UI/OnScreenLogGui.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "UI/Canvas2d.h"
 #include "UI/RmlUi/RmlUiSystem.h"
 #include "Assets/AssetDatabase.h"
@@ -72,7 +72,7 @@ ConfigVar r_editor_fast_frame_limit_fps("r.editor_fast_frame_limit_fps", "0",
 										 "editor fps cap while dragging/panning the viewport; 0 = uncapped");
 
 // Free functions defined in EngineMain_Debug.cpp
-extern void debug_shape_ctx_update(float dt);
+extern void debug_shape_ctx_update(float dt, const View_Setup& upcoming_vs);
 extern void debug_shape_ctx_fixed_update_start();
 
 // Unreal-style "stat fps" overlay: current framerate and frametime in the top-right
@@ -81,7 +81,7 @@ static void draw_fps_counter(double dt) {
 	if (!stat_fps.get_bool())
 		return;
 
-	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+	auto font = g_assets.find<FontAsset>("eng/fonts/monospace12.fnt").get();
 	if (!font)
 		return;
 
@@ -99,17 +99,12 @@ static void draw_fps_counter(double dt) {
 	else // <30 fps
 		color = Color32(230, 50, 50, 255);
 
-	Rect2d size = GuiHelpers::calc_text_size_no_wrap(std::string_view(buf), font);
-	glm::ivec2 pos = GuiHelpers::calc_layout({-size.w - 12, 10}, guiAnchor::TopRight, UiSystem::inst->get_vp_rect());
+	Rect2d size = FontAsset::calc_text_size_no_wrap(std::string_view(buf), font);
+	glm::ivec2 pos = calc_layout({-size.w - 12, 10}, guiAnchor::TopRight, ViewportSystem::get_vp_rect());
 
-	TextShape shape;
-	shape.rect = Rect2d(pos, {0, 0});
-	shape.font = font;
-	shape.text = buf;
-	shape.color = color;
-	shape.with_drop_shadow = true;
-	shape.drop_shadow_ofs = 1;
-	UiSystem::inst->window.draw(shape);
+	lColor lcolor{color.r, color.g, color.b, color.a};
+	Canvas2d::draw_text(buf, pos.x + 1, pos.y + 1, lColor{0, 0, 0, 255}, (FontAsset*)font, guiAnchor::TopLeft);
+	Canvas2d::draw_text(buf, pos.x, pos.y, lcolor, (FontAsset*)font, guiAnchor::TopLeft);
 }
 
 struct GameUpdateOuput
@@ -127,7 +122,7 @@ static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap)
 	// Deliberately don't go through the normal scene_draw / editor viewport / property-panel
 	// path here:
 	//  - In the editor, the game view renders into an offscreen texture that only reaches the
-	//    screen via the editor's own docked ImGui panel (UiSystem::draw_imgui_interfaces).
+	//    screen via the editor's own docked ImGui panel (ViewportSystem::draw_imgui_interfaces).
 	//    Reusing the last frame's SceneDrawParamsEx/View_Setup and calling idraw->scene_draw
 	//    directly (the old approach) therefore never actually reached the presented backbuffer
 	//    -- nothing appeared, which is why no BSOD showed up.
@@ -293,13 +288,13 @@ void GameEngineLocal::loop() {
 		CPU_SCOPE("frame_start");
 		// update input
 		Input::inst->pre_events();
-		UiSystem::inst->pre_events();
+		ViewportSystem::pre_events();
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
 			gfx().imgui_process_event(&event);
 			RmlUiSystem::inst->handle_event(event);
 			Input::inst->handle_event(event);
-			UiSystem::inst->handle_event(event);
+			ViewportSystem::handle_event(event);
 
 			switch (event.type) {
 			case SDL_EVENT_QUIT:
@@ -345,7 +340,7 @@ void GameEngineLocal::loop() {
 			// g_guiSystem->handle_event(event);
 		}
 		Input::inst->tick();
-		UiSystem::inst->update();
+		ViewportSystem::update();
 		Canvas2d::update();
 		// Update the messsage queue! does level changing etc.
 		Cmd_Manager::inst->execute_buffer();
@@ -353,7 +348,7 @@ void GameEngineLocal::loop() {
 		agent_bridge_update();
 
 		if (g_window_fullscreen.was_changed())
-			Canvas::set_window_fullscreen(g_window_fullscreen.get_bool());
+			Canvas2d::set_window_fullscreen(g_window_fullscreen.get_bool());
 
 		if (g_engine_ticks_per_frame.get_integer() <= 1) {
 			sub_tick_index_ = -1;
@@ -437,10 +432,10 @@ void GameEngineLocal::loop() {
 	auto imgui_render = [&](const bool skip_rendering) {
 		RENDER_SCOPE("ImGuiUpdate");
 
-		gui_log.draw(UiSystem::inst->window);
+		gui_log.draw();
 		draw_fps_counter(frame_time);
 
-		UiSystem::inst->draw_imgui_interfaces(editor_tool.get());
+		ViewportSystem::draw_imgui_interfaces(editor_tool.get());
 		prof_ui::draw();
 
 		ImGui::Render();
@@ -449,8 +444,8 @@ void GameEngineLocal::loop() {
 		}
 	};
 	// Draw is triggered from within Renderer::scene_draw_internal (right
-	// after windowDrawer->render()), onto the same composite texture the 3D
-	// scene/Gui:: HUD render into - not here. That's what makes RmlUi show up
+	// after canvas2dDrawer->render()), onto the same composite texture the 3D
+	// scene/Canvas2d:: HUD render into - not here. That's what makes RmlUi show up
 	// both in the game's on-screen output (later blitted to backbuffer) and
 	// inside the editor's ImGui scene-viewport image, instead of only being
 	// visible when drawing straight to the backbuffer.
@@ -458,9 +453,21 @@ void GameEngineLocal::loop() {
 		RENDER_SCOPE("RmlUiUpdate");
 		RmlUiSystem::inst->update();
 	};
+	// declared here (rather than down with the other "last game frame" locals below) so the
+	// do_sync_update lambda's [&] capture below can see it -- it's captured by reference before
+	// its first real assignment, same as everything else that lambda captures.
+	View_Setup setupNext;
 	auto do_sync_update = [&]() {
 		CPU_SCOPE("SyncUpdate");
-		debug_shape_ctx_update(frame_time);
+		// Use setupNext (this iteration's freshly-computed camera, not yet
+		// rendered) rather than draw.get_current_frame_vs() -- debug text world
+		// positions are captured this same iteration too, and Canvas2d batches
+		// get consumed one iteration later by the scene_draw call that will
+		// actually use setupNext as its camera. Projecting with the stale
+		// "just rendered" camera instead caused debug text to visibly swim
+		// relative to world geometry whenever the camera moves fast frame to
+		// frame (e.g. BikeDebugger's orbit cam).
+		debug_shape_ctx_update(frame_time, setupNext);
 #ifdef EDITOR_BUILD
 		AssetRegistrySystem::get().update(); // update hot reloading
 #endif
@@ -468,7 +475,6 @@ void GameEngineLocal::loop() {
 		idraw->pre_sync_update();
 		if (get_level())
 			get_level()->sync_level_render_data();
-		UiSystem::inst->sync_to_renderer();
 		Canvas2d::sync_to_renderer();
 		g_physics.sync_render_data();
 		idraw->sync_update();
@@ -477,7 +483,6 @@ void GameEngineLocal::loop() {
 	double last = GetTime() - 0.1;
 	// these are from the last game frame
 	SceneDrawParamsEx drawparamsNext(0, 0);
-	View_Setup setupNext;
 	bool shouldDrawNext = true;
 	bool prev_skip_rendering = true; // nothing submitted yet on the first iteration
 

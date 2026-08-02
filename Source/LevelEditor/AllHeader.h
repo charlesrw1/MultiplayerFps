@@ -3,7 +3,7 @@
 #include "glm/glm.hpp"
 #include "Framework/MulticastDelegate.h"
 #include "IInputReciever.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Game/EntityPtr.h"
 #include "Render/RenderObj.h"
 #include "Render/DrawPublic.h"

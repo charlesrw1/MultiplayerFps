@@ -41,7 +41,7 @@ void FoliagePaintTool::tick(EditorInputs& inputs) {
 	float R = foliage_brush.get_float();
 	const float area = PI * (R * R);
 	const float exclusive_radius = foliage_exdensity.get_float();
-	const bool is_hovered = UiSystem::inst->is_vp_hovered();
+	const bool is_hovered = ViewportSystem::is_vp_hovered();
 
 	if (!is_hovered || !inputs.can_use_mouse_click())
 		return;

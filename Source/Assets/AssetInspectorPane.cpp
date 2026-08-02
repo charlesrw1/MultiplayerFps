@@ -24,8 +24,8 @@
 #include "Assets/AssetBrowser.h"
 #include "Assets/AssetRegistryLocal.h"
 #include "Assets/ScriptableObject.h"
-#include "UI/GUISystemPublic.h"
-#include "Render/RenderWindow.h"
+#include "UI/ViewportSystem.h"
+#include "UI/Canvas2d.h"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <vector>
@@ -806,16 +806,10 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
 // screen-space percentage (fraction of viewport height) -- lets a LOD/cull threshold
 // slider show what that percentage actually looks like on screen while it's being dragged.
 static void draw_screenspace_size_preview(float percentage) {
-    if (!UiSystem::inst) return;
-    const Rect2d vp = UiSystem::inst->get_vp_rect();
+    const Rect2d vp = ViewportSystem::get_vp_rect();
     const int side = (int)std::round(std::clamp(percentage, 0.0f, 1.0f) * vp.h);
-    RectangleShape s;
-    s.rect = Rect2d((vp.w - side) / 2, (vp.h - side) / 2, side, side);
-    s.color = {80, 200, 255, 60};
-    s.with_outline = true;
-    s.outline_color = {80, 200, 255, 220};
-    s.outline_width = 2;
-    UiSystem::inst->window.draw(s);
+    Canvas2d::rectangle((vp.w - side) / 2, (vp.h - side) / 2, side, side, lColor{80, 200, 255, 60});
+    Canvas2d::rectangle_outline((vp.w - side) / 2, (vp.h - side) / 2, side, side, 2, lColor{80, 200, 255, 220});
 }
 
 void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {

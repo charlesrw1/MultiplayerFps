@@ -10,12 +10,11 @@
 #include "Animation/Runtime/Animation.h"
 #include "Debug.h"
 #include <SDL3/SDL.h>
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
-#include "Render/RenderWindow.h"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
@@ -281,8 +280,6 @@ void Renderer::init() {
 	print_time("draw:init_state");
 
 	BuildSceneData_CpuFast::inst = new BuildSceneData_CpuFast;
-	windowDrawer = new RenderWindowBackendLocal();
-	RenderWindowBackend::inst = windowDrawer;
 	canvas2dDrawer = new Canvas2dBackendLocal();
 
 	mem_arena.init("RenderTemp", renderer_memory_arena_size.get_integer());

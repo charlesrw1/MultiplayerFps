@@ -1,7 +1,7 @@
 #pragma once
 
 #include "IInputReciever.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 enum class MouseSelectionAction
 {
 	SELECT_ONLY,
@@ -17,7 +17,7 @@ public:
 		//	ASSERT(mouse_click);
 		mouse_click = false;
 	}
-	bool can_use_keyboard() { return keyboard && !focused_item && !UiSystem::inst->blocking_keyboard_inputs(); }
+	bool can_use_keyboard() { return keyboard && !focused_item && !ViewportSystem::blocking_keyboard_inputs(); }
 	void eat_keyboard() {
 		ASSERT(keyboard);
 		keyboard = false;

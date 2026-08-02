@@ -23,7 +23,7 @@
 #include "imgui.h"
 #include "IEditorTool.h"
 #include "Render/ViewSetup.h"
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 #endif
 
 // Single source of truth for ragdolls: this drives the real RagdollComponent (the same one
@@ -601,7 +601,7 @@ void RagdollConfigComponent::update_drag_in_editor() {
 		drag_body = obj<PhysicsBody>();
 		return;
 	}
-	if (!UiSystem::inst->is_vp_hovered() && !is_dragging) {
+	if (!ViewportSystem::is_vp_hovered() && !is_dragging) {
 		return;
 	}
 
@@ -612,7 +612,7 @@ void RagdollConfigComponent::update_drag_in_editor() {
 	if (!vs)
 		return;
 
-	const auto vp_rect = UiSystem::inst->get_vp_rect();
+	const auto vp_rect = ViewportSystem::get_vp_rect();
 	const auto mouse = Input::get_mouse_pos() - vp_rect.get_pos();
 	const auto vp_size = vp_rect.get_size();
 	if (vp_size.x <= 0 || vp_size.y <= 0)

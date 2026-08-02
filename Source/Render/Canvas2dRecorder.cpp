@@ -16,7 +16,7 @@ void Canvas2dRecorder::begin_frame() {
 	transient_arena.Begin();
 }
 
-void Canvas2dRecorder::set_target(IGraphicsTexture* new_target, glm::ivec2 new_target_size) {
+void Canvas2dRecorder::set_target(Texture* new_target, glm::ivec2 new_target_size) {
 	target = new_target;
 	target_size = new_target_size;
 	state_version++;

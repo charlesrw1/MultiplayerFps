@@ -62,7 +62,6 @@ class Model;
 class Animator;
 class Texture;
 class Entity;
-class RenderWindowBackendLocal;
 
 // ---------------------------------------------------------------------------
 // Renderer — main render pipeline
@@ -359,7 +358,6 @@ public:
 	bool wants_disable_temporal_effects_this_frame() const { return disable_taa_this_frame; }
 
 private:
-	RenderWindowBackendLocal* windowDrawer = nullptr;
 	Canvas2dBackendLocal* canvas2dDrawer = nullptr;
 #ifdef EDITOR_BUILD
 	std::unique_ptr<ThumbnailRenderer> thumbnailRenderer;

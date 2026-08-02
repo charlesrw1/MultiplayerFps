@@ -1,4 +1,4 @@
-#include "UILoader.h"
+#include "FontAsset.h"
 #include <cassert>
 #include "Assets/AssetDatabase.h"
 #include "Assets/AssetRegistry.h"
@@ -8,7 +8,6 @@
 #include "Framework/BinaryReadWrite.h"
 #include "imgui.h"
 #include "GameEnginePublic.h"
-#include "GUISystemPublic.h"
 
 #ifdef EDITOR_BUILD
 class FontAssetMetadata : public AssetMetadata
@@ -20,7 +19,7 @@ public:
 
 	virtual std::string get_type_name() const override { return "Font"; }
 
-	virtual const ClassTypeInfo* get_asset_class_type() const { return &GuiFont::StaticType; }
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &FontAsset::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
 #endif
@@ -30,8 +29,8 @@ REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
 
 #include "Framework/StringUtils.h"
 
-void GuiFont::post_load() {}
-bool GuiFont::load_asset() {
+void FontAsset::post_load() {}
+bool FontAsset::load_asset() {
 
 	auto& path = get_name();
 	auto file = FileSys::open_read_game(path.c_str());
@@ -81,7 +80,7 @@ bool GuiFont::load_asset() {
 	uint32_t numChars = blockSz / 20;
 	for (uint32_t charIdx = 0; charIdx < numChars; charIdx++) {
 
-		GuiFontGlyph glyph;
+		FontGlyph glyph;
 
 		auto id = in.read_int32();
 		glyph.x = in.read_int16();
@@ -97,10 +96,57 @@ bool GuiFont::load_asset() {
 		character_to_glyph.insert({id, glyph});
 	}
 	std::string texpath = StringUtils::get_directory(get_name()) + "/" + texname;
-	font_texture = g_assets.find_sync_sptr<Texture>(texpath); // load->load_asset(&Texture::StaticType, texpath);
+	font_texture = g_assets.find_sync_sptr<Texture>(texpath);
 	return true;
 }
 
-#include "GameEnginePublic.h"
+Rect2d FontAsset::calc_text_size_no_wrap(std::string_view sv, const FontAsset* font) {
+	ASSERT(font);
+	int x = 0;
+	int y = -font->base;
+	for (char c : sv) {
+		auto find = font->character_to_glyph.find(c);
+		if (find == font->character_to_glyph.end()) {
+			x += 10; // empty character
+		} else
+			x += find->second.advance;
+	}
+	return Rect2d(0, y, x, font->lineHeight);
+}
+Rect2d FontAsset::calc_text_size(std::string_view sv, const FontAsset* font, int force_width) {
+	ASSERT(font);
 
-#include "Render/MaterialPublic.h"
+	if (force_width == -1)
+		return calc_text_size_no_wrap(sv, font);
+
+	std::string currentLine;
+	std::string currentWord;
+
+	int x = 0;
+	int y = -font->base;
+	for (char c : sv) {
+		if (c == ' ' || c == '\n') {
+			auto sz = calc_text_size_no_wrap((currentLine + currentWord).c_str(), font);
+			if (sz.w > force_width) {
+				x = glm::max((int)sz.w, x);
+				y += font->lineHeight;
+				currentLine = currentWord + " ";
+			} else
+				currentLine += currentWord + " ";
+			currentWord.clear();
+			if (c == '\n') {
+				y += font->lineHeight;
+				currentLine.clear();
+			}
+		} else
+			currentWord += c;
+	}
+	if (!currentWord.empty()) {
+		currentLine += currentWord;
+
+		x = glm::max((int)calc_text_size_no_wrap(currentLine.c_str(), font).w, x);
+		y += font->lineHeight;
+	}
+
+	return Rect2d(0, -font->base, x, (y + font->base));
+}

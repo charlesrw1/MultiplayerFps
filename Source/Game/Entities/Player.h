@@ -107,7 +107,7 @@ public:
 /// </summary>
 ///
 ///
-#include "UI/GUISystemPublic.h"
+#include "UI/ViewportSystem.h"
 
 struct lVec2
 {
@@ -148,9 +148,9 @@ public:
 	REF static bool was_mouse_released(int button) { return Input::was_mouse_released(button); }
 	REF static lVec2 get_mouse_delta() { return Input::get_mouse_delta(); }
 	REF static lVec2 get_mouse_pos() { return Input::get_mouse_pos(); }
-	REF static void set_capture_mouse(bool b) { UiSystem::inst->set_game_capture_mouse(b); }
+	REF static void set_capture_mouse(bool b) { ViewportSystem::set_game_capture_mouse(b); }
 	REF static bool is_imgui_blocking_inputs() {
-		return UiSystem::inst->blocking_keyboard_inputs() || UiSystem::inst->blocking_mouse_inputs();
+		return ViewportSystem::blocking_keyboard_inputs() || ViewportSystem::blocking_mouse_inputs();
 	}
 };
 

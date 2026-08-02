@@ -5,7 +5,7 @@
 
 void DecalStampTool::tick(EditorInputs& inputs) {
 	auto handle_scroll = [&]() {
-		const bool hovered = UiSystem::inst->is_vp_hovered();
+		const bool hovered = ViewportSystem::is_vp_hovered();
 		const int amt = Input::get_mouse_scroll();
 		if (hovered && !Input::is_mouse_down(1)) {
 			const bool small = Input::is_shift_down();
@@ -43,7 +43,7 @@ void DecalStampTool::tick(EditorInputs& inputs) {
 			decal_comp->set_material(material);
 	}
 
-	const bool is_hovered = UiSystem::inst->is_vp_hovered();
+	const bool is_hovered = ViewportSystem::is_vp_hovered();
 
 	if (!is_hovered || !inputs.can_use_mouse_click())
 		return;

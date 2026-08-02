@@ -12,12 +12,11 @@
 #include "Debug.h"
 #include <SDL3/SDL.h>
 
-#include "UI/GUISystemPublic.h" // for GuiSystemPublic::paint
+#include "UI/ViewportSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/ParticleMgr.h" // FIXME
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
-#include "Render/RenderWindow.h"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
@@ -101,9 +100,6 @@ ConfigVar ddgi_test("dt", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar ddgi_rt("ddrt", "0", CVAR_BOOL | CVAR_DEV, "");
 
 extern void build_frustum_for_cascade(Frustum& f, int index);
-
-RenderWindowBackend* RenderWindowBackend::inst = nullptr;
-#include "RenderWindowLocal.h"
 
 TaaManager r_taa_manager;
 
