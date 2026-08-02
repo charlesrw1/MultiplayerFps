@@ -88,7 +88,14 @@ void RmlUiSystem::init() {
 	last_vp_w = vp.w > 0 ? vp.w : 1;
 	last_vp_h = vp.h > 0 ? vp.h : 1;
 	context = Rml::CreateContext("main", Rml::Vector2i(last_vp_w, last_vp_h));
-	ASSERT(context && "Rml::CreateContext failed");
+	if (!context) {
+		// Expected on backends with no RmlUi render interface (DX11 - see
+		// Dx11Device::rmlui_init). Every other method on this class already
+		// null-checks `context` and no-ops, so the system stays a harmless
+		// stub rather than crashing engine init.
+		sys_print(Warning, "RmlUiSystem: Rml::CreateContext failed (no render interface?) - RmlUi disabled\n");
+		return;
+	}
 
 	// Official RmlUi Lua plugin, bound into the engine's own lua_State
 	// (ScriptManager owns creation/closing of that state; passing an
@@ -151,7 +158,8 @@ void RmlUiSystem::shutdown() {
 }
 
 void RmlUiSystem::update() {
-	ASSERT(context);
+	if (!context)
+		return;
 	Rect2d vp = ViewportSystem::get_vp_rect();
 	const int w = vp.w > 0 ? vp.w : 1;
 	const int h = vp.h > 0 ? vp.h : 1;
@@ -245,7 +253,8 @@ Rml::ElementDocument* RmlUiSystem::find_doc(RmlDocHandle handle) {
 }
 
 RmlDocHandle RmlUiSystem::load_document(const std::string& path) {
-	ASSERT(context);
+	if (!context)
+		return RML_INVALID_DOC;
 	Rml::ElementDocument* doc = context->LoadDocument(path);
 	if (!doc) {
 		sys_print(Error, "RmlUiSystem::load_document failed: %s\n", path.c_str());

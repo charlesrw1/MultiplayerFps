@@ -171,11 +171,12 @@ Dx11Texture::Dx11Texture(const CreateTextureArgs& args) {
 
 	UINT misc_flags = 0;
 	// D3D11_RESOURCE_MISC_GENERATE_MIPS is for textures whose mip chain is
-	// generated at runtime via GenerateMips() (single mip supplied at
-	// creation). It also restricts UpdateSubresource to whole-subresource,
-	// mip-0-only updates - incompatible with assets (e.g. DDS) that upload a
-	// full pre-baked mip chain.
-	if (mips == 1 && (bind_flags & D3D11_BIND_RENDER_TARGET) && (bind_flags & D3D11_BIND_SHADER_RESOURCE)) {
+	// generated at runtime via GenerateMips(). It also restricts
+	// UpdateSubresource to whole-subresource, mip-0-only updates -
+	// incompatible with assets (e.g. DDS) that upload a full pre-baked mip
+	// chain, hence the explicit opt-in flag rather than inferring from
+	// num_mip_maps (see CreateTextureArgs::runtime_generate_mips).
+	if (args.runtime_generate_mips && (bind_flags & D3D11_BIND_RENDER_TARGET) && (bind_flags & D3D11_BIND_SHADER_RESOURCE)) {
 		misc_flags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
 		generates_mips = true;
 	}
@@ -335,15 +336,34 @@ void Dx11Texture::sub_image_upload(int level, int x, int y, int w, int h, int si
 
 void Dx11Texture::sub_image_upload_3d(int z, int level, int x, int y, int w, int h, int size, const void* data) {
 	ASSERT(w > 0 && h > 0 && resource);
+	// For array-shaped textures (2DArray/cubemap/cubemap-array) `z` selects the
+	// array slice -> its own subresource, addressed via D3D11CalcSubresource;
+	// the box itself only spans a single 2D slice (front/back = 0/1). For a
+	// true Texture3D, `z` is a depth offset within the one subresource for
+	// `level`, so it belongs on the box instead. Mirrors GL's
+	// glTextureSubImage3D(..., z, ..., depth=1) which always uploads one
+	// array-layer at a time.
+	const bool is_array = is_2d_array_shaped(my_type);
 	D3D11_BOX box{};
 	box.left = x; box.right = x + w;
 	box.top = y; box.bottom = y + h;
-	box.front = z; box.back = z + 1;
+	box.front = is_array ? 0 : z;
+	box.back = is_array ? 1 : z + 1;
 
 	UINT row_pitch = fmt_info.is_compressed ? (UINT)((w + 3) / 4) * get_compressed_stride() : (UINT)(size / h);
-	const bool is_array = is_2d_array_shaped(my_type);
-	const UINT subresource = is_array ? D3D11CalcSubresource(level, 0, mips) : level;
-	g_dx11_context->UpdateSubresource(resource.Get(), subresource, &box, data, row_pitch, 0);
+	const UINT subresource = is_array ? D3D11CalcSubresource(level, z, mips) : level;
+
+	// Same small-mip / whole-chain constraints as sub_image_upload: BC formats
+	// need 4x4-aligned box coords, and D3D11_RESOURCE_MISC_GENERATE_MIPS
+	// resources only accept whole-subresource updates. Uploads here always
+	// cover the whole mip already (x==y==0), so falling back to a null box is
+	// exact, not approximate.
+	const bool whole_subresource = generates_mips ||
+		(fmt_info.is_compressed && (x != 0 || y != 0 || (w % 4) != 0 || (h % 4) != 0));
+	Microsoft::WRL::ComPtr<ID3D11Device> dev;
+	resource->GetDevice(dev.GetAddressOf());
+	update_subresource_diag(g_dx11_context.Get(), dev.Get(), resource.Get(), subresource,
+							 whole_subresource ? nullptr : &box, data, row_pitch);
 }
 
 void Dx11Texture::clear_image() {

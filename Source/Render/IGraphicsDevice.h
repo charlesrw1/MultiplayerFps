@@ -371,6 +371,14 @@ struct CreateTextureArgs
 	GraphicsSamplerType sampler_type = GraphicsSamplerType::AnisotropyDefault;
 
 	bool float_input_is_16f = false;
+	// Caller intends to upload mip 0 only and then call generate_mipmaps() to
+	// fill the rest in hardware (vs. e.g. DDS assets that upload every mip
+	// level explicitly). DX11 needs this at creation time:
+	// D3D11_RESOURCE_MISC_GENERATE_MIPS restricts UpdateSubresource to mip 0
+	// only, so it can't be inferred from num_mip_maps alone (make_from_data
+	// allocates the full chain up front, uploads mip 0, then generates the
+	// rest). GL ignores this - glGenerateMipmap has no such restriction.
+	bool runtime_generate_mips = false;
 };
 
 struct CreateBufferArgs

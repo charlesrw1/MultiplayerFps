@@ -50,12 +50,65 @@ CompilerHLSL, SM5.0) -> DXBC (`D3DCompile`).
   `test_spirv_pipeline.cpp` gained `renderer/spirv_hlsl_dxbc`, exercising the
   HLSL->DXBC leg end to end.
 
+## D7+ — post-doc regressions found resuming this work (in progress)
+
+DX11 hadn't been exercised since the D7-follow-up commits (`9bd9768d`,
+`d3357d8d`); RmlUi integration landed on top afterwards as OpenGL-only
+(`2d80ce00` et al.) without gating DX11. Full-game-pass boot
+(`-Backend dx11`) was broken from engine init onward. Fixed so far:
+
+- **RmlUi crash on DX11 boot**: `RmlUiSystem::init()` unconditionally
+  asserted `Rml::CreateContext()` succeeded, but DX11's `rmlui_init()` is an
+  intentional no-op (RmlUi render interface is OpenGL-only, see
+  `Dx11Device.cpp`) so `Rml::SetRenderInterface` is never called and
+  `CreateContext` legitimately returns null. `RmlUiSystem::init/update/
+  load_document` now null-check `context` and no-op instead of asserting —
+  matches the pattern every other method on the class already used.
+- **`Dx11Texture::sub_image_upload_3d` array-slice bug**: for 2DArray/
+  cubemap/cubemap-array textures, `z` (the array slice) was only applied to
+  the upload box's depth range (`box.front/back`), while the subresource
+  index was hardcoded to array-slice 0 via `D3D11CalcSubresource(level, 0,
+  mips)` — every slice past 0 uploaded to the wrong subresource with an
+  invalid box. Fixed: array-shaped textures route `z` into
+  `D3D11CalcSubresource(level, z, mips)` and keep the box at depth [0,1];
+  true `t3D` volumes keep `z` on the box as before. Also ported the
+  existing 4x4 BC-alignment / `generates_mips` whole-subresource fallback
+  from `sub_image_upload` into this path (was missing, tripped on small
+  cubemap mips).
+- **`D3D11_RESOURCE_MISC_GENERATE_MIPS` misapplied**: was gated on
+  `mips == 1` at texture-creation time, but the one real caller
+  (`TextureUpload.cpp::make_from_data`) allocates the full computed mip
+  chain up front and calls `generate_mipmaps()` after uploading mip 0 —
+  legal in D3D11 (the flag doesn't require `MipLevels == 1`) but never hit
+  the `mips==1` gate, so `GenerateMips()` ran on a resource created without
+  the flag. Replaced the inference with an explicit
+  `CreateTextureArgs::runtime_generate_mips` opt-in (GL ignores it).
+
+**Not yet fixed** (surfaced by the same `-Backend dx11 renderer/*` run,
+first test only — `compact_instances_smoke`):
+- `ID3D11Device::CreateInputLayout`: a `R16G16B16A16_UINT` vertex element at
+  byte offset 26 violates DX11's 4-byte-alignment requirement for that
+  format (GL has no such constraint) — likely the compact-instance packed
+  format (`CompactInstancePack`, 24-byte record). Needs either padding the
+  shared layout or a DX11-specific split into aligned elements.
+- Several shader/pipeline binding-table mismatches during `Draw`: SRV
+  dimension `TEXTURE2D` bound where the shader/pipeline expects `BUFFER`
+  (and vice versa) at multiple slots; a comparison-filtering sampler
+  expected at slot 0 with none bound (shadow sampling); repeated
+  `Vertex Shader - Pixel Shader linkage error: SV_Position ... mismatched
+  hardware registers` — likely an spirv-cross HLSL codegen issue for
+  specific shaders, not yet isolated to one shader/pass. Full DX11 game-pass
+  boot doesn't yet reach a clean run of `renderer/*`; needs one bug at a
+  time, ideally isolated per shader/pass via `-Pattern` before attempting
+  `test_dx11_parity.cpp` below.
+
 ## Remaining / out of scope for M1
 
 - **`test_dx11_parity.cpp`** (M1 gate, not yet written): port of
   `test_sdl3_parity` shape — same scene on both backends, SSIM >= 0.98 per
   pass (G-buffer MRT, shadows, deferred, decals, SSAO, SSR, TAA, bloom,
-  composite).
+  composite). Blocked on the D7+ issues above — a real diff test needs the
+  game pass to actually complete on DX11 first.
 - **Scaled `blit_textures`**: shader blit pass, deferred until a call site
   needs it (currently all 1:1).
 - **`multi_draw_elements_indirect_count`**: `DX11_STUB`, no GPU-driven
