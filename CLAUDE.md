@@ -51,7 +51,7 @@ Engine uses depth buffer is reverse-Z, standard perspective projection matrix is
 
 ## Documentation
 
-Some limited project documentation lives under `docs/`. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases. 
+Some limited project documentation lives under `docs/`. Documentation should follow `SD-STE100 Simplified Technical English` rules.
 
 ## Feature Workflow (GitHub Issues)
 

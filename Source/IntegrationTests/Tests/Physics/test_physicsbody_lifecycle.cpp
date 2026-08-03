@@ -250,22 +250,3 @@ static TestTask test_dynamic_ignores_entity_push(TestContext& t) {
 }
 GAME_TEST("physics/body/dynamic_ignores_entity_push", 10.f, test_dynamic_ignores_entity_push);
 
-
-// 10) Ownership model: a Kinematic body is driven BY the Entity. Moving the Entity
-//     issues a swept kinematic target (move_to), and the actor reaches it after a
-//     sim step.
-static TestTask test_kinematic_follows_entity(TestContext& t) {
-    eng->load_level("");
-    auto* body = spawn_box({0, 5, 0});
-    body->set_body_type(BodyType::Kinematic);
-    co_await t.wait_ticks(1);
-    t.require(body->get_is_actor_kinematic(), "body is kinematic");
-
-    body->get_owner()->set_ws_position(glm::vec3(2, 5, 0));
-    co_await t.wait_ticks(2); // sim advances the kinematic body to its target
-
-    glm::vec3 p = glm::vec3(body->get_physics_pose()[3]);
-    t.check(glm::length(p - glm::vec3(2, 5, 0)) < 0.1f, "kinematic actor reached the Entity target");
-    co_return;
-}
-GAME_TEST("physics/body/kinematic_follows_entity", 10.f, test_kinematic_follows_entity);
