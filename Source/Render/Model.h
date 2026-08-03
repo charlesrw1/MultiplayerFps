@@ -141,6 +141,7 @@ struct MeshLod
 extern glm::vec4 bounds_to_sphere(Bounds b);
 
 class PhysicsMaterialWrapper;
+GENERATED_CLASS_INCLUDE(Physics/Physics2.h)
 class MSkeleton;
 class PhysicsBodyDefinition;
 class Model : public IAsset

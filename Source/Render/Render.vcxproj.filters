@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Dx11">
+      <UniqueIdentifier>{1cd5ce4a-22a8-5b57-bb44-30384dc38db3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor">
+      <UniqueIdentifier>{a5e55ab0-70ad-5106-82df-409e5a9d342f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RT">
+      <UniqueIdentifier>{2d5e9aec-a031-5fe7-aefc-4dc1e24b9b8b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DdsExport.cpp" />
+    <ClCompile Include="DecalBatcher.cpp" />
+    <ClCompile Include="DrawLocal_Misc.cpp" />
+    <ClCompile Include="DrawLocal_Device.cpp" />
+    <ClCompile Include="DrawLocal_Init.cpp" />
+    <ClCompile Include="DrawLocal_RenderPass.cpp" />
+    <ClCompile Include="DrawLocal_Scene.cpp" />
+    <ClCompile Include="DrawLocal_Lighting.cpp" />
+    <ClCompile Include="DrawLocal_Editor.cpp" />
+    <ClCompile Include="DrawLocal_SceneDraw.cpp" />
+    <ClCompile Include="DrawLocal_SceneDrawInternal.cpp" />
+    <ClCompile Include="DrawLocal_Debug.cpp" />
+    <ClCompile Include="DrawLocal_BatchScene.cpp" />
+    <ClCompile Include="DrawLocal_CullShadow.cpp" />
+    <ClCompile Include="EnvProbe.cpp" />
+    <ClCompile Include="Frustum.cpp" />
+    <ClCompile Include="GpuAllocator.cpp" />
+    <ClCompile Include="GpuCullingTest.cpp" />
+    <ClCompile Include="MaterialLocal.cpp" />
+    <ClCompile Include="MaterialLocal_Loading.cpp" />
+    <ClCompile Include="MaterialLocal_Manager.cpp" />
+    <ClCompile Include="MaterialLocal_Shader.cpp" />
+    <ClCompile Include="Model.cpp" />
+    <ClCompile Include="ModelGpuUpload.cpp" />
+    <ClCompile Include="ModelLoad.cpp" />
+    <ClCompile Include="ModelDynamic.cpp" />
+    <ClCompile Include="OpenGlDevice.cpp" />
+    <ClCompile Include="OpenGlBufferImpl.cpp" />
+    <ClCompile Include="OpenGlShaderImpl.cpp" />
+    <ClCompile Include="OpenGlTextureImpl.cpp" />
+    <ClCompile Include="GraphicsDeviceCommon.cpp" />
+    <ClCompile Include="Dx11\Dx11Device.cpp">
+      <Filter>Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Dx11\Dx11TextureImpl.cpp">
+      <Filter>Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Dx11\Dx11BufferImpl.cpp">
+      <Filter>Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Dx11\Dx11ShaderImpl.cpp">
+      <Filter>Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Dx11\Dx11PipelineImpl.cpp">
+      <Filter>Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="PPManager.cpp" />
+    <ClCompile Include="PostProcessSettings.cpp" />
+    <ClCompile Include="RenderExtra.cpp" />
+    <ClCompile Include="RenderExtra_LightCookieAtlas.cpp" />
+    <ClCompile Include="RenderExtra_SSR.cpp" />
+    <ClCompile Include="RenderGiManager.cpp" />
+    <ClCompile Include="RenderScene.cpp" />
+    <ClCompile Include="Canvas2dTypes.cpp" />
+    <ClCompile Include="Canvas2dGpuMesh.cpp" />
+    <ClCompile Include="Canvas2dRecorder.cpp" />
+    <ClCompile Include="Canvas2dVertexArray.cpp" />
+    <ClCompile Include="Canvas2dBackendLocal.cpp" />
+    <ClCompile Include="RT\RaytraceTest.cpp">
+      <Filter>RT</Filter>
+    </ClCompile>
+    <ClCompile Include="RT\RaytraceTest_BVH.cpp">
+      <Filter>RT</Filter>
+    </ClCompile>
+    <ClCompile Include="RT\RaytraceTest_Probe.cpp">
+      <Filter>RT</Filter>
+    </ClCompile>
+    <ClCompile Include="RT\RaytraceTest_Shade.cpp">
+      <Filter>RT</Filter>
+    </ClCompile>
+    <ClCompile Include="Shadowmap.cpp" />
+    <ClCompile Include="Ssao.cpp" />
+    <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="TextureDDS.cpp" />
+    <ClCompile Include="TextureUpload.cpp" />
+    <ClCompile Include="Volumetricfog.cpp" />
+    <ClCompile Include="RmlUiRenderInterface.cpp" />
+    <ClCompile Include="Meshlet.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DynamicMaterialPtr.h" />
+    <ClInclude Include="Dx11\Dx11Local.h">
+      <Filter>Dx11</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuAllocator.h" />
+    <ClInclude Include="GpuCullingTest.h" />
+    <ClInclude Include="IGraphicsDevice.h" />
+    <ClInclude Include="ShaderSourceLoader.h" />
+    <ClInclude Include="SpirvCompile.h" />
+    <ClInclude Include="ModelManager.h" />
+    <ClInclude Include="RectPackerUtil.h" />
+    <ClInclude Include="RenderConfigVars.h" />
+    <ClInclude Include="RenderGiManager.h" />
+    <ClInclude Include="RT\RaytraceTest.h">
+      <Filter>RT</Filter>
+    </ClInclude>
+    <ClInclude Include="ViewSetup.h" />
+    <ClInclude Include="Canvas2dTypes.h" />
+    <ClInclude Include="Canvas2dGpuMesh.h" />
+    <ClInclude Include="Canvas2dRecorder.h" />
+    <ClInclude Include="Canvas2dVertexArray.h" />
+    <ClInclude Include="Canvas2dBackendLocal.h" />
+    <ClInclude Include="RmlUiRenderInterface.h" />
+    <ClInclude Include="DrawLocal.h" />
+    <ClInclude Include="DrawPublic.h" />
+    <ClInclude Include="DrawTypedefs.h" />
+    <ClInclude Include="Editor\TextureEditor.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EnvProbe.h" />
+    <ClInclude Include="Frustum.h" />
+    <ClInclude Include="Meshlet.h" />
+    <ClInclude Include="Model.h" />
+    <ClInclude Include="MaterialLocal.h" />
+    <ClInclude Include="MaterialPublic.h" />
+    <ClInclude Include="PPManager.h" />
+    <ClInclude Include="PostProcessSettings.h" />
+    <ClInclude Include="RenderExtra.h" />
+    <ClInclude Include="RenderObj.h" />
+    <ClInclude Include="RenderScene.h" />
+    <ClInclude Include="Render_Decal.h" />
+    <ClInclude Include="Render_Light.h" />
+    <ClInclude Include="Render_Sun.h" />
+    <ClInclude Include="Render_Volumes.h" />
+    <ClInclude Include="Texture.h" />
+    <ClInclude Include="CompactInstancePack.h" />
+    <ClInclude Include="DrawLocalConfigVars.h" />
+    <ClInclude Include="DrawLocal_Batching.h" />
+    <ClInclude Include="DrawLocal_Device.h" />
+    <ClInclude Include="DrawLocal_Helpers.h" />
+    <ClInclude Include="DynamicModelPtr.h" />
+    <ClInclude Include="OpenGlDeviceLocal.h" />
+    <ClInclude Include="RT\RaytraceTest_internal.h">
+      <Filter>RT</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderLevelParams.h" />
+    <ClInclude Include="TaaManager.h" />
+  </ItemGroup>
+</Project>

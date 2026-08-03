@@ -1,4 +1,4 @@
-// **** GENERATED SOURCE FILE version:1 2026-07-29 15:01:23 ****
+// **** GENERATED SOURCE FILE version:1 2026-08-03 10:43:49 ****
 #include "Framework/ReflectionProp.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/VectorReflect2.h"
@@ -12,6 +12,10 @@
 #include "./MyGame\fps/fpsObjects.h"
 #include "./MyGame\fps/fpsTestObjects.h"
 
+void push_lVec3_to_lua(lua_State* L, const lVec3& value);
+lVec3 get_lVec3_from_lua(lua_State* L, int index);
+void push_lQuat_to_lua(lua_State* L, const lQuat& value);
+lQuat get_lQuat_from_lua(lua_State* L, int index);
 int lua_binding_fpsIDamageable_deal_damage(lua_State* L)
 {
 	ClassBase* obj = get_object_from_lua(L,1);

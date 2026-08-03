@@ -883,7 +883,7 @@ def parse_file(file_path:str, typenames:dict[str,ClassDef]):
                     if start_p == -1 or end_p == -1:
                         raise Exception("expcted GENERATED_CLASS_INCLUDE(...)")
                     include_name : str = line[start_p+1:end_p].strip()
-                    additional_includes.append(include_name)
+                    additional_includes.append(f'"{include_name}"')
                 elif line.startswith("//"):
                     current_comments.append(line[2:])
                 else:

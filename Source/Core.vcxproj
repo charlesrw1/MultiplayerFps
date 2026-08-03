@@ -190,92 +190,6 @@
     <ClCompile Include="Game\Components\RoadNetworkComponent.cpp" />
     <ClCompile Include="LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Logging.cpp" />
-    <ClCompile Include="Render\DdsExport.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Render\DecalBatcher.cpp" />
-    <ClCompile Include="Render\DrawLocal_Misc.cpp" />
-    <ClCompile Include="Render\DrawLocal_Device.cpp" />
-    <ClCompile Include="Render\DrawLocal_Init.cpp" />
-    <ClCompile Include="Render\DrawLocal_RenderPass.cpp" />
-    <ClCompile Include="Render\DrawLocal_Scene.cpp" />
-    <ClCompile Include="Render\DrawLocal_Lighting.cpp" />
-    <ClCompile Include="Render\DrawLocal_Editor.cpp" />
-    <ClCompile Include="Render\DrawLocal_SceneDraw.cpp" />
-    <ClCompile Include="Render\DrawLocal_SceneDrawInternal.cpp" />
-    <ClCompile Include="Render\DrawLocal_Debug.cpp" />
-    <ClCompile Include="Render\DrawLocal_BatchScene.cpp" />
-    <ClCompile Include="Render\DrawLocal_CullShadow.cpp" />
-    <ClCompile Include="Render\EnvProbe.cpp" />
-    <ClCompile Include="Render\Frustum.cpp" />
-    <ClCompile Include="Render\GpuAllocator.cpp" />
-    <ClCompile Include="Render\GpuCullingTest.cpp" />
-    <ClCompile Include="Render\MaterialLocal.cpp" />
-    <ClCompile Include="Render\MaterialLocal_Loading.cpp" />
-    <ClCompile Include="Render\MaterialLocal_Manager.cpp" />
-    <ClCompile Include="Render\MaterialLocal_Shader.cpp" />
-    <!-- MaterialLocal_ShaderGen moved to AssetTools project -->
-    <ClCompile Include="Render\Model.cpp" />
-    <ClCompile Include="Render\ModelGpuUpload.cpp" />
-    <ClCompile Include="Render\ModelLoad.cpp" />
-    <ClCompile Include="Render\ModelDynamic.cpp" />
-    <ClCompile Include="Render\OpenGlDevice.cpp" />
-    <ClCompile Include="Render\OpenGlBufferImpl.cpp" />
-    <ClCompile Include="Render\OpenGlShaderImpl.cpp" />
-    <ClCompile Include="Render\OpenGlTextureImpl.cpp" />
-    <ClCompile Include="Render\GraphicsDeviceCommon.cpp" />
-    <ClCompile Include="Render\Dx11\Dx11Device.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Render\Dx11\Dx11TextureImpl.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Render\Dx11\Dx11BufferImpl.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Render\Dx11\Dx11ShaderImpl.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Render\Dx11\Dx11PipelineImpl.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <!-- ShaderSourceLoader and SpirvCompile moved to AssetTools project -->
-    <ClCompile Include="Render\PPManager.cpp" />
-    <ClCompile Include="Render\PostProcessSettings.cpp" />
-    <ClCompile Include="Render\RenderExtra.cpp" />
-    <ClCompile Include="Render\RenderExtra_LightCookieAtlas.cpp" />
-    <ClCompile Include="Render\RenderExtra_SSR.cpp" />
-    <ClCompile Include="Render\RenderGiManager.cpp" />
-    <ClCompile Include="Render\RenderScene.cpp" />
-    <ClCompile Include="Render\Canvas2dTypes.cpp" />
-    <ClCompile Include="Render\Canvas2dGpuMesh.cpp" />
-    <ClCompile Include="Render\Canvas2dRecorder.cpp" />
-    <ClCompile Include="Render\Canvas2dVertexArray.cpp" />
-    <ClCompile Include="Render\Canvas2dBackendLocal.cpp" />
-    <ClCompile Include="Render\RT\RaytraceTest.cpp" />
-    <ClCompile Include="Render\RT\RaytraceTest_BVH.cpp" />
-    <ClCompile Include="Render\RT\RaytraceTest_Probe.cpp" />
-    <ClCompile Include="Render\RT\RaytraceTest_Shade.cpp" />
-    <ClCompile Include="Render\Shadowmap.cpp" />
-    <ClCompile Include="Render\Ssao.cpp" />
-    <ClCompile Include="Render\Texture.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Render\TextureDDS.cpp" />
-    <ClCompile Include="Render\TextureUpload.cpp" />
-    <ClCompile Include="Render\Volumetricfog.cpp" />
     <ClCompile Include="Scripting\LuaTestRunner.cpp" />
     <ClCompile Include="Scripting\ScriptFunctionCodegen.cpp" />
     <ClCompile Include="Scripting\LuaTransform.cpp" />
@@ -292,7 +206,6 @@
     <ClCompile Include="UI\RmlUi\RmlUiSystem.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiSystemInterface.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiDebugMenu.cpp" />
-    <ClCompile Include="Render\RmlUiRenderInterface.cpp" />
     <ClCompile Include="User_Camera.cpp" />
     <ClInclude Include="Animation\AnimationTypes.h" />
     <ClInclude Include="Animation\AnimationUtil.h" />
@@ -390,18 +303,6 @@
     <ClInclude Include="ITestRunner.h" />
     <ClInclude Include="LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Logging.h" />
-    <ClInclude Include="Render\DynamicMaterialPtr.h" />
-    <ClInclude Include="Render\Dx11\Dx11Local.h" />
-    <ClInclude Include="Render\GpuAllocator.h" />
-    <ClInclude Include="Render\GpuCullingTest.h" />
-    <ClInclude Include="Render\IGraphicsDevice.h" />
-    <ClInclude Include="Render\ShaderSourceLoader.h" />
-    <ClInclude Include="Render\SpirvCompile.h" />
-    <ClInclude Include="Render\ModelManager.h" />
-    <ClInclude Include="Render\RectPackerUtil.h" />
-    <ClInclude Include="Render\RenderConfigVars.h" />
-    <ClInclude Include="Render\RenderGiManager.h" />
-    <ClInclude Include="Render\RT\RaytraceTest.h" />
     <ClInclude Include="Framework\Hashmap.h" />
     <ClInclude Include="Framework\Hashset.h" />
     <ClInclude Include="Game\Components\CameraComponent.h" />
@@ -502,7 +403,6 @@
     <ClInclude Include="Input\InputSystem.h" />
     <ClInclude Include="Level.h" />
     <ClInclude Include="Physics\Physics2Local.h" />
-    <ClInclude Include="Render\ViewSetup.h" />
     <ClInclude Include="Scripting\LuaTestRunner.h" />
     <ClInclude Include="Scripting\ScriptFunctionCodegen.h" />
     <ClInclude Include="Scripting\LuaTransform.h" />
@@ -511,39 +411,12 @@
     <ClInclude Include="Scripting\ScriptManager.h" />
     <ClInclude Include="Sound\SoundComponent.h" />
     <ClInclude Include="Testheader.h" />
-    <ClInclude Include="Render\Canvas2dTypes.h" />
-    <ClInclude Include="Render\Canvas2dGpuMesh.h" />
-    <ClInclude Include="Render\Canvas2dRecorder.h" />
-    <ClInclude Include="Render\Canvas2dVertexArray.h" />
-    <ClInclude Include="Render\Canvas2dBackendLocal.h" />
     <ClInclude Include="UI\Canvas2d.h" />
     <ClInclude Include="UI\OnScreenLogGui.h" />
     <ClInclude Include="UI\RmlUi\RmlUiSystem.h" />
     <ClInclude Include="UI\RmlUi\RmlUiSystemInterface.h" />
-    <ClInclude Include="UI\RmlUi\RmlUiRenderHook.h" />
-    <ClInclude Include="Render\RmlUiRenderInterface.h" />
     <ClInclude Include="Physics\ChannelsAndPresets.h" />
     <ClInclude Include="Physics\Physics2.h" />
-    <ClInclude Include="Render\DrawLocal.h" />
-    <ClInclude Include="Render\DrawPublic.h" />
-    <ClInclude Include="Render\DrawTypedefs.h" />
-    <ClInclude Include="Render\Editor\TextureEditor.h" />
-    <ClInclude Include="Render\EnvProbe.h" />
-    <ClInclude Include="Render\Frustum.h" />
-    <ClInclude Include="Render\Meshlet.h" />
-    <ClInclude Include="Render\Model.h" />
-    <ClInclude Include="Render\MaterialLocal.h" />
-    <ClInclude Include="Render\MaterialPublic.h" />
-    <ClInclude Include="Render\PPManager.h" />
-    <ClInclude Include="Render\PostProcessSettings.h" />
-    <ClInclude Include="Render\RenderExtra.h" />
-    <ClInclude Include="Render\RenderObj.h" />
-    <ClInclude Include="Render\RenderScene.h" />
-    <ClInclude Include="Render\Render_Decal.h" />
-    <ClInclude Include="Render\Render_Light.h" />
-    <ClInclude Include="Render\Render_Sun.h" />
-    <ClInclude Include="Render\Render_Volumes.h" />
-    <ClInclude Include="Render\Texture.h" />
     <ClInclude Include="Sound\SoundPublic.h" />
     <ClInclude Include="User_Camera.h" />
     <ClInclude Include="UI\FontAsset.h" />
@@ -594,7 +467,6 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Assets\AssetSizeViewer.cpp" />
-    <ClCompile Include="Render\Meshlet.cpp" />
     <ClCompile Include="Sound\SoundComponent.cpp" />
     <ClCompile Include="Sound\SoundLocal.cpp" />
     <ClInclude Include="Sound\SoundLocal.h" />
@@ -820,7 +692,7 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <PropertyGroup>
-    <CodegenExcludeExtra>$(ProjectDir)MyGame\**;$(ProjectDir)LevelEditor\**</CodegenExcludeExtra>
+    <CodegenExcludeExtra>$(ProjectDir)MyGame\**;$(ProjectDir)LevelEditor\**;$(ProjectDir)Render\**</CodegenExcludeExtra>
   </PropertyGroup>
   <Import Project="$(SolutionDir)Scripts\GameProjectCodegen.targets" />
   <!-- Regenerates docs/console_commands.json from `@cmd:`/`@usage:` comments above console

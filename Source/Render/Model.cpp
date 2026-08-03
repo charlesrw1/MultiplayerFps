@@ -31,6 +31,7 @@
 #include "Assets/AssetRegistry.h"
 
 #include "Assets/AssetDatabase.h"
+#include "Framework/StringUtils.h"
 
 ModelMan g_modelMgr;
 

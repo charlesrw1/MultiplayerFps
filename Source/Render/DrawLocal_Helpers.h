@@ -34,6 +34,8 @@ extern ConfigVar enable_ssao;
 extern ConfigVar use_halfres_reflections;
 extern ConfigVar r_indirect_loop;
 
+void update_debug_grid();
+
 // ---------------------------------------------------------------------------
 // 3-D texture wrapper + Perlin generator
 // ---------------------------------------------------------------------------

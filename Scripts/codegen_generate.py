@@ -871,10 +871,19 @@ def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,
         print(f"Writing {generated_path}")
         if len(classes)>0:
             file.write(write_headers(root+"/"+filename, additional_includes))
+            # lVec3/lQuat are defined (and their push/get_..._from_lua bodies generated) only by
+            # whichever pass scans the file that declares them - but any split-out project's own
+            # reflected methods can still take them as Lua-bound parameters. Forward-declare both
+            # unconditionally so every pass's generated file compiles regardless of which pass
+            # owns the definition; redeclaring a function prototype twice (including here, in the
+            # owning pass) is harmless.
+            output = "void push_lVec3_to_lua(lua_State* L, const lVec3& value);\n"
+            output += "lVec3 get_lVec3_from_lua(lua_State* L, int index);\n"
+            output += "void push_lQuat_to_lua(lua_State* L, const lQuat& value);\n"
+            output += "lQuat get_lQuat_from_lua(lua_State* L, int index);\n"
             # write struct stubs first
-            output = ""
             for c in classes:
-                if c.object_type == ClassDef.TYPE_STRUCT:
+                if c.object_type == ClassDef.TYPE_STRUCT and c.classname not in ("lVec3", "lQuat"):
                     output += f"void push_{c.classname}_to_lua(lua_State* L, const {c.classname}& value);\n"
                     output += f"{c.classname} get_{c.classname}_from_lua(lua_State* L, int index);\n"
             file.write(output)

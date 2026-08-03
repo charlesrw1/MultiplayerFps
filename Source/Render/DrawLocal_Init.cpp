@@ -19,6 +19,7 @@
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
+#include "Render/TaaManager.h"
 #include "Framework/ArenaStd.h"
 #include <algorithm>
 

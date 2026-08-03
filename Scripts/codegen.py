@@ -8,7 +8,7 @@ BASE_SKIP_DIRS = ["./.generated","./External"]
 # Sibling project dirs that have their own codegen pass (own vcxproj + own mega file).
 # Core's own pass (path==".") must skip these so it doesn't double-generate their classes.
 # Add one line here whenever a new project splits itself out of Core.
-SPLIT_PROJECT_DIRS = ["./MyGame", "./LevelEditor"]
+SPLIT_PROJECT_DIRS = ["./MyGame", "./LevelEditor", "./Render"]
 FULL_REBUILD = False
 LUA_OUTPUT_PATH = "./../TestFilesData/scripts"
 

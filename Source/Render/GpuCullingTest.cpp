@@ -1,4 +1,5 @@
 #include "GpuCullingTest.h"
+#include "glad/glad.h"
 
 GpuCullingTest::GpuCullingTest() {
 

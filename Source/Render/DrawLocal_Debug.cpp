@@ -22,7 +22,7 @@
 #include "Framework/ArenaStd.h"
 #include <algorithm>
 
-static void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front) {
+void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front) {
 	vec3 up = vec3(0, -1, 0);
 	switch (idx) {
 	case 0:
