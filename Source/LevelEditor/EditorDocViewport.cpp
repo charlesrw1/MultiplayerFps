@@ -33,6 +33,8 @@
 #include "Game/EditorAddMenu.h"
 #include "Game/Components/PrefabAssetComponent.h"
 #include "Game/Prefab.h"
+#include "Game/Components/LightComponents.h"
+#include "Framework/Files.h"
 #include "Debug.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>

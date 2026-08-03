@@ -67,9 +67,6 @@
     <Filter Include="Input">
       <UniqueIdentifier>{f3317ce5-d24d-51d3-ac2f-50b7e4b5641e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="LevelEditor">
-      <UniqueIdentifier>{9a30c6a2-c810-5cc3-9d31-b28efd675009}</UniqueIdentifier>
-    </Filter>
     <Filter Include="LevelSerialization">
       <UniqueIdentifier>{c38509c2-f9be-5936-91ec-4a675db83563}</UniqueIdentifier>
     </Filter>
@@ -503,105 +500,6 @@
       <Filter>Input</Filter>
     </ClCompile>
     <ClCompile Include="Level.cpp" />
-    <ClCompile Include="LevelEditor\AddEditorCommands.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\Commands.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\CommandsComponent.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\CommandsParenting.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\CommandsPrefab.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\CommandsUndoRedo.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\DecalStampTool.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\DragDetector.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\DragDropPreview.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\EditorDocInput.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\EditorDocLocal.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\EditorDocScene.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\EditorDocViewport.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\EditorRecents.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\EditorUILayout.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\EdPropertyGrid.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\FoliagePaintTool.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\LevelEditorCamera.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\ManipulateTransformTool.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\ObjectOutliner.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\ObjectOutlinerContextMenu.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\ObjectOutlinerDraw.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\ObjectOutlinerFilter.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\OrthoCamera.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\PropertyEditors.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\RoadBuilderTool.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\RoadBuilderTool_Helpers.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\RoadBuilderTool_Overlay.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\RoadBuilderTool_Tick.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\SceneExport.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\SelectionMode.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\SelectionState.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="LevelEditor\ViewportHandles.cpp">
-      <Filter>LevelEditor</Filter>
-    </ClCompile>
     <ClCompile Include="LevelSerialization\SerializeNew.cpp">
       <Filter>LevelSerialization</Filter>
     </ClCompile>
@@ -1411,63 +1309,6 @@
     </ClInclude>
     <ClInclude Include="ITestRunner.h" />
     <ClInclude Include="Level.h" />
-    <ClInclude Include="LevelEditor\Commands.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\DragDetector.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\DragDropPreview.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\EditorDocLocal.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\EditorInputs.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\EditorModes.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\EditorRecents.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\EditorUILayout.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\EdPropertyGrid.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\IEditorApi.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\IInputReciever.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\LevelEditorCamera.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\ManipulateTransformTool.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\ObjectOutlineFilter.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\OrthoCamera.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\PropertyEditors.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\RoadBuilderTool.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\SelectionState.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\ViewportHandles.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
     <ClInclude Include="LevelSerialization\SerializeNew.h">
       <Filter>LevelSerialization</Filter>
     </ClInclude>

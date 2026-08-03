@@ -8,7 +8,7 @@ BASE_SKIP_DIRS = ["./.generated","./External"]
 # Sibling project dirs that have their own codegen pass (own vcxproj + own mega file).
 # Core's own pass (path==".") must skip these so it doesn't double-generate their classes.
 # Add one line here whenever a new project splits itself out of Core.
-SPLIT_PROJECT_DIRS = ["./MyGame"]
+SPLIT_PROJECT_DIRS = ["./MyGame", "./LevelEditor"]
 FULL_REBUILD = False
 LUA_OUTPUT_PATH = "./../TestFilesData/scripts"
 
@@ -27,7 +27,13 @@ if __name__ == "__main__":
     this_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(this_dir+SOURCE_DIR)
 
+    # skip_dirs controls this pass's *output* - excluding sibling split-project dirs when
+    # generating Core's own MEGA keeps their classes from being registered twice.
     skip_dirs = BASE_SKIP_DIRS + SPLIT_PROJECT_DIRS if codegen_path == "." else BASE_SKIP_DIRS
+    # Type *resolution* must always see the whole tree (minus .generated/External) so a
+    # Core-side reflected field typed as a split-out project's class (e.g. Game's
+    # AssetPtr<Model> referencing Render's Model) still resolves correctly.
+    typename_skip_dirs = BASE_SKIP_DIRS
     generated_root = codegen_path.rstrip("/") + "/.generated/" if codegen_path != "." else "./.generated/"
     # "lua_stubs.lua" is the documented, authoritative LSP stub filename (see docs/scripting_system.md) -
     # keep it exact for Core's own pass; sibling projects get their own file so they don't clobber it.
@@ -36,7 +42,8 @@ if __name__ == "__main__":
     try:
         codegen_run.do_codegen(LUA_OUTPUT_PATH, codegen_path, skip_dirs, do_rebuild,
                                 generated_root=generated_root, mega_name=mega_name,
-                                lua_stub_filename=lua_stub_filename)
+                                lua_stub_filename=lua_stub_filename,
+                                typename_skip_dirs=typename_skip_dirs)
     except codegen_lib.CodegenError as e:
         # Already pre-formatted as file:line:col: error: message
         print(str(e))

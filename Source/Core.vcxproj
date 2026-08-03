@@ -187,40 +187,7 @@
     <ClCompile Include="Game\TopDownShooter\TopDownPlayer.cpp" />
     <ClCompile Include="Game\TopDownShooter\TopDownShooterGame.cpp" />
     <ClCompile Include="Game\TP\TPGame.cpp" />
-    <ClCompile Include="LevelEditor\AddEditorCommands.cpp" />
-    <ClCompile Include="LevelEditor\Commands.cpp" />
-    <ClCompile Include="LevelEditor\CommandsComponent.cpp" />
-    <ClCompile Include="LevelEditor\CommandsParenting.cpp" />
-    <ClCompile Include="LevelEditor\CommandsPrefab.cpp" />
-    <ClCompile Include="LevelEditor\CommandsUndoRedo.cpp" />
-    <ClCompile Include="LevelEditor\DecalStampTool.cpp" />
-    <ClCompile Include="LevelEditor\DragDetector.cpp" />
-    <ClCompile Include="LevelEditor\DragDropPreview.cpp" />
-    <ClCompile Include="LevelEditor\EditorDocLocal.cpp" />
-    <ClCompile Include="LevelEditor\EditorDocInput.cpp" />
-    <ClCompile Include="LevelEditor\EditorRecents.cpp" />
-    <ClCompile Include="LevelEditor\EditorDocScene.cpp" />
-    <ClCompile Include="LevelEditor\EditorDocViewport.cpp" />
-    <ClCompile Include="LevelEditor\EditorUILayout.cpp" />
-    <ClCompile Include="LevelEditor\EdPropertyGrid.cpp" />
-    <ClCompile Include="LevelEditor\FoliagePaintTool.cpp" />
-    <ClCompile Include="LevelEditor\LevelEditorCamera.cpp" />
-    <ClCompile Include="LevelEditor\ManipulateTransformTool.cpp" />
-    <ClCompile Include="LevelEditor\ObjectOutliner.cpp" />
-    <ClCompile Include="LevelEditor\ObjectOutlinerContextMenu.cpp" />
-    <ClCompile Include="LevelEditor\ObjectOutlinerDraw.cpp" />
-    <ClCompile Include="LevelEditor\ObjectOutlinerFilter.cpp" />
-    <ClCompile Include="LevelEditor\OrthoCamera.cpp" />
-    <ClCompile Include="LevelEditor\PropertyEditors.cpp" />
-    <ClCompile Include="LevelEditor\RoadBuilderTool.cpp" />
-    <ClCompile Include="LevelEditor\RoadBuilderTool_Helpers.cpp" />
-    <ClCompile Include="LevelEditor\RoadBuilderTool_Overlay.cpp" />
-    <ClCompile Include="LevelEditor\RoadBuilderTool_Tick.cpp" />
     <ClCompile Include="Game\Components\RoadNetworkComponent.cpp" />
-    <ClCompile Include="LevelEditor\SceneExport.cpp" />
-    <ClCompile Include="LevelEditor\SelectionMode.cpp" />
-    <ClCompile Include="LevelEditor\SelectionState.cpp" />
-    <ClCompile Include="LevelEditor\ViewportHandles.cpp" />
     <ClCompile Include="LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="Render\DdsExport.cpp">
@@ -421,22 +388,6 @@
     <ClInclude Include="Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Game\TP\TPGame.h" />
     <ClInclude Include="ITestRunner.h" />
-    <ClInclude Include="LevelEditor\DragDetector.h" />
-    <ClInclude Include="LevelEditor\DragDropPreview.h" />
-    <ClInclude Include="LevelEditor\EditorInputs.h" />
-    <ClInclude Include="LevelEditor\EditorModes.h" />
-    <ClInclude Include="LevelEditor\EditorUILayout.h" />
-    <ClInclude Include="LevelEditor\EdPropertyGrid.h" />
-    <ClInclude Include="LevelEditor\IEditorApi.h" />
-    <ClInclude Include="LevelEditor\IInputReciever.h" />
-    <ClInclude Include="LevelEditor\LevelEditorCamera.h" />
-    <ClInclude Include="LevelEditor\EditorRecents.h" />
-    <ClInclude Include="LevelEditor\ManipulateTransformTool.h" />
-    <ClInclude Include="LevelEditor\ObjectOutlineFilter.h" />
-    <ClInclude Include="LevelEditor\OrthoCamera.h" />
-    <ClInclude Include="LevelEditor\PropertyEditors.h" />
-    <ClInclude Include="LevelEditor\SelectionState.h" />
-    <ClInclude Include="LevelEditor\ViewportHandles.h" />
     <ClInclude Include="LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Logging.h" />
     <ClInclude Include="Render\DynamicMaterialPtr.h" />
@@ -476,15 +427,12 @@
     <ClInclude Include="Game\Components\MeshComponent.h" />
     <ClInclude Include="Game\Components\RenderStressTestComponent.h" />
     <ClInclude Include="Game\Components\RoadNetworkComponent.h" />
-    <ClInclude Include="LevelEditor\RoadBuilderTool.h" />
     <ClInclude Include="Game\Components\PhysicsComponents.h" />
     <ClInclude Include="Game\Components\PrefabAssetComponent.h" />
     <ClInclude Include="Debug.h" />
     <ClInclude Include="Game\LevelAssets.h" />
     <ClInclude Include="Game\Prefab.h" />
     <ClInclude Include="Game\TopDownShooter\TopDownShooterGame.h" />
-    <ClInclude Include="LevelEditor\Commands.h" />
-    <ClInclude Include="LevelEditor\EditorDocLocal.h" />
     <ClInclude Include="External\cgltf.h" />
     <ClInclude Include="External\glad\glad.h" />
     <ClInclude Include="External\imconfig.h" />
@@ -872,7 +820,7 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <PropertyGroup>
-    <CodegenExcludeExtra>$(ProjectDir)MyGame\**</CodegenExcludeExtra>
+    <CodegenExcludeExtra>$(ProjectDir)MyGame\**;$(ProjectDir)LevelEditor\**</CodegenExcludeExtra>
   </PropertyGroup>
   <Import Project="$(SolutionDir)Scripts\GameProjectCodegen.targets" />
   <!-- Regenerates docs/console_commands.json from `@cmd:`/`@usage:` comments above console

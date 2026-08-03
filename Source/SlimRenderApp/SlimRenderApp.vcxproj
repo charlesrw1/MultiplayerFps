@@ -125,7 +125,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>lua.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib" %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
@@ -146,7 +146,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>lua.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib" %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>

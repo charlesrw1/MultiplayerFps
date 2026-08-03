@@ -4,11 +4,18 @@ import time
 PRINT_SOURCE_FILES = True
 def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuild:bool,
                 generated_root:str = "./.generated/", mega_name:str = "MEGA",
-                lua_stub_filename:str = "lua_stubs.lua"):
+                lua_stub_filename:str = "lua_stubs.lua",
+                typename_skip_dirs:list[str]|None = None):
 
     print(f"Starting codegen script... fullrebuild={full_rebuild}")
     start_time = time.perf_counter()
-    typenames : dict[str,ClassDef] = read_typenames_from_files(skip_dirs)
+    # Type *declarations* (typenames dict, used to resolve property types like AssetPtr<Model>
+    # for base-class/parent fixups) must always be visible tree-wide, even for a split-out
+    # project's own pass or Core's pass excluding split-out dirs from its own output - a
+    # Core-side reflected field can be typed as a Render/LevelEditor class. `skip_dirs` (below)
+    # additionally excludes sibling split-project dirs, but only from *this pass's output*
+    # (to avoid double-registering their classes in two MEGA files), not from type resolution.
+    typenames : dict[str,ClassDef] = read_typenames_from_files(typename_skip_dirs if typename_skip_dirs is not None else skip_dirs)
 
     print("fixing pts in typenames")
     ClassDef.fixup_types(typenames) # this will sort out parents etc

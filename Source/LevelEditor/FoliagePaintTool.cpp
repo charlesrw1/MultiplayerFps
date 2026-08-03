@@ -1,5 +1,6 @@
 ﻿#include "EditorModes.h"
 #include "EditorDocLocal.h"
+#include "Render/MaterialPublic.h"
 int SamplePoisson(float lambda, Random& r) {
 	float L = exp(-lambda);
 	int k = 0;
