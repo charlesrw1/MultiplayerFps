@@ -1,28 +1,38 @@
-- Project has a unit tests project, already use it. It links all projects in solution.
+# Gotchas
 
-- must call set_call_init_in_editor(true) if you want components to call start() in editor mode. must call set_ticking(true) to tick. editor_start() is called on all components. set_editor_model() should only be used as a shorthand way for an editor visualization. Lua components can get this automatically via `---editor, init_in_editor` on the `---@class` block instead of calling set_call_init_in_editor(true) themselves.
+- The project has a unit tests project. Use it for new tests. It links every project in the solution.
 
-- renderer for opengl uses reverse-Z and infinite Z projection matrix
+- To run `start()` on a component in the editor, call `set_call_init_in_editor(true)`. To run `update()` each frame, call `set_ticking(true)`. The engine always calls `editor_start()` on every component. Use `set_editor_model()` only as a shorthand for an editor visualization. Lua components can set `init_in_editor` on the `---@class` block instead of calling `set_call_init_in_editor(true)` directly.
 
-- gpu driven rendering (occlusion, lod, frustum) for opaque objects. Occlusion culling splits the fast-path draw into two separate GPU-culled batches
+- The OpenGL renderer uses reverse-Z and an infinite-Z projection matrix.
 
-- RenderWindow's ortho projection is built from get_vp_rect().get_size() only, with no offset — meaning window.draw()
-  rect coordinates are viewport-local (0,0 = top-left of the scene viewport), not window-local
+- GPU-driven rendering (occlusion, LOD, frustum culling) applies to opaque objects. Occlusion culling splits the fast-path draw into two GPU-culled batches.
 
-- animation import's trailing-duplicate-frame strip (ModelCompile_Animation.cpp) must be a single near-bit-exact
-  check, not a loop with a loose tolerance — a loose/looped check chews into real frames on eased/decelerating
-  loops (e.g. idle sway), truncating the clip and causing a snap at the loop point
-  
- - shader cache. if you change a header that is included in a shder, engine doesnt pick up on that and loads stale shader from cache. it does pick up on the source file changes, but not includes.
- 
- - DOMAIN Particle for meshbuilder rendering
- 
- - parenting only is in prefab mode, not in level edit mode. instantiating a prefab with parenting removes the parenting.
+- `RenderWindow`'s ortho projection uses only `get_vp_rect().get_size()`, with no offset. So `window.draw()` rect coordinates are viewport-local: `(0,0)` is the top-left of the scene viewport, not the top-left of the window.
 
- - VS incremental builds get broken (every rebuild recompiles everything, no source changes) whenever a CLI/agent build alternates with the VS IDE: PROVEN ROOT CAUSE is a `/errorReport` mismatch in the CL command line. VS sets `BuildingInsideVisualStudio=true` -> CL gets `/errorReport:prompt`; a bare `msbuild` sets it false -> `/errorReport:queue`. The CL task hashes the full command line into `CL.command.1.tlog`; when it changes, CL recompiles EVERY file. So each tool switch (IDE<->CLI) triggers a full rebuild, and it looks like it "never settles" if CLI builds keep happening between IDE builds. (Confirmed from a VS Diagnostic build log: every CL line ended `/errorReport:prompt`; CLI ended `/errorReport:queue` — otherwise identical.)
-   Fixes (all applied):
-   1. Pin the flag in the project so IDE and CLI always match: `<ItemDefinitionGroup><ClCompile><ErrorReporting>Prompt</ErrorReporting></ClCompile></ItemDefinitionGroup>` in Core.vcxproj (near the Microsoft.Cpp.targets import). Verify: a bare `msbuild.cmd Source/Core.vcxproj ... -v:diag | grep errorReport` should now show `prompt`. (Other projects — App etc. — need the same pin to be fully immune.)
-   2. Use the 64-bit MSBuild everywhere (`...\Bin\amd64\MSBuild.exe`, via vswhere `-find MSBuild\**\Bin\amd64\MSBuild.exe`) so the engine/FileTracker also match the IDE. Fixed in msbuild.cmd + build_and_test.ps1 + integration_test.ps1 + _vs_attach.ps1.
-   3. Wrapper scripts also pass `/p:BuildingInsideVisualStudio=true` (independently yields prompt).
-   Reset after poisoning: delete every `*.tlog` dir under `x64\Debug\intermediate\` (regenerates; one full rebuild, then incremental returns).
-   Note: phantom ClInclude entries were investigated and are NOT the cause — don't chase them for this symptom.
+- The animation importer's trailing-duplicate-frame strip (`ModelCompile_Animation.cpp`) must use a single near-bit-exact check. Do not use a loop with a loose tolerance. A loose or looped check removes real frames from eased or decelerating loops, such as idle sway. This truncates the clip and causes a snap at the loop point.
+
+- Shader cache: if you change a header included by a shader, the engine does not detect the change and loads the stale shader from cache. The engine does detect changes to the shader source file itself.
+
+- `DOMAIN Particle` exists for MeshBuilder rendering.
+
+- Parenting works only in prefab mode, not in level-edit mode. Instantiating a prefab removes its parenting.
+
+- Codegen.py script is wonky. If you are using multiple VCPROJ, it needs special handling to generate a .gen.cpp for each.
+
+- CLI builds and VS IDE builds can break VS incremental builds. When they alternate, every rebuild recompiles the whole codebase, even with no source changes.
+
+  **Root cause:** an `/errorReport` mismatch in the CL command line. The VS IDE sets `BuildingInsideVisualStudio=true`, so CL gets `/errorReport:prompt`. A bare `msbuild` call sets this to false, so CL gets `/errorReport:queue`. The CL task hashes the full command line into `CL.command.1.tlog`. When the hash changes, CL recompiles every file. So each switch between IDE and CLI triggers a full rebuild. Confirmed from a VS Diagnostic build log: every CL line from the IDE ended in `/errorReport:prompt`; every CLI line ended in `/errorReport:queue`. Otherwise the lines were identical.
+
+  **Fixes (already applied):**
+  1. Pin the flag in the project, so the IDE and CLI always match. In `Core.vcxproj`, near the `Microsoft.Cpp.targets` import, add:
+     ```xml
+     <ItemDefinitionGroup><ClCompile><ErrorReporting>Prompt</ErrorReporting></ClCompile></ItemDefinitionGroup>
+     ```
+     To verify, run `msbuild.cmd Source/Core.vcxproj ... -v:diag | grep errorReport`. It should show `prompt`. Other projects, such as `App`, need the same pin to be fully immune.
+  2. Use the 64-bit MSBuild everywhere: `...\Bin\amd64\MSBuild.exe`, found via `vswhere -find MSBuild\**\Bin\amd64\MSBuild.exe`. This keeps the engine and FileTracker in sync with the IDE. Applied in `msbuild.cmd`, `build_and_test.ps1`, `integration_test.ps1`, and `_vs_attach.ps1`.
+  3. The wrapper scripts also pass `/p:BuildingInsideVisualStudio=true`. This independently produces `prompt`.
+
+  **To reset a poisoned build:** delete every `*.tlog` directory under `x64\Debug\intermediate\`. The tlogs regenerate. One full rebuild follows, then incremental builds work again.
+
+  **Note:** phantom `ClInclude` entries were investigated. They are not the cause. Do not chase them for this symptom.

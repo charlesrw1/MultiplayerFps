@@ -1,10 +1,10 @@
 # Engine Overview
 
-C++ game engine, Windows / VS2019 / OpenGL / SDL2, no CMake (`.vcxproj` / `.sln` direct). Embedded Lua, PhysX, hand-rolled 2D UI, editor-time asset compilation.
+This is a C++ game engine. It targets Windows, VS2026, OpenGL, and SDL2. It uses `.vcxproj`/`.sln` files directly, with no CMake. It embeds Lua and PhysX, and includes a hand-rolled 2D UI and editor-time asset compilation.
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 CsRemake/
@@ -25,61 +25,61 @@ CsRemake/
 
 ---
 
-## Build System
+## Build system
 
-- **Solution:** `CsRemake.sln` — projects: `CsRemake` (static lib, all engine .cpp), `App` (links lib), `UnitTests`, `IntegrationTests`, `External`.
-- **Add source:** add `<ClCompile>` + `<ClInclude>` to `Core.vcxproj`.
-- **Codegen:** `py Scripts/codegen.py` — parses C++ headers, writes `Source/.generated/MEGA.gen.cpp` (Lua bindings). Rerun after adding/removing `REF` / `CLASS_BODY`.
-- **Unit tests:** `powershell Scripts/build_and_test.ps1 -Configuration Debug -Platform x64`.
-- **Integration tests:** `powershell Scripts/integration_test.ps1 -Config Debug` — see [[testing.md]].
-- **Clang-format:** `powershell Scripts/clang-format-all.ps1` — required pre-commit.
+- **Solution:** `CsRemake.sln` has these projects: `CsRemake` (a static lib with all engine `.cpp` files), `App` (links the lib), `UnitTests`, `IntegrationTests`, and `External`.
+- **Add source:** add `<ClCompile>` and `<ClInclude>` entries to `Core.vcxproj`.
+- **Codegen:** run `py Scripts/codegen.py`. It parses the C++ headers and writes the Lua bindings to `Source/.generated/MEGA.gen.cpp`. Rerun it after you add or remove a `REF` or `CLASS_BODY`.
+- **Unit tests:** run `powershell Scripts/build_and_test.ps1 -Configuration Debug -Platform x64`.
+- **Integration tests:** run `powershell Scripts/integration_test.ps1 -Config Debug`. See [[testing.md]].
+- **Clang-format:** run `powershell Scripts/clang-format-all.ps1`. Run this before every commit.
 
 ---
 
 ## Configuration (Config_Var / Engine_Cmd)
 
-Quake/Source-style cvars + commands. See `Source/Framework/Config.h`. `EngineVars.ini`, the per-project `.ini`, and `init.txt` execute in order at engine init — write any var sets or commands.
+The engine uses Quake/Source-style cvars and commands. See `Source/Framework/Config.h`. At init, the engine executes `EngineVars.ini`, the per-project `.ini`, and `init.txt`, in that order. Write any var sets or commands into these files.
 
 Key cvars:
-- `g_application_class` — Lua class name to instantiate as Application.
-- `g_entry_level` — first level (asset name). Startup runs `map <g_entry_level>`.
-- `g_project_base` — data dir. **Use `"Data"` (relative), not absolute paths.**
+- `g_application_class` — the Lua class name to instantiate as the Application.
+- `g_entry_level` — the first level to load, by asset name. Startup runs `map <g_entry_level>`.
+- `g_project_base` — the data directory. Use a relative path, such as `"Data"`, not an absolute path.
 
 Launch flags:
-- `--editor` — open editor UI (default: game mode). Implicit when `--tests editor` is used.
-- `--project <name|path>` — per-project `.ini` to load (default: `startup_project` cvar set in `EngineVars.ini`). A bare name (`DevEngine`) resolves to `Projects/DevEngine.ini`. Ignored for `--tests` runs.
+- `--editor` — opens the editor UI. The default is game mode. This flag is implicit when you use `--tests editor`.
+- `--project <name|path>` — the per-project `.ini` to load. The default is the `startup_project` cvar, set in `EngineVars.ini`. A bare name, such as `DevEngine`, resolves to `Projects/DevEngine.ini`. This flag is ignored for `--tests` runs.
 
-`EngineVars.ini` is sectioned: `[app]` runs on a normal launch, `[game_test]` on `App.exe --tests game`, `[editor_test]` on `--tests editor`. Sections are independent; the engine selects exactly one. See [[testing]].
+`EngineVars.ini` has three sections: `[app]` runs on a normal launch, `[game_test]` runs on `App.exe --tests game`, and `[editor_test]` runs on `--tests editor`. The sections are independent. The engine selects exactly one. See [[testing]].
 
-`[app]` additionally loads a per-project `.ini` (e.g. `Projects/DevEngine.ini`) on top — project vars win. That's where per-project vars like `g_project_base`, `g_application_class`, `g_project_name`, `g_entry_level` live. `game_test`/`editor_test` never load a project file; they set those vars directly in their own section.
+`[app]` also loads a per-project `.ini`, such as `Projects/DevEngine.ini`, on top of the base config. Project vars win over the base config. This is where per-project vars live, such as `g_project_base`, `g_application_class`, `g_project_name`, and `g_entry_level`. `game_test` and `editor_test` never load a project file. Instead, they set these vars directly in their own section.
 
 Commands:
-- `map <mapname>` — open for play.
-- `start_ed <AssetType> <file>` — open asset editor. Types: `Map`, `AnimGraph`, `DataClass`, `Model`, etc. (see `AssetMetadata` in `AssetRegistry.h`). Empty filename = new doc.
-- `ot <scale> <alpha> <mip> <texture>` — overlay a texture for debug. `cot` clears. Internal targets: `_gbuffer0/1/2`, `_csm_shadow`. Example: `ot 1 1 0 _gbuffer0`.
+- `map <mapname>` — opens a map for play.
+- `start_ed <AssetType> <file>` — opens an asset editor. Asset types include `Map`, `AnimGraph`, `DataClass`, and `Model`. See `AssetMetadata` in `AssetRegistry.h` for the full list. An empty filename creates a new document.
+- `ot <scale> <alpha> <mip> <texture>` — overlays a texture for debugging. `cot` clears the overlay. Internal targets include `_gbuffer0`, `_gbuffer1`, `_gbuffer2`, and `_csm_shadow`. Example: `ot 1 1 0 _gbuffer0`.
 
-Editors also open by double-clicking an asset in the AssetBrowser imgui window (if the asset type has an `IEditorTool`).
+You can also open an editor by double-clicking an asset in the AssetBrowser imgui window, if that asset type has an `IEditorTool`.
 
 ---
 
 ## AssetBrowser
 
-Main level-creation tool. Double-click an asset to open its editor. Drag onto viewport to instantiate in level editor. Drag onto **AssetPtr** property fields (solid colored rects in the property grid) to set them — auto-serializes and loads.
+This is the main level-creation tool. Double-click an asset to open its editor. Drag an asset onto the viewport to instantiate it in the level editor. Drag an asset onto an **AssetPtr** property field — shown as a solid colored rect in the property grid — to set that property. This auto-serializes and loads the asset.
 
 ---
 
 ## ClassBase
 
-Global class system / registry, similar to Unreal UObjects. See `ClassBase.h`, `ReflectionProp.h`, `PropertyEd.h`.
+This is the engine's global class system and registry, similar to Unreal's UObjects. See `ClassBase.h`, `ReflectionProp.h`, and `PropertyEd.h`.
 
-Reflectable C++ types inherit `ClassBase` and declare:
+A reflectable C++ type inherits `ClassBase` and declares one of these:
 
 ```cpp
 CLASS_BODY(ClassName);              // non-scriptable
 CLASS_BODY(ClassName, scriptable);  // Lua can inherit
 ```
 
-Property list:
+A property list looks like this:
 
 ```cpp
 static const PropertyInfoList* get_props() {
@@ -89,45 +89,46 @@ static const PropertyInfoList* get_props() {
 }
 ```
 
-`PROP_SERIALIZE`, `PROP_DEFAULT`, `PROP_EDITABLE` control serialization/UI. Full `REG_*` set in `ReflectionMacros.h`.
+`PROP_SERIALIZE`, `PROP_DEFAULT`, and `PROP_EDITABLE` control serialization and the editor UI. See `ReflectionMacros.h` for the full set of `REG_*` macros.
 
-`REF` annotation on a method/field exposes it to Lua (codegen produces bindings in `MEGA.gen.cpp`). For `scriptable` classes codegen also emits `ScriptImpl_ClassName` overriding every virtual to dispatch to Lua first. See [[scripting_system]].
+A `REF` annotation on a method or field exposes it to Lua. Codegen produces the bindings in `MEGA.gen.cpp`. For `scriptable` classes, codegen also emits a `ScriptImpl_ClassName` class. This class overrides every virtual method to dispatch to Lua first. See [[scripting_system]].
 
 ---
 
 ## Entity-Component System
 
-- **Entity** — world node. Transform (ws+ls pos/rot/scale). Can have children.
-- **Component / EntityComponent** — attached to entity. Lifecycle opt-ins (must be set in constructor):
-  - `set_call_init_in_editor(true)` — required for `start()` to be called at all.
-  - `editor_start()` — always called in editor regardless of the above.
-  - `set_ticking(true)` — required for `update()` to be called each frame.
-  Built-ins:
-  - `MeshComponent` — renders a `.cmdl`.
-  - `CapsuleComponent` / `BoxComponent` / `SphereComponent` — physics bodies (extend `PhysicsBody`).
-  - `CharacterMovementComponent` — collide+slide wrapper (see Physics).
-  - `CameraComponent` — marks entity as active camera.
-  - `LightComponents` — point/spot/directional.
-- **BaseUpdater** — base of Entity and Component; `get_owner()` → Entity.
-- **Level** — current entity collection. `eng->get_level()`.
+- **Entity** — a node in the world. It has a transform (world-space and local-space position, rotation, and scale), and it can have children.
+- **Component / EntityComponent** — attached to an entity. Its lifecycle needs these opt-ins, set in the constructor:
+  - `set_call_init_in_editor(true)` — required for the engine to call `start()` at all.
+  - `editor_start()` — the engine always calls this in the editor, regardless of the setting above.
+  - `set_ticking(true)` — required for the engine to call `update()` each frame.
+
+  Built-in components:
+  - `MeshComponent` — renders a `.cmdl` file.
+  - `CapsuleComponent` / `BoxComponent` / `SphereComponent` — physics bodies. These extend `PhysicsBody`.
+  - `CharacterMovementComponent` — a collide-and-slide wrapper. See Physics, below.
+  - `CameraComponent` — marks an entity as the active camera.
+  - `LightComponents` — point, spot, and directional lights.
+- **BaseUpdater** — the base class of both Entity and Component. Call `get_owner()` to get its Entity.
+- **Level** — the current collection of entities. Access it with `eng->get_level()`.
 
 ---
 
-## Application 
+## Application
 
-[[Source/GameEnginePublic.h]]
+See [[Source/GameEnginePublic.h]].
 
-`Application : public ClassBase` with `CLASS_BODY(Application, scriptable)`. Engine instantiates the class named by `g_application_class`. Lifecycle:
+`Application` inherits `ClassBase` and declares `CLASS_BODY(Application, scriptable)`. The engine instantiates the class named by `g_application_class`. Its lifecycle runs in this order:
 
 ```
 start() → on_map_changed() → [per frame: pre_update(), update()] → stop()
 ```
 
-`on_map_changed()` also fires on subsequent level changes.
+`on_map_changed()` also fires on every later level change.
 
-Integration tests are launched via the engine CLI (`App.exe --tests <mode>`); they no longer go through the Application class. See [[testing]].
+The engine CLI launches integration tests directly, with `App.exe --tests <mode>`. They no longer go through the Application class. See [[testing]].
 
-Lua subclass:
+A Lua subclass looks like this:
 
 ```lua
 ---@class FpsGameApplication : Application
@@ -138,93 +139,93 @@ function FpsGameApplication:on_map_changed() ... end
 
 ---
 
-## GameplayStatic 
+## GameplayStatic
 
-[[Source/Game/Entities/Player.h]]
+See [[Source/Game/Entities/Player.h]].
 
-Static utility, exposed to Lua:
-- `spawn_entity()` → Entity
-- `find_by_name(name)` → Entity or nil
-- `change_level(levelname)` — async, triggers `on_map_changed()`
-- `get_current_level_name()` → string
-- `get_dt()` → float
-- `cast_ray(start, end, channel_mask, ignore_body)` → `{hit, what, pos, normal}`
+This is a static utility class, exposed to Lua:
+- `spawn_entity()` — returns an Entity.
+- `find_by_name(name)` — returns an Entity, or nil if none matches.
+- `change_level(levelname)` — changes the level asynchronously, and triggers `on_map_changed()`.
+- `get_current_level_name()` — returns the current level name, as a string.
+- `get_dt()` — returns the frame delta time, as a float.
+- `cast_ray(start, end, channel_mask, ignore_body)` — returns `{hit, what, pos, normal}`.
 
 ---
 
-## Physics 
+## Physics
 
-[[Source/Physics/Physics2.h]]
+See [[Source/Physics/Physics2.h]].
 
-PhysX wrapper. Bodies are components: `CapsuleComponent`, `BoxComponent`, `SphereComponent`, `MeshColliderComponent`.
+This is a wrapper around PhysX. Physics bodies are components: `CapsuleComponent`, `BoxComponent`, `SphereComponent`, and `MeshColliderComponent`.
 
-- `set_body_type(BodyType)` — `Static` / `Kinematic` / `Dynamic` (Lua: `BODYTYPE_*`).
-- Triggers: `set_is_trigger(true)` + `set_send_overlap(true)`.
+- `set_body_type(BodyType)` — sets the body type. Values are `Static`, `Kinematic`, or `Dynamic` (in Lua: `BODYTYPE_*`).
+- Triggers: call `set_is_trigger(true)` and `set_send_overlap(true)`.
 
-**CharacterMovementComponent** (`Source/Game/Entities/CharacterController.h`) — wraps a `CharacterController`, NOT a physics body:
-- Requires separate body via `set_physics_body(body)`.
-- `move({x,y,z}, dt, min_dist)` — collide+slide, one frame.
-- After `move()`, caller MUST `entity:set_ws_position(move:get_position())` to sync the entity transform. Awkward but intentional.
-- `is_touching_down()` — ground check.
-- Gravity is manual (`gravity_vel -= 9.8 * dt`).
+**CharacterMovementComponent** (`Source/Game/Entities/CharacterController.h`) wraps a `CharacterController`. It is not itself a physics body:
+- It requires a separate body, set with `set_physics_body(body)`.
+- `move({x,y,z}, dt, min_dist)` — runs one frame of collide-and-slide movement.
+- After you call `move()`, you must call `entity:set_ws_position(move:get_position())` to sync the entity's transform. This step is awkward, but intentional.
+- `is_touching_down()` — checks whether the character is on the ground.
+- Gravity is manual: apply it yourself, for example with `gravity_vel -= 9.8 * dt`.
 
 ---
 
 ## Rendering
 
-**RenderWindow** [[Source/Render/RenderWindow.h]] — 2D draw list (`MeshBuilder` + `UIDrawCmdUnion`s). Used by UiSystem.
+**RenderWindow** ([[Source/Render/RenderWindow.h]]) holds a 2D draw list, built from `MeshBuilder` and `UIDrawCmdUnion`s. `UiSystem` uses it.
 
 Shape types:
-- `RectangleShape` — filled, optional texture.
-- `TextShape` — `GuiFont` text. **`text` field is `std::string_view`** — caller string must outlive the draw call.
-- `LineShape` — thin quad along direction.
-- `CircleShape` — filled (triangle fan) or outline (line segments).
+- `RectangleShape` — a filled rectangle, with an optional texture.
+- `TextShape` — text drawn with a `GuiFont`. Its `text` field is a `std::string_view`, so the caller's string must outlive the draw call.
+- `LineShape` — a thin quad, drawn along a direction.
+- `CircleShape` — filled, as a triangle fan, or drawn as an outline, as line segments.
 
-**MeshBuilder** [[Source/Framework/MeshBuilder.h]] — manual vertex/index push:
+**MeshBuilder** ([[Source/Framework/MeshBuilder.h]]) lets you push vertices and indices manually.
 
-**UiSystem** [[Source/UI/GUISystemPublic.h]] — singleton (`UiSystem::inst`), owns the main `RenderWindow window`.
+**UiSystem** ([[Source/UI/GUISystemPublic.h]]) is a singleton, `UiSystem::inst`. It owns the main `RenderWindow window`.
 
-**Canvas** — Lua static, basic drawing:
+**Canvas** is a Lua static class for basic drawing:
 - `draw_rect(lRect, Texture*, lColor)`
 - `draw_text(string, x, y)`
-- `get_window_rect()` → lRect
+- `get_window_rect()` — returns an lRect.
 - `set_window_capture_mouse(bool)`
 
-**Gui** — Love2D-style static drawing:
-- `set_color(r,g,b,a)` — sets static `current_color` (floats 0–1).
+**Gui** is a Love2D-style static class for drawing:
+- `set_color(r,g,b,a)` — sets the static `current_color`. Values are floats from 0 to 1.
 - `rectangle(x,y,w,h)`, `rectangle_outline(x,y,w,h,thickness)`
 - `circle(x,y,radius,segments)`, `line(x1,y1,x2,y2,thickness)`
 - `image(tex,x,y,w,h)`, `print(text,x,y)`
-- `measure_text(text)` → lRect, `get_screen_size()` → lRect
+- `measure_text(text)` — returns an lRect. `get_screen_size()` — returns an lRect.
 
-Materials/master shaders: [[rendering/materials]]. Decals/POM: [[rendering/decals]].
+For materials and master shaders, see [[rendering/materials]]. For decals and POM, see [[rendering/decals]].
 
 ---
 
-## Lua Scripting
+## Lua scripting
 
-All `Data/scripts/**/*.lua` auto-loaded at startup by `ScriptManager::load_script_files()`. No require/import.
+The engine auto-loads every file under `Data/scripts/**/*.lua` at startup, through `ScriptManager::load_script_files()`. There is no require or import step.
 
-Single shared global namespace. Convention: declare classes via `---@class MyClass : ParentClass`.
+All Lua code shares one global namespace. By convention, declare classes with `---@class MyClass : ParentClass`.
 
 Lua type wrappers:
-- `lRect` — `Rect2d`. `.x .y .w .h`.
-- `lColor` — `Color32`. `.r .g .b .a`.
-- `vec3` — table `{x=,y=,z=}`, mapped to `glm::vec3` via codegen.
-- `lInput` — wrapper for `Input` static.
+- `lRect` — wraps `Rect2d`. Fields: `.x .y .w .h`.
+- `lColor` — wraps `Color32`. Fields: `.r .g .b .a`.
+- `vec3` — a table `{x=,y=,z=}`, mapped to `glm::vec3` by codegen.
+- `lInput` — a wrapper around the `Input` static class.
 
-Full lifecycle/dispatch: [[scripting_system]].
+For the full lifecycle and dispatch model, see [[scripting_system]].
 
 ---
 
 ## Input (`Source/Input/InputSystem.h`)
 
-`lInput` (Lua):
-- `is_key_down(SDL_SCANCODE_*)` — held.
-- `was_key_pressed(SDL_SCANCODE_*)` — pressed this frame.
-- `get_mouse_delta()` → `{x, y}` ivec2 table (NOT separate methods).
-- `was_mouse_pressed(button)` — 0=left, 1=right, 2=middle.
-- Mouse delta only meaningful while `Canvas.set_window_capture_mouse(true)`.
+`lInput`, in Lua:
+- `is_key_down(SDL_SCANCODE_*)` — true while the key is held.
+- `was_key_pressed(SDL_SCANCODE_*)` — true if the key was pressed this frame.
+- `get_mouse_delta()` — returns an `{x, y}` ivec2 table. There are no separate x/y methods.
+- `was_mouse_pressed(button)` — button values are 0 for left, 1 for right, 2 for middle.
+- The mouse delta is meaningful only while `Canvas.set_window_capture_mouse(true)` is active.
 
 ---
 
@@ -232,20 +233,20 @@ Full lifecycle/dispatch: [[scripting_system]].
 
 - `Model.load("filename.cmdl")` — see [[rendering/model_importing]].
 - `MaterialInstance.load("filename.mi")` — see [[rendering/materials]].
-- `Texture` — loaded via material; rarely loaded directly in Lua.
-- Refcounted (`IAsset`). Hot-reload supported in editor builds.
+- `Texture` — usually loaded through a material. Lua code rarely loads a texture directly.
+- Assets are refcounted through `IAsset`. Editor builds support hot-reload.
 
 ---
 
-## Key Workflows
+## Key workflows
 
 ### Adding a new scriptable C++ class
 
-1. Create `.h`/`.cpp` under appropriate `Source/` subdir.
-2. Add `CLASS_BODY(MyClass)` + `REF` methods.
-3. Add `<ClCompile>`/`<ClInclude>` to `Core.vcxproj`.
-4. `py Scripts/codegen.py`.
-5. Build & verify.
+1. Create a `.h`/`.cpp` pair under the appropriate `Source/` subdirectory.
+2. Add `CLASS_BODY(MyClass)` and any `REF` methods.
+3. Add `<ClCompile>`/`<ClInclude>` entries to `Core.vcxproj`.
+4. Run `py Scripts/codegen.py`.
+5. Build the project and verify the result.
 
 ### Running tests
 

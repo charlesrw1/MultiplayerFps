@@ -91,6 +91,8 @@ void Canvas2dRecorder::submit(Canvas2dGpuMesh* source, int index_start, int inde
 		}
 	}
 
+	// some edit
+
 	Canvas2dBatch b;
 	b.target = target;
 	b.viewport = viewport;

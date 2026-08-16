@@ -1,57 +1,55 @@
-This is a game engine project. Uses C++ 20 VS2026 , modern OpenGL 4.7, SDL2, vcpkg. No CMAKE.
++ This is a game engine project. Uses C++ 20 VS2026 , modern OpenGL 4.7, SDL2, vcpkg. No CMAKE.
 
-path to compiler: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\MSBuild.exe" OR use msbuild.cmd which is in PATH.
++ path to compiler: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\MSBuild.exe" OR use msbuild.cmd which is in PATH.
 
-CRITICAL: ALWAYS use the 64-bit MSBuild under `Bin\amd64\` (NEVER the 32-bit `Bin\MSBuild.exe`). Prefer the wrapper scripts
++ CRITICAL: ALWAYS use the 64-bit MSBuild under `Bin\amd64\` (NEVER the 32-bit `Bin\MSBuild.exe`). Prefer the wrapper scripts
 (build_and_test.ps1 / integration_test.ps1 / run_editor.ps1 / run_game.ps1 / msbuild.cmd),
 which already select the 64-bit engine.
 
-NEVER use VS compiler under "C:\Program Files (x86)\...", that is old compiler.
++ NEVER use VS compiler under "C:\Program Files (x86)\...", that is old compiler.
 
-If you see error code c0000135, then it most likely means NO DLLs were copied to the x64/Debug or x64/Release folder for some reason? Bug with vcpkg.
++ If you see error code c0000135, then it most likely means NO DLLs were copied to the x64/Debug or x64/Release folder for some reason? Bug with vcpkg.
 
-D:/Data is the path to the data directory for assets (g_project_base) used in editor and game. ./TestFilesData/ is used for the test files used during integration tests.
++ D:/Data is the path to the data directory for assets (g_project_base) used in editor and game. ./TestFilesData/ is used for the test files used during integration tests.
 
-Use cscli.exe for a CLI that lets you run commands and `eval` lua code on a running editor or game instance. 
++ Use cscli.exe for a CLI that lets you run commands and `eval` lua code on a running editor or game instance. 
 
-Uses Lua for scripting, see [[docs/scripting/lua_cookbook.md]] for examples.
++ Uses Lua for scripting, see [[docs/scripting/lua_cookbook.md]] for examples.
 
-Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
++ Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
 
-When a test crashes, use `Scripts/dbg.ps1 <dump> '<cdb cmd>'` to inspect locals/pointers/stack frames/etc.. See [[docs/debugging/crash_dumps.md]] for commands.
++ When a test crashes, use `Scripts/dbg.ps1 <dump> '<cdb cmd>'` to inspect locals/pointers/stack frames/etc.. See [[docs/debugging/crash_dumps.md]] for commands.
 
-Use git to commit after you are done. Write summaries in the message of all commits. 
++ Use git to commit after you are done. Write summaries in the message of all commits. 
 
-DO NOT use new/delete/malloc etc UNLESS given permission. Always use modern C++ 17/20. unique_ptr, shared_ptr, etc.
++ DO NOT use new/delete/malloc etc UNLESS given permission. Always use modern C++ 17/20. unique_ptr, shared_ptr, etc.
 
-WHEN USING PYTHON: use powershell.exe to launch "py" alias. DO NOT use python from bash.
++ WHEN USING PYTHON: use powershell.exe to launch "py" alias. DO NOT use python from bash.
 
-Uses code generation for ClassBase system, similar to Unreal UOBJECTS. The python codegen script is located under Scripts/. It generates MEGA.cpp in Source/ by parsing headers.
++ Uses code generation for ClassBase system, similar to Unreal UOBJECTS. The python codegen script is located under Scripts/. It generates MEGA.cpp in Source/ by parsing headers.
 
-EngineVars.ini and init.txt store configuration used at runtime. EngineVars.ini's [app] section additionally loads a per-project ini on top (project vars win) — Projects/&lt;Name&gt;.ini, selected via `startup_project` in EngineVars.ini or `--project &lt;Name|path&gt;` on the CLI (a bare name like `DevEngine` resolves to `Projects/DevEngine.ini`). Project inis hold things like data dir (g_project_base) and application class (g_application_class). --tests runs never load a project ini.
++ EngineVars.ini and init.txt store configuration used at runtime. EngineVars.ini's [app] section additionally loads a per-project ini on top (project vars win) — Projects/&lt;Name&gt;.ini, selected via `startup_project` in EngineVars.ini or `--project &lt;Name|path&gt;` on the CLI (a bare name like `DevEngine` resolves to `Projects/DevEngine.ini`). Project inis hold things like data dir (g_project_base) and application class (g_application_class). --tests runs never load a project ini.
 
-vcpkg is located in ~\source\vcpkg\vcpkg.exe
++ vcpkg is located in ~\source\vcpkg\vcpkg.exe
 
-NEVER read source files in External/ unless given permission. ONLY read AGENTS.md in External/ for summary.
++ NEVER read source files in External/ unless given permission. ONLY read AGENTS.md in External/ for summary.
 
-Limit the source files you read to the module you are working on.
++ Dont write long comments explaining your code, be brief. If you feel the need to write long, multi-line comment blocks to document a "hack" you wrote in code, step back and try to find a better way.
 
-Dont write long comments explaining your code, be brief. If you feel the need to write long, multi-line comment blocks to document a "hack" you wrote in code, step back and try to find a better way.
-
-Use ASSERTS() liberaly, documenting its preconditions and invariants. 
++ Use ASSERTS() liberaly, documenting its preconditions and invariants. 
 
 Follow DRY, SOLID principles. SELF DOCUMENTING code. Single Responsiblity Principle
 
-Uses RmlUI for the gameplay UI framework, a C++/lua UI framework that is very similar to Css/Html/Js (using .rml files for layout and .rcss for styling). Includes the lua plugin for it. See '..vcpkg\buildtrees\rmlui\src\6.2-203a9587f9.clean\' for the source files for it. Also see 'D:\Data\scripts\rmlui_lua_stubs.lua' for a list of callable functions from the lua api. Look at '...rmlui\src\6.2-203a9587f9.clean\Samples' for samples of using rmlui and lua. See 'https://mikke89.github.io/RmlUiDoc/index.html' for documentation about RmlUI in general. 
++ Uses RmlUI for the gameplay UI framework, a C++/lua UI framework that is very similar to Css/Html/Js (using .rml files for layout and .rcss for styling). Includes the lua plugin for it. See '..vcpkg\buildtrees\rmlui\src\6.2-203a9587f9.clean\' for the source files for it. Also see 'D:\Data\scripts\rmlui_lua_stubs.lua' for a list of callable functions from the lua api. Look at '...rmlui\src\6.2-203a9587f9.clean\Samples' for samples of using rmlui and lua. See 'https://mikke89.github.io/RmlUiDoc/index.html' for documentation about RmlUI in general. 
 Note that rmlui script operates in the same enviorment as the rest of the engine's lua. So you can call the same ClassBase REF'd functions, or lua global variables, and such. You can attach scripts by using inline <script> or by doing 'onclick=' etc.
 
-Editor architecture only allows placing entities with 1 component that can be edited/serialized. Runtime allows multiple components per entity.
++ Editor architecture only allows placing entities with 1 component that can be edited/serialized. Runtime allows multiple components per entity.
 
-Engine uses depth buffer is reverse-Z, standard perspective projection matrix is infinite Z.
++ Engine uses depth buffer is reverse-Z, standard perspective projection matrix is infinite Z.
 
 ## Documentation
 
-Some limited project documentation lives under `docs/`. Documentation should follow `SD-STE100 Simplified Technical English` rules.
+Some limited project documentation lives under `docs/`. Documentation should follow `SD-STE100 Simplified Technical English` styleguide rules.
 
 ## Feature Workflow (GitHub Issues)
 

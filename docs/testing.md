@@ -1,19 +1,21 @@
 # Testing
 
-Unit tests (GTest) under `Source/UnitTests/` (`UnitTests.vcxproj`). Integration tests (C++20 coroutines + Lua) under `Source/IntegrationTests/` (`IntegrationTests.vcxproj`, now built as a static lib and linked into `App.exe` via `/WHOLEARCHIVE`).
+Unit tests use GTest and live under `Source/UnitTests/` (`UnitTests.vcxproj`).
+
+Integration tests use C++20 coroutines and Lua, and live under `Source/IntegrationTests/` (`IntegrationTests.vcxproj`). This project builds as a static lib. `App.exe` links it via `/WHOLEARCHIVE`.
 
 ---
 
-## Running
+## Running tests
 
-Unit tests — [[Scripts/build_and_test.ps1]]:
+Run unit tests with [[Scripts/build_and_test.ps1]]:
 ```powershell
 powershell Scripts/build_and_test.ps1 -Configuration Debug -Platform x64
 ```
 
-Integration tests — always go through [[Scripts/integration_test.ps1]] (it builds + runs both passes and writes the XML). Do not invoke `App.exe --tests` directly unless debugging the runner itself.
+Run integration tests only through [[Scripts/integration_test.ps1]]. It builds the project, runs both test passes, and writes the results XML. Do not call `App.exe --tests` directly, unless you are debugging the test runner itself.
 
-Use integration tests as both a full "test suite" and as a way to interactively test out a feature autonomously by writing the test and running it in isolation and ensuring correct output or dumping stuff to disk to evaluate later.
+Use integration tests two ways: as the full test suite, and as a way to test one feature in isolation. For the second use, write a test that checks the output directly, or dumps data to disk for you to inspect later.
 
 ```powershell
 # Both passes, all tests
@@ -31,37 +33,45 @@ powershell Scripts/integration_test.ps1 -Pattern "renderer/*","racing_line/*"
 powershell Scripts/integration_test.ps1 -PatternFile smoke.txt
 ```
 
-Switches: `-Config Release` (default Debug), `-Promote` (rewrite screenshot goldens), `-Interactive` (keep window visible), `-TimingAssert` (fail on slow GPU timings), `-ShowEngineLog` (forward App.exe's full engine output to the console — off by default; only `[TEST] ...` sentinel lines pass through), `-Debugger` (attach a running VS 2026 instance to App.exe via DTE; falls back to `vsjitdebugger.exe` if no VS is in the ROT — output filtering is bypassed in this mode). Empty `-Pattern` = all tests for the selected mode(s). `Get-Help Scripts/integration_test.ps1 -Examples` for the same list inline.
+Switches:
+- `-Config Release` — default is Debug.
+- `-Promote` — rewrite screenshot goldens.
+- `-Interactive` — keep the window visible.
+- `-TimingAssert` — fail the test on slow GPU timings.
+- `-ShowEngineLog` — forward the full engine output from `App.exe` to the console. Off by default. Normally only `[TEST] ...` sentinel lines pass through.
+- `-Debugger` — attach a running VS 2026 instance to `App.exe` via DTE. Falls back to `vsjitdebugger.exe` if no VS instance is in the ROT. This mode bypasses output filtering.
 
-The runner always prints a parsed XML summary at the end (per-test PASS/FAIL list) and writes the full uncoloured engine log to `Logs/test_<mode>_output.log` regardless of `-ShowEngineLog`. Log lines are prefixed `[Error]`, `[Warning]`, `[Debug]`, `[Info]` so they grep cleanly. Test-runner status lines (`[TEST] ==> [N/M] ...`, `[TEST]   PASS/FAIL ...`, `[TEST] === <mode> Tests: ... ===`) are emitted on stdout/stderr only — they don't go through the logger and don't appear in the .log file.
+An empty `-Pattern` runs all tests for the selected mode or modes. Run `Get-Help Scripts/integration_test.ps1 -Examples` for the same list inline.
 
-> `build_and_test.ps1` calls `check_deps` (runs `dumpbin /SYMBOLS`). Don't combine with the integration runner — call `integration_test.ps1` directly.
+The runner always prints a parsed XML summary at the end: a per-test PASS/FAIL list. It also writes the full, uncoloured engine log to `Logs/test_<mode>_output.log`, regardless of `-ShowEngineLog`. Log lines carry a prefix — `[Error]`, `[Warning]`, `[Debug]`, or `[Info]` — so you can grep them cleanly. Test-runner status lines (`[TEST] ==> [N/M] ...`, `[TEST]   PASS/FAIL ...`, `[TEST] === <mode> Tests: ... ===`) go to stdout/stderr only. They do not pass through the logger, so they do not appear in the `.log` file.
+
+> `build_and_test.ps1` calls `check_deps`, which runs `dumpbin /SYMBOLS`. Do not combine this with the integration runner. Call `integration_test.ps1` directly instead.
 
 ---
 
 ## How the test runner is wired
 
-- `Source/App/App.vcxproj` is the only test/runtime executable. It links `Core.lib` and `IntegrationTests.lib` with `/WHOLEARCHIVE` so static-init `TestRegistrar` constructors are kept and tests register themselves at startup.
-- `game_engine_main` (in `Source/EngineMain.cpp`) parses `--tests <mode> [pattern...]` before engine init, configures the vars file section + log file, then constructs a `TestRunner` that the engine loop pumps once per frame.
-- `EngineVars.ini` is sectioned: `[app]` for normal launch, `[game_test]` for `--tests game`, `[editor_test]` for `--tests editor`. Sections are independent — there is no fall-through, so duplicate every var that needs to apply in multiple modes. The engine selects exactly one section via `Cmd_Manager::execute_file_section`. `--tests` runs never load a per-project `.ini` (unlike `[app]`) — `game_test`/`editor_test` set `g_project_base` etc. directly.
+- `Source/App/App.vcxproj` is the only test and runtime executable. It links `Core.lib` and `IntegrationTests.lib` with `/WHOLEARCHIVE`, so the static-init `TestRegistrar` constructors are kept. Tests register themselves at startup.
+- `game_engine_main` (in `Source/EngineMain.cpp`) parses `--tests <mode> [pattern...]` before engine init. It configures the vars-file section and the log file, then constructs a `TestRunner`. The engine loop pumps this runner once per frame.
+- `EngineVars.ini` has three sections: `[app]` for a normal launch, `[game_test]` for `--tests game`, and `[editor_test]` for `--tests editor`. Sections are independent. There is no fall-through between them, so duplicate any var that must apply in more than one mode. The engine selects exactly one section, through `Cmd_Manager::execute_file_section`. `--tests` runs never load a per-project `.ini` (unlike `[app]`). Instead, `game_test` and `editor_test` set vars such as `g_project_base` directly in their own section.
 
 ---
 
-## Integration Test Framework (C++)
+## Integration test framework (C++)
 
-C++20 coroutines, two passes (game / editor) selected by `--tests <mode>`, single binary.
+The framework uses C++20 coroutines. It has two passes, game and editor, selected by `--tests <mode>`, in a single binary.
 
 ### Key files
 
-- `ITestRunner.h` — polymorphic interface: `tick(float dt)`, `exit_code()`.
-- `TestTask.h` — coroutine task; `TestAbortException` for `require()` failures.
-- `TestContext.h/.cpp` — test API: `check()`, `require()`, awaitables for ticks/seconds/delegates/levels/screenshots.
-- `TestRegistry.h` — `GAME_TEST(name, timeout, fn)` / `EDITOR_TEST(...)`; static-init registration. `get_filtered(mode, patterns)` accepts a glob list.
-- `TestRunner.h/.cpp` — single mode-agnostic runner. Drives C++ tests, then the Lua phase, then writes one XML.
+- `ITestRunner.h` — the polymorphic interface: `tick(float dt)`, `exit_code()`.
+- `TestTask.h` — the coroutine task. `TestAbortException` signals a `require()` failure.
+- `TestContext.h/.cpp` — the test API: `check()`, `require()`, and awaitables for ticks, seconds, delegates, levels, and screenshots.
+- `TestRegistry.h` — `GAME_TEST(name, timeout, fn)` and `EDITOR_TEST(...)`, registered at static init. `get_filtered(mode, patterns)` accepts a glob list.
+- `TestRunner.h/.cpp` — the single, mode-agnostic runner. It drives the C++ tests, then the Lua phase, then writes one XML file.
 - `EditorTestContext.h/.cpp` — editor helpers: `entity_count()`, `save_level(path)`, `undo()`.
-- `Screenshot.h/.cpp` — `screenshot_capture_and_compare()`: glReadPixels → stb PNG → pixel diff vs golden.
-- `GpuTimer.h/.cpp` — `ScopedGpuTimer` wrapping GL_TIME_ELAPSED; `GpuTimingLog` writes JSON.
-- [[Scripts/integration_test.ps1]] — builds, runs both passes.
+- `Screenshot.h/.cpp` — `screenshot_capture_and_compare()`. It reads pixels with `glReadPixels`, encodes them with stb as a PNG, then diffs the pixels against a golden image.
+- `GpuTimer.h/.cpp` — `ScopedGpuTimer` wraps `GL_TIME_ELAPSED`. `GpuTimingLog` writes the result as JSON.
+- [[Scripts/integration_test.ps1]] — builds the project and runs both passes.
 
 ### Existing tests
 
@@ -70,25 +80,25 @@ C++20 coroutines, two passes (game / editor) selected by `--tests <mode>`, singl
 
 ### Gotchas
 
-- **STB:** `STB_IMAGE_IMPLEMENTATION` and `STB_IMAGE_WRITE_IMPLEMENTATION` already defined in `Source/External/External.cpp`. Do NOT redefine in `Screenshot.cpp` — just include the headers.
+- **STB:** `STB_IMAGE_IMPLEMENTATION` and `STB_IMAGE_WRITE_IMPLEMENTATION` are already defined in `Source/External/External.cpp`. Do not redefine them in `Screenshot.cpp`. Just include the headers.
 - **Includes:** `AdditionalIncludeDirectories` is `$(SolutionDir)Source\`. Use `"IntegrationTests/TestContext.h"`, not `"TestContext.h"`.
 - **EditorDoc access:**
   ```cpp
   auto* doc = static_cast<EditorDoc*>(eng_local.editorState->get_tool());
   ```
-  Includes: `GameEngineLocal.h`, `LevelEditor/EditorDocLocal.h`.
-- **save_level:** `doc->set_document_path(path)` then `doc->save_document_internal()`. Path is game-relative, e.g. `"TestFiles/tmp.tmap"`.
-- **Level API:** `eng->get_level()->get_all_objects()` → `const hash_map<BaseUpdater*>&`.
-- **Directory creation:** `_mkdir("TestFiles")` (`<direct.h>`), NOT `std::filesystem`.
-- **Screenshots:** goldens in `TestFiles/goldens/` (committed); `TestFiles/screenshots/` is gitignored. `--promote` creates/updates goldens.
+  Include `GameEngineLocal.h` and `LevelEditor/EditorDocLocal.h`.
+- **save_level:** call `doc->set_document_path(path)`, then `doc->save_document_internal()`. The path is game-relative, for example `"TestFiles/tmp.tmap"`.
+- **Level API:** `eng->get_level()->get_all_objects()` returns `const hash_map<BaseUpdater*>&`.
+- **Directory creation:** use `_mkdir("TestFiles")` from `<direct.h>`. Do not use `std::filesystem`.
+- **Screenshots:** goldens live in `TestFiles/goldens/` and are committed. `TestFiles/screenshots/` is gitignored. `--promote` creates or updates the goldens.
 
 ---
 
-## Lua Integration Tests
+## Lua integration tests
 
-Tests live under `Data/scripts/tests/**/*.lua` (gitignored along with the rest of `Data/`). The engine only loads them when `--tests` is set; in normal runs the directory is skipped so `add_test()` calls don't fire.
+Lua tests live under `Data/scripts/tests/**/*.lua`. Like the rest of `Data/`, this path is gitignored. The engine loads these files only when `--tests` is set. In a normal run, the engine skips the directory, so `add_test()` calls never fire.
 
-Each file calls `add_test(name, fn)` at file scope. The function is a coroutine — `coroutine.yield(seconds)` waits, raising an error fails the test:
+Each file calls `add_test(name, fn)` at file scope. The function runs as a coroutine. `coroutine.yield(seconds)` waits for that many seconds. An error raised inside the function fails the test.
 
 ```lua
 add_test("smoke/level_loads", function()
@@ -98,22 +108,22 @@ add_test("smoke/level_loads", function()
 end)
 ```
 
-The framework lives in `Data/scripts/integration_test_framework.lua`. The C++ `TestRunner` runs C++ tests first, then resumes `_lua_run_all_tests` (defined by the framework) inside a coroutine, ticking it each frame and respecting yielded wait seconds. Per-test results flow back via `LuaTestRunner.report(name, passed, msg)`; `LuaTestRunner.set_done()` ends the phase. Both phases append into the same `TestFiles/integration_<mode>_results.xml`.
+The framework lives in `Data/scripts/integration_test_framework.lua`. The C++ `TestRunner` runs the C++ tests first. It then resumes `_lua_run_all_tests`, defined by the framework, inside a coroutine. It ticks this coroutine each frame and honours any yielded wait time. Each Lua test reports its result through `LuaTestRunner.report(name, passed, msg)`. `LuaTestRunner.set_done()` ends the Lua phase. Both phases append to the same file: `TestFiles/integration_<mode>_results.xml`.
 
-`--tests` patterns filter Lua tests too (same glob syntax, matched against the test name).
+`--tests` patterns filter Lua tests too, using the same glob syntax matched against the test name.
 
 ---
 
 ## Repo health check — `check_codebase.ps1`
 
-[[Scripts/check_codebase.ps1]] is the single-shot quality gate. Sections, in order:
+[[Scripts/check_codebase.ps1]] is the single-shot quality gate. It runs these sections, in order:
 
-By default: skip code coverage! with `-Quick` only check code coverage on request.
+By default, the script skips code coverage. Pass `-Quick` to check coverage only when you ask for it explicitly.
 
-1. **`docs.exe check`** — wiki-link + `@docs` ref validation + freshness check on doc→source links. Errors fail the run; freshness issues (`stale` / `unblessed` / `orphan`) are warnings only. See [[tooling/docs-cli#Freshness]].
-2. **LOC per file** — warn >600, error >1000. Excludes `Source/External`, `.generated`, `MEGA.cpp`.
-3. **OpenCppCoverage** — builds App.exe, runs integration tests for `game` + `editor`, writes `TestFiles/coverage/coverage_<mode>.xml` (Cobertura) + `TestFiles/coverage/coverage_summary.md` (per-file matrix sorted ascending by best mode). Skipped if OpenCppCoverage isn't installed (`winget install OpenCppCoverage.OpenCppCoverage`).
-4. **TODO/FIXME/HACK scan** — `rg`-based, warning only.
+1. **`docs.exe check`** — validates wiki-links and `@docs` references, and checks the freshness of doc-to-source links. Errors fail the run. Freshness issues (`stale`, `unblessed`, `orphan`) are warnings only. See [[tooling/docs-cli#Freshness]].
+2. **LOC per file** — warns above 600 lines, errors above 1000. Excludes `Source/External`, `.generated`, and `MEGA.cpp`.
+3. **OpenCppCoverage** — builds `App.exe`, runs the integration tests for `game` and `editor`, then writes `TestFiles/coverage/coverage_<mode>.xml` (Cobertura format) and `TestFiles/coverage/coverage_summary.md` (a per-file matrix, sorted ascending by best mode). This section is skipped if OpenCppCoverage is not installed. Install it with `winget install OpenCppCoverage.OpenCppCoverage`.
+4. **TODO/FIXME/HACK scan** — uses `rg`. Warning only.
 
 ```powershell
 # Full run (includes coverage build + both test passes — slow)
@@ -126,21 +136,21 @@ powershell Scripts/check_codebase.ps1 -Quick
 powershell Scripts/check_codebase.ps1 -SkipDocs -SkipLoc -SkipCoverage -SkipTodos
 ```
 
-Exit 0 = no errors. Exit 1 = at least one section errored. Warnings never fail. The summary block at the end lists each section's status (`ok` / `warn` / `error` / `skip`).
+Exit code 0 means no errors. Exit code 1 means at least one section errored. Warnings never cause a failure. The summary block at the end lists each section's status: `ok`, `warn`, `error`, or `skip`.
 
-### Viewing coverage in VSCode
+### Viewing coverage in VS Code
 
-Install the **Coverage Gutters** extension (`ryanluker.vscode-coverage-gutters`). `.vscode/settings.json` already points it at `TestFiles/coverage/` and picks up `coverage_editor.xml` first.
+Install the **Coverage Gutters** extension (`ryanluker.vscode-coverage-gutters`). `.vscode/settings.json` already points it at `TestFiles/coverage/` and prefers `coverage_editor.xml`.
 
-- Command Palette → **Coverage Gutters: Display Coverage** — shows gutter marks + status-bar %.
-- **Coverage Gutters: Watch** — auto-refreshes when XMLs change.
-- To swap editor↔game XML: re-order `coverage-gutters.coverageFileNames` (first match wins), then **Remove Coverage** + **Display Coverage**.
+- Open the Command Palette and run **Coverage Gutters: Display Coverage** to show gutter marks and the status-bar percentage.
+- Run **Coverage Gutters: Watch** to auto-refresh when the XML files change.
+- To swap between the editor and game XML, re-order `coverage-gutters.coverageFileNames` so your preferred file matches first. Then run **Remove Coverage**, followed by **Display Coverage**.
 
-Pretty HTML report: `py [[Scripts/coverage_to_html.py]]` writes `TestFiles/coverage/coverage_summary.html` (filterable, per-module).
+For a readable HTML report, run `py [[Scripts/coverage_to_html.py]]`. It writes `TestFiles/coverage/coverage_summary.html`, which you can filter per module.
 
 ---
 
-## Known Pre-Existing Failures
+## Known pre-existing failures
 
-- `ScriptManagerTest.SyntaxErrorLeavesCleanStack` — flaky, suspected isolation issue.
-- `ClassBaseRegistryTest` suite setup — fails, blocks some unit test runs.
+- `ScriptManagerTest.SyntaxErrorLeavesCleanStack` — flaky. Suspected test-isolation issue.
+- `ClassBaseRegistryTest` suite setup — fails, and blocks some unit test runs.
