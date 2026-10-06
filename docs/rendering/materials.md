@@ -79,7 +79,9 @@ Paths relative to `Data/`. Override only what differs from master defaults.
 
 ---
 
-## Internals (Agent Notes)
+## Internals
+
+Engine internals. For authoring, see the sections above. For gameplay Lua, see [[scripting/lua_cookbook]].
 
 ### Key files
 

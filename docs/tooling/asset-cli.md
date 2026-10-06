@@ -1,6 +1,6 @@
 # Asset CLI/REPL
 
-Interactive shell for browsing/editing the asset tree under `Data/`. Understands **asset groups** (a logical asset = all sibling files sharing a stem, e.g. `rock.glb` + `rock.cmdl` + `rock.dds` + `rock.tis`) and rewrites references on rename/move.
+Interactive shell for browsing/editing the asset tree under `Data/`. Understands **asset groups** (a logical asset = all sibling files sharing a stem, e.g. `rock.glb` + `rock.cmdl` + `rock.dds` + `rock.tis`) and rewrites references on rename/move. For the C++ AssetTools library, see [[asset_tools]].
 
 Launch: `py [[Scripts/asset_cli.py]] [asset_root]`. Default root = `./Data` (falls back to cwd if absent). History at `~/.asset_cli_history`. Tab-completion via `prompt_toolkit`; falls back to plain `input()` if no console buffer.
 

@@ -1,4 +1,6 @@
-# Decal Material Authoring — Agent Notes
+# Decal Material Authoring
+
+Engine internals. For gameplay Lua, see [[scripting/lua_cookbook]]. For master materials, see [[rendering/materials]].
 
 Decals share `.mm`/`.mi` format with regular materials but use `DOMAIN Decal` and explicit `Write*` opt flags to control which G-buffer channels they touch.
 
@@ -45,7 +47,7 @@ One sidecar per source texture; editor compiles to `.dds` on reimport.
 
 ## Master Material Format (`.mm`) — Decal Domain
 
-```
+```text
 TYPE MaterialMaster
 DOMAIN Decal
 OPT BlendMode Blend

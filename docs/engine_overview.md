@@ -31,7 +31,7 @@ CsRemake/
 - **Add source:** add `<ClCompile>` and `<ClInclude>` entries to `Core.vcxproj`.
 - **Codegen:** run `py Scripts/codegen.py`. It parses the C++ headers and writes the Lua bindings to `Source/.generated/MEGA.gen.cpp`. Rerun it after you add or remove a `REF` or `CLASS_BODY`.
 - **Unit tests:** run `powershell Scripts/build_and_test.ps1 -Configuration Debug -Platform x64`.
-- **Integration tests:** run `powershell Scripts/integration_test.ps1 -Config Debug`. See [[testing.md]].
+- **Integration tests:** run `powershell Scripts/integration_test.ps1 -Config Debug`. See [[testing]].
 - **Clang-format:** run `powershell Scripts/clang-format-all.ps1`. Run this before every commit.
 
 ---
@@ -44,6 +44,9 @@ Key cvars:
 - `g_application_class` — the Lua class name to instantiate as the Application.
 - `g_entry_level` — the first level to load, by asset name. Startup runs `map <g_entry_level>`.
 - `g_project_base` — the data directory. Use a relative path, such as `"Data"`, not an absolute path.
+- `r.debug_mode` — debug output such as normals, object id, and material id. Values are 0–9. See `Draw.cpp` for the numbers.
+- `g_draw_physx_scene` — bitmask: 1 = collision shapes, 2 = joints, 3 = both.
+- `g_slomo` — time speed multiplier.
 
 Launch flags:
 - `--editor` — opens the editor UI. The default is game mode. This flag is implicit when you use `--tests editor`.
@@ -251,3 +254,12 @@ For the full lifecycle and dispatch model, see [[scripting_system]].
 ### Running tests
 
 See [[testing]].
+
+## See Also
+
+- [[tooling/level_editor]]
+- [[tooling/cscli]]
+- [[tooling/managing_projects]]
+- [[ui/rmlui_agent_guide]]
+- [[navigation]]
+- [[debugging/crash_dumps]]

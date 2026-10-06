@@ -1,22 +1,19 @@
-# RmlUi integration
+# RmlUi Integration
 
-RmlUi 6.2 (`core` + `freetype` vcpkg features, no `[lua]` feature — this engine
-binds RmlUi to Lua itself, not via RmlUi's own Lua plugin). The render
-interface (`Source/Render/RmlUiRenderInterface.h/.cpp`) is implemented
-entirely through `IGraphicsDevice` (textures/buffers/vertex-input/pipeline/
-push-constants) — no raw graphics-API calls — so it is backend-portable, but
-it's currently only instantiated by the OpenGL device; DX11 backend log-warns
-and no-ops (`Source/Render/Dx11/Dx11Device.cpp`) since it isn't wired up
-there yet.
+Engine internals for the RmlUi gameplay UI. For gameplay Lua, see [[scripting/lua_cookbook]].
 
-Draw order per frame: 3D scene -> `Gui::`/`Canvas::` immediate-mode HUD
-sprites -> RmlUi documents -> ImGui (editor, always on top). `Gui::`/`Canvas::`
-(`Source/UI/Gui.h`, `Source/UI/GUISystemPublic.h`) is a separate lower-level
-immediate-mode primitive layer, still used for dynamic/gameplay drawing
-(minimap blips, damage numbers, debug overlays). Use RmlUi for anything with a
-document/DOM shape (menus, inventories, dialogs, HUD panels with layout).
+RmlUi 6.2 uses the `core` and `freetype` vcpkg features. The render interface is `Source/Render/RmlUiRenderInterface.h`. It talks only to `IGraphicsDevice` (textures, buffers, vertex input, pipeline, push constants). It makes no raw graphics-API calls. The OpenGL device constructs it. The DX11 backend logs a warning and no-ops (`Source/Render/Dx11/Dx11Device.cpp`).
 
-## Known v1 limitations
+Draw order per frame:
+
+1. 3D scene
+2. `Gui::` / `Canvas::` immediate-mode HUD sprites
+3. RmlUi documents
+4. ImGui (editor, always on top)
+
+`Gui::` / `Canvas::` (`Source/UI/Gui.h`, `Source/UI/GUISystemPublic.h`) is a separate immediate-mode layer. Use it for dynamic gameplay drawing such as minimap blips, damage numbers, and debug overlays. Use RmlUi for document and DOM UI such as menus, inventories, dialogs, and HUD panels with layout.
+
+## Known v1 Limitations
 
 - **File-based image loading routes through the engine's asset system.**
   `RmlUiRenderInterface::LoadTexture` calls `Texture::load(source)` — the same
@@ -34,7 +31,7 @@ document/DOM shape (menus, inventories, dialogs, HUD panels with layout).
   `RenderGeometry` call. `filter`/`backdrop-filter` and custom
   `Rml::Decorator`/shader effects still parse and animate correctly (RmlUi
   core handles that regardless of backend) but **do not visually apply** —
-  the render interface doesn't implement `CompileFilter`/`RenderShader`/
+  the render interface does not implement `CompileFilter`/`RenderShader`/
   layer compositing yet. See `Source/Render/RmlUiRenderInterface.h` for the
   extension point if this is needed later (custom decorator ->
   `CompileShader`/`RenderShader` binding a custom GLSL program via
@@ -47,9 +44,9 @@ document/DOM shape (menus, inventories, dialogs, HUD panels with layout).
   re-loading the `.rml` alone silently reuses the stale pre-edit stylesheet
   (`RmlUiSystem::poll_hot_reload()` calls this already; a symptom of
   forgetting it is the `.rml` visibly reloading - e.g. layout/text edits
-  apply - while style edits don't).
+  apply - while style edits do not).
 - **No fonts ship yet.** `RmlUiSystem::init()` loads every `.ttf`/`.otf`
-  under `Data/ui/fonts/` via `Rml::LoadFontFace`, but that directory doesn't
+  under `Data/ui/fonts/` via `Rml::LoadFontFace`, but that directory does not
   exist in this repo — add font files there for text to actually render.
   The engine's own bitmap `GuiFont` format (`Data/eng/fonts/*.fnt`, used by
   `Gui::`/`Canvas::`) is a different, incompatible format; RmlUi's freetype
@@ -60,21 +57,15 @@ document/DOM shape (menus, inventories, dialogs, HUD panels with layout).
   cleanly released. Non-fatal (log-only, verified via integration test: no
   crash, all resources still functionally torn down), but not yet root-
   caused — a follow-up if it turns out to matter (e.g. leak detection noise).
-- **`ElementDocument:Close()` does not synchronously tear down its data
-  model** — actual document/model removal is deferred to the `Context`'s own
-  `Update()` pass. Calling `ctx:OpenDataModel()` again with the same model
-  name right after `Close()` (e.g. a fast open/close/reopen cycle) hits the
-  still-registered old model: `Log::Message` warnings like `Data model name
-  '...' already exists` / `Data model variable with name '...' already
-  exists`, and the new Lua table never actually gets bound — the on-screen
-  doc is left pointing at the OLD (about-to-be-destroyed) Lua table. Once
-  that table's only Lua reference gets overwritten it's GC'd, and the next
-  `data-for`/variable `Update()` (e.g. a bound button click doing
-  `table.insert(model.cards, ...)`) dereferences a dead Lua stack slot and
-  hard-crashes (`LuaTableDef::Size` → `lua_type` → `index2value`, `READ @
-  0xFFFFFFFFFFFFFFFF`). **Fix: call `OpenDataModel`/`LoadDocument` exactly
-  once per model name, ever.** Toggling a data-model-backed doc on/off
-  afterward is `Show()`/`Hide()` only, never `Close()` + reopen.
+- **`ElementDocument:Close()` does not tear down its data model in the same call.**
+  Removal waits for the next `Context::Update()`. If you call `ctx:OpenDataModel()`
+  with the same name right after `Close()`, the old model is still registered.
+  You get warnings such as `Data model name '...' already exists`. The new Lua
+  table is not bound. The on-screen document still points at the old table.
+  When that table is garbage-collected, the next `data-for` or variable `Update()`
+  crashes (`LuaTableDef::Size` → `lua_type` → `index2value`, `READ @
+  0xFFFFFFFFFFFFFFFF`). Call `OpenDataModel` and `LoadDocument` once per model
+  name. After that, use `Show()` and `Hide()` only. Do not `Close()` and reopen.
 
 ## RCSS vs CSS — do not assume standard CSS
 
@@ -137,7 +128,7 @@ Bound via `data-model="model_name"` on a container element, then inside it:
   (`ElementUtilities::ApplyDataViewsControllers`), and those take a raw
   `DataExpression` (numbers/`+`/`-`/comparisons/model variables), not `{{ }}`
   template text — `data-attr-id="row_index"` sets `id` to the numeric index,
-  not `"row_2"`. Don't rely on generated per-row ids from a `data-for` loop
+  not `"row_2"`. Do not rely on generated per-row ids from a `data-for` loop
   unless you've confirmed the expression does what you think.
 - `data-attr-<name>="expr"` — bind an element attribute.
 - `data-class-<name>="expr"` — toggle a class based on a boolean expression.

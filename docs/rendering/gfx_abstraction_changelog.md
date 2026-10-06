@@ -1,3 +1,6 @@
++++
+hidden = true
++++
 # Graphics Device Abstraction — Sub-phase changelog
 
 Historical record of every Phase 1 and Phase 2 sub-phase as it landed.

@@ -1,11 +1,11 @@
-# Physics transforms & triggers
+# Physics Transforms and Triggers
 
 PhysX wrapper. Bodies are `Component`s: `PhysicsBody` base +
 `CapsuleComponent`/`BoxComponent`/`SphereComponent`/`MeshColliderComponent`.
 Source: `Source/Game/Components/PhysicsComponents.{h,cpp}`, scene/filter in
 `Source/Physics/Physics2Local.cpp`.
 
-## Transform ownership model (the #1 source of confusion)
+## Transform Ownership
 
 A body has ONE of two relationships with its Entity's transform, chosen by
 `get_body_type()`:
@@ -21,7 +21,7 @@ A body has ONE of two relationships with its Entity's transform, chosen by
 Rule of thumb: never push Entity transforms into a Dynamic body every frame —
 it fights the solver and does nothing useful.
 
-## Transform API — one method, one meaning
+## Transform API
 
 | Method | What it does | Body types | Velocity |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Neither `teleport_to` nor `move_to` mutates velocity. (The old `set_transform`
 silently zeroed a Dynamic body's velocity — that was the ragdoll "crawl instead
 of fall" bug. It is now a deprecated shim; do not use it.)
 
-## Body type
+## Body Type
 
 `enum BodyType { Static, Kinematic, Dynamic }` via `get/set_body_type()` — the
 sole body-type API (C++ and Lua). Internally: `Static` = RigidStatic;
@@ -47,14 +47,14 @@ actor ticks at all. Lua uses the `BODYTYPE_STATIC/KINEMATIC/DYNAMIC` constants.
 The old bool API (`set_is_static/set_is_simulating/set_is_kinematic`) has been
 removed; use `set_body_type`.
 
-## Scale (known limitation)
+## Scale
 
 Collision shapes bake `entity->get_ls_scale()` **once** at shape-creation time.
 PhysX poses are rigid (position+rotation only), so `teleport_to`/`move_to` strip
 scale. Rescaling an Entity at runtime does NOT resize its collision shape. Set
 the scale before the body starts, or rebuild the shapes.
 
-## Unity / Unreal → CsRemake cheat-sheet
+## Unity and Unreal Mapping
 
 | Unity | Unreal | CsRemake |
 |---|---|---|
@@ -73,7 +73,7 @@ Not yet implemented (agents will reach for these — they are gaps, not hidden
 API): gravity toggle, linear/angular damping, `set_mass`, torque, center-of-mass
 force helpers, sleep/wake, axis-lock constraints, CCD.
 
-## Triggers — rules & sharp edges
+## Triggers
 
 Set `set_is_trigger(true)`. Overlap enter/leave is delivered via
 `Component::on_trigger(Entity* other, bool entered)`.

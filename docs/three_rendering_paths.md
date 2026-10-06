@@ -1,23 +1,26 @@
++++
+hidden = true
++++
 # Rendering Paths
 
-There are 3-ish rendering paths for models:
+There are three rendering paths for models:
 
-### MeshComponent path 
+## MeshComponent path 
 
 This is the standard one, high level and flexible. Attached the scene graph so you can parent it to things. Internally, this uses a Render_Object handle.
 
-### Render_Object path 
+## Render_Object path 
 
 Internally used by MeshComponent. You can also use this manually, this avoids some of the overhead of a MeshComponent and Entity scene graph (although Render_Object still has overhead internally). Automatically has batching and LOD selection, frustum and occlusion culling on the GPU. 
 
-### CompactInstance path. 
+## CompactInstance path. 
 
 This is the fastest path, meant for drawing 100,000s of objects with good performance out of the box. As a tradeoff, theres more bookkeeping work for the user to set this up. All you have to do is set the instance data and can be static or dynamic. its culled (LOD, frustum, occlusion) on the GPU and has automatic batching like the Render_Object path. Use this for lots of foliage or debris instances or other meshes with tons and tons of instances.
 
 It has some restrictions. It doesnt support animated objects, its rotation is compressed, and only has uniform scale.  
 
 
-### Misc notes
+## Misc notes
 
 50K instances (renderstresstest component): 
 

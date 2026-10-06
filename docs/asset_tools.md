@@ -1,6 +1,6 @@
 # Asset Tools
 
-Static library (`Source/AssetTools/AssetTools.vcxproj`) containing editor-only asset compilation, diagnostics, file operations, and templates. Built only under `EDITOR_BUILD`.
+Static library (`Source/AssetTools/AssetTools.vcxproj`) containing editor-only asset compilation, diagnostics, file operations, and templates. Built only under `EDITOR_BUILD`. For the Python asset REPL, see [[tooling/asset-cli]].
 
 Consuming projects (App, UnitTests, SlimRenderApp) link via `/WHOLEARCHIVE:AssetTools.lib`.
 

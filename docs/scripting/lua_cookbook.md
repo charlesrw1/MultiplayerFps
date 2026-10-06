@@ -1,12 +1,14 @@
 # Lua Cookbook
 
-- **IMPORTANT** See all Lua functions available in `lua_stubs.lua` `transform_lua_stubs.lua` `vec_quat_lua_stubs.lua` and other `*_lua_stubs.lua`
+See [[scripting_system]] for dispatch and ClassBase scriptable classes. See [[scripting/vscode_debugger]] to attach VS Code.
+
+- See all Lua functions available in `lua_stubs.lua`, `transform_lua_stubs.lua`, `vec_quat_lua_stubs.lua`, and other `*_lua_stubs.lua`.
 - `REF`/`CLASS_BODY` C++ methods are exposed to Lua directly: `Type.static_method()` for statics,
 `obj:method()` for instance methods. Reflected static classes act as namespaces (`GameplayStatic`,
 `lInput`).
 
 - See example scripts in: `D:/Data/scripts/**` or `TestFilesData/scripts/***`.
-- Lua snippets below work identically from `cscli eval` against a running engine instance.
+- Lua snippets below work identically from `cscli eval` against a running engine instance. See [[tooling/cscli]].
 
 ## Entities
 

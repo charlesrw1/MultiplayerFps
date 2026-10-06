@@ -1,4 +1,3 @@
-// @docs [[tooling/docs-cli]]
 // Grid background and axis-label drawing for CurveEditorImgui.
 // See: draw_editor_background_and_grid()
 

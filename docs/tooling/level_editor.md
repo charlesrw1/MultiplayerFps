@@ -3,84 +3,90 @@ order = -4
 +++
 # Level Editor
 
-## Interface Overview
+The level editor is the main map-creation tool. Launch it with `.\Scripts\run_editor.ps1` or `App.exe --editor`.
 
-![Editor Interface](tooling/screenshot1.png)
+## Camera
 
-## Controls
+1. Hold `Right Mouse` to use the FPS camera.
+2. Use `WASD` to move. Use the mouse to look.
+3. Use `Mouse Wheel` to change camera speed. With `Right Mouse` held, the wheel also changes speed or orthographic zoom.
+4. Press `Z` to move up on the Y-axis. Press `X` to move down.
+5. Hold `Middle Mouse` to orbit around the target point.
+6. Press `F` with an object selected to set the orbit target.
+7. Hold `Shift` and `Middle Mouse` to pan.
+8. Press Numpad `1`, `7`, or `3` for an orthographic view. Hold `Ctrl` with those keys for the opposite axis.
+9. Press Numpad `5` for a perspective view.
 
-- Camera can be controlled with an FPS-like camera and orbit camera. Hold `Right Mouse` to go into the FPS camera, use `WASD` controls to move around and use mouse to look around. Use `Mouse Wheel` to change camera speed. `Z` to go up on Y-axis, `X` to go down on Y-axis. Hold `Middle Mouse` to go into orbit camera mode. It orbits around the set target point. The target point can be set by pressing `F` with an object selected. Hold `Shift` and `Middle Mouse` to pan the camera around. 
+## Gizmos
 
-- Uses Blender-style keybinds for translation/rotation/scale gizmos. With object(s) selected: press `G` to activate screenspace translation, press `R` for screenspace rotation, or press `S` for uniform scale. Press `Right Mouse` to cancel, `Left Mouse` to confirm. After activating one of the gizmo tools, you can also press `X`, `Y`, and `Z` to only translate/rotate/scale about that axis. Press `Shift` along with one of the axis keys to translate about that plane.
+The gizmos use Blender-style keys. Select one or more objects first.
 
-- `Ctrl+Z` to undo last command.
+1. Press `G` for screenspace translation.
+2. Press `R` for screenspace rotation.
+3. Press `S` for uniform scale.
+4. Press `X`, `Y`, or `Z` after a gizmo tool to lock that axis. Hold `Shift` with an axis key to lock the plane.
+5. Press `Left Mouse` to confirm. Press `Right Mouse` to cancel.
 
-- `Ctrl+S` to save document.
+## Selection
 
-- `Ctrl+Tab` to change current document to previous documents.
+1. Click `Left Mouse` to select an object. Drag `Left Mouse` to box-select.
+2. Hold `Shift` and click to add to the selection.
+3. Hold `Ctrl` and click to remove from the selection.
+4. Press `Ctrl+A` to select all. Press `Ctrl+I` to invert the selection.
+5. Press `Delete` to delete the selection.
+6. Press `Shift+D` to duplicate the selection. Hold `Ctrl` and drag a transform tool to duplicate and transform in one step.
+7. Press `H` to hide the selection. Press `Alt+H` to unhide all.
 
-- Use keypad keys to set camera into orthographic mode. 
+## Document and Undo
 
-- `T` to toggle text labels on entities. 
+1. Press `Ctrl+Z` to undo.
+2. Press `Ctrl+S` to save.
+3. Press `Ctrl+Tab` to cycle previous documents.
 
-- `Delete` to delete current selection.
+## Parenting and Context Menu
 
-- `Shift+D` to duplicate and select current selection.
+1. Press `Right Mouse` on selected entities to open the context menu. Use it to parent entities in prefab mode, or to unpack prefabs.
+2. Press `Ctrl+P` to parent the first selected entity to the second selected entity.
 
-- `Right Mouse` to open context menu of selected entities. Use this to parent entities (in prefab mode) or other actions like unpacking prefabs.
+Parenting works only in prefab mode. Instantiating a prefab removes parenting. See [[gotchas]].
 
-- `Ctrl+P` to parent first selected entity to second selected entity.
+## Other Shortcuts
 
-- `Mouse Left` to select an object. Drag the mouse with `Mouse Left` to box select. Hold `Shift` to add to selection. Hold `Ctrl` to remove from selection. 
-
-- `Ctrl+A` to select all. `Ctrl+I` to invert selection.
-
-- `H` to hide selected. `Alt+H` to unhide all.
-
-- `,` to toggle open debug menu.
-
-- `.` to toggle open console.
+- Press `T` to toggle entity text labels.
+- Press `,` to toggle the debug menu.
+- Press `.` to toggle the console.
 
 ## Menu Bar
 
-- Use `File>Restore Backup...` to open a window where you can select a past automatic backup to reload current file.
-
-- Use `Tools>Asset Size Viewer` to open a tree graph of asset file sizes in the active data directory, where tile size corresponds to file size. Color coded according to asset type, and grouped by folders. Only includes compilied assets.
-
-- Use `Tools>Diagnostics` to open a window that can display some errors related to assets or map entities like missing fields.
-
-- Use `Tools>Profilier` to open the profilier. See [[profilier|Profilier]] for information.
+- `File > Restore Backup...` opens a list of automatic backups for the current file.
+- `Tools > Asset Size Viewer` shows a tree graph of asset file sizes in the active data directory. Tile size matches file size. Color marks asset type. The view groups files by folder. It includes compiled assets only.
+- `Tools > Diagnostics` shows errors on assets or map entities, such as missing fields.
+- `Tools > Profiler` opens the CPU profiler.
 
 ## Scene Menu Bar
 
-- Use the magnet button to enable/disable snapping. Click the arrow to change the snap settings. 
-
-- Use the coordinate icon to enable global/local coordinates on the gizmo tools.
-
-- Use the box handles button to select between 3 modes: off, faces, edges. Faces add a handle to the bounds of the selected object that let you drag to expand it, which modifies the position and/or scale to move the bounding box. Edges is similar, but places the handles on the edges of the bounding box, letting you manipulate in 2 axis.
-
-- Use the T icon to toggle text labels on entities (shortcut `T` key). 
-
-- Use the "Lit" label to change between scene debug render modes. 
-
-- Use the "OT: Off" label to select between an internal render texture to display.
+- Magnet button: enable or disable snapping. Click the arrow to change snap settings.
+- Coordinate icon: switch the gizmos between global and local coordinates.
+- Box handles: Off, Faces, or Edges. Faces add a handle on each bound of the selection. Drag a handle to expand the bounds. This changes position and scale. Edges place handles on the bounding-box edges, so you can drag two axes at once.
+- T icon: toggle entity text labels (same as `T`).
+- Lit label: change scene debug render modes.
+- OT: Off label: overlay an internal render texture.
 
 ## Asset Browser
 
-- Use the green "upload" button to select .glb model(s) to import. 
-
-- Use the "Grid" checkbox to enable grid vs list mode. Grid mode displays assets with a thumbnail if available.
-
-- The folders on the left can be selected and/or expanded/collapsed. 
-
-- Use the filter button to select a type filter.
-
-- Right click on an asset to open a popup. You can copy the asset path (the path you can use in-engine) to the OS clipboard. Use "Open in notepad" on some assets like textures, models, materials, to open the text file in the OS text editor. Use "Show in Explorer" to open the containg folder in the OS explorer. Use "View References" to open reference viewer. Use "Create New..." to create a new asset in that folder. 
-
-- Some assets allow drag-drop into the scene. Drag-dop Lua/C++ components, models, and prefabs to place them into the scene.
-
-- Click on an asset to select it, and it opens in the Asset Inspector window for editing its import settings.
+1. Click the green upload button to import `.glb` models.
+2. Use the Grid checkbox to switch between grid and list mode. Grid mode shows a thumbnail when one exists.
+3. Select folders on the left. Expand or collapse them.
+4. Use the filter button to filter by asset type.
+5. Right-click an asset for a popup:
+   - Copy the in-engine asset path to the clipboard.
+   - Open in Notepad for text assets such as textures, models, and materials.
+   - Show in Explorer to open the containing folder.
+   - View References to open the reference viewer.
+   - Create New... to create an asset in that folder.
+6. Drag Lua or C++ components, models, and prefabs from the browser into the scene to place them.
+7. Click an asset to select it. The Asset Inspector shows its import settings.
 
 ## Outline Filter
 
-Lets you hide/show entities of certain types.
+Use the outline filter to hide or show entities by type.

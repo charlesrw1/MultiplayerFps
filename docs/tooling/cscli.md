@@ -1,10 +1,9 @@
 +++
 order = -3
 +++
-
 # Command Line Bridge
 
-This covers cscli.exe, which is a tool that agents can use to access the running game/editor and run commands on it.
+`cscli.exe` lets you run commands and Lua on a running editor or game instance.
 
 ```
 cscli - CLI for driving a running CsRemake editor/game instance over AgentBridge
@@ -38,7 +37,14 @@ Examples:
   cscli log --lines 50
 ```
 
-## Notes
+## Connect to a Running Instance
 
-- engine can take ~10sec to spin up (espically first time runs), so don't try to connect to cscli immeditaely after launching, check tasklist
- 
+The engine can take about 10 seconds to start. The first run is slower.
+
+1. Launch the editor or game. See [[tooling/run-scripts]].
+2. Wait until the process is running. Use `tasklist` if you need to confirm.
+3. Run `cscli status` to connect.
+
+Do not call `cscli` immediately after launch.
+
+See [[scripting/lua_cookbook]] for `eval` examples.

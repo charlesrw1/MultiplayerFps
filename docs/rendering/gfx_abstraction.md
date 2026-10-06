@@ -1,3 +1,6 @@
++++
+hidden = true
++++
 # Graphics Device Abstraction
 
 This is the canonical migration doc. The earlier strategy doc at

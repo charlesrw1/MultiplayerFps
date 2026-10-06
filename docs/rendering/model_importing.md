@@ -53,4 +53,4 @@ In the DCC tool, prefix meshes with `CVX_` to make them convex collision meshes 
 
 ## Model Animations
 
-(TODO — animation pipeline notes pending.)
+For skeleton and armature bake, see [[rendering/skeleton_armature_bake]]. Animation clip authoring notes are not written yet.

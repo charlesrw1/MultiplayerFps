@@ -1,3 +1,6 @@
++++
+hidden = true
++++
 # Test Coverage
 
 - Point/Spot shadows: covered

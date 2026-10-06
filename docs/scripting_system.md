@@ -1,4 +1,6 @@
-# Scripting System — Agent Notes
+# Scripting System
+
+Engine internals. For gameplay Lua, see [[scripting/lua_cookbook]].
 
 ## Overview
 
@@ -18,7 +20,7 @@
 
 ## Debugger
 
-VS Code attach via EmmyLuaDebugger — see [[scripting/vscode_debugger]].
+VS Code attach via `actboy168.lua-debug` — see [[scripting/vscode_debugger]].
 
 ## Lua Stubs
 

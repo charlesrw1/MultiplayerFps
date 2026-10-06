@@ -1,3 +1,6 @@
++++
+hidden = true
++++
 # Bike AI plan
 
 Replaces the leader/boid two-state model. One unified controller. The only decision a rider makes each frame is: whose wheel am I on.
