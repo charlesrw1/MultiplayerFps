@@ -32,10 +32,13 @@ std::vector<InstanceInfo> discover_instances() {
 			info.port = j.value("port", 0);
 			info.mode = j.value("mode", std::string());
 			info.project_base = j.value("project_base", std::string());
+			info.project_name = j.value("project_name", std::string());
+			info.project_file = j.value("project_file", std::string());
 			info.started_at = j.value("started_at", (int64_t)0);
 			info.lockfile_path = entry.path().string();
 			out.push_back(std::move(info));
-		} catch (...) {
+		}
+		catch (...) {
 			// Malformed/partially-written lockfile (e.g. read mid-write) - just skip it.
 		}
 	}
@@ -52,8 +55,9 @@ void live_check_instances(std::vector<InstanceInfo>& instances, int timeout_seco
 	}
 }
 
-bool resolve_instance(int filter_port, int filter_pid, const std::string& filter_mode, int timeout_seconds,
-					   bool quiet, int& out_port) {
+bool resolve_instance(int filter_port, int filter_pid, const std::string& filter_mode,
+					  const std::string& filter_project, int timeout_seconds, bool quiet, int& out_port,
+					  bool report_errors) {
 	auto instances = discover_instances();
 	live_check_instances(instances, timeout_seconds);
 
@@ -67,21 +71,28 @@ bool resolve_instance(int filter_port, int filter_pid, const std::string& filter
 			continue;
 		if (!filter_mode.empty() && inst.mode != filter_mode)
 			continue;
+		if (!filter_project.empty() && inst.project_name != filter_project && inst.project_file != filter_project &&
+			inst.project_base != filter_project)
+			continue;
 		candidates.push_back(inst);
 	}
 
 	if (candidates.empty()) {
-		std::cerr << "cscli: no running instance found";
-		if (filter_port || filter_pid || !filter_mode.empty())
-			std::cerr << " matching the given --port/--pid/--mode filter";
-		std::cerr << " (start the editor/game with agentbridge.enabled 1, which is the default)\n";
+		if (report_errors) {
+			std::cerr << "cscli: no running instance found";
+			if (filter_port || filter_pid || !filter_mode.empty() || !filter_project.empty())
+				std::cerr << " matching the given --port/--pid/--mode/--project filter";
+			std::cerr << " (start the editor/game with agentbridge.enabled 1, which is the default)\n";
+		}
 		return false;
 	}
 	if (candidates.size() > 1) {
-		std::cerr << "cscli: multiple running instances found - disambiguate with --port/--pid/--mode:\n";
-		for (auto& c : candidates) {
-			std::cerr << "  port=" << c.port << " pid=" << c.pid << " mode=" << c.mode
-					   << " project_base=" << c.project_base << "\n";
+		if (report_errors) {
+			std::cerr << "cscli: multiple running instances found - disambiguate with --port/--pid/--mode/--project:\n";
+			for (auto& c : candidates) {
+				std::cerr << "  port=" << c.port << " pid=" << c.pid << " mode=" << c.mode
+						  << " project=" << c.project_name << " project_base=" << c.project_base << "\n";
+			}
 		}
 		return false;
 	}

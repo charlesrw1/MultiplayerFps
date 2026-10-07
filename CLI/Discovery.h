@@ -13,6 +13,8 @@ struct InstanceInfo
 	int port = 0;
 	std::string mode; // "editor" or "game"
 	std::string project_base;
+	std::string project_name;
+	std::string project_file;
 	int64_t started_at = 0;
 	std::string lockfile_path;
 	bool alive = false;
@@ -29,5 +31,6 @@ void live_check_instances(std::vector<InstanceInfo>& instances, int timeout_seco
 // discovered instance set and resolves to exactly one. On success returns true and fills
 // out_port. On failure (none found, or more than one matches) prints an explanatory error to
 // stderr and returns false - callers should exit with code 3 in that case.
-bool resolve_instance(int filter_port, int filter_pid, const std::string& filter_mode, int timeout_seconds,
-					   bool quiet, int& out_port);
+bool resolve_instance(int filter_port, int filter_pid, const std::string& filter_mode,
+					  const std::string& filter_project, int timeout_seconds, bool quiet, int& out_port,
+					  bool report_errors = true);

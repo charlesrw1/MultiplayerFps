@@ -191,6 +191,7 @@
     <ClCompile Include="lua_vec_quat_test.cpp" />
     <ClCompile Include="scripting_lua_component_reflection_test.cpp" />
     <ClCompile Include="hashmap_test.cpp" />
+    <ClCompile Include="agent_bridge_test.cpp" />
     <ClCompile Include="inlinevec_test.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ringbuffer_test.cpp" />

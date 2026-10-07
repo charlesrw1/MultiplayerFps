@@ -57,15 +57,15 @@ void EditorDoc::instantiate_into_scene(BaseUpdater* u) {
 // ---------------------------------------------------------------------------
 
 // Live-tunable dashed-line params (exposed in the "Parent Lines" debug menu below).
-static float g_dashed_half_w_px = 16.f;   // on-screen half-thickness of the ribbon, in pixels
-static float g_dashed_period_px = 250.f;   // on-screen length of one dash+gap cell, in pixels
+static float g_dashed_half_w_px = 16.f;	 // on-screen half-thickness of the ribbon, in pixels
+static float g_dashed_period_px = 250.f; // on-screen length of one dash+gap cell, in pixels
 
 static void draw_dashed_line_debug_menu() {
 	ImGui::SliderFloat("thickness (px)", &g_dashed_half_w_px, 1.f, 50.f, "%.2f");
 	ImGui::SliderFloat("dash period (px)", &g_dashed_period_px, 20.f, 500.f, "%.1f");
 	ImGui::TextDisabled("prefab-edit relationship lines");
 }
-//static AddToDebugMenu s_dashed_line_menu("Parent Lines", draw_dashed_line_debug_menu);
+// static AddToDebugMenu s_dashed_line_menu("Parent Lines", draw_dashed_line_debug_menu);
 
 // Builds one camera-facing dashed ribbon (a stretched textured quad) from `from` to `to`. Both the
 // UV.x tiling and the ribbon width are driven off the line's *screen-space* size so the dash sprite
@@ -91,9 +91,8 @@ static void push_dashed_ribbon(MeshBuilder& mb, glm::vec3 from, glm::vec3 to, co
 	// ortho does not -- the projection matrix already maps world units to screen space independent of
 	// depth, so dividing by cam_dist there would make the ribbon shrink/balloon with camera distance
 	// instead of staying a constant on-screen thickness.
-	const float px_per_world = view.is_ortho
-		? (view.proj[1][1] * 0.5f * (float)view.height)
-		: (view.proj[1][1] * 0.5f * (float)view.height) / cam_dist;
+	const float px_per_world = view.is_ortho ? (view.proj[1][1] * 0.5f * (float)view.height)
+											 : (view.proj[1][1] * 0.5f * (float)view.height) / cam_dist;
 	if (px_per_world < 1e-6f)
 		return;
 	glm::vec3 side = glm::cross(along, to_cam);
@@ -105,10 +104,14 @@ static void push_dashed_ribbon(MeshBuilder& mb, glm::vec3 from, glm::vec3 to, co
 	const float u_max = (len * px_per_world) / glm::max(g_dashed_period_px, 1e-3f);
 	const Color32 col = COLOR_WHITE; // color comes from the sprite texture
 	const int base = mb.GetBaseVertex();
-	MbVertex v0(from - side, col); v0.uv = glm::vec2(0.f, 0.f);
-	MbVertex v1(from + side, col); v1.uv = glm::vec2(0.f, 1.f);
-	MbVertex v2(to + side, col);   v2.uv = glm::vec2(u_max, 1.f);
-	MbVertex v3(to - side, col);   v3.uv = glm::vec2(u_max, 0.f);
+	MbVertex v0(from - side, col);
+	v0.uv = glm::vec2(0.f, 0.f);
+	MbVertex v1(from + side, col);
+	v1.uv = glm::vec2(0.f, 1.f);
+	MbVertex v2(to + side, col);
+	v2.uv = glm::vec2(u_max, 1.f);
+	MbVertex v3(to - side, col);
+	v3.uv = glm::vec2(u_max, 0.f);
 	mb.AddVertex(v0);
 	mb.AddVertex(v1);
 	mb.AddVertex(v2);
@@ -402,6 +405,17 @@ void DocumentApiImpl::undo() {
 	ASSERT(doc);
 	if (doc->command_mgr)
 		doc->command_mgr->undo();
+}
+
+bool EditorDoc::undo_document() {
+	if (!command_mgr)
+		return false;
+	int undo_index = command_mgr->index - 1;
+	if (undo_index < 0)
+		undo_index = command_mgr->HIST_SIZE - 1;
+	const bool had_command = command_mgr->hist[undo_index] != nullptr;
+	command_mgr->undo();
+	return had_command;
 }
 
 void DocumentApiImpl::redo() {

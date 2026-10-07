@@ -28,6 +28,7 @@
     <ClCompile Include="DrawLocal_CullShadow.cpp" />
     <ClCompile Include="EnvProbe.cpp" />
     <ClCompile Include="Frustum.cpp" />
+    <ClCompile Include="FrameCapture.cpp" />
     <ClCompile Include="GpuAllocator.cpp" />
     <ClCompile Include="GpuCullingTest.cpp" />
     <ClCompile Include="MaterialLocal.cpp" />
@@ -122,6 +123,7 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="EnvProbe.h" />
+    <ClInclude Include="FrameCapture.h" />
     <ClInclude Include="Frustum.h" />
     <ClInclude Include="Meshlet.h" />
     <ClInclude Include="Model.h" />

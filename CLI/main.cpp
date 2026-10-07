@@ -14,6 +14,9 @@ Usage: cscli [global options] <subcommand> [args...]
 
 Subcommands:
   status                     Show mode/pid/project_base/port of the connected instance
+  wait-ready                 Wait until the selected instance reports ready
+  tools [name]               List typed bridge tools or describe one
+  call <name> [--args JSON]  Invoke any typed bridge tool
   eval "<lua code>"          Execute Lua against the running instance's Lua state
   command [name] [args...]   Run a console command; omit name to list all; add --help to describe one
   instances                  List cscli-discoverable running instances (editor and/or game)
@@ -22,7 +25,7 @@ Subcommands:
 Global options:
   --format <human|json|tsv|ndjson>  Output format (default: human)
   --timeout <seconds>                Connect/response timeout (default: 10)
-  --port <n>  --pid <n>  --mode <editor|game>
+  --port <n>  --pid <n>  --mode <editor|game>  --project <name|file|data-dir>
                                       Disambiguate when more than one instance is running
   --quiet                             Suppress "connecting to..." status lines
   --verbose                           On failure, also print the raw JSON error response
@@ -31,6 +34,10 @@ Global options:
 
 Examples:
   cscli status
+  cscli wait-ready --wait-timeout 30
+  cscli tools scene_hierarchy
+  cscli call scene_hierarchy
+  cscli call capture_frame --args "{\"path\":\"TestFiles/screenshots/live.png\"}"
   cscli eval "1+1"
   cscli command give_weapon rifle 30
   cscli command give_weapon --help
@@ -75,6 +82,8 @@ int main(int argc, char** argv) {
 			g.pid_filter = std::atoi(next().c_str());
 		} else if (a == "--mode") {
 			g.mode_filter = next();
+		} else if (a == "--project") {
+			g.project_filter = next();
 		} else if (a == "-V" || a == "--version") {
 			std::cout << "cscli 0.1.0\n";
 			return 0;
@@ -98,6 +107,49 @@ int main(int argc, char** argv) {
 
 	if (sub == "status") {
 		return cmd_status(g);
+	}
+
+	if (sub == "wait-ready") {
+		int wait_timeout = 30;
+		for (size_t j = 0; j < sub_args.size(); j++) {
+			if (sub_args[j] == "--wait-timeout" && j + 1 < sub_args.size())
+				wait_timeout = std::atoi(sub_args[++j].c_str());
+			else {
+				std::cerr << "usage: cscli wait-ready [--wait-timeout seconds]\n";
+				return 2;
+			}
+		}
+		if (wait_timeout < 1) {
+			std::cerr << "cscli: --wait-timeout must be at least 1 second\n";
+			return 2;
+		}
+		return cmd_wait_ready(g, wait_timeout);
+	}
+
+	if (sub == "tools") {
+		if (sub_args.size() > 1) {
+			std::cerr << "usage: cscli tools [name]\n";
+			return 2;
+		}
+		return cmd_tools(g, sub_args.empty() ? std::string() : sub_args[0]);
+	}
+
+	if (sub == "call") {
+		if (sub_args.empty()) {
+			std::cerr << "usage: cscli call <name> [--args <json-object>]\n";
+			return 2;
+		}
+		const std::string name = sub_args[0];
+		std::string json_args;
+		for (size_t j = 1; j < sub_args.size(); j++) {
+			if (sub_args[j] == "--args" && j + 1 < sub_args.size())
+				json_args = sub_args[++j];
+			else {
+				std::cerr << "usage: cscli call <name> [--args <json-object>]\n";
+				return 2;
+			}
+		}
+		return cmd_call(g, name, json_args);
 	}
 
 	if (sub == "eval") {

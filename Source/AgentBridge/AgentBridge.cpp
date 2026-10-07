@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <chrono>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -24,13 +25,22 @@ ConfigVar g_agentbridge_port("agentbridge.port", "23456", CVAR_INTEGER,
 							 "TCP port the local agent bridge listens on (127.0.0.1 only)", 0, 65535);
 
 extern ConfigVar g_project_base;
+extern ConfigVar g_project_name;
 
 namespace {
 
-std::unordered_map<std::string, AgentBridgeHandler>& registry() {
-	static std::unordered_map<std::string, AgentBridgeHandler> map;
+struct RegisteredCommand
+{
+	AgentBridgeCommandDescriptor descriptor;
+	AgentBridgeHandler handler;
+};
+
+std::unordered_map<std::string, RegisteredCommand>& registry() {
+	static std::unordered_map<std::string, RegisteredCommand> map;
 	return map;
 }
+
+uint64_t frame_index = 0;
 
 #ifdef _WIN32
 SOCKET listen_sock = INVALID_SOCKET;
@@ -61,9 +71,11 @@ void write_instance_lockfile() {
 	info["port"] = g_agentbridge_port.get_integer();
 	info["mode"] = (eng && eng->is_editor_app()) ? "editor" : "game";
 	info["project_base"] = g_project_base.get_string();
-	info["started_at"] = (int64_t)std::chrono::duration_cast<std::chrono::seconds>(
-							  std::chrono::system_clock::now().time_since_epoch())
-							  .count();
+	info["project_name"] = g_project_name.get_string();
+	info["project_file"] = get_effective_project_file();
+	info["started_at"] =
+		(int64_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+			.count();
 
 	std::ofstream f(instance_lockfile_path, std::ios::trunc);
 	if (f)
@@ -146,23 +158,73 @@ nlohmann::json dispatch(const nlohmann::json& request) {
 	try {
 		nlohmann::json response = nlohmann::json::object();
 		response["ok"] = true;
-		response["result"] = it->second(args);
+		response["result"] = it->second.handler(args);
 		return response;
-	} catch (const std::exception& e) {
+	}
+	catch (const std::exception& e) {
 		return make_error(e.what());
-	} catch (...) {
+	}
+	catch (...) {
 		return make_error("unknown exception in command '" + cmd + "'");
 	}
 }
 
 } // namespace
 
+nlohmann::json AgentBridgeCommandDescriptor::to_json() const {
+	nlohmann::json out;
+	out["name"] = name;
+	out["description"] = description;
+	out["availability"] = availability;
+	out["effects"] = effects;
+	out["input_schema"] = input_schema;
+	out["output_schema"] = output_schema;
+	return out;
+}
+
 void agent_bridge_register_command(const std::string& name, AgentBridgeHandler handler) {
-	registry()[name] = std::move(handler);
+	AgentBridgeCommandDescriptor descriptor;
+	descriptor.name = name;
+	agent_bridge_register_command(std::move(descriptor), std::move(handler));
+}
+
+void agent_bridge_register_command(AgentBridgeCommandDescriptor descriptor, AgentBridgeHandler handler) {
+	if (descriptor.name.empty())
+		throw std::runtime_error("AgentBridge command name cannot be empty");
+	const std::string name = descriptor.name;
+	registry()[name] = RegisteredCommand{std::move(descriptor), std::move(handler)};
+}
+
+nlohmann::json agent_bridge_list_commands() {
+	std::vector<std::string> names;
+	names.reserve(registry().size());
+	for (const auto& [name, command] : registry())
+		names.push_back(name);
+	std::sort(names.begin(), names.end());
+
+	nlohmann::json out = nlohmann::json::array();
+	for (const auto& name : names)
+		out.push_back(registry().at(name).descriptor.to_json());
+	return out;
+}
+
+nlohmann::json agent_bridge_describe_command(const std::string& name) {
+	auto it = registry().find(name);
+	if (it == registry().end())
+		throw std::runtime_error("unknown command '" + name + "'");
+	return it->second.descriptor.to_json();
+}
+
+uint64_t agent_bridge_frame_index() {
+	return frame_index;
 }
 
 AutoAgentBridgeCommand::AutoAgentBridgeCommand(const char* name, AgentBridgeHandler handler) {
 	agent_bridge_register_command(name, std::move(handler));
+}
+
+AutoAgentBridgeCommand::AutoAgentBridgeCommand(AgentBridgeCommandDescriptor descriptor, AgentBridgeHandler handler) {
+	agent_bridge_register_command(std::move(descriptor), std::move(handler));
 }
 
 void agent_bridge_init() {
@@ -180,6 +242,7 @@ void agent_bridge_init() {
 }
 
 void agent_bridge_update() {
+	frame_index++;
 #ifdef _WIN32
 	if (!wsa_started || listen_sock == INVALID_SOCKET)
 		return;
@@ -207,7 +270,8 @@ void agent_bridge_update() {
 			try {
 				nlohmann::json request = nlohmann::json::parse(line);
 				response = dispatch(request);
-			} catch (const std::exception& e) {
+			}
+			catch (const std::exception& e) {
 				response = make_error(std::string("bad JSON request: ") + e.what());
 			}
 			std::string out = response.dump() + "\n";

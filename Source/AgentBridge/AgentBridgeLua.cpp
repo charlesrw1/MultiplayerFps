@@ -3,7 +3,8 @@
 // since it's the only handler that needs the raw Lua C API.
 #include "AgentBridge.h"
 #include "Scripting/ScriptManager.h"
-extern "C" {
+extern "C"
+{
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
@@ -133,10 +134,24 @@ nlohmann::json eval_lua_cmd(const nlohmann::json& args) {
 	return r;
 }
 
+AgentBridgeCommandDescriptor eval_lua_descriptor() {
+	AgentBridgeCommandDescriptor descriptor;
+	descriptor.name = "eval_lua";
+	descriptor.description = "Execute Lua in the running engine and convert returned values to JSON.";
+	descriptor.availability = "any";
+	descriptor.effects = "mutating";
+	descriptor.input_schema = {
+		{"type", "object"},
+		{"properties", {{"code", {{"type", "string"}, {"description", "Lua expression or statements"}}}}},
+		{"required", {"code"}}};
+	descriptor.output_schema = {{"type", "object"}, {"properties", {{"result", nlohmann::json::object()}}}};
+	return descriptor;
+}
+
 } // namespace
 
 // @cmd: executes Lua source against the running engine's Lua state and returns its value as JSON.
 // Tries the code as an expression first (`return <code>`), falling back to running it verbatim
 // for statements/blocks. Errors (syntax or runtime) come back as a normal bridge error.
 // @usage: eval_lua {"code": "<lua source, e.g. \"1+1\" or \"return get_player()\">"}
-AGENT_BRIDGE_COMMAND(eval_lua, eval_lua_cmd);
+AGENT_BRIDGE_COMMAND_DESC(eval_lua, eval_lua_cmd, eval_lua_descriptor());

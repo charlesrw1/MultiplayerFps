@@ -135,7 +135,6 @@ class LEPlugin;
 class EditorUILayout;
 class Model;
 
-
 class CameraApiImpl : public IEditorCameraApi
 {
 public:
@@ -296,9 +295,11 @@ public:
 	void set_camera_target_to_sel();
 	string get_doc_name() const final {
 		string name = assetName.value_or("<unnamed>");
-		if (editing_prefab) name += " [Prefab]";
+		if (editing_prefab)
+			name += " [Prefab]";
 		return name;
 	}
+	bool undo_document() final;
 	// Raw asset path (empty if unnamed). Used by EditorRecents to record
 	// which document the user is leaving.
 	string get_asset_path() const { return assetName.value_or(""); }

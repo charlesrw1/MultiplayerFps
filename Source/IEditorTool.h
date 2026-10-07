@@ -42,6 +42,8 @@ public:
 	// the name of the document
 	// the full path of the document is ($ENGINE_ROOT)+"get_save_root_dir() + name"
 	virtual std::string get_doc_name() const { return ""; }
+	// Undo through the active tool's command system. Returns false when unsupported or empty.
+	virtual bool undo_document() { return false; }
 
 	bool get_has_editor_changes() const { return has_editor_changes; }
 	void clear_editor_changes() { has_editor_changes = false; }

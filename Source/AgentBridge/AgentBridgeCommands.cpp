@@ -6,13 +6,16 @@
 #include "LevelSerialization/SerializeNew.h"
 #include "Game/Entity.h"
 #include "Game/Components/MeshComponent.h"
+#include "Level.h"
 #include "Render/Model.h"
 #include "Render/MaterialPublic.h"
+#include "Render/FrameCapture.h"
 #include "AssetCompile/GltfExport.h"
 #include "Framework/Config.h"
 #include "GameEnginePublic.h"
 #include "Logging.h"
 #include "Framework/Files.h"
+#include "IEditorTool.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -20,15 +23,54 @@
 #include <fstream>
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
+#include <filesystem>
 
 #ifdef _WIN32
 #include <windows.h>
 #endif
 
 extern ConfigVar g_project_base;
+extern ConfigVar g_project_name;
 extern ConfigVar g_agentbridge_port;
 
 namespace {
+
+nlohmann::json string_schema(const char* description = nullptr) {
+	nlohmann::json out = {{"type", "string"}};
+	if (description)
+		out["description"] = description;
+	return out;
+}
+
+nlohmann::json object_schema(nlohmann::json properties = nlohmann::json::object(),
+							 nlohmann::json required = nlohmann::json::array()) {
+	nlohmann::json out = {{"type", "object"}, {"properties", std::move(properties)}};
+	if (!required.empty())
+		out["required"] = std::move(required);
+	return out;
+}
+
+AgentBridgeCommandDescriptor descriptor(const char* name, const char* description, const char* availability = "any",
+										const char* effects = "read_only", nlohmann::json input = object_schema(),
+										nlohmann::json output = object_schema()) {
+	AgentBridgeCommandDescriptor out;
+	out.name = name;
+	out.description = description;
+	out.availability = availability;
+	out.effects = effects;
+	out.input_schema = std::move(input);
+	out.output_schema = std::move(output);
+	return out;
+}
+
+nlohmann::json vec3_json(const glm::vec3& value) {
+	return {{"x", value.x}, {"y", value.y}, {"z", value.z}};
+}
+
+nlohmann::json quat_json(const glm::quat& value) {
+	return {{"x", value.x}, {"y", value.y}, {"z", value.z}, {"w", value.w}};
+}
 
 glm::vec3 unpack_normal(const ModelVertex& mv) {
 	return glm::normalize(glm::vec3(double(mv.normal[0]) / INT16_MAX, double(mv.normal[1]) / INT16_MAX,
@@ -44,7 +86,8 @@ glm::vec3 unpack_normal(const ModelVertex& mv) {
 // coordinates for free, without needing to know or guess this engine's axis conventions.
 nlohmann::json export_tmap_cmd(const nlohmann::json& args) {
 	if (!args.contains("tmap") || !args["tmap"].is_string())
-		throw std::runtime_error("export_tmap requires a string 'tmap' arg (game-relative path, e.g. \"maps/foo.tmap\")");
+		throw std::runtime_error(
+			"export_tmap requires a string 'tmap' arg (game-relative path, e.g. \"maps/foo.tmap\")");
 	if (!args.contains("output") || !args["output"].is_string())
 		throw std::runtime_error("export_tmap requires a string 'output' arg (absolute output .gltf path)");
 
@@ -156,6 +199,16 @@ nlohmann::json ping_cmd(const nlohmann::json&) {
 	return result;
 }
 
+nlohmann::json list_tools_cmd(const nlohmann::json&) {
+	return {{"commands", agent_bridge_list_commands()}};
+}
+
+nlohmann::json describe_tool_cmd(const nlohmann::json& args) {
+	if (!args.contains("name") || !args["name"].is_string())
+		throw std::runtime_error("describe_tool requires a string 'name' arg");
+	return agent_bridge_describe_command(args["name"].get<std::string>());
+}
+
 struct CommandDoc
 {
 	std::string description;
@@ -184,7 +237,8 @@ const std::unordered_map<std::string, CommandDoc>& command_docs() {
 					d.usage = (*it)["usage"].get<std::string>();
 				map[it.key()] = std::move(d);
 			}
-		} catch (...) {
+		}
+		catch (...) {
 			// malformed sidecar - proceed with whatever was parsed before the exception, blank is fine
 		}
 		return map;
@@ -209,8 +263,101 @@ nlohmann::json status_cmd(const nlohmann::json&) {
 	r["pid"] = (int)GetCurrentProcessId();
 #endif
 	r["project_base"] = g_project_base.get_string();
+	r["project_name"] = g_project_name.get_string();
+	r["project_file"] = get_effective_project_file();
 	r["port"] = g_agentbridge_port.get_integer();
+	r["frame"] = agent_bridge_frame_index();
+	const bool is_editor = eng && eng->is_editor_app();
+	r["ready"] = eng && (is_editor ? eng->get_tool() != nullptr : eng->get_app() != nullptr);
+	r["state"] = r["ready"].get<bool>() ? "ready" : "starting";
+	if (eng && eng->get_level())
+		r["level"] = eng->get_level()->get_source_asset_name();
+	else
+		r["level"] = nullptr;
+
+	if (eng && eng->is_editor_app() && eng->get_tool()) {
+		IEditorTool* tool = eng->get_tool();
+		r["document"] = tool->get_doc_name();
+		r["document_dirty"] = tool->get_has_editor_changes();
+	} else {
+		r["document"] = nullptr;
+		r["document_dirty"] = false;
+	}
 	return r;
+}
+
+nlohmann::json scene_hierarchy_cmd(const nlohmann::json&) {
+	if (!eng || !eng->get_level())
+		throw std::runtime_error("no level is loaded");
+
+	std::vector<Entity*> entities;
+	for (BaseUpdater* object : eng->get_level()->get_all_objects()) {
+		if (Entity* entity = object ? object->cast_to<Entity>() : nullptr)
+			entities.push_back(entity);
+	}
+	std::sort(entities.begin(), entities.end(),
+			  [](const Entity* a, const Entity* b) { return a->get_instance_id() < b->get_instance_id(); });
+
+	nlohmann::json rows = nlohmann::json::array();
+	for (Entity* entity : entities) {
+		nlohmann::json row;
+		row["id"] = entity->get_instance_id();
+		row["name"] = entity->get_editor_name();
+		row["type"] = entity->get_type().classname;
+		row["parent_id"] =
+			entity->get_parent() ? nlohmann::json(entity->get_parent()->get_instance_id()) : nlohmann::json(nullptr);
+		row["position"] = vec3_json(entity->get_ws_position());
+		row["rotation"] = quat_json(entity->get_ws_rotation());
+		row["scale"] = vec3_json(entity->get_ws_scale());
+		row["components"] = nlohmann::json::array();
+		for (Component* component : entity->get_components()) {
+			row["components"].push_back({{"id", component->get_instance_id()},
+										 {"type", component->get_type().classname},
+										 {"active", component->is_activated()}});
+		}
+		rows.push_back(std::move(row));
+	}
+	return {{"level", eng->get_level()->get_source_asset_name()}, {"entity_count", rows.size()}, {"entities", rows}};
+}
+
+IEditorTool* require_editor_document() {
+	if (!eng || !eng->is_editor_app())
+		throw std::runtime_error("this command requires an editor instance");
+	IEditorTool* tool = eng->get_tool();
+	if (!tool)
+		throw std::runtime_error("no editor document is active");
+	return tool;
+}
+
+nlohmann::json editor_save_cmd(const nlohmann::json&) {
+#ifdef EDITOR_BUILD
+	IEditorTool* document = require_editor_document();
+	const bool saved = document->save();
+	return {{"document", document->get_doc_name()}, {"saved", saved}};
+#else
+	throw std::runtime_error("editor commands are unavailable in this build");
+#endif
+}
+
+nlohmann::json editor_undo_cmd(const nlohmann::json&) {
+#ifdef EDITOR_BUILD
+	IEditorTool* document = require_editor_document();
+	const bool undone = document->undo_document();
+	return {{"document", document->get_doc_name()}, {"undone", undone}};
+#else
+	throw std::runtime_error("editor commands are unavailable in this build");
+#endif
+}
+
+nlohmann::json capture_frame_cmd(const nlohmann::json& args) {
+	if (!args.contains("path") || !args["path"].is_string() || args["path"].get<std::string>().empty())
+		throw std::runtime_error("capture_frame requires a non-empty string 'path' arg");
+	const std::string path = args["path"];
+	glm::ivec2 size{};
+	std::string error;
+	if (!capture_composite_frame_png(path, size, error))
+		throw std::runtime_error(error);
+	return {{"path", std::filesystem::absolute(path).string()}, {"width", size.x}, {"height", size.y}};
 }
 
 nlohmann::json get_log_cmd(const nlohmann::json& args) {
@@ -221,8 +368,7 @@ nlohmann::json get_log_cmd(const nlohmann::json& args) {
 	if (args.contains("lines") && args["lines"].is_number_integer())
 		max_lines = args["lines"].get<int>();
 
-	const std::string path =
-		FileSys::get_full_path_from_relative(Logger::inst->get_log_path(), FileSys::ENGINE_DIR);
+	const std::string path = FileSys::get_full_path_from_relative(Logger::inst->get_log_path(), FileSys::ENGINE_DIR);
 	std::ifstream file(path, std::ios::binary);
 	if (!file)
 		throw std::runtime_error("could not open log file: " + path);
@@ -270,7 +416,8 @@ nlohmann::json run_command_cmd(const nlohmann::json& args) {
 }
 
 nlohmann::json list_commands_cmd(const nlohmann::json& args) {
-	std::string filter = (args.contains("filter") && args["filter"].is_string()) ? args["filter"].get<std::string>() : "";
+	std::string filter =
+		(args.contains("filter") && args["filter"].is_string()) ? args["filter"].get<std::string>() : "";
 	auto matches = Cmd_Manager::get()->get_matches(filter.c_str());
 
 	nlohmann::json arr = nlohmann::json::array();
@@ -300,26 +447,62 @@ nlohmann::json describe_command_cmd(const nlohmann::json& args) {
 // transforms, for external tools (e.g. the Blender viewer addon). Reads the asset directly without
 // spawning a Level, so it never touches any level currently open in the editor.
 // @usage: export_tmap {"tmap": "<game-relative .tmap/.tprefab path>", "output": "<absolute output .gltf path>"}
-AGENT_BRIDGE_COMMAND(export_tmap, export_tmap_cmd);
+AGENT_BRIDGE_COMMAND_DESC(
+	export_tmap, export_tmap_cmd,
+	descriptor("export_tmap", "Export a map or prefab's mesh components to glTF without changing the active level.",
+			   "any", "read_only",
+			   object_schema({{"tmap", string_schema("Game-relative .tmap or .tprefab path")},
+							  {"output", string_schema("Absolute output .gltf path")}},
+							 {"tmap", "output"})));
 // @cmd: connectivity check - returns {"pong": true} if the bridge is alive.
-AGENT_BRIDGE_COMMAND(ping, ping_cmd);
+AGENT_BRIDGE_COMMAND_DESC(ping, ping_cmd, descriptor("ping", "Check whether the bridge is responsive."));
+AGENT_BRIDGE_COMMAND_DESC(list_tools, list_tools_cmd,
+						  descriptor("list_tools", "List every registered AgentBridge command and its schemas."));
+AGENT_BRIDGE_COMMAND_DESC(describe_tool, describe_tool_cmd,
+						  descriptor("describe_tool", "Describe one AgentBridge command.", "any", "read_only",
+									 object_schema({{"name", string_schema("Exact AgentBridge command name")}},
+												   {"name"})));
 // @cmd: reports which process (editor or game), pid, project base, and agent bridge port this
 // bridge instance belongs to. Used by `cscli status`/`cscli instances` to identify a connection.
-AGENT_BRIDGE_COMMAND(status, status_cmd);
+AGENT_BRIDGE_COMMAND_DESC(status, status_cmd,
+						  descriptor("status",
+									 "Report process, project, document, level, readiness, and frame state."));
+AGENT_BRIDGE_COMMAND_DESC(scene_hierarchy, scene_hierarchy_cmd,
+						  descriptor("scene_hierarchy",
+									 "Inspect the loaded level's entities, transforms, and components."));
+AGENT_BRIDGE_COMMAND_DESC(editor_save, editor_save_cmd,
+						  descriptor("editor_save", "Save the active editor document through its document API.",
+									 "editor", "mutating"));
+AGENT_BRIDGE_COMMAND_DESC(editor_undo, editor_undo_cmd,
+						  descriptor("editor_undo", "Undo the most recent active-editor command.", "editor",
+									 "mutating"));
+AGENT_BRIDGE_COMMAND_DESC(
+	capture_frame, capture_frame_cmd,
+	descriptor("capture_frame", "Save the most recent composited frame as a PNG.", "any", "read_only",
+			   object_schema({{"path",
+							   string_schema("Output PNG path; relative paths use the process working directory")}},
+							 {"path"})));
 // @cmd: runs a console command line exactly as if typed at the in-game console, and returns
 // everything it printed. `had_error` is true if any part of the line logged at Error level.
 // @usage: run_command {"command": "<command line, e.g. \"give_weapon rifle 30\">"}
-AGENT_BRIDGE_COMMAND(run_command, run_command_cmd);
+AGENT_BRIDGE_COMMAND_DESC(
+	run_command, run_command_cmd,
+	descriptor("run_command", "Execute one engine console command line and capture its output.", "any", "mutating",
+			   object_schema({{"command", string_schema("Complete console command line")}}, {"command"})));
 // @cmd: returns the tail of this process's engine log (Logs/output.log or
 // Logs/test_<mode>_output.log), as a list of lines, newest last. Lets an agent watching over
 // cscli see recent [Error]/[Warning]/[Debug]/[Info] output without knowing the log path or
 // polling the file itself.
 // @usage: get_log {"lines": <optional int, default 200>}
-AGENT_BRIDGE_COMMAND(get_log, get_log_cmd);
+AGENT_BRIDGE_COMMAND_DESC(get_log, get_log_cmd, descriptor("get_log", "Return the tail of the active engine log."));
 // @cmd: lists registered console commands and cvars (optionally substring-filtered), each with
 // whatever description/usage docs/console_commands.json has for it.
 // @usage: list_commands {"filter": "<optional substring, empty = everything>"}
-AGENT_BRIDGE_COMMAND(list_commands, list_commands_cmd);
+AGENT_BRIDGE_COMMAND_DESC(list_commands, list_commands_cmd,
+						  descriptor("list_commands", "List engine console commands and cvars."));
 // @cmd: describes a single console command/cvar by exact name (name, is_command, description, usage).
 // @usage: describe_command {"name": "<exact command or cvar name>"}
-AGENT_BRIDGE_COMMAND(describe_command, describe_command_cmd);
+AGENT_BRIDGE_COMMAND_DESC(
+	describe_command, describe_command_cmd,
+	descriptor("describe_command", "Describe one engine console command or cvar.", "any", "read_only",
+			   object_schema({{"name", string_schema("Exact console command or cvar name")}}, {"name"})));
