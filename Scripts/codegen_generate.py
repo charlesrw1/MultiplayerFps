@@ -1,16 +1,8 @@
 from numpy import typename
 from codegen_lib import *
 
-from datetime import datetime
-
-
-
 def write_headers(path:str, additional_includes:list[str]):
-
-    now = datetime.now()
-    timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
-
-    out = f"// **** GENERATED SOURCE FILE version:{VERSION} {timestamp_str} ****\n"
+    out = f"// **** GENERATED SOURCE FILE version:{VERSION} ****\n"
     #out += f"#include \"{path}\"\n"
     out += "#include \"Framework/ReflectionProp.h\"\n"
     out += "#include \"Framework/ReflectionMacros.h\"\n"
@@ -23,6 +15,19 @@ def write_headers(path:str, additional_includes:list[str]):
         out += f"#include {inc}\n"
 
     return out + "\n"
+
+
+def write_if_changed(path: str, contents: str, label: str) -> None:
+    """Avoid invalidating MSBuild outputs when reflection input is unchanged."""
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as existing:
+            if existing.read() == contents:
+                return
+    except FileNotFoundError:
+        pass
+    with open(path, "w", encoding="utf-8", newline="") as output:
+        output.write(contents)
+    print(f"Writing {label} {path}")
 
 
 def output_macro_for_prop(typenames : dict[str,ClassDef],cpptype:CppType,name:str,flags:str,offset:str,custom_type:str,hint:str,nameoverride:str,tooltip:str)->str:
@@ -867,44 +872,40 @@ def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,
     generated_path = GENERATED_DIR+generated_path+".gen.cpp"
     generated_path.replace("\\","/")
     os.makedirs(os.path.dirname(generated_path), exist_ok=True)
-    with open(generated_path,"w") as file:
-        print(f"Writing {generated_path}")
-        if len(classes)>0:
-            file.write(write_headers(root+"/"+filename, additional_includes))
-            # lVec3/lQuat are defined (and their push/get_..._from_lua bodies generated) only by
-            # whichever pass scans the file that declares them - but any split-out project's own
-            # reflected methods can still take them as Lua-bound parameters. Forward-declare both
-            # unconditionally so every pass's generated file compiles regardless of which pass
-            # owns the definition; redeclaring a function prototype twice (including here, in the
-            # owning pass) is harmless.
-            output = "void push_lVec3_to_lua(lua_State* L, const lVec3& value);\n"
-            output += "lVec3 get_lVec3_from_lua(lua_State* L, int index);\n"
-            output += "void push_lQuat_to_lua(lua_State* L, const lQuat& value);\n"
-            output += "lQuat get_lQuat_from_lua(lua_State* L, int index);\n"
-            # write struct stubs first
-            for c in classes:
-                if c.object_type == ClassDef.TYPE_STRUCT and c.classname not in ("lVec3", "lQuat"):
-                    output += f"void push_{c.classname}_to_lua(lua_State* L, const {c.classname}& value);\n"
-                    output += f"{c.classname} get_{c.classname}_from_lua(lua_State* L, int index);\n"
-            file.write(output)
+    generated = ""
+    if len(classes)>0:
+        generated += write_headers(root+"/"+filename, additional_includes)
+        # lVec3/lQuat are defined (and their push/get_..._from_lua bodies generated) only by
+        # whichever pass scans the file that declares them - but any split-out project's own
+        # reflected methods can still take them as Lua-bound parameters. Forward-declare both
+        # unconditionally so every pass's generated file compiles regardless of which pass
+        # owns the definition; redeclaring a function prototype twice (including here, in the
+        # owning pass) is harmless.
+        output = "void push_lVec3_to_lua(lua_State* L, const lVec3& value);\n"
+        output += "lVec3 get_lVec3_from_lua(lua_State* L, int index);\n"
+        output += "void push_lQuat_to_lua(lua_State* L, const lQuat& value);\n"
+        output += "lQuat get_lQuat_from_lua(lua_State* L, int index);\n"
+        # write struct stubs first
+        for c in classes:
+            if c.object_type == ClassDef.TYPE_STRUCT and c.classname not in ("lVec3", "lQuat"):
+                output += f"void push_{c.classname}_to_lua(lua_State* L, const {c.classname}& value);\n"
+                output += f"{c.classname} get_{c.classname}_from_lua(lua_State* L, int index);\n"
+        generated += output
 
-            interfaces = [c for c in classes if c.object_type == ClassDef.TYPE_INTERFACE]
-            non_interfaces = [c for c in classes if c.object_type != ClassDef.TYPE_INTERFACE]
-            for c in interfaces:
-                file.write(write_class_old(typenames,c))
-            for c in non_interfaces:
-                file.write(write_class_old(typenames,c))
+        interfaces = [c for c in classes if c.object_type == ClassDef.TYPE_INTERFACE]
+        non_interfaces = [c for c in classes if c.object_type != ClassDef.TYPE_INTERFACE]
+        for c in interfaces:
+            generated += write_class_old(typenames,c)
+        for c in non_interfaces:
+            generated += write_class_old(typenames,c)
+
+    write_if_changed(generated_path, generated, "generated source")
 
 
     lua_stub_path = LUA_GEN_DIR + "/" + lua_stub_filename
-    with open(lua_stub_path,"w") as luaFile:
-        print(f"Writing lua stubs {lua_stub_path}")
-
-        time_now = datetime.now()
-        timestamp_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
-        luaFile.write(f"--- GENERATED LUA FILE FROM C++ CLASSES v{VERSION} {timestamp_str}\n")
-        luaFile.write("---@diagnostic disable\n")
-
-        if len(classes)>0:
-            for c in classes:
-                luaFile.write(write_lua_class(c))
+    lua_stubs = f"--- GENERATED LUA FILE FROM C++ CLASSES v{VERSION}\n"
+    lua_stubs += "---@diagnostic disable\n"
+    if len(classes)>0:
+        for c in classes:
+            lua_stubs += write_lua_class(c)
+    write_if_changed(lua_stub_path, lua_stubs, "lua stubs")

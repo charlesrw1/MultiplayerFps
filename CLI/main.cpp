@@ -18,6 +18,9 @@ Subcommands:
   build [options]            Build an external game project
   editor [options]           Build and launch the project's editor
   run [options]              Build and launch the project as a game
+  test [options]             Build and run the project's editor tests
+  projects                   List projects created by cscli on this machine
+  cache clear [options]      Clear external-project shader caches
   status                     Show mode/pid/project_base/port of the connected instance
   wait-ready                 Wait until the selected instance reports ready
   tools [name]               List typed bridge tools or describe one
@@ -134,6 +137,7 @@ int main(int argc, char** argv) {
 		std::string project = g.project_filter;
 		std::string configuration = "Debug";
 		std::string target = "all";
+		bool restart_running = false;
 		for (size_t j = 0; j < sub_args.size(); j++) {
 			if (sub_args[j] == "--project" && j + 1 < sub_args.size())
 				project = sub_args[++j];
@@ -141,12 +145,14 @@ int main(int argc, char** argv) {
 				configuration = sub_args[++j];
 			else if (sub_args[j] == "--target" && j + 1 < sub_args.size())
 				target = sub_args[++j];
+			else if (sub_args[j] == "--restart-running")
+				restart_running = true;
 			else {
-				std::cerr << "usage: cscli build [--project path] [--configuration name] [--target editor|game|all]\n";
+				std::cerr << "usage: cscli build [--project path] [--configuration name] [--target editor|game|test|all] [--restart-running]\n";
 				return 2;
 			}
 		}
-		return cmd_project_build(g, project, configuration, target);
+		return cmd_project_build(g, project, configuration, target, restart_running);
 	}
 
 	if (sub == "editor" || sub == "run") {
@@ -170,6 +176,63 @@ int main(int argc, char** argv) {
 			}
 		}
 		return cmd_project_launch(g, project, configuration, sub == "editor", build_first, wait_ready);
+	}
+
+	if (sub == "test") {
+		std::string project = g.project_filter;
+		std::string configuration = "Debug";
+		bool build_first = true;
+		std::string mode = "editor";
+		std::vector<std::string> patterns;
+		for (size_t j = 0; j < sub_args.size(); j++) {
+			if (sub_args[j] == "--project" && j + 1 < sub_args.size())
+				project = sub_args[++j];
+			else if (sub_args[j] == "--configuration" && j + 1 < sub_args.size())
+				configuration = sub_args[++j];
+			else if (sub_args[j] == "--mode" && j + 1 < sub_args.size())
+				mode = sub_args[++j];
+			else if (sub_args[j] == "--no-build")
+				build_first = false;
+			else if (sub_args[j] == "--pattern" && j + 1 < sub_args.size())
+				patterns.push_back(sub_args[++j]);
+			else {
+				std::cerr << "usage: cscli test [--project path] [--configuration name] [--mode editor|game] [--no-build] [--pattern glob]\n";
+				return 2;
+			}
+		}
+		return cmd_project_test(g, project, configuration, build_first, mode, patterns);
+	}
+
+	if (sub == "projects") {
+		if (!sub_args.empty()) {
+			std::cerr << "usage: cscli projects\n";
+			return 2;
+		}
+		return cmd_projects(g);
+	}
+
+	if (sub == "cache") {
+		if (sub_args.empty() || sub_args[0] != "clear") {
+			std::cerr << "usage: cscli cache clear [--project path|--all]\n";
+			return 2;
+		}
+		std::string project = g.project_filter;
+		bool all_projects = false;
+		for (size_t j = 1; j < sub_args.size(); ++j) {
+			if (sub_args[j] == "--project" && j + 1 < sub_args.size())
+				project = sub_args[++j];
+			else if (sub_args[j] == "--all")
+				all_projects = true;
+			else {
+				std::cerr << "usage: cscli cache clear [--project path|--all]\n";
+				return 2;
+			}
+		}
+		if (all_projects && !project.empty()) {
+			std::cerr << "cscli: use either --project or --all\n";
+			return 2;
+		}
+		return cmd_shader_cache_clear(g, project, all_projects);
 	}
 
 	if (sub == "status") {

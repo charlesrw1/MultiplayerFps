@@ -14,12 +14,12 @@ inline float evaluate_easing(Easing type, float t) {
 		return t * t * t;
 		break;
 	case Easing::CubicEaseOut: {
-		float oneminus = 1 - t;
-		return 1.0 - oneminus * oneminus * oneminus;
+		float oneminus = 1.f - t;
+		return 1.0f - oneminus * oneminus * oneminus;
 	} break;
 	case Easing::CubicEaseInOut: {
-		float othert = -2 * t + 2;
-		return (t < 0.5) ? 4 * t * t * t : 1.0 - othert * othert * othert * 0.5;
+		float othert = -2.f * t + 2.f;
+		return (t < 0.5f) ? 4.f * t * t * t : 1.0f - othert * othert * othert * 0.5f;
 	} break;
 	case Easing::Constant: {
 		return 1.f;

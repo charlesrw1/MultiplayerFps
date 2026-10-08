@@ -60,24 +60,24 @@ public:
 		data[0] = 0;
 	}
 	Stack_String(const char* str) {
-		int s = strlen(str);
-		if (s + 1 < BUFSIZE) {
+		const size_t s = strlen(str);
+		if (s + 1 < static_cast<size_t>(BUFSIZE)) {
 			memcpy(data, str, s);
 			data[s] = 0;
-			data_len = s;
+			data_len = static_cast<int>(s);
 		}
 	}
 	Stack_String(const char* str, int len) {
 		data[0] = 0;
 		data_len = 0;
 
-		int s = strlen(str);
-		if (len < s)
-			s = len;
-		if (s + 1 < BUFSIZE) {
+		size_t s = strlen(str);
+		if (len >= 0 && static_cast<size_t>(len) < s)
+			s = static_cast<size_t>(len);
+		if (s + 1 < static_cast<size_t>(BUFSIZE)) {
 			memcpy(data, str, s);
 			data[s] = 0;
-			data_len = s;
+			data_len = static_cast<int>(s);
 		}
 	}
 	int size() { return data_len; }

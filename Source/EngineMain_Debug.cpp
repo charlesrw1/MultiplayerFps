@@ -487,7 +487,8 @@ void Debug_Console::draw() {
 		lines.clear();
 
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-	if (!ImGui::Begin("Console")) {
+	const ImGuiWindowFlags console_window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+	if (!ImGui::Begin("Console", nullptr, console_window_flags)) {
 		ImGui::End();
 
 		return;

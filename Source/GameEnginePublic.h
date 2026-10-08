@@ -70,7 +70,6 @@ class DefaultGameApplication : public Application
 {
 public:
 	CLASS_BODY(DefaultGameApplication);
-	void start() override;
 };
 
 class GameEnginePublic

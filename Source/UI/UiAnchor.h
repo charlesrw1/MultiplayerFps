@@ -32,8 +32,8 @@ struct UIAnchorPos
 	}
 
 	static uint8_t float_to_uint(float f) {
-		int i = f * 255.f;
-		return (uint8_t)glm::clamp(i, 0, 255);
+		int i = static_cast<int>(f * 255.f);
+		return static_cast<uint8_t>(glm::clamp(i, 0, 255));
 	}
 	static UIAnchorPos create_single(float x, float y) {
 		UIAnchorPos ui;

@@ -15,6 +15,7 @@ Subcommands:
   build [options]            Build an external game project
   editor [options]           Build and launch the project's editor
   run [options]              Build and launch the project as a game
+  test [options]             Build and run the project's editor tests
   status                     Show process, project, document, level, and readiness state
   wait-ready                 Wait until the selected instance reports ready
   tools [name]               List typed bridge tools or describe one
@@ -56,12 +57,24 @@ Examples:
 
 ```text
 cscli new <name> [--path <directory>]
-cscli build [--project <path>] [--configuration <name>] [--target editor|game|all]
+cscli build [--project <path>] [--configuration <name>] [--target editor|game|all] [--restart-running]
 cscli editor [--project <path>] [--configuration <name>] [--no-build] [--wait-ready]
 cscli run [--project <path>] [--configuration <name>] [--no-build] [--wait-ready]
+cscli test [--project <path>] [--configuration <name>] [--no-build] [--pattern glob]
+cscli projects
+cscli cache clear [--project <path>|--all]
 ```
 
 When `--project` is omitted, project commands search the current directory and its parents for `game.json`.
+
+`cscli build --restart-running` is the C++ iteration shortcut: it gracefully asks every running
+editor/game instance for that project to quit, force-terminates one only if it does not exit within
+five seconds, builds, then relaunches each instance and waits for it to become ready. It is opt-in
+because force-closing can discard unsaved editor changes.
+
+`cscli projects` lists external projects created or built on this machine. Use
+`cscli cache clear --project D:/Gamedev/Asteroids` to remove one project's compiled shader cache,
+or `cscli cache clear --all` for every registered project.
 
 ## Connect to a Running Instance
 

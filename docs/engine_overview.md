@@ -42,7 +42,6 @@ The engine uses Quake/Source-style cvars and commands. See `Source/Framework/Con
 
 Key cvars:
 - `g_application_class` — the Lua class name to instantiate as the Application.
-- `g_entry_level` — the first level to load, by asset name. Startup runs `map <g_entry_level>`.
 - `g_project_base` — the data directory. Use a relative path, such as `"Data"`, not an absolute path.
 - `r.debug_mode` — debug output such as normals, object id, and material id. Values are 0–9. See `Draw.cpp` for the numbers.
 - `g_draw_physx_scene` — bitmask: 1 = collision shapes, 2 = joints, 3 = both.
@@ -54,7 +53,7 @@ Launch flags:
 
 `EngineVars.ini` has three sections: `[app]` runs on a normal launch, `[game_test]` runs on `App.exe --tests game`, and `[editor_test]` runs on `--tests editor`. The sections are independent. The engine selects exactly one. See [[testing]].
 
-`[app]` also loads a per-project `.ini`, such as `Projects/DevEngine.ini`, on top of the base config. Project vars win over the base config. This is where per-project vars live, such as `g_project_base`, `g_application_class`, `g_project_name`, and `g_entry_level`. `game_test` and `editor_test` never load a project file. Instead, they set these vars directly in their own section.
+`[app]` also loads a per-project `.ini`, such as `Projects/DevEngine.ini`, on top of the base config. Project vars win over the base config. This is where per-project vars live, such as `g_project_base`, `g_application_class`, and `g_project_name`. `game_test` and `editor_test` never load a project file. Instead, they set these vars directly in their own section.
 
 Commands:
 - `map <mapname>` — opens a map for play.

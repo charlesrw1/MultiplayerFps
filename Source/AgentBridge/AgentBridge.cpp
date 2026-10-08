@@ -108,23 +108,42 @@ void start_listening() {
 		return;
 	attempted_listen = true;
 
-	listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listen_sock == INVALID_SOCKET) {
-		sys_print(Error, "agent_bridge: socket() failed\n");
-		return;
-	}
+	const int requested_port = g_agentbridge_port.get_integer();
+	for (int offset = 0; offset < 100; ++offset) {
+		const int port = requested_port + offset;
+		if (port > 65535)
+			break;
 
-	sockaddr_in addr = {};
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // loopback only, by design
-	addr.sin_port = htons((u_short)g_agentbridge_port.get_integer());
+		listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (listen_sock == INVALID_SOCKET) {
+			sys_print(Error, "agent_bridge: socket() failed\n");
+			return;
+		}
 
-	if (bind(listen_sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
-		sys_print(Error, "agent_bridge: bind() on 127.0.0.1:%d failed\n", g_agentbridge_port.get_integer());
+		sockaddr_in addr = {};
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // loopback only, by design
+		addr.sin_port = htons((u_short)port);
+		if (bind(listen_sock, (sockaddr*)&addr, sizeof(addr)) != SOCKET_ERROR) {
+			g_agentbridge_port.set_integer(port);
+			break;
+		}
+
+		const int error = WSAGetLastError();
 		closesocket(listen_sock);
 		listen_sock = INVALID_SOCKET;
+		if (error != WSAEADDRINUSE) {
+			sys_print(Error, "agent_bridge: bind() on 127.0.0.1:%d failed\n", port);
+			return;
+		}
+	}
+	if (listen_sock == INVALID_SOCKET) {
+		sys_print(Error, "agent_bridge: no available port in 127.0.0.1:%d-%d\n", requested_port, requested_port + 99);
 		return;
 	}
+	if (g_agentbridge_port.get_integer() != requested_port)
+		sys_print(Warning, "agent_bridge: port %d was in use; using 127.0.0.1:%d\n", requested_port,
+			g_agentbridge_port.get_integer());
 	if (listen(listen_sock, 1) == SOCKET_ERROR) {
 		sys_print(Error, "agent_bridge: listen() failed\n");
 		closesocket(listen_sock);

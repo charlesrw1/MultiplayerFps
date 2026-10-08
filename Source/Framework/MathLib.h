@@ -21,11 +21,11 @@ inline glm::mat4 MakeInfReversedZProjRH(float fovY_radians, float aspectWbyH, fl
 }
 
 inline float linearize_depth(float d, float zNear, float zFar) {
-	float z_n = 2.0 * d - 1.0;
-	return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+	float z_n = 2.0f * d - 1.0f;
+	return 2.0f * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
 }
 inline glm::vec4 color32_to_vec4(Color32 c) {
-	return glm::vec4(c.r / 255.0, c.g / 255.0, c.b / 255.0, c.a / 255.0);
+	return glm::vec4(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
 }
 inline Color32 vec4_to_color32(glm::vec4 v) {
 	Color32 out;
@@ -216,7 +216,7 @@ public:
 		state = x;
 		return x;
 	}
-	float RandF() { return (float)Rand() * (1.0 / 4294967296.0); }
+	float RandF() { return static_cast<float>(Rand()) * (1.0f / 4294967296.0f); }
 	float RandF(float min, float max) { return min + (max - min) * RandF(); }
 	int RandI(int start, int end) {
 		int range = end - start;

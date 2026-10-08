@@ -49,6 +49,7 @@
 #include "Framework/Jobs.h"
 #include "EditorPopups.h"
 #ifdef EDITOR_BUILD
+#include "AssetTools/AssetTemplates.h"
 #include "LevelEditor/EditorDocLocal.h"
 #include "LevelEditor/EditorRecents.h"
 #endif
@@ -289,17 +290,25 @@ void GameEngineLocal::add_commands() {
 	// @cmd: exits the process immediately.
 	commands->add("quit", [](const Cmd_Args& args) { Quit(); });
 
-	// @cmd: creates a new empty .tmap at a game-relative path. Fails if the file already exists.
+	// @cmd: creates a new .tmap by copying the configured editor template. Fails if the file already exists.
 	// @usage: create-map <game-relative path, e.g. "maps/foo.tmap">
 	commands->add("create-map", [](const Cmd_Args& args) {
-		auto existing = FileSys::open_read_game(args.at(1));
-		if (!existing) {
-			auto file = FileSys::open_write_game(args.at(1));
-			string s = "!json\n{\"objs\":[]}";
-			file->write(s.c_str(), s.size());
-		} else {
+		if (args.size() < 2) {
+			sys_print(Error, "usage: create-map <game-relative path>\n");
+			return;
+		}
+
+#ifdef EDITOR_BUILD
+		const std::string gamepath = args.at(1);
+		const size_t separator = gamepath.find_last_of('/');
+		const std::string directory = separator == std::string::npos ? "" : gamepath.substr(0, separator);
+		const std::string basename = separator == std::string::npos ? gamepath : gamepath.substr(separator + 1);
+		if (!AssetTemplates::create_empty_map(directory, basename)) {
 			sys_print(Error, "cant make new map, already exists\n");
 		}
+#else
+		sys_print(Error, "create-map requires an editor build\n");
+#endif
 	});
 	// @cmd: opens (or switches to) the level editor tool, optionally loading a map. Requires the
 	// process to have been launched with --editor; a no-op error otherwise.

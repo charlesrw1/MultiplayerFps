@@ -115,13 +115,12 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(CsGameRoot)'!=''">
     <CsExternalGame>true</CsExternalGame>
-    <CsTargetKind Condition="'$(CsTargetKind)'==''">editor</CsTargetKind>
+    <CsTargetKind Condition="'$(CsTargetKind)'==''">app</CsTargetKind>
     <CsGameName Condition="'$(CsGameName)'==''">Game</CsGameName>
     <CsGameGeneratedDir>$(CsGameRoot)\Build\generated\</CsGameGeneratedDir>
-    <OutDir>$(CsGameRoot)\Build\bin\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(CsGameRoot)\Build\intermediate\$(Platform)\$(Configuration)\$(CsTargetKind)\</IntDir>
-    <TargetName Condition="'$(CsTargetKind)'=='editor'">$(CsGameName)Editor</TargetName>
-    <TargetName Condition="'$(CsTargetKind)'!='editor'">$(CsGameName)</TargetName>
+    <OutDir>$(CsGameRoot)\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(CsGameRoot)\$(Platform)\$(Configuration)\intermediate\App\</IntDir>
+    <TargetName>App</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -197,7 +196,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;_DEBUG;_CONSOLE;EDITOR_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;$(SolutionDir)Source\External\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -216,7 +215,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;EDITOR_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;$(SolutionDir)Source\External\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -237,7 +236,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;$(SolutionDir)Source\External\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -256,11 +255,19 @@
       <Message>Copy vcpkg DLL deps to output (vcpkg's AppLocalFromInstalled hook is broken on this toolset)</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
+  <!-- PhysX's static extension library references this PDB. Copy it before link so
+       project-local external App.exe builds retain debug symbols without LNK4099. -->
+  <Target Name="CopyPhysXExtensionPdb" BeforeTargets="Link" Condition="'$(Configuration)'=='Debug' and Exists('$(_ZVcpkgCurrentInstalledDir)$(_ZVcpkgConfigSubdir)bin\PhysXExtensions_static_64.pdb')">
+    <MakeDir Directories="$(OutDir)" />
+    <Copy SourceFiles="$(_ZVcpkgCurrentInstalledDir)$(_ZVcpkgConfigSubdir)bin\PhysXExtensions_static_64.pdb" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="$(CsGameRoot)\Source\**\*.cpp" Condition="'$(CsExternalGame)'=='true'" />
+	<ClCompile Include="$(CsGameRoot)\Tests\**\*.cpp" Condition="'$(CsTargetKind)'=='test'" />
     <ClCompile Include="$(CsGameGeneratedDir)ExternalGame.gen.cpp" Condition="'$(CsExternalGame)'=='true'" />
     <ClInclude Include="$(CsGameRoot)\Source\**\*.h" Condition="'$(CsExternalGame)'=='true'" />
+	<ClInclude Include="$(CsGameRoot)\Tests\**\*.h" Condition="'$(CsTargetKind)'=='test'" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Core.vcxproj">

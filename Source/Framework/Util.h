@@ -83,12 +83,12 @@ struct Buffer
 	size_t length;
 };
 
-const float PI = 3.1415926536;
+const float PI = 3.1415926536f;
 const float TWOPI = PI * 2.f;
 const float HALFPI = PI * 0.5f;
 const float INV_PI = 1.f / PI;
-const float SQRT2 = 1.41421362;
-const float INV_SQRT2 = 1 / SQRT2;
+const float SQRT2 = 1.41421362f;
+const float INV_SQRT2 = 1.f / SQRT2;
 
 #include "Framework/Profiler.h" // CPU_SCOPE / GPU_SCOPE / RENDER_SCOPE / CPU_FUNCTION / GPU_FUNCTION
 

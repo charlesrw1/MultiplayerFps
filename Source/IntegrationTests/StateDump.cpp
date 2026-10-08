@@ -1,5 +1,4 @@
 // Source/IntegrationTests/StateDump.cpp
-#define _CRT_SECURE_NO_WARNINGS
 #include "StateDump.h"
 #include <cstdio>
 #include <string>

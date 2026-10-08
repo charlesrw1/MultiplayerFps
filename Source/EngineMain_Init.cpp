@@ -7,6 +7,8 @@
 #include <sstream>
 #include <chrono>
 #include <iomanip>
+#include <filesystem>
+#include <optional>
 #include "GameEngineLocal.h"
 #include "Level.h"
 #include "AgentBridge/AgentBridge.h"
@@ -83,6 +85,25 @@ extern ConfigVar g_editor_cfg_folder;
 extern ConfigVar g_project_base;
 double GetTime();
 double TimeSinceStart();
+
+namespace fs = std::filesystem;
+
+static std::optional<fs::path> get_external_project_root(const std::string& project_file) {
+	if (project_file.empty())
+		return std::nullopt;
+	std::error_code ec;
+	const fs::path ini = fs::weakly_canonical(fs::path(project_file), ec);
+	if (ec || ini.filename() != "project.ini" || ini.parent_path().filename() != "Build")
+		return std::nullopt;
+	const fs::path root = ini.parent_path().parent_path();
+	return fs::is_regular_file(root / "game.json") ? std::optional<fs::path>(root) : std::nullopt;
+}
+
+static std::string path_relative_to_engine(const fs::path& path) {
+	std::error_code ec;
+	const fs::path relative = fs::relative(path, fs::current_path(), ec);
+	return (ec ? path : relative).generic_string();
+}
 
 // Forward declaration for init_debug_shape_ctx defined in EngineMain_Debug.cpp
 extern void init_debug_shape_ctx();
@@ -347,10 +368,16 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		}
 	}
 	FileSys::init(engine_root);
+	const auto external_project_root = get_external_project_root(options.project_file);
+	if (external_project_root) {
+		const std::string logs_dir = path_relative_to_engine(*external_project_root / "Logs");
+		FileSys::create_directory(logs_dir, FileSys::ENGINE_DIR);
+		options.log_file = logs_dir + "/output.log";
+	}
 
 	// log_file/dumps live under Logs/ (see EngineMain.h) — must exist before the Logger opens
 	// its file below.
-	FileSys::create_directory("Logs", FileSys::ENGINE_DIR);
+	FileSys::create_directory(fs::path(options.log_file).parent_path().generic_string(), FileSys::ENGINE_DIR);
 
 	Logger::inst = Logger::make_logger(options.log_file, options.no_console_print);
 
@@ -392,14 +419,22 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	print_time("execute vars file");
 	FileSys::set_engine_asset_root(g_project_base.get_string());
 
-	// Project .ini is always applied on top of vars_file, never for --tests runs (those stay
-	// self-contained in the game_test/editor_test sections). --project on the CLI wins over the
-	// `startup_project` cvar that vars_file just set.
-	if (!options.pending_test_runnner) {
-		const std::string project_file =
-			resolve_project_ini(!options.project_file.empty() ? options.project_file : g_startup_project.get_string());
+	// Test runs stay self-contained unless an explicit --project selects an external game's
+	// Content/ and test scripts. Outside test mode, --project wins over startup_project.
+	const bool explicit_project = !options.project_file.empty();
+	if (!options.pending_test_runnner || explicit_project) {
+		const std::string project_file = resolve_project_ini(
+			explicit_project ? options.project_file : g_startup_project.get_string());
 		if (!project_file.empty())
 			Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, project_file.c_str());
+		if (const auto root = get_external_project_root(project_file)) {
+			const std::string shader_cache = path_relative_to_engine(*root / "Cache" / "ShaderCache");
+			const std::string editor_config = path_relative_to_engine(*root / "Config" / "Editor");
+			FileSys::set_shader_cache_root(shader_cache);
+			FileSys::create_directory(shader_cache, FileSys::ENGINE_DIR);
+			FileSys::create_directory(editor_config, FileSys::ENGINE_DIR);
+			g_editor_cfg_folder.set_string(editor_config.c_str());
+		}
 		print_time("execute project file");
 	}
 
@@ -565,6 +600,9 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	};
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
+	if (explicit_project) {
+		AssetCompiler::build_all(false);
+	}
 
 	if (m_is_editor_app) {
 		AssetBrowser::inst = new AssetBrowser();

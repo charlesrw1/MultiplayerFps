@@ -1,5 +1,6 @@
 #ifdef EDITOR_BUILD
 #include "AssetTools/AssetTemplates.h"
+#include "Framework/Config.h"
 #include "Framework/Files.h"
 #include "Framework/StringUtils.h"
 #include "Render/Editor/TextureEditor.h"
@@ -17,6 +18,8 @@ extern void write_model_import_settings(ModelImportSettings* mis, const std::str
 
 // Defined in TextureEditor.cpp (moved into AssetTools) — available in same lib
 extern void write_texture_import_settings(TextureImportSettings* tis, const std::string& path);
+
+extern ConfigVar g_editor_newmap_template;
 
 namespace AssetTemplates {
 
@@ -153,6 +156,16 @@ std::optional<std::string> create_empty_map(const std::string& dir, const std::s
         return std::nullopt;
 
     std::string text = "!json\n{\"objs\":[]}\n";
+    const std::string template_path = g_editor_newmap_template.get_string();
+    auto template_file = FileSys::open_read_game(template_path.c_str());
+    if (template_file) {
+        text.resize(template_file->size());
+        template_file->read(text.data(), text.size());
+    } else {
+        sys_print(Warning,
+            "create_empty_map: editor template %s was not found; creating an empty map instead\n",
+            template_path.c_str());
+    }
 
     auto f = FileSys::open_write_game(map_gamepath);
     if (!f) return std::nullopt;

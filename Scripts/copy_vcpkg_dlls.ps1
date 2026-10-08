@@ -62,12 +62,25 @@ $dlls = @(
     "vorbisfile.dll"
 )
 
+# Debug vcpkg packages conventionally use these suffixed names. The regular
+# spelling is the Release variant, so do not warn about it when the matching
+# Debug DLL is the one we will actually copy.
+$debugAlternatives = @{
+    "freetype.dll" = "freetyped.dll"
+    "zlib1.dll" = "zlibd1.dll"
+    "bz2.dll" = "bz2d.dll"
+    "libpng16.dll" = "libpng16d.dll"
+}
+
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 foreach ($dll in $dlls) {
     $src = Join-Path $VcpkgBinDir $dll
     $dst = Join-Path $OutDir $dll
     if (-not (Test-Path $src)) {
+        if ($debugAlternatives.ContainsKey($dll) -and (Test-Path (Join-Path $VcpkgBinDir $debugAlternatives[$dll]))) {
+            continue
+        }
         Write-Warning "copy_vcpkg_dlls: missing $src"
         continue
     }

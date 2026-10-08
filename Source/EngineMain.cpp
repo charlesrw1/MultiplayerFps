@@ -134,7 +134,6 @@ ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV,
 ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
 ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
 ConfigVar g_application_class("g_application_class", "Application", CVAR_DEV, "");
-ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV, "startup scene for the default game application");
 ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
 ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV,
@@ -149,7 +148,7 @@ ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER, "", 0, 2);
 ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL, "");
 ConfigVar g_debug_skeletons("g_debug_skeletons", "0", CVAR_BOOL, "draw skeletons of active animated renderables");
 ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL, "draw a debug grid around the origin");
-ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, "size of g_draw_grid", 0.01, 10);
+ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, "base spacing of g_draw_grid", 0.01, 10);
 ConfigVar ed_default_sky_material("ed_default_sky_material", "eng/hdriSky.mm", CVAR_DEV,
 								  "default sky material used for editors");
 ConfigVar g_drawdebugmenu("g_drawdebugmenu", "0", CVAR_BOOL, "draw the debug menu");
@@ -376,12 +375,10 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 
 	// --project overrides the `startup_project` cvar from vars_file. Not consulted for
 	// --tests runs — game_test/editor_test stay self-contained.
-	if (!test_args.present) {
-		for (int i = 1; i + 1 < argc; ++i) {
-			if (std::string(argv[i]) == "--project") {
-				options.project_file = argv[i + 1];
-				break;
-			}
+	for (int i = 1; i + 1 < argc; ++i) {
+		if (std::string(argv[i]) == "--project") {
+			options.project_file = argv[i + 1];
+			break;
 		}
 	}
 
@@ -446,9 +443,4 @@ GameEngineLocal::GameEngineLocal() {}
 Application* Application::get_app() {
 	ASSERT(eng);
 	return eng->get_app();
-}
-
-void DefaultGameApplication::start() {
-	if (g_entry_level.get_string()[0] != '\0' && !eng->load_level(g_entry_level.get_string()))
-		sys_print(Error, "DefaultGameApplication: failed to load startup scene %s\n", g_entry_level.get_string());
 }

@@ -1,5 +1,4 @@
 // Source/IntegrationTests/GpuTimer.cpp
-#define _CRT_SECURE_NO_WARNINGS
 #include "GpuTimer.h"
 #include "Render/IGraphicsDevice.h"
 #include <cstdio>

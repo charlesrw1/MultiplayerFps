@@ -97,7 +97,7 @@ class Cmd_Manager_Impl;
 class Cmd_Args
 {
 public:
-	int size() const { return args.size(); }
+	int size() const { return static_cast<int>(args.size()); }
 	const char* at(int index) const;
 
 	void add_arg(const char* v, int len);

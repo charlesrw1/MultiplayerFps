@@ -17,6 +17,7 @@
 
 ConfigVar g_project_base("g_project_base", "Data", CVAR_DEV, "what folder to search for assets in");
 static std::string g_engine_asset_root;
+static std::string g_shader_cache_root = "ShaderCache";
 static ConfigVar g_user_save_dir("g_user_save_dir", "User", CVAR_DEV, "what folder to save user config/settings to");
 
 static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", "0", CVAR_DEV | CVAR_BOOL,
@@ -205,7 +206,7 @@ IFilePtr FileSys::open_read(const char* p, WhereEnum flags) {
 	} else if (flags == FileSys::ENGINE_DIR) {
 		return open_read_dir(".", p);
 	} else if (flags == FileSys::SHADER_CACHE) {
-		return open_read_dir("ShaderCache", p);
+		return open_read_dir(g_shader_cache_root, p);
 	} else if (flags == FileSys::FULL_SYSTEM) {
 		return open_read_dir("", p);
 	}
@@ -222,7 +223,7 @@ IFilePtr FileSys::open_write(const char* relative_path, WhereEnum where) {
 	} else if (where == FileSys::ENGINE_DIR) {
 		return open_write_dir(".", relative_path);
 	} else if (where == FileSys::SHADER_CACHE) {
-		return open_write_dir("ShaderCache", relative_path);
+		return open_write_dir(g_shader_cache_root, relative_path);
 	}
 
 	assert(0);
@@ -237,7 +238,7 @@ const char* FileSys::get_path(WhereEnum where) {
 	else if (where == ENGINE_DIR)
 		return ".";
 	else if (where == SHADER_CACHE)
-		return "ShaderCache";
+		return g_shader_cache_root.c_str();
 	else
 		return ".";
 }
@@ -427,6 +428,10 @@ void FileSys::init(const std::string& engine_root) {
 
 void FileSys::set_engine_asset_root(const std::string& root) {
 	g_engine_asset_root = root;
+}
+
+void FileSys::set_shader_cache_root(const std::string& root) {
+	g_shader_cache_root = root.empty() ? "ShaderCache" : root;
 }
 
 class FileTreeIterator

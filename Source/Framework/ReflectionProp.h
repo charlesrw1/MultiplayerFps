@@ -68,13 +68,13 @@ struct ParsedHintStr
 	bool has_default = false;
 	bool has_min = false;
 	bool has_max = false;
-	float default_f = 0.0;
+	float default_f = 0.0f;
 	int default_i = 0;
 	float min_f = -9999.f;
 	float max_f = 9999.f;
 	int min_i = INT32_MIN;
 	int max_i = INT32_MAX;
-	float step_f = 0.1;
+	float step_f = 0.1f;
 	int step_i = 1;
 };
 

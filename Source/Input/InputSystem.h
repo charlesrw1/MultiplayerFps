@@ -107,16 +107,16 @@ struct lVec2
 	STRUCT_BODY();
 	lVec2() = default;
 	lVec2(const glm::ivec2& v) {
-		x = v.x;
-		y = v.y;
+		x = static_cast<float>(v.x);
+		y = static_cast<float>(v.y);
 	}
 	lVec2(const glm::vec2& v) {
 		x = v.x;
 		y = v.y;
 	}
 
-	REF float x = 0;
-	REF float y = 0;
+	REF float x = 0.f;
+	REF float y = 0.f;
 };
 
 // lua-exposed input wrapper, see Input for the C++ api
@@ -136,7 +136,7 @@ public:
 	REF static bool was_con_button_released(int con_button) {
 		return Input::was_con_button_released(SDL_GamepadButton(con_button));
 	}
-	REF static float get_con_axis(int con_axis) { return Input::get_con_axis(SDL_GamepadAxis(con_axis)); }
+	REF static float get_con_axis(int con_axis) { return static_cast<float>(Input::get_con_axis(SDL_GamepadAxis(con_axis))); }
 	REF static bool is_any_con_active() { return Input::is_any_con_active(); }
 	REF static bool is_mouse_down(int button) { return Input::is_mouse_down(button); }
 	REF static bool was_mouse_pressed(int button) { return Input::was_mouse_pressed(button); }

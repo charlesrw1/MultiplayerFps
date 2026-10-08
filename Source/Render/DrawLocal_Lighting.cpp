@@ -97,7 +97,9 @@ void update_debug_grid() {
 	}
 	MeshBuilder_Object mbo;
 	mbo.use_background_color = true;
-	mbo.visible = g_draw_grid.get_bool();
+	// g_draw_grid is now rendered by the depth-aware fullscreen editor grid pass.
+	// Keep this legacy mesh hidden so it cannot overlap the infinite grid.
+	mbo.visible = false;
 	mbo.meshbuilder = &mb;
 	idraw->get_scene()->update_meshbuilder(debug_grid_handle, mbo);
 }

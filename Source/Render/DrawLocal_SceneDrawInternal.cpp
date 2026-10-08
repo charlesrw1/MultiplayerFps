@@ -21,6 +21,9 @@
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
 #include <algorithm>
+
+extern ConfigVar g_draw_grid;
+
 void Renderer::draw_editor_ortho_grid(IGraphicsTexture* target) {
 	GPU_SCOPE("draw_editor_ortho_grid");
 
@@ -541,6 +544,14 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			auto mat = g_assets.find<MaterialInstance>("eng/editorEdgeDetect.mm");
 			if (mat.get() && mat->impl->gpu_buffer_offset != mat->impl->INVALID_MAPPING)
 				postProcesses.push_back(mat.get());
+		}
+		if (g_draw_grid.get_bool() && !view.is_ortho) {
+			auto mat = MaterialInstance::load("eng/infinite_grid.mm");
+			if (mat) {
+				matman.flush_dirty_material(mat);
+				if (mat->impl && mat->impl->gpu_buffer_offset != mat->impl->INVALID_MAPPING)
+					postProcesses.push_back(mat);
+			}
 		}
 		if (params.is_editor) {
 			postProcesses.push_back(matman.get_default_editor_sel_PP());

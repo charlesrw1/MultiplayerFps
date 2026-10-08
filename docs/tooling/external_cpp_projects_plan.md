@@ -8,7 +8,7 @@ Create, build, and run a C++ game outside the CsRemake repository. The game owns
 
 ## Project contract
 
-An external project contains `game.json`, `Source/`, `Content/`, and `Tests/`. `game.json` defines the project name, engine checkout, and startup scene. Paths in the manifest are relative to the manifest unless they are absolute.
+An external project contains `game.json`, `Source/`, `Content/`, and `Tests/`. `game.json` defines the project name and engine checkout. Paths in the manifest are relative to the manifest unless they are absolute.
 
 The first implementation statically links game code into project-specific editor and game executables. It does not add DLL modules, hot reload, packaging, or a stable plugin ABI.
 
@@ -18,10 +18,9 @@ The first implementation statically links game code into project-specific editor
 2. Let reflection codegen scan an external game source tree while resolving engine types.
 3. Parameterize the App target with `CsGameRoot`, `CsGameName`, and `CsTargetKind`.
 4. Write executable and generated output under the external project's `Build/` directory.
-5. Add a built-in default application that loads the configured startup scene.
-6. Add `cscli new`, `build`, `editor`, and `run` project commands.
-7. Generate a runtime `.ini` from `game.json` as a compatibility layer for the current config system.
-8. Test project creation and build an out-of-tree project.
+5. Add `cscli new`, `build`, `editor`, and `run` project commands.
+6. Generate a runtime `.ini` from `game.json` as a compatibility layer for the current config system.
+7. Test project creation and build an out-of-tree project.
 
 ## Acceptance criteria
 

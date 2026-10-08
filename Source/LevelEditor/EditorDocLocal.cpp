@@ -57,7 +57,7 @@
 MulticastDelegate<EditorDoc*> EditorDoc::on_creation;
 MulticastDelegate<EditorDoc*> EditorDoc::on_deletion;
 
-ConfigVar g_editor_newmap_template("g_editor_newmap_template", "eng/template_map.tmap", CVAR_DEV,
+ConfigVar g_editor_newmap_template("g_editor_newmap_template", "eng/editor_template.tmap", CVAR_DEV,
 								   "whenever a new map is created, it will use this map as a template");
 
 ConfigVar ed_has_snap("ed_has_snap", "0", CVAR_BOOL, "");
@@ -438,14 +438,15 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 				}
 			}
 
-			// Load the template level (clears current level). If template.tmap can't be
+			// Use the same configured template as new-map creation so prefab editing has the
+			// identical editor background, meshes, materials, and lighting.
 			// loaded, load_level returns false and leaves the level untouched — fall back to
 			// an empty level so the subsequent mark + restore steps operate on a cleared
 			// level. Without this fallback the original prefab entities remain, the mark
 			// loop stamps them un-editable, and the restore step inserts a duplicate set.
-			if (!eng->load_level("template.tmap")) {
+			if (!eng->load_level(g_editor_newmap_template.get_string())) {
 				sys_print(Warning,
-						  "init_for_scene: template.tmap load failed; opening prefab without template background\n");
+						  "init_for_scene: editor template load failed; opening prefab without template background\n");
 				eng->load_level("");
 			}
 

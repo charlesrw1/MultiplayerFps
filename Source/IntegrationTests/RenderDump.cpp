@@ -1,5 +1,4 @@
 // Source/IntegrationTests/RenderDump.cpp
-#define _CRT_SECURE_NO_WARNINGS
 #include "RenderDump.h"
 #include <cstdio>
 #include <cstring>

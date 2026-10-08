@@ -51,8 +51,9 @@ public:
 
 	bool read_string(StringView& str) { return read_next_token(str); }
 	void return_string(StringView view) {
-		int index = (char*)view.str_start - buffer;
-		assert(index >= 0 && index < buffer_size);
+		const ptrdiff_t offset = view.str_start - buffer;
+		assert(offset >= 0 && offset < static_cast<ptrdiff_t>(buffer_size));
+		int index = static_cast<int>(offset);
 		if (index > 0 && index + 1 < buffer_size) {
 			if (view.str_start[-1] == '\"' && view.str_start[view.str_len] == '\"') {
 				index -= 1;

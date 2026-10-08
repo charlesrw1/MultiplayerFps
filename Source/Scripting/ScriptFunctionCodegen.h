@@ -64,17 +64,17 @@ struct lRect
 	}
 	Rect2d to_rect2d() const {
 		Rect2d out;
-		out.x = x;
-		out.y = y;
-		out.w = w;
-		out.h = h;
+		out.x = static_cast<int16_t>(x);
+		out.y = static_cast<int16_t>(y);
+		out.w = static_cast<int16_t>(w);
+		out.h = static_cast<int16_t>(h);
 		return out;
 	}
 
-	REF float x = 0;
-	REF float y = 0;
-	REF float w = 0;
-	REF float h = 0;
+	REF float x = 0.f;
+	REF float y = 0.f;
+	REF float w = 0.f;
+	REF float h = 0.f;
 };
 
 struct lVec3Pair

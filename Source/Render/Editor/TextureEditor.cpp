@@ -517,6 +517,9 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 		parentDir = parentDir.substr(0, findSlash + 1);
 
 	const std::string pathToNvidiaTextureConvertTool = "./x64/Debug/texconv.exe";
+	auto quote_process_argument = [](const std::string& argument) {
+		return "\"" + argument + "\"";
+	};
 
 	// sRGB only makes sense for color formats (BC1/BC7/uncompressed); normal maps and
 	// masks are non-color data and are always sampled linearly.
@@ -532,7 +535,7 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 	default:                     format = tis->is_srgb ? "BC1_UNORM_SRGB" : "BC1_UNORM"; apply_srgb = tis->is_srgb; break;
 	}
 
-	std::string commandLine = pathToNvidiaTextureConvertTool + " -f ";
+	std::string commandLine = quote_process_argument(pathToNvidiaTextureConvertTool) + " -f ";
 	commandLine += format;
 
 	// otherwise texconv picks up on input .png srgb randomly incorrectly
@@ -545,8 +548,8 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 	}
 
 	commandLine += " -y ";
-	commandLine += " -o " + parentDir;
-	commandLine += " " + parentDir + tis->src_file;
+	commandLine += " -o " + quote_process_argument(parentDir);
+	commandLine += " " + quote_process_argument(parentDir + tis->src_file);
 	sys_print(Info, "executing texture compile: %s\n", commandLine.c_str());
 
 	STARTUPINFOA startup = {};
@@ -555,14 +558,22 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 	delete tis;
 	tis = nullptr;
 
-	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
+	std::vector<char> mutable_command_line(commandLine.begin(), commandLine.end());
+	mutable_command_line.push_back('\0');
+	if (!CreateProcessA(nullptr, mutable_command_line.data(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
 						&out)) {
 		sys_print(Error, "couldn't create process\n");
 		return false;
 	}
 	WaitForSingleObject(out.hProcess, INFINITE);
+	DWORD exit_code = 1;
+	GetExitCodeProcess(out.hProcess, &exit_code);
 	CloseHandle(out.hProcess);
 	CloseHandle(out.hThread);
+	if (exit_code != 0) {
+		sys_print(Error, "texconv failed with exit code %lu for %s\n", exit_code, gamepath.c_str());
+		return false;
+	}
 #endif
 	return true;
 }

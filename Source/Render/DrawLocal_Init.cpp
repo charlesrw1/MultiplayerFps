@@ -78,15 +78,19 @@ void Renderer::create_shaders() {
 }
 
 void Renderer::reload_shaders() {
-	assert(0);
 	on_reload_shaders.invoke();
 
 	ssao.reload_shaders();
-	// prog_man.recompile_all();
+	get_prog_man().recompile_all();
 }
 
 static float get_editor_grid_snap() {
 #ifdef EDITOR_BUILD
+	extern ConfigVar g_draw_grid;
+	extern ConfigVar g_grid_size;
+	if (g_draw_grid.get_bool())
+		return g_grid_size.get_float();
+
 	extern ConfigVar ed_translation_snap;
 	return ed_translation_snap.get_float();
 #else
