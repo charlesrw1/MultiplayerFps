@@ -214,7 +214,7 @@ void imgui_vars_hook() {
 }
 
 VarManImpl::VarManImpl() {
-	//Debug_Interface::get()->add_hook("Cvars", imgui_vars_hook);
+	// Debug_Interface::get()->add_hook("Cvars", imgui_vars_hook);
 }
 
 std::vector<std::string> tokenize_string(const std::string& input) {
@@ -529,14 +529,13 @@ public:
 	}
 
 	void execute_cmd(const std::string& msg) final { execute_string(msg.c_str()); }
-	void execute_file(Cmd_Execute_Mode mode, const char* path) override {
-		execute_file_impl(mode, path, nullptr);
-	}
+	void execute_file(Cmd_Execute_Mode mode, const char* path) override { execute_file_impl(mode, path, nullptr); }
 	void execute_file_section(Cmd_Execute_Mode mode, const char* path, const char* section) override {
 		execute_file_impl(mode, path, section);
 	}
 	void execute_file_impl(Cmd_Execute_Mode mode, const char* path, const char* section) {
-		auto file = FileSys::open_read_engine(path);
+		const bool absolute = path && ((path[0] && path[1] == ':') || path[0] == '/' || path[0] == '\\');
+		auto file = FileSys::open_read(path, absolute ? FileSys::FULL_SYSTEM : FileSys::ENGINE_DIR);
 		if (!file) {
 			sys_print(Error, "couldn't open config file to execute: %s\n", path);
 			return;

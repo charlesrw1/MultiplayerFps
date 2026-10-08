@@ -61,10 +61,6 @@
     <ClCompile Include="ObjectOutlinerFilter.cpp" />
     <ClCompile Include="OrthoCamera.cpp" />
     <ClCompile Include="PropertyEditors.cpp" />
-    <ClCompile Include="RoadBuilderTool.cpp" />
-    <ClCompile Include="RoadBuilderTool_Helpers.cpp" />
-    <ClCompile Include="RoadBuilderTool_Overlay.cpp" />
-    <ClCompile Include="RoadBuilderTool_Tick.cpp" />
     <ClCompile Include="SceneExport.cpp" />
     <ClCompile Include="SelectionMode.cpp" />
     <ClCompile Include="SelectionState.cpp" />
@@ -89,7 +85,6 @@
     <ClInclude Include="PropertyEditors.h" />
     <ClInclude Include="SelectionState.h" />
     <ClInclude Include="ViewportHandles.h" />
-    <ClInclude Include="RoadBuilderTool.h" />
     <ClInclude Include="Commands.h" />
     <ClInclude Include="EditorDocLocal.h" />
   </ItemGroup>

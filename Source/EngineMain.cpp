@@ -64,7 +64,6 @@
 // Global singletons
 // ---------------------------------------------------------------------------
 
-
 Debug_Console* Debug_Console::inst = nullptr;
 
 GameEngineLocal eng_local;
@@ -75,7 +74,8 @@ GameEnginePublic* eng = &eng_local;
 // Projects/, adding .ini if missing. Anything containing a path separator is
 // assumed to already be a full path and is returned unchanged.
 std::string resolve_project_ini(const std::string& name_or_path) {
-	if (name_or_path.empty()) return name_or_path;
+	if (name_or_path.empty())
+		return name_or_path;
 	if (name_or_path.find('/') != std::string::npos || name_or_path.find('\\') != std::string::npos)
 		return name_or_path;
 	const bool has_ini_ext = name_or_path.size() >= 4 && name_or_path.compare(name_or_path.size() - 4, 4, ".ini") == 0;
@@ -101,12 +101,16 @@ std::string get_effective_project_file() {
 std::string get_cli_arg(const std::string& name, const std::string& default_value) {
 	const int argc = eng_local.argc;
 	char** argv = eng_local.argv;
-	if (!argv) return default_value;
+	if (!argv)
+		return default_value;
 	for (int i = 1; i < argc; i++) {
-		if (argv[i][0] != '-') continue;
+		if (argv[i][0] != '-')
+			continue;
 		if (name == argv[i] + 1) {
-			if (i + 1 >= argc) return default_value;
-			if (argv[i + 1][0] == '-') return default_value;
+			if (i + 1 >= argc)
+				return default_value;
+			if (argv[i + 1][0] == '-')
+				return default_value;
 			return argv[i + 1];
 		}
 	}
@@ -130,12 +134,14 @@ ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV,
 ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
 ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
 ConfigVar g_application_class("g_application_class", "Application", CVAR_DEV, "");
+ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV, "startup scene for the default game application");
 ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
 ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV,
 						 "the project name of the game, used for save file folders");
-ConfigVar g_startup_project("startup_project", "", CVAR_DEV,
-							"path to the default project .ini, loaded after EngineVars.ini unless overridden by --project");
+ConfigVar g_startup_project(
+	"startup_project", "", CVAR_DEV,
+	"path to the default project .ini, loaded after EngineVars.ini unless overridden by --project");
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 10.0, 110.0);
 ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL, "");
@@ -155,8 +161,9 @@ ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL,
 						 "enables dev mode features like compiling assets when loading");
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
-ConfigVar g_engine_ticks_per_frame("engine.ticks_per_frame", "1", CVAR_INTEGER,
-    "game ticks to simulate per render frame; render+present are skipped for all but the last", 1, 10000);
+ConfigVar g_engine_ticks_per_frame(
+	"engine.ticks_per_frame", "1", CVAR_INTEGER,
+	"game ticks to simulate per render frame; render+present are skipped for all but the last", 1, 10000);
 ConfigVar ui_disable_screen_log("ui.disable_screen_log", "0", CVAR_BOOL, "");
 ConfigVar stat_fps("stat.fps", "0", CVAR_BOOL, "show fps/frametime counter overlay in the top-right corner");
 ConfigVar disable_render_time_tick("disable_render_time_tick", "0", CVAR_BOOL, "");
@@ -177,8 +184,6 @@ double TimeSinceStart() {
 // Model event hooks
 // ---------------------------------------------------------------------------
 
-
-
 // ---------------------------------------------------------------------------
 // Quit
 // ---------------------------------------------------------------------------
@@ -189,7 +194,7 @@ void Quit() {
 	eng_local.cleanup();
 	exit(0);
 
-	//asdfasdf
+	// asdfasdf
 
 	printf("");
 }
@@ -248,15 +253,16 @@ void GameEngineLocal::set_runner(ITestRunner* runner, bool skip_swap_) {
 // ---------------------------------------------------------------------------
 
 // --tests <mode> [pattern...]   pattern may be a glob or "@file" reading newline-separated globs.
-struct TestModeArgs {
+struct TestModeArgs
+{
 	bool present = false;
 	std::string mode; // "game" or "editor"
 	std::vector<std::string> patterns;
 	bool promote = false;
 	bool interactive = false;
 	bool timing_assert = false;
-	bool editor = false;              // --editor (launch editor app)
-	bool wait_for_debugger = false;   // --wait-for-debugger
+	bool editor = false;			// --editor (launch editor app)
+	bool wait_for_debugger = false; // --wait-for-debugger
 };
 
 static void read_pattern_file(const char* path, std::vector<std::string>& out) {
@@ -349,8 +355,6 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 			options.editor_mode = true;
 		}
 
-
-
 		set_assert_hook([](const char* cond) {
 			fprintf(stderr, "\n[ASSERT FAILED] %s\n", cond);
 			print_stack_trace();
@@ -368,8 +372,7 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 		options.pending_test_runnner = std::move(runner);
 	}
 
-	developer_mode
-		.set_bool(true);
+	developer_mode.set_bool(true);
 
 	// --project overrides the `startup_project` cvar from vars_file. Not consulted for
 	// --tests runs — game_test/editor_test stay self-contained.
@@ -445,4 +448,7 @@ Application* Application::get_app() {
 	return eng->get_app();
 }
 
-
+void DefaultGameApplication::start() {
+	if (g_entry_level.get_string()[0] != '\0' && !eng->load_level(g_entry_level.get_string()))
+		sys_print(Error, "DefaultGameApplication: failed to load startup scene %s\n", g_entry_level.get_string());
+}

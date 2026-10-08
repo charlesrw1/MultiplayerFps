@@ -1,4 +1,5 @@
 #include "Commands.h"
+#include "ProjectCommands.h"
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -13,6 +14,10 @@ void print_top_help() {
 Usage: cscli [global options] <subcommand> [args...]
 
 Subcommands:
+  new <name> --path <dir>    Create an external C++ game project
+  build [options]            Build an external game project
+  editor [options]           Build and launch the project's editor
+  run [options]              Build and launch the project as a game
   status                     Show mode/pid/project_base/port of the connected instance
   wait-ready                 Wait until the selected instance reports ready
   tools [name]               List typed bridge tools or describe one
@@ -33,6 +38,9 @@ Global options:
   -V, --version                       Show cscli's version
 
 Examples:
+  cscli new Asteroids --path D:/Gamedev/Asteroids
+  cscli build --project D:/Gamedev/Asteroids
+  cscli editor --project D:/Gamedev/Asteroids --wait-ready
   cscli status
   cscli wait-ready --wait-timeout 30
   cscli tools scene_hierarchy
@@ -104,6 +112,65 @@ int main(int argc, char** argv) {
 
 	const std::string sub = rest[0];
 	const std::vector<std::string> sub_args(rest.begin() + 1, rest.end());
+
+	if (sub == "new") {
+		if (sub_args.empty()) {
+			std::cerr << "usage: cscli new <name> [--path directory]\n";
+			return 2;
+		}
+		std::string path;
+		for (size_t j = 1; j < sub_args.size(); j++) {
+			if (sub_args[j] == "--path" && j + 1 < sub_args.size())
+				path = sub_args[++j];
+			else {
+				std::cerr << "usage: cscli new <name> [--path directory]\n";
+				return 2;
+			}
+		}
+		return cmd_project_new(g, sub_args[0], path);
+	}
+
+	if (sub == "build") {
+		std::string project = g.project_filter;
+		std::string configuration = "Debug";
+		std::string target = "all";
+		for (size_t j = 0; j < sub_args.size(); j++) {
+			if (sub_args[j] == "--project" && j + 1 < sub_args.size())
+				project = sub_args[++j];
+			else if (sub_args[j] == "--configuration" && j + 1 < sub_args.size())
+				configuration = sub_args[++j];
+			else if (sub_args[j] == "--target" && j + 1 < sub_args.size())
+				target = sub_args[++j];
+			else {
+				std::cerr << "usage: cscli build [--project path] [--configuration name] [--target editor|game|all]\n";
+				return 2;
+			}
+		}
+		return cmd_project_build(g, project, configuration, target);
+	}
+
+	if (sub == "editor" || sub == "run") {
+		std::string project = g.project_filter;
+		std::string configuration = "Debug";
+		bool build_first = true;
+		bool wait_ready = false;
+		for (size_t j = 0; j < sub_args.size(); j++) {
+			if (sub_args[j] == "--project" && j + 1 < sub_args.size())
+				project = sub_args[++j];
+			else if (sub_args[j] == "--configuration" && j + 1 < sub_args.size())
+				configuration = sub_args[++j];
+			else if (sub_args[j] == "--no-build")
+				build_first = false;
+			else if (sub_args[j] == "--wait-ready")
+				wait_ready = true;
+			else {
+				std::cerr << "usage: cscli " << sub
+						  << " [--project path] [--configuration name] [--no-build] [--wait-ready]\n";
+				return 2;
+			}
+		}
+		return cmd_project_launch(g, project, configuration, sub == "editor", build_first, wait_ready);
+	}
 
 	if (sub == "status") {
 		return cmd_status(g);

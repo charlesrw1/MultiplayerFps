@@ -196,7 +196,6 @@ void EditorDoc::init_new() {
 	drag_drop_preview = std::make_unique<DragDropPreview>();
 	foliage_tool = std::make_unique<FoliagePaintTool>(*this);
 	stamp_tool = std::make_unique<DecalStampTool>(*this);
-	road_tool = std::make_unique<RoadBuilderTool>(*this);
 	handle_dragger = std::make_unique<EViewportHandles>(*this);
 	selection_mode = std::make_unique<SelectionMode>(*this);
 	draw_handles = std::make_unique<DrawHandlesObject>(*this);
@@ -431,8 +430,8 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 			SerializedSceneFile prefab_content;
 			if (!prefab_entities.empty()) {
 				try {
-					prefab_content = NewSerialization::serialize_to_text("prefab_edit_backup", prefab_entities, false,
-																		nullptr, nullptr, /*serialize_hierarchy*/ true);
+					prefab_content = NewSerialization::serialize_to_text(
+						"prefab_edit_backup", prefab_entities, false, nullptr, nullptr, /*serialize_hierarchy*/ true);
 				}
 				catch (const std::exception& e) {
 					sys_print(Warning, "Failed to backup prefab content: %s\n", e.what());
@@ -461,8 +460,8 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 			// Restore the prefab content into the scene
 			if (!prefab_content.text.empty()) {
 				try {
-					UnserializedSceneFile unserialized = NewSerialization::unserialize_from_text(
-						"prefab_edit_restore", prefab_content.text, false);
+					UnserializedSceneFile unserialized =
+						NewSerialization::unserialize_from_text("prefab_edit_restore", prefab_content.text, false);
 					insert_unserialized_into_scene(unserialized);
 				}
 				catch (const std::exception& e) {
@@ -485,20 +484,19 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 						break;
 					}
 				}
-				if (!found) break;
+				if (!found)
+					break;
 
 				Entity* owner = found->get_owner();
 				ASSERT(owner);
-				std::vector<Entity*> children_snap(owner->get_children().begin(),
-												   owner->get_children().end());
+				std::vector<Entity*> children_snap(owner->get_children().begin(), owner->get_children().end());
 				for (Entity* child : children_snap) {
 					glm::mat4 ws = child->get_ws_transform();
 					child->parent_to(nullptr);
 					child->set_ws_transform(ws);
 					child->dont_serialize_or_edit = false;
 				}
-				sys_print(Warning,
-						  "Auto-flattening prefab-in-prefab on load: '%s' (%d entities promoted to root)\n",
+				sys_print(Warning, "Auto-flattening prefab-in-prefab on load: '%s' (%d entities promoted to root)\n",
 						  found->prefab_path.c_str(), (int)children_snap.size());
 				owner->destroy();
 				flatten_pass_count++;

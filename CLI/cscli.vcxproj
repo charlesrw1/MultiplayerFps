@@ -150,11 +150,13 @@
     <ClCompile Include="BridgeClient.cpp" />
     <ClCompile Include="Discovery.cpp" />
     <ClCompile Include="Commands.cpp" />
+    <ClCompile Include="ProjectCommands.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BridgeClient.h" />
     <ClInclude Include="Discovery.h" />
     <ClInclude Include="Commands.h" />
+    <ClInclude Include="ProjectCommands.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

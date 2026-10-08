@@ -16,15 +16,16 @@
 #include "GameEnginePublic.h"
 
 ConfigVar g_project_base("g_project_base", "Data", CVAR_DEV, "what folder to search for assets in");
+static std::string g_engine_asset_root;
 static ConfigVar g_user_save_dir("g_user_save_dir", "User", CVAR_DEV, "what folder to save user config/settings to");
 
 static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", "0", CVAR_DEV | CVAR_BOOL,
 											   "prints an error log for all CreateFile errors");
 
-void wait_for_debugger_windows()
-{
+void wait_for_debugger_windows() {
 	while (!IsDebuggerPresent())
-		Sleep(10);	DebugBreak();
+		Sleep(10);
+	DebugBreak();
 }
 
 class OSFile : public IFile
@@ -197,7 +198,10 @@ IFilePtr FileSys::open_read(const char* p, WhereEnum flags) {
 	if (flags == FileSys::USER_DIR) {
 		return open_read_dir(g_user_save_dir.get_string(), p);
 	} else if (flags == FileSys::GAME_DIR) {
-		return open_read_dir(g_project_base.get_string(), p);
+		auto project_file = open_read_dir(g_project_base.get_string(), p);
+		if (project_file || g_engine_asset_root.empty() || g_engine_asset_root == g_project_base.get_string())
+			return project_file;
+		return open_read_dir(g_engine_asset_root, p);
 	} else if (flags == FileSys::ENGINE_DIR) {
 		return open_read_dir(".", p);
 	} else if (flags == FileSys::SHADER_CACHE) {
@@ -341,7 +345,6 @@ bool FileSys::create_directory(std::string_view relative_path, WhereEnum where) 
 	}
 }
 
-
 // stick it here for windows.h
 // lua_debug: appends --lua_debug so the spawned process opens its lua-debug socket immediately
 // and leaves it listening for the whole session -- VS Code can attach at any point during play,
@@ -378,10 +381,9 @@ void start_play_process(const std::string& play_map_path, bool lua_debug, bool c
 	}
 
 	if (cpp_debug) {
-		std::string psCommand = ". 'Scripts/_vs_attach.ps1'; Attach-VSDebugger -TargetPid " +
-								 std::to_string(out.dwProcessId);
-		std::string psCommandLine = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"" +
-									 psCommand + "\"";
+		std::string psCommand =
+			". 'Scripts/_vs_attach.ps1'; Attach-VSDebugger -TargetPid " + std::to_string(out.dwProcessId);
+		std::string psCommandLine = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"" + psCommand + "\"";
 		STARTUPINFOA psStartup = {};
 		PROCESS_INFORMATION psOut = {};
 		if (CreateProcessA(nullptr, (char*)psCommandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr,
@@ -396,8 +398,13 @@ void start_play_process(const std::string& play_map_path, bool lua_debug, bool c
 	CloseHandle(out.hProcess);
 	CloseHandle(out.hThread);
 }
-void FileSys::init() {
+void FileSys::init(const std::string& engine_root) {
 	// sys_print(Info, "------ FileSys init ------\n");
+	if (!engine_root.empty()) {
+		if (_chdir(engine_root.c_str()) != 0)
+			Fatalf("!!! failed to change to engine root %s\n", engine_root.c_str());
+		return;
+	}
 
 	// updates working directory to ./CsRemake/*
 	char own_path[256];
@@ -416,6 +423,10 @@ void FileSys::init() {
 	} else {
 		Fatalf("!!! GetModuleHandle returned null\n");
 	}
+}
+
+void FileSys::set_engine_asset_root(const std::string& root) {
+	g_engine_asset_root = root;
 }
 
 class FileTreeIterator

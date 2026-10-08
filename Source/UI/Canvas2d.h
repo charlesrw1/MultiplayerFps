@@ -5,15 +5,17 @@
 #include "Framework/LuaColor.h"
 #include "Framework/Rect2d.h"
 #include "Render/DrawTypedefs.h"
+#include "Render/Canvas2dTypes.h"
 #include "UI/UiAnchor.h"
 #include <glm/glm.hpp>
+#include <span>
 
 class Texture;
 class FontAsset;
 class MaterialInstance;
 class Canvas2dVertexArray;
-struct DrawSettings;
 class IGraphicsTexture;
+struct MbVertex;
 
 // Immediate-mode *recording* 2d drawing API: draw_* calls append geometry + append/extend
 // a batch (see Canvas2dRecorder), nothing touches the GPU until sync_to_renderer(). See
@@ -37,6 +39,7 @@ public:
 	static void update();				  // per-frame: reset recording state to defaults
 	static void sync_to_renderer();	  // hand the recorded batch list to the render-thread backend
 	static void on_resize(int w, int h); // recreate the dedicated 2d depth texture
+	static bool is_recording();
 
 	REF static void set_target_window();
 	REF static void set_target_texture(Texture* render_texture);
@@ -68,7 +71,29 @@ public:
 	REF static void rectangle(int x, int y, int w, int h, lColor color);
 	REF static void rectangle_outline(int x, int y, int w, int h, int thickness, lColor color);
 	REF static void circle(int x, int y, int radius, int segments, lColor color);
+	REF static void circle_outline(int x, int y, int radius, int segments, int thickness, lColor color);
 	REF static void line(int x1, int y1, int x2, int y2, int thickness, lColor color);
+	REF static void triangle(float x0, float y0, float x1, float y1, float x2, float y2, lColor color);
+	REF static void quad(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3,
+					 lColor color);
+	REF static void gradient_rectangle(int x, int y, int w, int h, lColor top_left, lColor top_right,
+							   lColor bottom_right, lColor bottom_left);
+	REF static void rounded_rectangle(int x, int y, int w, int h, int radius, int corner_segments, lColor color);
+	REF static void draw_nine_slice(int x, int y, int w, int h, Texture* tex, int left, int top, int right,
+								int bottom, lColor color);
+	REF static void draw_tiled_sprite(int x, int y, int w, int h, Texture* tex, int tile_w, int tile_h,
+								  lColor color);
+
+	// C++ span-based primitives. Lua-facing variants can be added later with a native
+	// vector-table binding instead of forcing allocations into the core renderer.
+	static void polygon(std::span<const glm::vec2> points, Color32 color, float z = 0.f);
+	static void line_strip(std::span<const glm::vec2> points, float thickness, Color32 color, bool closed = false,
+						   float z = 0.f, CanvasLineCap cap = CanvasLineCap::Butt,
+						   CanvasLineJoin join = CanvasLineJoin::Miter, int round_segments = 8);
+	static void textured_polygon(std::span<const glm::vec2> points, std::span<const glm::vec2> uvs, Texture* tex,
+								 Color32 color = COLOR_WHITE, float z = 0.f);
+	static void draw_mesh(std::span<const MbVertex> vertices, std::span<const uint32_t> indices,
+						  const DrawSettings& settings, glm::mat4 transform = glm::mat4(1.f));
 
 	static void draw_vertex_array(Canvas2dVertexArray& arr, int index_offset, int index_count,
 								   const DrawSettings& settings, glm::mat4 transform = glm::mat4(1.f));

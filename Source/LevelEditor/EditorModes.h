@@ -12,7 +12,7 @@ public:
 	// See SelectionMode's split of on_mouse_pick() out of tick() for why this exists.
 	virtual void tick_late(EditorInputs& inputs) {}
 
-	virtual void draw_ui()  {}
+	virtual void draw_ui() {}
 };
 
 class FoliagePaintTool : public IInputReciever, public IEditorMode
@@ -56,8 +56,6 @@ private:
 	EditorDoc& doc;
 };
 // Road network editor (Cities-Skylines style)
-// Full definition in RoadBuilderTool.h
-class RoadBuilderTool;
 
 // the default tool
 class SelectionMode : public IEditorMode
@@ -72,4 +70,3 @@ public:
 	EditorDoc& doc;
 	DragDetector dragger;
 };
-

@@ -201,6 +201,75 @@ void Canvas2d::circle(int x, int y, int radius, int segments, lColor color) {
 	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
 }
 
+void Canvas2d::circle_outline(int x, int y, int radius, int segments, int thickness, lColor color) {
+	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
+	int start = (int)g_recorder.get_transient_arena().get_i().size();
+	Canvas2dGeometry::build_circle_outline(g_recorder.get_transient_arena(), glm::vec2(x, y), (float)radius, segments,
+		(float)thickness, color.to_color32(), 0.f);
+	int count = (int)g_recorder.get_transient_arena().get_i().size() - start;
+	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
+}
+
+void Canvas2d::triangle(float x0, float y0, float x1, float y1, float x2, float y2, lColor color) {
+	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
+	int start = (int)g_recorder.get_transient_arena().get_i().size();
+	Canvas2dGeometry::build_triangle(g_recorder.get_transient_arena(), {x0, y0}, {x1, y1}, {x2, y2}, color.to_color32(), 0.f);
+	int count = (int)g_recorder.get_transient_arena().get_i().size() - start;
+	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
+}
+
+void Canvas2d::quad(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, lColor color) {
+	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
+	int start = (int)g_recorder.get_transient_arena().get_i().size();
+	Canvas2dGeometry::build_quad(g_recorder.get_transient_arena(), {x0, y0}, {x1, y1}, {x2, y2}, {x3, y3}, color.to_color32(), 0.f);
+	int count = (int)g_recorder.get_transient_arena().get_i().size() - start;
+	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
+}
+
+void Canvas2d::gradient_rectangle(int x, int y, int w, int h, lColor top_left, lColor top_right, lColor bottom_right,
+																				  lColor bottom_left) {
+	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
+	int start = (int)g_recorder.get_transient_arena().get_i().size();
+	Canvas2dGeometry::build_gradient_rect(g_recorder.get_transient_arena(), {(float)x, (float)y}, {(float)w, (float)h},
+		top_left.to_color32(), top_right.to_color32(), bottom_right.to_color32(), bottom_left.to_color32(), 0.f);
+	int count = (int)g_recorder.get_transient_arena().get_i().size() - start;
+	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
+}
+
+void Canvas2d::rounded_rectangle(int x, int y, int w, int h, int radius, int corner_segments, lColor color) {
+	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
+	int start = (int)g_recorder.get_transient_arena().get_i().size();
+	Canvas2dGeometry::build_rounded_rect(g_recorder.get_transient_arena(), {(float)x, (float)y}, {(float)w, (float)h},
+		(float)radius, corner_segments, color.to_color32(), 0.f);
+	int count = (int)g_recorder.get_transient_arena().get_i().size() - start;
+	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
+}
+
+void Canvas2d::draw_nine_slice(int x, int y, int w, int h, Texture* tex, int left, int top, int right, int bottom,
+																				 lColor color) {
+	if (!tex)
+		return;
+	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
+	settings.texture = tex;
+	int start = (int)g_recorder.get_transient_arena().get_i().size();
+	Canvas2dGeometry::build_nine_slice(g_recorder.get_transient_arena(), {(float)x, (float)y}, {(float)w, (float)h},
+		tex->get_size(), {left, top, right, bottom}, color.to_color32(), 0.f);
+	int count = (int)g_recorder.get_transient_arena().get_i().size() - start;
+	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
+}
+
+void Canvas2d::draw_tiled_sprite(int x, int y, int w, int h, Texture* tex, int tile_w, int tile_h, lColor color) {
+	if (!tex)
+		return;
+	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
+	settings.texture = tex;
+	int start = (int)g_recorder.get_transient_arena().get_i().size();
+	Canvas2dGeometry::build_tiled_sprite(g_recorder.get_transient_arena(), {(float)x, (float)y}, {(float)w, (float)h},
+		{(float)tile_w, (float)tile_h}, color.to_color32(), 0.f);
+	int count = (int)g_recorder.get_transient_arena().get_i().size() - start;
+	g_recorder.submit(&g_recorder.get_transient_gpu_mesh(), start, count, settings, glm::mat4(1.f), false);
+}
+
 void Canvas2d::line(int x1, int y1, int x2, int y2, int thickness, lColor color) {
 	DrawSettings settings = make_default_settings(BlendState::BLEND, 0.f);
 	int start = (int)g_recorder.get_transient_arena().get_i().size();

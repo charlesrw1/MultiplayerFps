@@ -6,10 +6,8 @@
          builds as up-to-date and forces a full rebuild every time. -->
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
 
-    <!-- Hardcode SolutionDir to the canonical real path (no symlinks).
-         $(MSBuildThisFileDirectory) would inherit whichever path VS used to
-         open the file, so we pin the real path explicitly. -->
-    <SolutionDir>C:\Users\charl\source\repos\CsRemake\</SolutionDir>
+    <!-- Keep project files relocatable. Callers may still provide SolutionDir explicitly. -->
+    <SolutionDir Condition="'$(SolutionDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</SolutionDir>
 
     <!-- Match VS's default tool architecture. VS sets PreferredToolArchitecture=x64
          (uses 64-bit compiler host), but CLI MSBuild defaults to Native32Bit.

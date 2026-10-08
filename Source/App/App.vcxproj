@@ -113,6 +113,16 @@
     <VcpkgTriplet>x64-windows</VcpkgTriplet>
   </PropertyGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(CsGameRoot)'!=''">
+    <CsExternalGame>true</CsExternalGame>
+    <CsTargetKind Condition="'$(CsTargetKind)'==''">editor</CsTargetKind>
+    <CsGameName Condition="'$(CsGameName)'==''">Game</CsGameName>
+    <CsGameGeneratedDir>$(CsGameRoot)\Build\generated\</CsGameGeneratedDir>
+    <OutDir>$(CsGameRoot)\Build\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(CsGameRoot)\Build\intermediate\$(Platform)\$(Configuration)\$(CsTargetKind)\</IntDir>
+    <TargetName Condition="'$(CsTargetKind)'=='editor'">$(CsGameName)Editor</TargetName>
+    <TargetName Condition="'$(CsTargetKind)'!='editor'">$(CsGameName)</TargetName>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
@@ -185,16 +195,17 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;_DEBUG;_CONSOLE;EDITOR_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib;lua.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions Condition="'$(CsExternalGame)'!='true'">/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions Condition="'$(CsExternalGame)'=='true'">/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -203,10 +214,10 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;EDITOR_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -214,7 +225,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib;lua.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions Condition="'$(CsExternalGame)'!='true'">/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions Condition="'$(CsExternalGame)'=='true'">/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
@@ -225,8 +237,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(CsGameRoot)\Source;$(CsGameGeneratedDir);$(SolutionDir)Source\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -234,7 +246,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib;lua.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions Condition="'$(CsExternalGame)'!='true'">/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\MyGame.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions Condition="'$(CsExternalGame)'=='true'">/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\AssetTools.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\LevelEditor.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Render.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>
@@ -245,6 +258,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="$(CsGameRoot)\Source\**\*.cpp" Condition="'$(CsExternalGame)'=='true'" />
+    <ClCompile Include="$(CsGameGeneratedDir)ExternalGame.gen.cpp" Condition="'$(CsExternalGame)'=='true'" />
+    <ClInclude Include="$(CsGameRoot)\Source\**\*.h" Condition="'$(CsExternalGame)'=='true'" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Core.vcxproj">
@@ -258,8 +274,16 @@
       <Project>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</Project>
       <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
     </ProjectReference>
+    <ProjectReference Include="..\MyGame\MyGame.vcxproj" Condition="'$(CsExternalGame)'!='true'">
+      <Project>{9a6e5c2d-3f1b-4e7a-8c6d-2b4f1a9e5c3d}</Project>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="GenerateExternalGameCode" BeforeTargets="ClCompile" Condition="'$(CsExternalGame)'=='true'">
+    <MakeDir Directories="$(CsGameGeneratedDir)" />
+    <Exec Command="py &quot;$(SolutionDir)Scripts\external_game_codegen.py&quot; --engine-root &quot;$(SolutionDir).&quot; --game-root &quot;$(CsGameRoot)&quot; --output &quot;$(CsGameGeneratedDir).&quot;" WorkingDirectory="$(SolutionDir)" />
+  </Target>
 </Project>

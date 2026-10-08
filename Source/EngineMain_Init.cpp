@@ -80,6 +80,7 @@ extern ConfigVar g_application_class;
 extern ConfigVar developer_mode;
 extern ConfigVar g_startup_project;
 extern ConfigVar g_editor_cfg_folder;
+extern ConfigVar g_project_base;
 double GetTime();
 double TimeSinceStart();
 
@@ -109,7 +110,6 @@ void set_app_window_size(glm::ivec2 i) {
 // ---------------------------------------------------------------------------
 // SDL window creation
 // ---------------------------------------------------------------------------
-
 
 void GameEngineLocal::init_sdl_window() {
 	ASSERT(!window);
@@ -226,15 +226,11 @@ void GameEngineLocal::open_tool(string mapname, const CameraSnapshot* restore_ca
 		// invalidated before the deferred switch actually runs.
 		const bool has_cam = restore_cam != nullptr;
 		const CameraSnapshot cam_copy = has_cam ? *restore_cam : CameraSnapshot();
-		PopupTemplate::create_unsaved_changes_prompt(EditorPopupManager::inst, this->editor_tool.get(),
-													 [this, mapname, cam_copy, has_cam]() {
-														 Cmd_Manager::inst->append_cmd(
-															 std::make_unique<LambdaSystemCommand>(
-																 [this, mapname, cam_copy, has_cam]() {
-																	 do_open_tool(mapname,
-																				 has_cam ? &cam_copy : nullptr);
-																 }));
-													 });
+		PopupTemplate::create_unsaved_changes_prompt(
+			EditorPopupManager::inst, this->editor_tool.get(), [this, mapname, cam_copy, has_cam]() {
+				Cmd_Manager::inst->append_cmd(std::make_unique<LambdaSystemCommand>(
+					[this, mapname, cam_copy, has_cam]() { do_open_tool(mapname, has_cam ? &cam_copy : nullptr); }));
+			});
 		return;
 	}
 #endif
@@ -343,7 +339,14 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	this->argv = argv;
 	this->m_is_editor_app = options.editor_mode;
 
-	FileSys::init();
+	std::string engine_root;
+	for (int i = 1; i + 1 < argc; ++i) {
+		if (std::string(argv[i]) == "--engine-root") {
+			engine_root = argv[i + 1];
+			break;
+		}
+	}
+	FileSys::init(engine_root);
 
 	// log_file/dumps live under Logs/ (see EngineMain.h) — must exist before the Logger opens
 	// its file below.
@@ -383,17 +386,18 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	Cmd_Manager::inst->set_set_unknown_variables(true);
 	if (!options.vars_section.empty())
 		Cmd_Manager::inst->execute_file_section(Cmd_Execute_Mode::NOW, options.vars_file.c_str(),
-											   options.vars_section.c_str());
+												options.vars_section.c_str());
 	else
 		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, options.vars_file.c_str());
 	print_time("execute vars file");
+	FileSys::set_engine_asset_root(g_project_base.get_string());
 
 	// Project .ini is always applied on top of vars_file, never for --tests runs (those stay
 	// self-contained in the game_test/editor_test sections). --project on the CLI wins over the
 	// `startup_project` cvar that vars_file just set.
 	if (!options.pending_test_runnner) {
-		const std::string project_file = resolve_project_ini(
-			!options.project_file.empty() ? options.project_file : g_startup_project.get_string());
+		const std::string project_file =
+			resolve_project_ini(!options.project_file.empty() ? options.project_file : g_startup_project.get_string());
 		if (!project_file.empty())
 			Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, project_file.c_str());
 		print_time("execute project file");
@@ -416,13 +420,17 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	};
 	for (; i < argc; i++) {
 		if (strcmp(argv[i], "-x") == 0) {
-			if (needs_value("-x")) startx = atoi(argv[++i]);
+			if (needs_value("-x"))
+				startx = atoi(argv[++i]);
 		} else if (strcmp(argv[i], "-y") == 0) {
-			if (needs_value("-y")) starty = atoi(argv[++i]);
+			if (needs_value("-y"))
+				starty = atoi(argv[++i]);
 		} else if (strcmp(argv[i], "-w") == 0) {
-			if (needs_value("-w")) g_window_w.set_integer(atoi(argv[++i]));
+			if (needs_value("-w"))
+				g_window_w.set_integer(atoi(argv[++i]));
 		} else if (strcmp(argv[i], "-h") == 0) {
-			if (needs_value("-h")) g_window_h.set_integer(atoi(argv[++i]));
+			if (needs_value("-h"))
+				g_window_h.set_integer(atoi(argv[++i]));
 		} else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
 			const char* projName = g_project_name.get_string();
 			SDL_SetWindowTitle(window, string_format("%s - VISUAL STUDIO\n", projName));
@@ -485,9 +493,8 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	ImGui::SetCurrentContext(imgui_context);
 	// io.IniFilename is stored as a raw pointer (not copied), so this needs to outlive the
 	// context; static is fine since there's exactly one imgui context for the app's lifetime.
-	static const std::string imgui_ini_path =
-		FileSys::get_full_path_from_relative(std::string(g_editor_cfg_folder.get_string()) + "/imgui.ini",
-											 FileSys::ENGINE_DIR);
+	static const std::string imgui_ini_path = FileSys::get_full_path_from_relative(
+		std::string(g_editor_cfg_folder.get_string()) + "/imgui.ini", FileSys::ENGINE_DIR);
 	ImGui::GetIO().IniFilename = imgui_ini_path.c_str();
 	gfx().imgui_init();
 	print_time("imgui init");
@@ -520,7 +527,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	build_imgui_fonts();
 	{
 		auto& flist = *ImGui::GetIO().Fonts;
-		g_prop_bold_font    = flist.Fonts.Size > 0 ? flist.Fonts[0] : nullptr; // inconsolata bold 14pt — group headers
+		g_prop_bold_font = flist.Fonts.Size > 0 ? flist.Fonts[0] : nullptr; // inconsolata bold 14pt — group headers
 		g_prop_regular_font = flist.Fonts.Size > 4 ? flist.Fonts[4] : nullptr; // consolas 12pt — property labels
 	}
 	apply_editor_dark_theme();
@@ -589,5 +596,4 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	print_time("load default bundle");
 
 	sys_print(Info, "execute startup in %f\n", (float)TimeSinceStart());
-
 }

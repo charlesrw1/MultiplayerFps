@@ -1,32 +1,32 @@
 {
   "bake_nav": {
     "description": "bakes all navmesh volumes for the current level. Does not save to disk - follow with save_baked_nav to persist.",
-    "source": "Source/EngineMain_Commands.cpp:237",
+    "source": "Source/EngineMain_Commands.cpp:236",
     "usage": ""
   },
   "bake_probes": {
     "description": "bakes all static GI cubemap probes for the current level. Does not save to disk - follow with save_baked_gi to persist.",
-    "source": "Source/EngineMain_Commands.cpp:226",
+    "source": "Source/EngineMain_Commands.cpp:225",
     "usage": ""
   },
   "create-map": {
     "description": "creates a new empty .tmap at a game-relative path. Fails if the file already exists.",
-    "source": "Source/EngineMain_Commands.cpp:295",
+    "source": "Source/EngineMain_Commands.cpp:294",
     "usage": "create-map <game-relative path, e.g. \"maps/foo.tmap\">"
   },
   "exec": {
     "description": "runs every line of a text file as a console command, immediately (before the next queued command). Same file lookup convention as EngineVars.ini/init.txt.",
-    "source": "Source/EngineMain_Commands.cpp:283",
+    "source": "Source/EngineMain_Commands.cpp:282",
     "usage": "exec <filename>"
   },
   "open-editor": {
     "description": "opens (or switches to) the level editor tool, optionally loading a map. Requires the process to have been launched with --editor; a no-op error otherwise.",
-    "source": "Source/EngineMain_Commands.cpp:308",
+    "source": "Source/EngineMain_Commands.cpp:307",
     "usage": "open-editor [game-relative .tmap/.tprefab path, omit for an empty scene]"
   },
   "quit": {
     "description": "exits the process immediately.",
-    "source": "Source/EngineMain_Commands.cpp:291",
+    "source": "Source/EngineMain_Commands.cpp:290",
     "usage": ""
   }
 }

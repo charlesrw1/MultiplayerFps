@@ -3,6 +3,8 @@
 #include "UI/FontAsset.h"
 #include "Render/Texture.h"
 #include <glm/gtc/constants.hpp>
+#include <algorithm>
+#include <vector>
 
 namespace {
 void get_glyph_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int h, const FontAsset* f) {
@@ -125,6 +127,42 @@ void Canvas2dGeometry::build_quad_textured(MeshBuilder& mb, glm::vec2 p0, glm::v
 	mb.AddQuad(start, start + 1, start + 2, start + 3);
 }
 
+void Canvas2dGeometry::build_gradient_rect(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, Color32 top_left,
+																Color32 top_right, Color32 bottom_right, Color32 bottom_left, float z) {
+	const int start = mb.GetBaseVertex();
+	const glm::vec2 positions[] = {pos, {pos.x + size.x, pos.y}, pos + size, {pos.x, pos.y + size.y}};
+	const Color32 colors[] = {top_left, top_right, bottom_right, bottom_left};
+	for (int i = 0; i < 4; ++i)
+		mb.AddVertex(MbVertex(glm::vec3(positions[i], z), colors[i]));
+	mb.AddQuad(start, start + 1, start + 2, start + 3);
+}
+
+void Canvas2dGeometry::build_textured_polygon(MeshBuilder& mb, std::span<const glm::vec2> points,
+																						 std::span<const glm::vec2> uvs, Color32 color, float z) {
+	if (points.size() < 3 || points.size() != uvs.size())
+		return;
+	const int base = mb.GetBaseVertex();
+	for (size_t i = 0; i < points.size(); ++i) {
+		MbVertex v(glm::vec3(points[i], z), color);
+		v.uv = uvs[i];
+		mb.AddVertex(v);
+	}
+	for (size_t i = 1; i + 1 < points.size(); ++i)
+		mb.AddTriangle(base, base + (int)i, base + (int)i + 1);
+}
+
+void Canvas2dGeometry::build_mesh(MeshBuilder& mb, std::span<const MbVertex> vertices, std::span<const uint32_t> indices,
+																 glm::mat4 transform) {
+	const int base = mb.GetBaseVertex();
+	for (MbVertex v : vertices) {
+		v.position = glm::vec3(transform * glm::vec4(v.position, 1.f));
+		mb.AddVertex(v);
+	}
+	for (size_t i = 0; i + 2 < indices.size(); i += 3)
+		if (indices[i] < vertices.size() && indices[i + 1] < vertices.size() && indices[i + 2] < vertices.size())
+			mb.AddTriangle(base + (int)indices[i], base + (int)indices[i + 1], base + (int)indices[i + 2]);
+}
+
 void Canvas2dGeometry::build_circle(MeshBuilder& mb, glm::vec2 center, float radius, int segments, Color32 color,
 									 float z) {
 	if (segments <= 0)
@@ -168,7 +206,11 @@ void Canvas2dGeometry::build_line(MeshBuilder& mb, glm::vec2 start, glm::vec2 en
 }
 
 void Canvas2dGeometry::build_line_strip(MeshBuilder& mb, std::span<const glm::vec2> points, float thickness,
-										 Color32 color, bool closed, float z) {
+										 Color32 color, bool closed, float z, CanvasLineCap cap,
+										 CanvasLineJoin join, int round_segments) {
+	(void)cap;
+	(void)join;
+	(void)round_segments;
 	if (points.size() < 2)
 		return;
 	for (size_t i = 0; i + 1 < points.size(); i++)
@@ -197,4 +239,55 @@ void Canvas2dGeometry::build_rect_outline(MeshBuilder& mb, glm::vec2 pos, glm::v
 	build_line(mb, glm::vec2(pos.x, pos.y + size.y), pos + size, thickness, color, z);
 	build_line(mb, pos, glm::vec2(pos.x, pos.y + size.y), thickness, color, z);
 	build_line(mb, glm::vec2(pos.x + size.x, pos.y), pos + size, thickness, color, z);
+}
+
+void Canvas2dGeometry::build_rounded_rect(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, float radius,
+																int corner_segments, Color32 color, float z) {
+	if (size.x <= 0.f || size.y <= 0.f)
+		return;
+	radius = std::clamp(radius, 0.f, glm::min(size.x, size.y) * 0.5f);
+	corner_segments = glm::max(corner_segments, 1);
+	if (radius == 0.f) {
+		build_sprite(mb, pos, size, {0.f, 0.f}, {1.f, 1.f}, color, z);
+		return;
+	}
+	std::vector<glm::vec2> points;
+	points.reserve((size_t)corner_segments * 4);
+	const glm::vec2 centers[] = {{pos.x + size.x - radius, pos.y + radius},
+		{pos.x + size.x - radius, pos.y + size.y - radius}, {pos.x + radius, pos.y + size.y - radius},
+		{pos.x + radius, pos.y + radius}};
+	for (int corner = 0; corner < 4; ++corner)
+		for (int i = 0; i <= corner_segments; ++i) {
+			const float angle = (-glm::half_pi<float>()) + corner * glm::half_pi<float>() +
+				(glm::half_pi<float>() * i / corner_segments);
+			points.push_back(centers[corner] + radius * glm::vec2(cos(angle), sin(angle)));
+		}
+	build_polygon(mb, points, color, z);
+}
+
+void Canvas2dGeometry::build_nine_slice(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, glm::ivec2 texture_size,
+															 glm::ivec4 borders, Color32 color, float z) {
+	if (texture_size.x <= 0 || texture_size.y <= 0 || size.x <= 0.f || size.y <= 0.f)
+		return;
+	const float left = glm::min((float)borders.x, size.x), right = glm::min((float)borders.z, size.x - left);
+	const float top = glm::min((float)borders.y, size.y), bottom = glm::min((float)borders.w, size.y - top);
+	const float xs[] = {0.f, left, size.x - right, size.x};
+	const float ys[] = {0.f, top, size.y - bottom, size.y};
+	const float us[] = {0.f, (float)borders.x / texture_size.x, 1.f - (float)borders.z / texture_size.x, 1.f};
+	const float vs[] = {0.f, (float)borders.y / texture_size.y, 1.f - (float)borders.w / texture_size.y, 1.f};
+	for (int y = 0; y < 3; ++y)
+		for (int x = 0; x < 3; ++x)
+			build_sprite(mb, pos + glm::vec2(xs[x], ys[y]), glm::vec2(xs[x + 1] - xs[x], ys[y + 1] - ys[y]),
+						 glm::vec2(us[x], vs[y]), glm::vec2(us[x + 1] - us[x], vs[y + 1] - vs[y]), color, z);
+}
+
+void Canvas2dGeometry::build_tiled_sprite(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, glm::vec2 tile_size,
+																Color32 color, float z) {
+	if (size.x <= 0.f || size.y <= 0.f || tile_size.x <= 0.f || tile_size.y <= 0.f)
+		return;
+	for (float y = 0.f; y < size.y; y += tile_size.y)
+		for (float x = 0.f; x < size.x; x += tile_size.x) {
+			const glm::vec2 tile(glm::min(tile_size.x, size.x - x), glm::min(tile_size.y, size.y - y));
+			build_sprite(mb, pos + glm::vec2(x, y), tile, {0.f, 0.f}, tile / tile_size, color, z);
+		}
 }

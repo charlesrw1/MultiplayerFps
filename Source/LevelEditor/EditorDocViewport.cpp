@@ -145,8 +145,7 @@ void EditorDoc::imgui_draw() {
 		// Usually a typo or a stale field from an older version of the component.
 		const int nf = (int)level->unknown_field_warnings.size();
 		if (nf > 0) {
-			std::string warn = "Map has " + std::to_string(nf) +
-							   " unknown field(s) — see Commands > Unknown Fields";
+			std::string warn = "Map has " + std::to_string(nf) + " unknown field(s) — see Commands > Unknown Fields";
 			draw_text(warn.c_str());
 		}
 		// No skylight means indirect lighting/reflections fall back to a flat 0.1 constant ambient
@@ -195,25 +194,25 @@ void EditorDoc::imgui_draw() {
 void EditorDoc::hook_pre_scene_viewport_draw() {
 	ASSERT(manipulate);
 	auto get_icon = [](std::string str) -> ImTextureID {
-		return ImTextureID(
-			uint64_t(g_assets.find<Texture>("eng/editor/" + str).get()->get_internal_render_handle()));
+		return ImTextureID(uint64_t(g_assets.find<Texture>("eng/editor/" + str).get()->get_internal_render_handle()));
 	};
 
-	if (!ImGui::BeginMenuBar()) return;
+	if (!ImGui::BeginMenuBar())
+		return;
 
 	// Sizes and shared style — icon_sz must match actual texture size to avoid bilinear blur
 	const ImVec2 icon_sz(16, 16);
 	const int icon_pad = -1;
-	const ImVec4 col_active   = ImGui::GetStyle().Colors[ImGuiCol_Header];
-	const ImVec4 col_hov_act  = ImGui::GetStyle().Colors[ImGuiCol_HeaderHovered];
+	const ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_Header];
+	const ImVec4 col_hov_act = ImGui::GetStyle().Colors[ImGuiCol_HeaderHovered];
 	const ImVec4 col_inactive = ImVec4(0, 0, 0, 0);
-	const ImVec4 col_hov      = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
+	const ImVec4 col_hov = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
 
 	// Helper: styled icon button with tooltip.  Returns true when clicked.
 	auto toolbar_btn = [&](ImTextureID icon, bool active, const char* tip, const char* shortcut = nullptr) -> bool {
-		ImGui::PushStyleColor(ImGuiCol_Button,        active ? col_active   : col_inactive);
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active ? col_hov_act  : col_hov);
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+		ImGui::PushStyleColor(ImGuiCol_Button, active ? col_active : col_inactive);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active ? col_hov_act : col_hov);
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
 		bool clicked = ImGui::ImageButton(icon, icon_sz, ImVec2(0, 0), ImVec2(1, 1), icon_pad);
 		ImGui::PopStyleColor(3);
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
@@ -231,39 +230,40 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 	// -- Gizmo mode -------------------------------------------------------
 	auto optype = manipulate->get_operation_type();
 
-	if (toolbar_btn(get_icon("cursor.png"),    optype == 0,                    "Select",    "Q"))
+	if (toolbar_btn(get_icon("cursor.png"), optype == 0, "Select", "Q"))
 		manipulate->set_operation_type({});
-	if (toolbar_btn(get_icon("translate.png"), optype == ImGuizmo::TRANSLATE,  "Translate", "W"))
+	if (toolbar_btn(get_icon("translate.png"), optype == ImGuizmo::TRANSLATE, "Translate", "W"))
 		manipulate->set_operation_type(ImGuizmo::TRANSLATE);
-	if (toolbar_btn(get_icon("rotate.png"),    optype == ImGuizmo::ROTATE,     "Rotate",    "E"))
+	if (toolbar_btn(get_icon("rotate.png"), optype == ImGuizmo::ROTATE, "Rotate", "E"))
 		manipulate->set_operation_type(ImGuizmo::ROTATE);
-	if (toolbar_btn(get_icon("scale.png"),     optype == ImGuizmo::SCALE,      "Scale",     "R"))
+	if (toolbar_btn(get_icon("scale.png"), optype == ImGuizmo::SCALE, "Scale", "R"))
 		manipulate->set_operation_type(ImGuizmo::SCALE);
 
 	ImGui::Separator();
 
 	// -- Snapping ---------------------------------------------------------
 	const bool snap_on = ed_has_snap.get_bool();
-	if (toolbar_btn(snap_on ? get_icon("magnet_on.png") : get_icon("magnet_off.png"),
-	                snap_on, "Snap to Grid", "Ctrl"))
+	if (toolbar_btn(snap_on ? get_icon("magnet_on.png") : get_icon("magnet_off.png"), snap_on, "Snap to Grid", "Ctrl"))
 		ed_has_snap.set_bool(!snap_on);
 
 	ImGui::SameLine(0, 0);
-	ImGui::PushStyleColor(ImGuiCol_Button,        snap_on ? col_active   : col_inactive);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, snap_on ? col_hov_act  : col_hov);
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+	ImGui::PushStyleColor(ImGuiCol_Button, snap_on ? col_active : col_inactive);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, snap_on ? col_hov_act : col_hov);
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3, 3));
 	const bool snap_dd_clicked = ImGui::ArrowButton("##snap_dd", ImGuiDir_Down);
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor(3);
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-		ImGui::BeginTooltip(); ImGui::TextUnformatted("Snap Settings"); ImGui::EndTooltip();
+		ImGui::BeginTooltip();
+		ImGui::TextUnformatted("Snap Settings");
+		ImGui::EndTooltip();
 	}
 
 	// -- Coordinate space -------------------------------------------------
 	const bool is_local = manipulate->get_mode() == ImGuizmo::MODE::LOCAL;
-	if (toolbar_btn(is_local ? get_icon("local_coord.png") : get_icon("global_coord.png"),
-	                false, is_local ? "Local Space (click for World)" : "World Space (click for Local)"))
+	if (toolbar_btn(is_local ? get_icon("local_coord.png") : get_icon("global_coord.png"), false,
+					is_local ? "Local Space (click for World)" : "World Space (click for Local)"))
 		manipulate->set_mode(is_local ? ImGuizmo::MODE::WORLD : ImGuizmo::MODE::LOCAL);
 
 	ImGui::Separator();
@@ -275,52 +275,63 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 		ed_show_box_handles.set_integer((box_handle_mode + 1) % 3);
 
 	const bool show_text = editor_draw_name_text.get_bool();
-	if (toolbar_btn(show_text ? get_icon("show_text_on.png") : get_icon("show_text_off.png"),
-	                show_text, "Show Entity Labels"))
+	if (toolbar_btn(show_text ? get_icon("show_text_on.png") : get_icon("show_text_off.png"), show_text,
+					"Show Entity Labels"))
 		editor_draw_name_text.set_bool(!show_text);
 
 	ImGui::Separator();
 
 	// -- Debug view dropdown (stays open so you can cycle modes) ----------
-	struct DebugMode { const char* name; int mode; };
+	struct DebugMode
+	{
+		const char* name;
+		int mode;
+	};
 	static const DebugMode debug_modes[] = {
-		{"Lit",           0},  {"Wireframe",      4},  {"Albedo",        5},
-		{"Normals",       1},  {"AO",             3},  {"Diffuse Light", 6},
-		{"Specular Light",7},  {"Lighting Only",  9},  {"Overdraw",     12},
-		{"Lightmap UV",  10},  {"Object ID",      8},  {"Material ID",   2},
-		{"Draw ID",      11},  {"Outlined",      100},
+		{"Lit", 0},			  {"Wireframe", 4},		 {"Albedo", 5},		   {"Normals", 1},	  {"AO", 3},
+		{"Diffuse Light", 6}, {"Specular Light", 7}, {"Lighting Only", 9}, {"Overdraw", 12},  {"Lightmap UV", 10},
+		{"Object ID", 8},	  {"Material ID", 2},	 {"Draw ID", 11},	   {"Outlined", 100},
 	};
 	const int cur_dbg = r_debug_mode.get_integer();
 	const char* view_label = "Lit";
-	for (auto& m : debug_modes) if (m.mode == cur_dbg) { view_label = m.name; break; }
+	for (auto& m : debug_modes)
+		if (m.mode == cur_dbg) {
+			view_label = m.name;
+			break;
+		}
 
 	const bool dbg_active = cur_dbg != 0;
-	ImGui::PushStyleColor(ImGuiCol_Button,        dbg_active ? col_active   : col_inactive);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, dbg_active ? col_hov_act  : col_hov);
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+	ImGui::PushStyleColor(ImGuiCol_Button, dbg_active ? col_active : col_inactive);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, dbg_active ? col_hov_act : col_hov);
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
 	const bool dbg_btn_clicked = ImGui::Button(view_label);
 	ImGui::PopStyleColor(3);
 
 	ImGui::Separator();
 
 	// -- Overlay texture dropdown (ot command) ----------------------------
-	struct OtEntry { const char* label; const char* tex; bool has_mip; };
+	struct OtEntry
+	{
+		const char* label;
+		const char* tex;
+		bool has_mip;
+	};
 	static const OtEntry ot_list[] = {
-		{"Scene Color",      "_scene_color",          false},
-		{"Scene Depth",      "_scene_depth",          false},
-		{"GBuffer 0",        "_gbuffer0",             false},
-		{"GBuffer 1",        "_gbuffer1",             false},
-		{"GBuffer 2",        "_gbuffer2",             false},
-		{"SSAO",             "_ssao_result",          false},
-		{"SSAO Blur",        "_ssao_blur",            false},
-		{"Linear Depth",     "_linear_depth",         false},
-		{"CSM Shadow",       "_csm_shadow",           true },
-		{"Spot Shadows",     "_spto_shadow",          false},
-		{"Bloom",            "_bloom_result",         false},
-		{"Velocity",         "_scene_motion",         false},
-		{"SSR",              "_ssr",                  false},
-		{"DDGI Accum",       "_ddgi_accum",           false},
-		{"Scene Mip Chain",  "_scene_color_mipchain", true },
+		{"Scene Color", "_scene_color", false},
+		{"Scene Depth", "_scene_depth", false},
+		{"GBuffer 0", "_gbuffer0", false},
+		{"GBuffer 1", "_gbuffer1", false},
+		{"GBuffer 2", "_gbuffer2", false},
+		{"SSAO", "_ssao_result", false},
+		{"SSAO Blur", "_ssao_blur", false},
+		{"Linear Depth", "_linear_depth", false},
+		{"CSM Shadow", "_csm_shadow", true},
+		{"Spot Shadows", "_spto_shadow", false},
+		{"Bloom", "_bloom_result", false},
+		{"Velocity", "_scene_motion", false},
+		{"SSR", "_ssr", false},
+		{"DDGI Accum", "_ddgi_accum", false},
+		{"Scene Mip Chain", "_scene_color_mipchain", true},
 	};
 
 	const auto ov = idraw->editor_get_debug_overlay_state();
@@ -329,12 +340,15 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 	if (ot_active) {
 		ot_btn_label = ov.active_tex;
 		for (auto& o : ot_list)
-			if (strcmp(o.tex, ov.active_tex) == 0) { ot_btn_label = o.label; break; }
+			if (strcmp(o.tex, ov.active_tex) == 0) {
+				ot_btn_label = o.label;
+				break;
+			}
 	}
 
-	ImGui::PushStyleColor(ImGuiCol_Button,        ot_active ? col_active   : col_inactive);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ot_active ? col_hov_act  : col_hov);
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+	ImGui::PushStyleColor(ImGuiCol_Button, ot_active ? col_active : col_inactive);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ot_active ? col_hov_act : col_hov);
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
 	const bool ot_btn_clicked = ImGui::Button(ot_btn_label);
 	ImGui::PopStyleColor(3);
 
@@ -342,9 +356,12 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 
 	// OpenPopup must be called outside BeginMenuBar()/EndMenuBar() so it shares
 	// the same window ID namespace as the BeginPopup() calls below.
-	if (snap_dd_clicked) ImGui::OpenPopup("##snap_settings");
-	if (dbg_btn_clicked) ImGui::OpenPopup("##dbg_view");
-	if (ot_btn_clicked)  ImGui::OpenPopup("##ot_view");
+	if (snap_dd_clicked)
+		ImGui::OpenPopup("##snap_settings");
+	if (dbg_btn_clicked)
+		ImGui::OpenPopup("##dbg_view");
+	if (ot_btn_clicked)
+		ImGui::OpenPopup("##ot_view");
 
 	// Ctrl+P / Alt+P parenting popups (opened via flags from check_inputs so they share this
 	// window's ID namespace, same as the popups above).
@@ -359,28 +376,33 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 			ImGui::TextUnformatted(label);
 			ImGui::SameLine(110.f);
 			ImGui::PushID(label);
-			if (ImGui::SmallButton("/2")) cvar.set_float(glm::clamp(val * 0.5f, min_val, max_val));
+			if (ImGui::SmallButton("/2"))
+				cvar.set_float(glm::clamp(val * 0.5f, min_val, max_val));
 			ImGui::SameLine();
-			char buf[32]; snprintf(buf, sizeof(buf), fmt, val);
+			char buf[32];
+			snprintf(buf, sizeof(buf), fmt, val);
 			ImGui::SetNextItemWidth(70.f);
 			if (ImGui::InputText("##v", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
 				float parsed = (float)atof(buf);
-				if (parsed > 0.f) cvar.set_float(glm::clamp(parsed, min_val, max_val));
+				if (parsed > 0.f)
+					cvar.set_float(glm::clamp(parsed, min_val, max_val));
 			}
 			ImGui::SameLine();
-			if (ImGui::SmallButton("x2")) cvar.set_float(glm::clamp(val * 2.0f, min_val, max_val));
+			if (ImGui::SmallButton("x2"))
+				cvar.set_float(glm::clamp(val * 2.0f, min_val, max_val));
 			ImGui::PopID();
 		};
 
-		snap_row("Translation",  ed_translation_snap, 0.05f, 128.f,  "%.4g");
-		snap_row("Rotation (°)", ed_rotation_snap,    1.0f,  180.f,  "%.4g");
-		snap_row("Scale",        ed_scale_snap,        0.05f, 64.f,   "%.4g");
+		snap_row("Translation", ed_translation_snap, 0.05f, 128.f, "%.4g");
+		snap_row("Rotation (°)", ed_rotation_snap, 1.0f, 180.f, "%.4g");
+		snap_row("Scale", ed_scale_snap, 0.05f, 64.f, "%.4g");
 		ImGui::EndPopup();
 	}
 
 	if (ImGui::BeginPopup("##dbg_view")) {
-		for (int i = 0; i < (int)(sizeof(debug_modes)/sizeof(debug_modes[0])); i++) {
-			if (i == 1) ImGui::Separator(); // separator after "Lit"
+		for (int i = 0; i < (int)(sizeof(debug_modes) / sizeof(debug_modes[0])); i++) {
+			if (i == 1)
+				ImGui::Separator(); // separator after "Lit"
 			auto& m = debug_modes[i];
 			bool sel = r_debug_mode.get_integer() == m.mode;
 			if (ImGui::Selectable(m.name, sel, ImGuiSelectableFlags_DontClosePopups))
@@ -397,16 +419,22 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 		bool cur_has_mip = false;
 		if (ov2.active_tex)
 			for (auto& o : ot_list)
-				if (strcmp(o.tex, ov2.active_tex) == 0) { cur_has_mip = o.has_mip; break; }
+				if (strcmp(o.tex, ov2.active_tex) == 0) {
+					cur_has_mip = o.has_mip;
+					break;
+				}
 
 		bool params_changed = false;
 		ImGui::SetNextItemWidth(180.f);
-		if (ImGui::SliderFloat("Scale", &s_ot_scale, 0.1f, 4.f)) params_changed = true;
+		if (ImGui::SliderFloat("Scale", &s_ot_scale, 0.1f, 4.f))
+			params_changed = true;
 		ImGui::SetNextItemWidth(180.f);
-		if (ImGui::SliderFloat("Alpha", &s_ot_alpha, 0.f,  1.f)) params_changed = true;
+		if (ImGui::SliderFloat("Alpha", &s_ot_alpha, 0.f, 1.f))
+			params_changed = true;
 		if (cur_has_mip) {
 			ImGui::SetNextItemWidth(180.f);
-			if (ImGui::SliderFloat("Mip / Slice", &s_ot_mip, 0.f, 7.f)) params_changed = true;
+			if (ImGui::SliderFloat("Mip / Slice", &s_ot_mip, 0.f, 7.f))
+				params_changed = true;
 		}
 		if (params_changed && ov2.active_tex)
 			idraw->editor_set_debug_overlay(ov2.active_tex, s_ot_scale, s_ot_alpha, s_ot_mip);
@@ -421,7 +449,9 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 		for (auto& o : ot_list) {
 			const bool sel = ov2.active_tex && strcmp(o.tex, ov2.active_tex) == 0;
 			if (ImGui::Selectable(o.label, sel, ImGuiSelectableFlags_DontClosePopups)) {
-				s_ot_scale = 1.f; s_ot_alpha = 1.f; s_ot_mip = 0.f;
+				s_ot_scale = 1.f;
+				s_ot_alpha = 1.f;
+				s_ot_mip = 0.f;
 				idraw->editor_set_debug_overlay(o.tex, s_ot_scale, s_ot_alpha, s_ot_mip);
 			}
 		}
@@ -486,8 +516,7 @@ void EditorDoc::draw_parenting_popups() {
 					const char* label = bone.strname.empty() ? bone.name.get_c_str() : bone.strname.c_str();
 					if (!label)
 						label = "<bone>";
-					if (!filter_lower.empty() &&
-						StringUtils::to_lower(label).find(filter_lower) == std::string::npos)
+					if (!filter_lower.empty() && StringUtils::to_lower(label).find(filter_lower) == std::string::npos)
 						continue;
 					if (ImGui::Selectable(label)) {
 						command_mgr->add_command(
@@ -553,7 +582,8 @@ void EditorDoc::draw_recent_switcher_popup() {
 			ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
 			for (int slot = 1; slot <= count; ++slot) {
 				auto entry = g_editor_recents.at_slot(slot);
-				if (!entry) continue;
+				if (!entry)
+					continue;
 				const bool is_sel = (slot - 1) == recent_switcher_index;
 				if (ImGui::Selectable(entry->path.c_str(), is_sel))
 					confirm_recent_switcher();
@@ -633,7 +663,8 @@ void EditorDoc::hook_scene_viewport_draw() {
 // Game/EditorAddMenu.h) and draws it as nested ImGui submenus, e.g. "NPCs/Enemy" becomes a "NPCs"
 // submenu containing an "Enemy" item.
 namespace {
-struct AddMenuNode {
+struct AddMenuNode
+{
 	std::string name;
 	std::vector<AddMenuNode> children;
 	const EditorAddMenuEntry* leaf = nullptr;
@@ -671,7 +702,7 @@ void draw_add_menu_node(const AddMenuNode& node, EditorDoc& doc, const glm::mat4
 		if (child.leaf) {
 			if (ImGui::MenuItem(child.name.c_str()))
 				doc.command_mgr->add_command(new CreateCppClassCommand(doc, child.leaf->classname, transform,
-																		 EntityPtr(), child.leaf->is_component));
+																	   EntityPtr(), child.leaf->is_component));
 		} else if (ImGui::BeginMenu(child.name.c_str())) {
 			draw_add_menu_node(child, doc, transform);
 			ImGui::EndMenu();
@@ -709,7 +740,7 @@ void EditorDoc::draw_scene_context_menu() {
 		const ImVec2 wsize = ImGui::GetWindowSize();
 		const ImVec2 mouse = ImGui::GetMousePos();
 		const bool outside = mouse.x < wpos.x - close_margin_px || mouse.x > wpos.x + wsize.x + close_margin_px ||
-							  mouse.y < wpos.y - close_margin_px || mouse.y > wpos.y + wsize.y + close_margin_px;
+							 mouse.y < wpos.y - close_margin_px || mouse.y > wpos.y + wsize.y + close_margin_px;
 		if (outside && !scene_ctx_menu_has_open_submenu) {
 			ImGui::CloseCurrentPopup();
 			ImGui::EndPopup();
@@ -789,8 +820,8 @@ void EditorDoc::draw_scene_context_menu() {
 		auto selected = selection_state->get_selection_as_vector();
 		if (ImGui::MenuItem("Make Prefab Using...", nullptr, false, !selected.empty() && !is_editing_prefab())) {
 			std::string folder = AssetBrowser::inst ? AssetBrowser::inst->selected_folder : std::string();
-			make_prefab_path_popup.open("Make Prefab Using...", folder, "new_prefab", ".tprefab",
-				[this, selected](const std::string& path) {
+			make_prefab_path_popup.open(
+				"Make Prefab Using...", folder, "new_prefab", ".tprefab", [this, selected](const std::string& path) {
 					command_mgr->add_command(new MakePrefabAndReplaceCommand(*this, selected, path));
 				});
 		}
@@ -808,13 +839,20 @@ void EditorDoc::draw_scene_context_menu() {
 				new CreateCppClassCommand(*this, classname, scene_context_menu_transform, EntityPtr(), true));
 		};
 
-		if (ImGui::MenuItem("Point Light"))     spawn_component("PointLightComponent");
-		if (ImGui::MenuItem("Spot Light"))      spawn_component("SpotLightComponent");
-		if (ImGui::MenuItem("Particle System")) spawn_component("ParticleSystemComponent");
-		if (ImGui::MenuItem("GI Volume"))       spawn_component("GiVolumeComponent");
-		if (ImGui::MenuItem("Cubemap Volume"))  spawn_component("CubemapComponent");
-		if (ImGui::MenuItem("Mesh"))            spawn_component("MeshComponent");
-		if (ImGui::MenuItem("Audio Player"))    spawn_component("SoundComponent");
+		if (ImGui::MenuItem("Point Light"))
+			spawn_component("PointLightComponent");
+		if (ImGui::MenuItem("Spot Light"))
+			spawn_component("SpotLightComponent");
+		if (ImGui::MenuItem("Particle System"))
+			spawn_component("ParticleSystemComponent");
+		if (ImGui::MenuItem("GI Volume"))
+			spawn_component("GiVolumeComponent");
+		if (ImGui::MenuItem("Cubemap Volume"))
+			spawn_component("CubemapComponent");
+		if (ImGui::MenuItem("Mesh"))
+			spawn_component("MeshComponent");
+		if (ImGui::MenuItem("Audio Player"))
+			spawn_component("SoundComponent");
 
 		const auto& registered = EditorAddMenuRegistry::get().get_entries();
 		if (!registered.empty()) {
@@ -1022,9 +1060,6 @@ void EditorDoc::hook_menu_bar() {
 		if (ImGui::MenuItem("Decal Stamp", nullptr, active_mode == stamp_tool.get())) {
 			active_mode = stamp_tool.get();
 		}
-		if (ImGui::MenuItem("Road Builder", nullptr, active_mode == road_tool.get())) {
-			active_mode = road_tool.get();
-		}
 		ImGui::EndMenu();
 	}
 }
@@ -1040,7 +1075,8 @@ void EditorDoc::hook_menu_bar_file_menu() {
 		} else {
 			for (int slot = 1; slot <= count; ++slot) {
 				auto entry = g_editor_recents.at_slot(slot);
-				if (!entry) continue;
+				if (!entry)
+					continue;
 				// imgui-time tear-down of the editor doc isn't safe; defer the
 				// open through the command buffer (same pattern as AssetBrowser
 				// double-click). Camera restore happens inside the `recent` handler.

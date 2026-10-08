@@ -460,6 +460,7 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float steer_lookahead_m = glm::max(p.steer_lookahead_m, speed * p.steer_lookahead_time_s);
 	const BikeWaypoint wp_ahead   = course->sample(my_bike->course_dist_m + steer_lookahead_m);
 
+
 	const float manual_offset_term = my_bike->manual_lateral_offset * offset_blend;
 
 	const float lat_limit = glm::max(wp_ahead.road_half_width - p.edge_safety_m, 0.1f);

@@ -66,6 +66,13 @@ public:
 	REF virtual void on_post_material_load(MaterialInstance* asset) {}
 };
 
+class DefaultGameApplication : public Application
+{
+public:
+	CLASS_BODY(DefaultGameApplication);
+	void start() override;
+};
+
 class GameEnginePublic
 {
 public:
@@ -107,11 +114,9 @@ public:
 	bool get_is_in_overlapped_period() const { return b_is_in_overlapped_period.get_value(); }
 
 protected:
-	bool draw_this_frame() const {
-		return sub_tick_index_ <= 0;
-	}
+	bool draw_this_frame() const { return sub_tick_index_ <= 0; }
 	ScopedBooleanValue b_is_in_overlapped_period;
-	int sub_tick_index_ = -1;  // -1 = normal/final tick; 0..N-2 = sub-tick
+	int sub_tick_index_ = -1; // -1 = normal/final tick; 0..N-2 = sub-tick
 };
 
 extern ConfigVar g_engine_ticks_per_frame;

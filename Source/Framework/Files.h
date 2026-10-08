@@ -62,7 +62,8 @@ public:
 		FULL_SYSTEM
 	};
 
-	static void init();
+	static void init(const std::string& engine_root = {});
+	static void set_engine_asset_root(const std::string& root);
 
 	// open a file for reading, can look in archive or os paths
 	static IFilePtr open_read(const char* relative_path, WhereEnum where);

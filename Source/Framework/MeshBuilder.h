@@ -51,7 +51,9 @@ public:
 	void Push2dCircle(glm::vec2 center, float radius, int segments, Color32 color);
 
 	const std::vector<MbVertex>& get_v() { return verticies; }
+	const std::vector<MbVertex>& get_v() const { return verticies; }
 	const std::vector<uint32_t>& get_i() { return indicies; }
+	const std::vector<uint32_t>& get_i() const { return indicies; }
 
 private:
 	friend class MeshBuilderDD;

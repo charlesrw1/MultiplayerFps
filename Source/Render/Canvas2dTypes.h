@@ -14,6 +14,21 @@ class IGraphicsTexture;
 class Canvas2dGpuMesh;
 class MeshBuilder;
 class FontAsset;
+struct MbVertex;
+
+enum class CanvasLineCap : uint8_t
+{
+	Butt,
+	Square,
+	Round,
+};
+
+enum class CanvasLineJoin : uint8_t
+{
+	Miter,
+	Bevel,
+	Round,
+};
 
 // Per-draw-call GPU state. Two draws only batch together if every field here matches
 // (plus contiguity/transform rules -- see Canvas2dRecorder).
@@ -74,13 +89,26 @@ namespace Canvas2dGeometry {
 	// can't be expressed as an affine transform of a rect (e.g. a perspective-projected
 	// gizmo face). p0..p3/uv0..uv3 must be given in matching winding order.
 	void build_quad_textured(MeshBuilder& mb, glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, glm::vec2 uv0,
-							  glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, Color32 color, float z);
+								  glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, Color32 color, float z);
+	void build_gradient_rect(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, Color32 top_left, Color32 top_right,
+							 Color32 bottom_right, Color32 bottom_left, float z);
+	void build_textured_polygon(MeshBuilder& mb, std::span<const glm::vec2> points, std::span<const glm::vec2> uvs,
+								Color32 color, float z);
+	void build_mesh(MeshBuilder& mb, std::span<const MbVertex> vertices, std::span<const uint32_t> indices,
+					glm::mat4 transform = glm::mat4(1.f));
 	void build_circle(MeshBuilder& mb, glm::vec2 center, float radius, int segments, Color32 color, float z);
 	void build_polygon(MeshBuilder& mb, std::span<const glm::vec2> points, Color32 color, float z);
 	void build_line(MeshBuilder& mb, glm::vec2 start, glm::vec2 end, float thickness, Color32 color, float z);
 	void build_line_strip(MeshBuilder& mb, std::span<const glm::vec2> points, float thickness, Color32 color,
-						   bool closed, float z);
+						   bool closed, float z, CanvasLineCap cap = CanvasLineCap::Butt,
+						   CanvasLineJoin join = CanvasLineJoin::Miter, int round_segments = 8);
 	void build_circle_outline(MeshBuilder& mb, glm::vec2 center, float radius, int segments, float thickness,
 							   Color32 color, float z);
 	void build_rect_outline(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, float thickness, Color32 color, float z);
+	void build_rounded_rect(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, float radius, int corner_segments,
+							Color32 color, float z);
+	void build_nine_slice(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, glm::ivec2 texture_size,
+						  glm::ivec4 borders, Color32 color, float z);
+	void build_tiled_sprite(MeshBuilder& mb, glm::vec2 pos, glm::vec2 size, glm::vec2 tile_size, Color32 color,
+							float z);
 }

@@ -59,7 +59,6 @@
 #include "EngineMain.h"
 #include "EditorPopupTemplate.h"
 #include "Animation/SkeletonData.h"
-#include "MyGame/fps/AnimGraphTester.h"
 #include "IntegrationTests/TestRegistry.h"
 #include "IntegrationTests/TestRunner.h"
 #include "IntegrationTests/StateDump.h"
@@ -309,9 +308,7 @@ void GameEngineLocal::add_commands() {
 		sys_print(Debug, "OpenEditorToolCommand::execute\n");
 
 		if (!eng_local.is_editor_state()) {
-			sys_print(
-				Error,
-				"OpenEditorToolCommand: didnt launch in editor mode, pass --editor on the command line\n");
+			sys_print(Error, "OpenEditorToolCommand: didnt launch in editor mode, pass --editor on the command line\n");
 			return;
 		}
 		string mapname = "<empty>";
@@ -363,21 +360,6 @@ void GameEngineLocal::add_commands() {
 	commands->add("reload_script", [](const Cmd_Args& args) { ScriptManager::inst->reload_all_scripts(); });
 
 	g_modelMgr.add_commands(*commands);
-
-#ifdef EDITOR_BUILD
-	commands->add("dump_ik", [](const Cmd_Args&) {
-		IEditorTool* tool = eng->get_tool();
-		if (!tool) { sys_print(Warning, "dump_ik: no editor tool active\n"); return; }
-		auto selected = tool->get_editor_api().selection()->get_selected();
-		for (auto& ptr : selected) {
-			Entity* e = ptr.get();
-			if (!e) continue;
-			auto* tester = e->get_component<AnimGraphTester>();
-			if (tester) { tester->start_ik_dump(); return; }
-		}
-		sys_print(Warning, "dump_ik: select an entity with AnimGraphTester first\n");
-	});
-#endif
 }
 
 #include "LevelSerialization/SerializeNew.h"
@@ -408,7 +390,7 @@ bool GameEngineLocal::load_level(string mapname) {
 #ifdef EDITOR_BUILD
 		if (editor_tool) {
 			editor_tool.reset();
-			//assert(!editorState->get_tool());
+			// assert(!editorState->get_tool());
 		}
 #endif
 		if (level) {

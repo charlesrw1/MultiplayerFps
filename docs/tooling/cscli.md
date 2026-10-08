@@ -3,7 +3,7 @@ order = -3
 +++
 # Command Line Bridge
 
-`cscli.exe` is the agent-facing control surface for a running editor or game. It discovers live instances, exposes typed AgentBridge tools, runs console commands and Lua, and returns structured output.
+`cscli.exe` creates external C++ projects and controls running editor or game instances. See [[external_projects]] for the project workflow.
 
 ```
 cscli - CLI for driving a running CsRemake editor/game instance over AgentBridge
@@ -11,6 +11,10 @@ cscli - CLI for driving a running CsRemake editor/game instance over AgentBridge
 Usage: cscli [global options] <subcommand> [args...]
 
 Subcommands:
+  new <name> --path <dir>    Create an external C++ game project
+  build [options]            Build an external game project
+  editor [options]           Build and launch the project's editor
+  run [options]              Build and launch the project as a game
   status                     Show process, project, document, level, and readiness state
   wait-ready                 Wait until the selected instance reports ready
   tools [name]               List typed bridge tools or describe one
@@ -31,6 +35,9 @@ Global options:
   -V, --version                       Show cscli's version
 
 Examples:
+  cscli new Asteroids --path D:/Gamedev/Asteroids
+  cscli build --project D:/Gamedev/Asteroids
+  cscli editor --project D:/Gamedev/Asteroids --wait-ready
   cscli status
   cscli wait-ready --wait-timeout 30
   cscli tools
@@ -44,6 +51,17 @@ Examples:
   cscli instances
   cscli log --lines 50
 ```
+
+## External Projects
+
+```text
+cscli new <name> [--path <directory>]
+cscli build [--project <path>] [--configuration <name>] [--target editor|game|all]
+cscli editor [--project <path>] [--configuration <name>] [--no-build] [--wait-ready]
+cscli run [--project <path>] [--configuration <name>] [--no-build] [--wait-ready]
+```
+
+When `--project` is omitted, project commands search the current directory and its parents for `game.json`.
 
 ## Connect to a Running Instance
 
