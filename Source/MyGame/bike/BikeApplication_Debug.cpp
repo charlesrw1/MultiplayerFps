@@ -132,6 +132,7 @@ void draw_rider_debug_info(BikeObject* bo)
 				bo->group_id, bo->pos_in_group_norm));
 		GameplayStatic::debug_text(string_format("[AI] spd=%.1fm/s  neighbors=%d  min_r=%.1fm%s",
 			bo->speed, ai->dbg_num_neighbors, ai->dbg_min_r, ai->dbg_clamped ? "  CLAMPED" : ""));
+	
 		GameplayStatic::debug_text(string_format("[AI] cohesion behind=%+.2f  closer=%+.2f  gap=%.1fm", ai->dbg_cohesion_behind_lat, ai->dbg_cohesion_closer_lat, ai->dbg_cohesion_gap_m));
 		if (ai->dbg_avoidance_active)
 			GameplayStatic::debug_text(string_format("[AI] AVOIDANCE lat_vel=%+.2fm/s brake=%.2f", ai->dbg_avoidance_lateral_vel, ai->dbg_avoidance_brake));

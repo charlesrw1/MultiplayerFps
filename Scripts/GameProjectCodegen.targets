@@ -28,8 +28,19 @@
     <_CodegenInputHeader Include="$(ProjectDir)**\*.h" Exclude="$(ProjectDir).generated\**;$(ProjectDir)External\**;$(CodegenExcludeExtra)" />
     <_CodegenScript Include="$(SolutionDir)Scripts\codegen.py;$(SolutionDir)Scripts\codegen_run.py;$(SolutionDir)Scripts\codegen_lib.py;$(SolutionDir)Scripts\codegen_generate.py" />
   </ItemGroup>
+  <Target Name="InvalidateCodegenForFullRebuild" BeforeTargets="GenerateMEGA" Condition="'$(CodegenFullRebuild)'=='true'">
+    <Delete Files="$(ProjectDir).generated\$(CodegenMegaName).gen.cpp" />
+  </Target>
   <Target Name="GenerateMEGA" BeforeTargets="ClCompile" Inputs="@(_CodegenInputHeader);@(_CodegenScript)" Outputs="$(ProjectDir).generated\$(CodegenMegaName).gen.cpp">
     <Message Text="Running codegen for $(MSBuildProjectName) (inputs changed)..." Importance="high" />
-    <Exec Command="py &quot;$(SolutionDir)Scripts\codegen.py&quot; &quot;$(CodegenSubdir)&quot; &quot;$(CodegenMegaName)&quot;" WorkingDirectory="$(SolutionDir)" />
+    <!--
+      MSBuild runs this target when either a scanned header or the generator changes.  The
+      generator's normal incremental mode only compares headers to the mega output; therefore
+      a changed generator could print "Skipping" without refreshing the output timestamp,
+      causing this target to run on every subsequent build.  Rebuild when MSBuild has already
+      determined an input changed, so the declared output is refreshed and generator changes
+      are correctly applied.
+    -->
+    <Exec Command="py &quot;$(SolutionDir)Scripts\codegen.py&quot; &quot;$(CodegenSubdir)&quot; &quot;$(CodegenMegaName)&quot; rebuild" WorkingDirectory="$(SolutionDir)" />
   </Target>
 </Project>
