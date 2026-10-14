@@ -44,6 +44,7 @@ internal sealed class LauncherForm : Form
     private Button? _stopSelected;
     private readonly Dictionary<int, LaunchSettings> _knownInstances = [];
     private List<TestFailure> _testFailures = [];
+    private TestResultsForm? _testResultsWindow;
     private Process? _activeBuildProcess;
     private bool _operationRunning;
     private static readonly Color GameTint = Color.FromArgb(224, 240, 252);
@@ -87,6 +88,7 @@ internal sealed class LauncherForm : Form
 
         var testControls = new WrappingFlowPanel();
         testControls.Controls.Add(AddOperationButton("Unit tests", RunUnitTestsAsync));
+        testControls.Controls.Add(AddOperationButton("Lua check", RunLuaCheckAsync));
         testControls.Controls.Add(new Label { Text = "Integration", AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
         testControls.Controls.Add(_integrationMode);
         testControls.Controls.Add(_integrationPattern);
@@ -229,6 +231,12 @@ internal sealed class LauncherForm : Form
 
     private async Task RunUnitTestsAsync() => await RunPowerShellScriptAsync("build_and_test.ps1", $"-Configuration {Config} -Platform x64");
 
+    private async Task RunLuaCheckAsync()
+    {
+        var exitCode = await RunPowerShellScriptAsync("lua_check.ps1", "-Level Warning");
+        if (exitCode == 1) Log("Lua check completed with diagnostics.");
+    }
+
     private async Task RunIntegrationTestsAsync()
     {
         var arguments = $"-Config {Config}";
@@ -238,6 +246,7 @@ internal sealed class LauncherForm : Form
         await RunPowerShellScriptAsync("integration_test.ps1", arguments);
         _testFailures = ReadIntegrationFailures();
         _viewTestResults.Enabled = _testFailures.Count > 0;
+        if (_testResultsWindow is { IsDisposed: false }) _testResultsWindow.RefreshFailures(_testFailures);
         if (_testFailures.Count > 0) Log($"Integration tests reported {_testFailures.Count} failure(s). Use View failures for details.");
     }
 
@@ -270,7 +279,15 @@ internal sealed class LauncherForm : Form
     private void ShowTestResults()
     {
         if (_testFailures.Count == 0) return;
-        new TestResultsForm(_repoRoot, _testFailures).Show(this);
+        if (_testResultsWindow is { IsDisposed: false })
+        {
+            _testResultsWindow.RefreshFailures(_testFailures);
+            _testResultsWindow.Activate();
+            return;
+        }
+        _testResultsWindow = new TestResultsForm(_repoRoot, _testFailures);
+        _testResultsWindow.FormClosed += (_, _) => _testResultsWindow = null;
+        _testResultsWindow.Show(this);
     }
 
     private async Task CleanCachesAsync()
@@ -362,7 +379,7 @@ internal sealed class LauncherForm : Form
 
     private Process StartEngineProcess(string executable, string arguments) => Process.Start(new ProcessStartInfo(executable, arguments) { WorkingDirectory = _repoRoot, UseShellExecute = false }) ?? throw new InvalidOperationException($"Could not start {executable}.");
 
-    private Task RunPowerShellScriptAsync(string scriptName, string arguments) => RunConsoleProcessAsync("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{Path.Combine(_repoRoot, "Scripts", scriptName)}\" {arguments}");
+    private Task<int> RunPowerShellScriptAsync(string scriptName, string arguments) => RunConsoleProcessAsync("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{Path.Combine(_repoRoot, "Scripts", scriptName)}\" {arguments}");
 
     private async Task<int> RunConsoleProcessAsync(string fileName, string arguments, bool isBuild = false)
     {
@@ -565,6 +582,8 @@ internal sealed class TestResultsForm : Form
     private readonly ZoomableImageView _screenshot = new() { Dock = DockStyle.Fill };
     private readonly Label _screenshotCaption = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
     private readonly Button _toggleScreenshot = new() { Text = "Show actual", Width = 120, Dock = DockStyle.Right, Enabled = false };
+    private readonly Button _promoteSelected = new() { Text = "Promote this", Width = 110, Dock = DockStyle.Right, Enabled = false };
+    private readonly Button _promoteAll = new() { Text = "Promote all", Width = 105, Dock = DockStyle.Right, Enabled = false };
     private string? _goldenPath;
     private string? _actualPath;
     private bool _showingGolden = true;
@@ -580,20 +599,18 @@ internal sealed class TestResultsForm : Form
         _failuresView.Columns.Add("Mode", 70);
         _failuresView.Columns.Add("Test", 370);
         _failuresView.Columns.Add("Type", 160);
-        foreach (var failure in failures)
-        {
-            var item = new ListViewItem([failure.Mode, failure.Name, failure.ScreenshotName is null ? "Test failure" : "Screenshot failure"]) { Tag = failure };
-            item.BackColor = failure.Mode.Equals("game", StringComparison.OrdinalIgnoreCase) ? Color.FromArgb(224, 240, 252) : Color.FromArgb(239, 231, 250);
-            _failuresView.Items.Add(item);
-        }
         _failuresView.SelectedIndexChanged += (_, _) => UpdateSelection();
         _toggleScreenshot.Click += (_, _) => { _showingGolden = !_showingGolden; ShowSelectedImage(preserveView: true); };
+        _promoteSelected.Click += (_, _) => PromoteSelected();
+        _promoteAll.Click += (_, _) => PromoteAll();
 
         var details = new SplitContainer { Dock = DockStyle.Top, Orientation = Orientation.Horizontal, Height = 98, SplitterDistance = 50, IsSplitterFixed = true };
         details.Panel1.Controls.Add(_message);
         var screenshotHeader = new Panel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(8, 4, 8, 4) };
         screenshotHeader.Controls.Add(_screenshotCaption);
         screenshotHeader.Controls.Add(_toggleScreenshot);
+        screenshotHeader.Controls.Add(_promoteSelected);
+        screenshotHeader.Controls.Add(_promoteAll);
         var lower = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
         lower.Controls.Add(_screenshot);
         lower.Controls.Add(screenshotHeader);
@@ -602,7 +619,25 @@ internal sealed class TestResultsForm : Form
         split.Panel1.Controls.Add(_failuresView);
         split.Panel2.Controls.Add(lower);
         Controls.Add(split);
+        RefreshFailures(failures);
+    }
+
+    public void RefreshFailures(IEnumerable<TestFailure> failures)
+    {
+        _failures.Clear();
+        _failures.AddRange(failures);
+        _failuresView.BeginUpdate();
+        _failuresView.Items.Clear();
+        foreach (var failure in _failures)
+        {
+            var item = new ListViewItem([failure.Mode, failure.Name, failure.ScreenshotName is null ? "Test failure" : "Screenshot failure"]) { Tag = failure };
+            item.BackColor = failure.Mode.Equals("game", StringComparison.OrdinalIgnoreCase) ? Color.FromArgb(224, 240, 252) : Color.FromArgb(239, 231, 250);
+            _failuresView.Items.Add(item);
+        }
+        _failuresView.EndUpdate();
+        Text = _failures.Count == 0 ? "Integration test failures — no failures" : $"Integration test failures ({_failures.Count})";
         if (_failuresView.Items.Count > 0) _failuresView.Items[0].Selected = true;
+        else UpdateSelection();
     }
 
     private TestFailure? SelectedFailure => _failuresView.SelectedItems.Count == 1 ? _failuresView.SelectedItems[0].Tag as TestFailure : null;
@@ -620,7 +655,46 @@ internal sealed class TestResultsForm : Form
             _actualPath = Path.Combine(_repoRoot, "TestFiles", "screenshots", failure.ScreenshotName + "_actual.png");
         }
         _toggleScreenshot.Enabled = _goldenPath is not null && File.Exists(_goldenPath) && _actualPath is not null && File.Exists(_actualPath);
+        _promoteSelected.Enabled = _toggleScreenshot.Enabled;
+        _promoteAll.Enabled = GetPromotableFailures().Count > 0;
         ShowSelectedImage();
+    }
+
+    private List<(TestFailure Failure, string Golden, string Actual)> GetPromotableFailures()
+    {
+        var items = new List<(TestFailure, string, string)>();
+        foreach (var failure in _failures.Where(failure => failure.ScreenshotName is not null))
+        {
+            var golden = Path.Combine(_repoRoot, "TestFiles", "goldens", failure.ScreenshotName! + ".png");
+            var actual = Path.Combine(_repoRoot, "TestFiles", "screenshots", failure.ScreenshotName + "_actual.png");
+            if (File.Exists(actual)) items.Add((failure, golden, actual));
+        }
+        return items;
+    }
+
+    private void PromoteSelected()
+    {
+        if (_goldenPath is null || _actualPath is null || !File.Exists(_actualPath)) return;
+        var failure = SelectedFailure;
+        if (MessageBox.Show(this, $"Replace the golden screenshot for '{failure?.Name}' with the current test capture?\n\nThis changes the checked-in baseline.", "Promote screenshot", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(_goldenPath)!);
+        File.Copy(_actualPath, _goldenPath, overwrite: true);
+        _showingGolden = true;
+        ShowSelectedImage(preserveView: true);
+    }
+
+    private void PromoteAll()
+    {
+        var screenshots = GetPromotableFailures();
+        if (screenshots.Count == 0) return;
+        if (MessageBox.Show(this, $"Replace {screenshots.Count} golden screenshot baseline(s) with the current test captures?\n\nThis changes checked-in files and should only be done after reviewing the failures.", "Promote all screenshots", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+        foreach (var (_, golden, actual) in screenshots)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(golden)!);
+            File.Copy(actual, golden, overwrite: true);
+        }
+        _showingGolden = true;
+        UpdateSelection();
     }
 
     private void ShowSelectedImage(bool preserveView = false)
@@ -644,6 +718,8 @@ internal sealed class ZoomableImageView : Control
     private Image? _image;
     private float _zoom = 1f;
     private PointF _pan;
+    private bool _panning;
+    private Point _lastPanPoint;
 
     public ZoomableImageView()
     {
@@ -684,6 +760,34 @@ internal sealed class ZoomableImageView : Control
     }
 
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Focus(); }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button != MouseButtons.Right || _image is null) return;
+        _panning = true;
+        _lastPanPoint = e.Location;
+        Capture = true;
+        Cursor = Cursors.SizeAll;
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (!_panning) return;
+        _pan = new PointF(_pan.X + e.X - _lastPanPoint.X, _pan.Y + e.Y - _lastPanPoint.Y);
+        _lastPanPoint = e.Location;
+        Invalidate();
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (e.Button != MouseButtons.Right) return;
+        _panning = false;
+        Capture = false;
+        Cursor = Cursors.Default;
+    }
 
     protected override void OnMouseWheel(MouseEventArgs e)
     {

@@ -63,13 +63,18 @@ $dlls = @(
 )
 
 # Debug vcpkg packages conventionally use these suffixed names. The regular
-# spelling is the Release variant, so do not warn about it when the matching
-# Debug DLL is the one we will actually copy.
-$debugAlternatives = @{
+# spelling is the Release variant. The list above contains both so either
+# configuration can be copied; suppress the missing counterpart in both
+# directions and only warn if neither variant is installed.
+$dllAlternatives = @{
     "freetype.dll" = "freetyped.dll"
+    "freetyped.dll" = "freetype.dll"
     "zlib1.dll" = "zlibd1.dll"
+    "zlibd1.dll" = "zlib1.dll"
     "bz2.dll" = "bz2d.dll"
+    "bz2d.dll" = "bz2.dll"
     "libpng16.dll" = "libpng16d.dll"
+    "libpng16d.dll" = "libpng16.dll"
 }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -78,7 +83,7 @@ foreach ($dll in $dlls) {
     $src = Join-Path $VcpkgBinDir $dll
     $dst = Join-Path $OutDir $dll
     if (-not (Test-Path $src)) {
-        if ($debugAlternatives.ContainsKey($dll) -and (Test-Path (Join-Path $VcpkgBinDir $debugAlternatives[$dll]))) {
+        if ($dllAlternatives.ContainsKey($dll) -and (Test-Path (Join-Path $VcpkgBinDir $dllAlternatives[$dll]))) {
             continue
         }
         Write-Warning "copy_vcpkg_dlls: missing $src"
