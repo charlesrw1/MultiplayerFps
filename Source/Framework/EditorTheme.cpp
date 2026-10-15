@@ -3,6 +3,7 @@
 
 ImFont* g_prop_bold_font    = nullptr;
 ImFont* g_prop_regular_font = nullptr;
+ImFont* g_asset_grid_font   = nullptr;
 
 // Colour palette — edit these to retune the whole UI at once
 namespace theme {

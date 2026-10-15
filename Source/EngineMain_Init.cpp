@@ -554,7 +554,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 			}
 		};
 		add_font_to_imgui("eng/inconsolata_bold.ttf", {14.0, 24.0});
-		add_font_to_imgui("inter_regular.ttf", {14.0,15.0,16.0, 18.0});
+		add_font_to_imgui("inter_regular.ttf", {14.0, 15.0, 16.0, 18.0, 12.0});
 		// Consolas 12pt — lighter monospace for property name labels
 		ImGui::GetIO().Fonts->AddFontFromFileTTF("C:/Windows/Fonts/consola.ttf", 12.0f);
 		ImGui::GetIO().Fonts->Build();
@@ -565,7 +565,8 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		auto& flist = *ImGui::GetIO().Fonts;
 		ImGui::GetIO().FontDefault = flist.Fonts.Size > 4 ? flist.Fonts[4] : nullptr;
 		g_prop_bold_font = flist.Fonts.Size > 0 ? flist.Fonts[0] : nullptr; // inconsolata bold 14pt — group headers
-		g_prop_regular_font = flist.Fonts.Size > 4 ? flist.Fonts[4] : nullptr; // consolas 12pt — property labels
+		g_prop_regular_font = flist.Fonts.Size > 4 ? flist.Fonts[4] : nullptr; // inter regular 16pt — property labels
+		g_asset_grid_font = flist.Fonts.Size > 6 ? flist.Fonts[6] : nullptr; // inter regular 12pt — asset browser grid labels
 	}
 	apply_editor_dark_theme();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;

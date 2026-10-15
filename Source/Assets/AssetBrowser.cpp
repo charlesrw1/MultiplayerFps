@@ -7,9 +7,11 @@
 
 #include "imgui.h"
 #include <algorithm>
+#include <cfloat>
 #include <optional>
 #include "Framework/MyImguiLib.h"
 #include "Framework/Config.h"
+#include "Framework/EditorTheme.h"
 
 #include "AssetCompile/Someutils.h"
 #include "AssetRegistryLocal.h"
@@ -667,13 +669,11 @@ static void draw_folder_tree(AssetBrowser* b) {
 // flip_v: rendered asset thumbnails (Model/MaterialInstance thumbnails, DDS texture mips) come out
 // upside-down relative to normal UI icons, so callers with real thumbnails need the V-flip (the
 // default, matching every existing call site) while regular UI icon PNGs (folder, document) need it off.
-bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* label, ImU32 tint_col = IM_COL32_WHITE,
-								bool flip_v = true, ImU32 text_col = IM_COL32_WHITE) {
+static bool ImageButtonWithImage(ImTextureID texture, ImVec2 size, ImU32 tint_col = IM_COL32_WHITE, bool flip_v = true) {
 	ImVec2 pos = ImGui::GetCursorScreenPos();
-	ImVec2 label_pos = pos;
 
 	// Invisible button to handle interaction
-	ImGui::InvisibleButton(label, size);
+	ImGui::InvisibleButton("##thumbnail", size);
 	bool hovered = ImGui::IsItemHovered();
 	bool pressed = ImGui::IsItemDeactivated() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 
@@ -687,19 +687,6 @@ bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* la
 	if (hovered) {
 		draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(255, 255, 255, 50));
 	}
-
-	// Draw wrapped text over image
-	float wrap_width = size.x - 10.0f;					  // small padding
-	ImVec2 text_pos = ImVec2(pos.x + 5.0f, pos.y + 5.0f); // small margin
-	ImGui::PushClipRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), true);
-	ImGui::PushTextWrapPos(text_pos.x + wrap_width);
-	auto shadow_pos = text_pos + ImVec2(1, 1);
-	draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), shadow_pos, IM_COL32(0, 0, 0, 255), label, nullptr,
-					   wrap_width);
-	draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), text_pos, text_col, label, nullptr, wrap_width);
-
-	ImGui::PopTextWrapPos();
-	ImGui::PopClipRect();
 
 	return pressed;
 }
@@ -716,9 +703,41 @@ static ImU32 grid_label_tint_for(const AssetMetadata* type) {
 	return IM_COL32(blend(c.r), blend(c.g), blend(c.b), 255);
 }
 
+// Keep filenames to one line beneath their thumbnail.  The full name remains available from
+// the thumbnail tooltip, so a dense grid never sacrifices discoverability.
+static std::string grid_label_with_ellipsis(const std::string& text, ImFont* font, float max_width) {
+	if (!font || font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text.c_str()).x <= max_width)
+		return text;
+
+	constexpr const char* ellipsis = "...";
+	const float ellipsis_width = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, ellipsis).x;
+	if (ellipsis_width > max_width)
+		return ellipsis;
+
+	size_t len = text.size();
+	while (len > 0 && font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text.c_str(), text.c_str() + len).x + ellipsis_width > max_width) {
+		--len;
+		while (len > 0 && (static_cast<unsigned char>(text[len]) & 0xc0) == 0x80)
+			--len;
+	}
+	return text.substr(0, len) + ellipsis;
+}
+
+static void draw_grid_label(const std::string& label, float width, ImU32 color) {
+	ImFont* font = g_asset_grid_font ? g_asset_grid_font : ImGui::GetFont();
+	ImGui::PushFont(font);
+	ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(color));
+	const std::string clipped_label = grid_label_with_ellipsis(label, font, width);
+	ImGui::TextUnformatted(clipped_label.c_str());
+	ImGui::PopStyleColor();
+	ImGui::PopFont();
+}
+
 void AssetBrowser::draw_browser_grid() {
 	CPU_FUNCTION();
 	const int SIZE_PER = (big_thumbnail) ? 144 : 80;
+	const int THUMB_SIZE = (big_thumbnail) ? 128 : 64;
+	const float GRID_ROW_HEIGHT = (float)THUMB_SIZE + 20.0f;
 	auto win_size = ImGui::GetWindowSize();
 	int boxes = win_size.x / SIZE_PER;
 	boxes = std::max(boxes, 1);
@@ -764,7 +783,7 @@ void AssetBrowser::draw_browser_grid() {
 	}
 
 	ImGuiListClipper clipper;
-	clipper.Begin((int)glm::ceil(items2.size() / float(boxes)));
+	clipper.Begin((int)glm::ceil(items2.size() / float(boxes)), GRID_ROW_HEIGHT);
 
 	// Folder tile: navigates into the folder on double-click (Unity-style), and accepts
 	// asset drag-drop to move the dragged asset into it.
@@ -772,19 +791,18 @@ void AssetBrowser::draw_browser_grid() {
 		std::string parent_path = node_parent_folder_path(node);
 		std::string folder_path = parent_path.empty() ? node->name : (parent_path + "/" + node->name);
 
-		const int THUMB_SIZE = (big_thumbnail) ? 128 : 64;
 		ImVec2 thumb_size = ImVec2((float)THUMB_SIZE, (float)THUMB_SIZE);
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 		if (folder_big) {
-			ImageButtonWithOverlayText(ImTextureID(uint64_t(folder_big->get_internal_render_handle())),
-									   thumb_size, node->name.c_str(), IM_COL32_WHITE, false);
+			ImageButtonWithImage(ImTextureID(uint64_t(folder_big->get_internal_render_handle())), thumb_size, IM_COL32_WHITE, false);
 		} else {
 			ImGui::InvisibleButton("##folder", thumb_size);
 		}
 		ImGui::PopStyleColor();
+		const bool thumb_hovered = ImGui::IsItemHovered();
 
-		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClickedCount[0] == 2)
+		if (thumb_hovered && ImGui::GetIO().MouseClickedCount[0] == 2)
 			navigate_to_folder(this, folder_path);
 
 		if (ImGui::BeginDragDropTarget()) {
@@ -797,6 +815,10 @@ void AssetBrowser::draw_browser_grid() {
 			}
 			ImGui::EndDragDropTarget();
 		}
+
+		if (thumb_hovered)
+			ImGui::SetTooltip("%s", node->name.c_str());
+		draw_grid_label(node->name, (float)THUMB_SIZE, IM_COL32_WHITE);
 	};
 
 	auto draw_item = [&](const int item_idx) {
@@ -821,7 +843,6 @@ void AssetBrowser::draw_browser_grid() {
 		string only_filename = c->asset.filename;
 		StringUtils::get_filename(only_filename);
 
-		const int THUMB_SIZE = (big_thumbnail) ? 128 : 64;
 		ImVec2 thumb_screen_pos = ImGui::GetCursorScreenPos();
 		ImVec2 thumb_size = ImVec2((float)THUMB_SIZE, (float)THUMB_SIZE);
 
@@ -830,9 +851,7 @@ void AssetBrowser::draw_browser_grid() {
 
 		if (t) {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-			item_pressed = ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())),
-													  thumb_size, only_filename.c_str(), IM_COL32_WHITE, true,
-													  grid_label_tint_for(c->asset.type));
+			item_pressed = ImageButtonWithImage(ImTextureID(uint64_t(t->get_internal_render_handle())), thumb_size);
 			ImGui::PopStyleColor();
 		} else if (has_real_thumb && !thumb_failed) {
 			// Placeholder while streaming in
@@ -842,21 +861,17 @@ void AssetBrowser::draw_browser_grid() {
 			ImVec2 bmax = ImVec2(thumb_screen_pos.x + THUMB_SIZE, thumb_screen_pos.y + THUMB_SIZE);
 			dl->AddRectFilled(thumb_screen_pos, bmax, IM_COL32(35, 35, 35, 255));
 			dl->AddRect(thumb_screen_pos, bmax, IM_COL32(60, 60, 60, 255));
-			ImGui::PushClipRect(thumb_screen_pos, bmax, true);
-			dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
-						ImVec2(thumb_screen_pos.x + 4.f, thumb_screen_pos.y + 4.f),
-						IM_COL32(110, 110, 110, 255), only_filename.c_str(), nullptr, THUMB_SIZE - 8.f);
-			ImGui::PopClipRect();
 		} else if (document_icon) {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 			ImU32 tint = color32_to_int(c->asset.type->get_browser_color());
-			item_pressed = ImageButtonWithOverlayText(ImTextureID(uint64_t(document_icon->get_internal_render_handle())),
-													  thumb_size, only_filename.c_str(), tint, false);
+			item_pressed = ImageButtonWithImage(ImTextureID(uint64_t(document_icon->get_internal_render_handle())), thumb_size, tint, false);
 			ImGui::PopStyleColor();
 		} else {
 			ImGui::InvisibleButton("##thumb", thumb_size);
 			item_pressed = ImGui::IsItemDeactivated() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 		}
+
+		const bool thumb_hovered = ImGui::IsItemHovered();
 
 		// Selection highlight border
 		if (is_selected) {
@@ -877,7 +892,7 @@ void AssetBrowser::draw_browser_grid() {
 		if (item_pressed) {
 			selected_resource = c->asset;
 		}
-		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClickedCount[0] == 2) {
+		if (thumb_hovered && ImGui::GetIO().MouseClickedCount[0] == 2) {
 			selected_resource = c->asset;
 			double_clicked_selected = true;
 			const auto& tname = c->asset.type->get_type_name();
@@ -885,8 +900,8 @@ void AssetBrowser::draw_browser_grid() {
 				Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, ("open-editor " + c->asset.filename).c_str());
 		}
 
-		// Hover tooltip: full path + type after short delay
-		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+		// Hovering the thumbnail reveals the full name and path when its grid label is clipped.
+		if (thumb_hovered) {
 			ImGui::BeginTooltip();
 			ImGui::TextColored(color32_to_imvec4(c->asset.type->get_browser_color()), "%s",
 							   c->asset.type->get_type_name().c_str());
@@ -895,7 +910,7 @@ void AssetBrowser::draw_browser_grid() {
 		}
 
 		// Right-click: select and open context menu
-		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+		if (thumb_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
 			selected_resource = c->asset;
 			ImGui::OpenPopup("asset-click-menu");
 		}
@@ -957,11 +972,13 @@ void AssetBrowser::draw_browser_grid() {
 			ImGui::Text("Asset: %s", c->asset.filename.c_str());
 			ImGui::EndDragDropSource();
 		}
+
+		draw_grid_label(only_filename, (float)THUMB_SIZE, grid_label_tint_for(c->asset.type));
 		ImGui::PopID();
 	};
 
 	auto draw_in_row = [&](const int row) {
-		ImGui::TableNextRow();
+		ImGui::TableNextRow(0, GRID_ROW_HEIGHT);
 		const int start = row * boxes;
 		for (int i = 0; i < boxes; i++) {
 			const int index = start + i;

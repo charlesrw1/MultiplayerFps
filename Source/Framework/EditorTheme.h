@@ -7,4 +7,5 @@ void apply_editor_dark_theme();
 
 // Font pointers set once after ImGui font build.
 extern ImFont* g_prop_bold_font;    // inconsolata bold 14pt  — group/array headers
-extern ImFont* g_prop_regular_font; // inter regular 14pt     — property name labels
+extern ImFont* g_prop_regular_font; // inter regular 16pt     — property name labels
+extern ImFont* g_asset_grid_font;   // inter regular 12pt     — asset browser grid labels
