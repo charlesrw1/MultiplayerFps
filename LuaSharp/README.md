@@ -8,6 +8,9 @@ Build the `LuaSharp` project in Visual Studio, or from the repository root:
 & 'C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\MSBuild.exe' LuaSharp\LuaSharp.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64
 .\x64\Debug\LuaSharp.exe --test
 .\x64\Debug\LuaSharp.exe .\LuaSharp\example.ls
+.\x64\Debug\LuaSharpTests.exe
 ```
 
 The final command writes `LuaSharp\example.lua`. The current compiler supports the syntax in `example.ls`: classes, public/private sections, typed fields and parameters, constructors, methods, `auto`, `if`, `return`, `new`, `null`, and Lua table literals. It also emits EmmyLua/LuaLS annotations for fields, parameters, and returns.
+
+`LuaSharpTests` is a separate unit-test executable. LSP integration tests will be added with the LuaSharp LSP proxy, because they require a real LuaLS process.

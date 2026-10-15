@@ -56,6 +56,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cscli", "CLI\cscli.vcxproj"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharp", "LuaSharp\LuaSharp.vcxproj", "{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharpTests", "LuaSharp\LuaSharpTests.vcxproj", "{B1C23C02-188D-48D8-B536-5CECEFAAB67B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -202,6 +204,12 @@ Global
 		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.NoEditRelease|x64.Build.0 = Release|x64
 		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.Release|x64.ActiveCfg = Release|x64
 		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.Release|x64.Build.0 = Release|x64
+		{B1C23C02-188D-48D8-B536-5CECEFAAB67B}.Debug|x64.ActiveCfg = Debug|x64
+		{B1C23C02-188D-48D8-B536-5CECEFAAB67B}.Debug|x64.Build.0 = Debug|x64
+		{B1C23C02-188D-48D8-B536-5CECEFAAB67B}.NoEditRelease|x64.ActiveCfg = Release|x64
+		{B1C23C02-188D-48D8-B536-5CECEFAAB67B}.NoEditRelease|x64.Build.0 = Release|x64
+		{B1C23C02-188D-48D8-B536-5CECEFAAB67B}.Release|x64.ActiveCfg = Release|x64
+		{B1C23C02-188D-48D8-B536-5CECEFAAB67B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
