@@ -62,7 +62,12 @@ IGraphicsShader* opengl_create_shader_compute(const std::string& compute_path,
 IGraphicsShader* opengl_create_shader_single_file(const std::string& shared_path,
 												  const std::string& defines);
 IGraphicsShader* opengl_create_shader_single_file_tess(const std::string& shared_path,
-													   const std::string& defines);
+	                                                     const std::string& defines);
+
+// Starts a worker that reads program binaries into RAM.  GL program creation
+// remains on the render thread; this only removes startup disk I/O from cache
+// hits and is safe with the main GL context.
+void opengl_prefetch_program_binaries_async();
 
 // Format mapping helper — also used by OpenglDataStatic::dump_to_disk
 const char* opengl_texture_format_to_str(GraphicsTextureFormat fmt);

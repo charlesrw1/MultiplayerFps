@@ -6,11 +6,47 @@
 
 #include "OpenGlDeviceLocal.h"
 #include "ShaderSourceLoader.h"
+#include "Framework/Files.h"
+#include "Framework/Jobs.h"
 #include "glad/glad.h"
+#include <atomic>
+#include <mutex>
+#include <unordered_map>
 
 extern ConfigVar log_shader_compiles;
 
 namespace {
+
+struct PrefetchedProgramBinary {
+	uint32_t format = 0;
+	std::vector<uint8_t> bytes;
+};
+std::mutex prefetched_binary_mutex;
+std::unordered_map<std::string, PrefetchedProgramBinary> prefetched_binaries;
+std::atomic<bool> prefetch_started = false;
+
+void prefetch_program_binaries_job(uintptr_t) {
+	std::unordered_map<std::string, PrefetchedProgramBinary> loaded;
+	for (const auto& full_path : FileTree(FileSys::get_path(FileSys::SHADER_CACHE))) {
+		if (full_path.size() < 4 || full_path.substr(full_path.size() - 4) != ".bin")
+			continue;
+		auto file = FileSys::open_read(full_path.c_str(), FileSys::FULL_SYSTEM);
+		if (!file || file->size() < 8)
+			continue;
+		PrefetchedProgramBinary binary;
+		int32_t byte_count = 0;
+		file->read(&binary.format, sizeof(binary.format));
+		file->read(&byte_count, sizeof(byte_count));
+		if (byte_count <= 0 || (size_t)byte_count + 8 > file->size())
+			continue;
+		binary.bytes.resize(byte_count);
+		file->read(binary.bytes.data(), binary.bytes.size());
+		const size_t slash = full_path.find_last_of("\\/");
+		loaded.emplace(full_path.substr(slash == std::string::npos ? 0 : slash + 1), std::move(binary));
+	}
+	std::lock_guard lock(prefetched_binary_mutex);
+	prefetched_binaries = std::move(loaded);
+}
 
 // Same constant as in ShaderSourceLoader.cpp — used here for the binary-cache
 // timestamp check (compares cached blob mtime against each engine-relative
@@ -254,11 +290,23 @@ uint32_t try_load_program_binary(const std::string& cache_filename,
 	if (log_shader_compiles.get_bool())
 		sys_print(Debug, "shader-cache load: %s\n", cache_filename.c_str());
 
-	BinaryReader reader(binFile.get());
-	auto sourceType = reader.read_int32();
-	auto len = reader.read_int32();
-	std::vector<uint8_t> bytes(len, 0);
-	reader.read_bytes_ptr(bytes.data(), bytes.size());
+	uint32_t sourceType = 0;
+	std::vector<uint8_t> bytes;
+	{
+		std::lock_guard lock(prefetched_binary_mutex);
+		auto it = prefetched_binaries.find(cache_filename);
+		if (it != prefetched_binaries.end()) {
+			sourceType = it->second.format;
+			bytes = it->second.bytes;
+		}
+	}
+	if (bytes.empty()) {
+		BinaryReader reader(binFile.get());
+		sourceType = reader.read_int32();
+		auto len = reader.read_int32();
+		bytes.resize(len);
+		reader.read_bytes_ptr(bytes.data(), bytes.size());
+	}
 
 	uint32_t program = glCreateProgram();
 	glProgramBinary(program, sourceType, bytes.data(), bytes.size());
@@ -430,6 +478,12 @@ IGraphicsShader* wrap_or_fail(uint32_t program_id) {
 }
 
 } // namespace
+
+void opengl_prefetch_program_binaries_async() {
+	if (prefetch_started.exchange(true) || !JobSystem::inst)
+		return;
+	JobSystem::inst->add_job_no_counter(prefetch_program_binaries_job, 0);
+}
 
 // ---------------------------------------------------------------------------
 // Factory entry points (declared in OpenGlDeviceLocal.h). Caching applies to

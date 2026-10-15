@@ -1141,6 +1141,7 @@ void gfx_init_opengl(SDL_Window* window) {
 	impl->window     = window;
 	impl->gl_context = ctx;
 	g_gfx_instance = impl;
+	opengl_prefetch_program_binaries_async();
 }
 
 // ---------------------------------------------------------------------------
