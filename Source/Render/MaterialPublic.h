@@ -38,6 +38,9 @@ public:
 	REF void set_floatvec_parameter(StringName name, glm::vec3 xyz, float a);
 	void set_u8vec_parameter(StringName name, Color32 f);
 	REF void set_tex_parameter(StringName name, const Texture* t);
+	// Lets systems such as terrain reuse the base-color texture from an assigned
+	// material without reaching into MaterialImpl internals.
+	const Texture* get_tex_parameter(StringName name) const;
 
 	REF bool is_this_a_dynamic_material() const;
 	const MasterMaterialImpl* get_master_material() const;

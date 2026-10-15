@@ -1073,6 +1073,9 @@ void EditorDoc::hook_menu_bar() {
 		if (ImGui::MenuItem("Decal Stamp", nullptr, active_mode == stamp_tool.get())) {
 			active_mode = stamp_tool.get();
 		}
+		if (ImGui::MenuItem("Terrain", nullptr, active_mode == terrain_tool.get())) {
+			active_mode = terrain_tool.get();
+		}
 		end_main_menu_bar_menu();
 	}
 }

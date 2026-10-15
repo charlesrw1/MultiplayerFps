@@ -55,6 +55,28 @@ private:
 	EntityPtr preview;
 	EditorDoc& doc;
 };
+
+class TerrainEditorTool : public IInputReciever, public IEditorMode
+{
+public:
+	TerrainEditorTool(EditorDoc& doc) : doc(doc) {}
+	~TerrainEditorTool();
+	void tick(EditorInputs& inputs) override;
+	void draw_ui() override;
+
+private:
+	EditorDoc& doc;
+	float radius = 8.f;
+	float strength = 1.f;
+	float falloff = 1.f;
+	int brush = 0;
+	int material_layer = 0;
+	class TerrainComponent* stroke_terrain = nullptr;
+	std::vector<float> stroke_before_heights;
+	std::vector<uint8_t> stroke_before_weights;
+	MeshBuilder* brush_preview = nullptr;
+	handle<MeshBuilder_Object> brush_preview_handle;
+};
 // Road network editor (Cities-Skylines style)
 
 // the default tool

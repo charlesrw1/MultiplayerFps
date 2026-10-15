@@ -329,6 +329,7 @@ public:
 	std::unique_ptr<DragDropPreview> drag_drop_preview;
 	std::unique_ptr<FoliagePaintTool> foliage_tool;
 	std::unique_ptr<DecalStampTool> stamp_tool;
+	std::unique_ptr<TerrainEditorTool> terrain_tool;
 	std::unique_ptr<EditorUILayout> gui;
 	std::unique_ptr<EViewportHandles> handle_dragger;
 	std::unique_ptr<SelectionMode> selection_mode;

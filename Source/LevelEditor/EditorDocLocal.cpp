@@ -196,6 +196,7 @@ void EditorDoc::init_new() {
 	drag_drop_preview = std::make_unique<DragDropPreview>();
 	foliage_tool = std::make_unique<FoliagePaintTool>(*this);
 	stamp_tool = std::make_unique<DecalStampTool>(*this);
+	terrain_tool = std::make_unique<TerrainEditorTool>(*this);
 	handle_dragger = std::make_unique<EViewportHandles>(*this);
 	selection_mode = std::make_unique<SelectionMode>(*this);
 	draw_handles = std::make_unique<DrawHandlesObject>(*this);

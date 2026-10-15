@@ -6,12 +6,21 @@
 layout (location = 0) in vec3 VS_IN_Pos;
 layout (location = 1) in vec2 VS_IN_Texcoord;
 
-layout(location = 2) out vec2 TCS_IN_Texcoord;
+layout(location = 1) out vec2 FS_IN_Texcoord;
+layout(location = 0) out vec3 FS_IN_FragPos;
+
+uniform mat4 ViewProj;
+uniform mat4 Model = mat4(1);
+layout(binding = 12) uniform sampler2D HeightMap;
+uniform float VerticalScale;
 
 void main()
 {
-    TCS_IN_Texcoord = VS_IN_Texcoord;
-    gl_Position = vec4(VS_IN_Pos, 1.0);
+    vec3 position = VS_IN_Pos;
+    position.y += texture(HeightMap, VS_IN_Texcoord).r * VerticalScale;
+    FS_IN_Texcoord = VS_IN_Texcoord;
+    FS_IN_FragPos = position;
+    gl_Position = ViewProj * Model * vec4(position, 1.0);
 }
 #endif
 

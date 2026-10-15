@@ -182,6 +182,14 @@ void MaterialInstance::set_tex_parameter(StringName name, const Texture* t) {
 	}
 }
 
+const Texture* MaterialInstance::get_tex_parameter(StringName name) const {
+	if (!impl)
+		return nullptr;
+	if (auto p = impl->find_param_type(name, MatParamType::Texture2D))
+		return p->tex.get();
+	return nullptr;
+}
+
 // ---------------------------------------------------------------------------
 // MaterialImpl – texture hash helper
 // ---------------------------------------------------------------------------

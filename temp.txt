@@ -1,246 +1,372 @@
-[19:03:40] > MSBuild.exe "C:\Users\charl\source\repos\CsRemake\CsRemake.sln" /m /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /p:BuildingInsideVisualStudio=true /p:PreferredToolArchitecture=x64 /v:minimal /p:CodegenFullRebuild=true
-[19:03:40] MSBuild version 18.11.0-1.26427.13+9353559c2 for .NET Framework
-[19:03:40] 
-[19:03:40]   Running codegen for MyGame (inputs changed)...
-[19:03:40]   cgltf_write_impl.cpp
-[19:03:40]   External.cpp
-[19:03:40]   imgui.cpp
-[19:03:40]   imgui_demo.cpp
-[19:03:40]   imgui_draw.cpp
-[19:03:40]   main.cpp
-[19:03:40]   imgui_impl_dx11.cpp
-[19:03:40]   imgui_impl_opengl3.cpp
-[19:03:40]   imgui_impl_sdl3.cpp
-[19:03:40]   Running codegen for LevelEditor (inputs changed)...
-[19:03:41]   imgui_tables.cpp
-[19:03:42]   unity_W0DOSTQLKFGFPQD5.cpp
-[19:03:42]   unity_3TM04PIJB9RQY4YG.cpp
-[19:03:42]   unity_MM7J5S1X83S2QR33.cpp
-[19:03:42]   unity_1OC9XRK8PMQPEQC8.cpp
-[19:03:42]   unity_1Q0QHAUSWXEXOGE2.cpp
-[19:03:42]   unity_G267RJCW44ECDPV5.cpp
-[19:03:42]   unity_V14MG96MTPLXY7HD.cpp
-[19:03:42]   imgui_widgets.cpp
-[19:03:42]   ImGuizmo.cpp
-[19:03:42]   ImSequencer.cpp
-[19:03:42]   imnodes.cpp
-[19:03:42]   Running codegen for Render (inputs changed)...
-[19:03:43]   BridgeClient.cpp
-[19:03:43]   doing full rebuild
-[19:03:44]   TracyClient.cpp
-[19:03:44]   Starting codegen script... fullrebuild=True
-[19:03:44]   fixing pts in typenames
-[19:03:44]   read enums and structs in 422.59 ms
-[19:03:44]   mega file time 0.0
-[19:03:44]   [('./MyGame', 'pch.h'), ('./MyGame\\bike', 'BikeCourse.h'), ('./MyGame\\bike', 'BikeCourseHilly.h'), ('./MyGame\\bike', 'BikeCourseTurtle.h'), ('./MyGame\\bike', 'BikeDebugger.h'), ('./MyGame\\bike', 'BikeHeaders.h'), ('./MyGame\\bike', 'BikeObject_Local.h'), ('./MyGame\\bike', 'BikeTerrainNoise.h'), ('./MyGame\\fps', 'AnimGraphTester.h'), ('./MyGame\\fps', 'AnimGraphTesterEditorUI.h'), ('./MyGame\\fps', 'fpsApp.h'), ('./MyGame\\fps', 'fpsDebugCamera.h'), ('./MyGame\\fps', 'fpsObjects.h'), ('./MyGame\\fps', 'fpsTestObjects.h')]
-[19:03:44]   Cleaning .generated/...
-[19:03:44]   Cleaning .generated/...
-[19:03:44]   Parsing files...
-[19:03:44]   Writing output...
-[19:03:44]   Writing generated source ./MyGame/.generated/MyGameMEGA.gen.cpp
-[19:03:44]   Finished in 508.00 ms
-[19:03:45]   doing full rebuild
-[19:03:45]   Starting codegen script... fullrebuild=True
-[19:03:45]   fixing pts in typenames
-[19:03:45]   read enums and structs in 330.73 ms
-[19:03:45]   mega file time 0.0
-[19:03:45]   [('./LevelEditor', 'AllHeader.h'), ('./LevelEditor', 'Commands.h'), ('./LevelEditor', 'DragDetector.h'), ('./LevelEditor', 'DragDropPreview.h'), ('./LevelEditor', 'EditorDocLocal.h'), ('./LevelEditor', 'EditorInputs.h'), ('./LevelEditor', 'EditorModes.h'), ('./LevelEditor', 'EditorRecents.h'), ('./LevelEditor', 'EditorUILayout.h'), ('./LevelEditor', 'EdPropertyGrid.h'), ('./LevelEditor', 'IEditorApi.h'), ('./LevelEditor', 'IInputReciever.h'), ('./LevelEditor', 'LevelEditorCamera.h'), ('./LevelEditor', 'ManipulateTransformTool.h'), ('./LevelEditor', 'ObjectOutlineFilter.h'), ('./LevelEditor', 'OrthoCamera.h'), ('./LevelEditor', 'pch.h'), ('./LevelEditor', 'PropertyEditors.h'), ('./LevelEditor', 'RoadBuilderTool.h'), ('./LevelEditor', 'SelectionState.h'), ('./LevelEditor', 'ViewportHandles.h')]
-[19:03:45]   Cleaning .generated/...
-[19:03:45]   Cleaning .generated/...
-[19:03:45]   Parsing files...
-[19:03:45]   Writing output...
-[19:03:45]   Writing generated source ./LevelEditor/.generated/LevelEditorMEGA.gen.cpp
-[19:03:45]   Finished in 345.62 ms
-[19:03:45]   doing full rebuild
-[19:03:45]   Starting codegen script... fullrebuild=True
-[19:03:45]   fixing pts in typenames
-[19:03:45]   read enums and structs in 342.66 ms
-[19:03:45]   mega file time 0.0
-[19:03:45]   [('./Render', 'Canvas2dBackendLocal.h'), ('./Render', 'Canvas2dGpuMesh.h'), ('./Render', 'Canvas2dRecorder.h'), ('./Render', 'Canvas2dTypes.h'), ('./Render', 'Canvas2dVertexArray.h'), ('./Render', 'CompactInstancePack.h'), ('./Render', 'DrawLocal.h'), ('./Render', 'DrawLocalConfigVars.h'), ('./Render', 'DrawLocal_Batching.h'), ('./Render', 'DrawLocal_Device.h'), ('./Render', 'DrawLocal_Helpers.h'), ('./Render', 'DrawPublic.h'), ('./Render', 'DrawTypedefs.h'), ('./Render', 'DynamicMaterialPtr.h'), ('./Render', 'DynamicModelPtr.h'), ('./Render', 'EnvProbe.h'), ('./Render', 'FrameCapture.h'), ('./Render', 'Frustum.h'), ('./Render', 'GpuAllocator.h'), ('./Render', 'GpuCullingTest.h'), ('./Render', 'IGraphicsDevice.h'), ('./Render', 'MaterialLocal.h'), ('./Render', 'MaterialPublic.h'), ('./Render', 'Meshlet.h'), ('./Render', 'Model.h'), ('./Render', 'ModelManager.h'), ('./Render', 'OpenGlDeviceLocal.h'), ('./Render', 'pch.h'), ('./Render', 'PostProcessSettings.h'), ('./Render', 'PPManager.h'), ('./Render', 'RectPackerUtil.h'), ('./Render', 'RenderConfigVars.h'), ('./Render', 'RenderExtra.h'), ('./Render', 'RenderGiManager.h'), ('./Render', 'RenderLevelParams.h'), ('./Render', 'RenderObj.h'), ('./Render', 'RenderScene.h'), ('./Render', 'Render_Decal.h'), ('./Render', 'Render_Light.h'), ('./Render', 'Render_Sun.h'), ('./Render', 'Render_Volumes.h'), ('./Render', 'RmlUiRenderInterface.h'), ('./Render', 'ShaderSourceLoader.h'), ('./Render', 'SpirvCompile.h'), ('./Render', 'TaaManager.h'), ('./Render', 'Texture.h'), ('./Render', 'ViewSetup.h'), ('./Render\\Dx11', 'Dx11Local.h'), ('./Render\\Editor', 'TextureEditor.h'), ('./Render\\RT', 'RaytraceTest.h'), ('./Render\\RT', 'RaytraceTest_internal.h')]
-[19:03:45]   Cleaning .generated/...
-[19:03:45]   Cleaning .generated/...
-[19:03:45]   Parsing files...
-[19:03:45]   pch.cpp
-[19:03:45]   Writing output...
-[19:03:45]   Writing generated source ./Render/.generated/RenderMEGA.gen.cpp
-[19:03:45]   Finished in 588.70 ms
-[19:03:45]   pch.cpp
-[19:03:46]   pch.cpp
-[19:03:49]   glad.c
-[19:03:49]   miniz.c
-[19:03:53]   External.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\External.lib
-[19:03:53]   Discovery.cpp
-[19:03:55]   SoundCompilier.cpp
-[19:03:55]   AssetCompiler.cpp
-[19:03:55]   AssetOps.cpp
-[19:03:55]   unity_HPFB3FNX1PRUEHO9.cpp
-[19:03:55]   unity_9C82JBTKCB0ZATEE.cpp
-[19:03:55]   unity_J2O94AE275UD4Y1H.cpp
-[19:03:55]   unity_9S1JK07O6P3HY72K.cpp
-[19:03:56]   unity_X9BP7BAD50AEE9B1.cpp
-[19:04:01]   RenderMEGA.gen.cpp
-[19:04:02]   LevelEditorMEGA.gen.cpp
-[19:04:03]   MyGameMEGA.gen.cpp
-[19:04:04]   Commands.cpp
-[19:04:10]   AddEditorCommands.cpp
-[19:04:10]   Commands.cpp
-[19:04:11]   CommandsComponent.cpp
-[19:04:11]   CommandsParenting.cpp
-[19:04:11]   CommandsPrefab.cpp
-[19:04:11]   CommandsUndoRedo.cpp
-[19:04:11]   DecalStampTool.cpp
-[19:04:11]   DragDetector.cpp
-[19:04:11]   DragDropPreview.cpp
-[19:04:13]   EditorDocLocal.cpp
-[19:04:13]   DdsExport.cpp
-[19:04:13]   DecalBatcher.cpp
-[19:04:13]   DrawLocal_Misc.cpp
-[19:04:13]   DrawLocal_Device.cpp
-[19:04:13]   DrawLocal_Init.cpp
-[19:04:13]   IntegrationTests.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\IntegrationTests.lib
-[19:04:14]   DrawLocal_RenderPass.cpp
-[19:04:14]   EditorDocInput.cpp
-[19:04:14]   EditorRecents.cpp
-[19:04:14]   DrawLocal_Scene.cpp
-[19:04:14]   DrawLocal_Lighting.cpp
-[19:04:16]   EditorDocScene.cpp
-[19:04:16]   EditorDocViewport.cpp
-[19:04:17]   EditorUILayout.cpp
-[19:04:17]   EdPropertyGrid.cpp
-[19:04:18]   ProjectCommands.cpp
-[19:04:19]   FoliagePaintTool.cpp
-[19:04:19]   LevelEditorCamera.cpp
-[19:04:20]   DrawLocal_Editor.cpp
-[19:04:20]   DrawLocal_SceneDraw.cpp
-[19:04:27]   DrawLocal_SceneDrawInternal.cpp
-[19:04:27]   DrawLocal_Debug.cpp
-[19:04:27]   DrawLocal_BatchScene.cpp
-[19:04:27]   ManipulateTransformTool.cpp
-[19:04:28]   DrawLocal_CullShadow.cpp
-[19:04:28]   ObjectOutliner.cpp
-[19:04:28]   EnvProbe.cpp
-[19:04:29]   ObjectOutlinerContextMenu.cpp
-[19:04:29]   ObjectOutlinerDraw.cpp
-[19:04:29]   ObjectOutlinerFilter.cpp
-[19:04:30]   OrthoCamera.cpp
-[19:04:30]   Frustum.cpp
-[19:04:31]   PropertyEditors.cpp
-[19:04:31]   FrameCapture.cpp
-[19:04:31]   Generating Code...
-[19:04:32]   GpuAllocator.cpp
-[19:04:33]   GpuCullingTest.cpp
-[19:04:33]   fpsApp.cpp
-[19:04:33]   fpsDebugCamera.cpp
-[19:04:33]   AnimGraphTester.cpp
-[19:04:33]   SceneExport.cpp
-[19:04:33]   AnimGraphTesterEditorUI.cpp
-[19:04:34]   fpsObjects.cpp
-[19:04:34]   fpsTestObjects.cpp
-[19:04:34]   BikeAI.cpp
-[19:04:34]   BikeApplication.cpp
-[19:04:34]   SelectionMode.cpp
-[19:04:34]   BikeApplication_AIDebug.cpp
-[19:04:35]   MaterialLocal.cpp
-[19:04:35]   MaterialLocal_Loading.cpp
-[19:04:35]   MaterialLocal_Manager.cpp
-[19:04:35]   MaterialLocal_Shader.cpp
-[19:04:37]   SelectionState.cpp
-[19:04:37]   BikeApplication_Debug.cpp
-[19:04:37]   Model.cpp
-[19:04:37]   BikeApplication_Pack.cpp
-[19:04:37]   ViewportHandles.cpp
-[19:04:37]   ModelGpuUpload.cpp
-[19:04:37]   BikeApplication_Player.cpp
-[19:04:38]   ModelLoad.cpp
-[19:04:38]   BikeCamera.cpp
-[19:04:38]   BikeCourse.cpp
-[19:04:39]   BikeCourseDebug.cpp
-[19:04:39]   BikeCourseHardcoded.cpp
-[19:04:40]   ModelDynamic.cpp
-[19:04:40]   BikeCourseHilly.cpp
-[19:04:40]   BikeCourseMesh.cpp
-[19:04:41]   BikeCourseRacingLine.cpp
-[19:04:41]   BikeCourseRoadNetwork.cpp
-[19:04:41]   OpenGlDevice.cpp
-[19:04:42]   OpenGlBufferImpl.cpp
-[19:04:42]   BikeCourseTerrainMesh.cpp
-[19:04:42]   AssetTools.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\AssetTools.lib
-[19:04:42]   OpenGlShaderImpl.cpp
-[19:04:42]   BikeDebugger.cpp
-[19:04:42]   BikeObject.cpp
-[19:04:42]   BikeObject_Physics.cpp
-[19:04:42]   Running codegen for Core (inputs changed)...
-[19:04:43]   BikeObject_Steer.cpp
-[19:04:43]   BikeUI.cpp
-[19:04:43]   OpenGlTextureImpl.cpp
-[19:04:44]   BikeWind.cpp
-[19:04:44]   GraphicsDeviceCommon.cpp
-[19:04:45]   Dx11Device.cpp
-[19:04:45]   Dx11TextureImpl.cpp
-[19:04:46]   Dx11BufferImpl.cpp
-[19:04:46]   Dx11ShaderImpl.cpp
-[19:04:47]   cscli.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\cscli.exe
-[19:04:47]   Dx11PipelineImpl.cpp
-[19:04:47]   PPManager.cpp
-[19:04:47]   PostProcessSettings.cpp
-[19:04:47]   'pwsh.exe' is not recognized as an internal or external command,
-[19:04:47]   operable program or batch file.
-[19:04:48]   RenderExtra.cpp
-[19:04:49]   RenderExtra_LightCookieAtlas.cpp
-[19:04:49]   MyGame.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\MyGame.lib
-[19:04:49]   RenderExtra_SSR.cpp
-[19:04:49]   RenderGiManager.cpp
-[19:04:49]   RenderScene.cpp
-[19:04:50]   Canvas2dTypes.cpp
-[19:04:50]   Canvas2dGpuMesh.cpp
-[19:04:50]   doing full rebuild
-[19:04:50]   Starting codegen script... fullrebuild=True
-[19:04:50]   fixing pts in typenames
-[19:04:50]   read enums and structs in 283.46 ms
-[19:04:50]   mega file time 0.0
-[19:04:50]   Canvas2dRecorder.cpp
-[19:04:50]   Canvas2dVertexArray.cpp
-[19:04:50]   Canvas2dBackendLocal.cpp
-[19:04:51]   RaytraceTest.cpp
-[19:04:51]   RaytraceTest_BVH.cpp
-[19:04:51]   RaytraceTest_Probe.cpp
-[19:04:51]   [('.', 'Debug.h'), ('.', 'DebugConsole.h'), ('.', 'EditorPopups.h'), ('.', 'EditorPopupTemplate.h'), ('.', 'EngineMain.h'), ('.', 'GameEngineLocal.h'), ('.', 'GameEnginePublic.h'), ('.', 'IEditorTool.h'), ('.', 'ITestRunner.h'), ('.', 'Level.h'), ('.', 'Logging.h'), ('.', 'pch.h'), ('.', 'Testheader.h'), ('.', 'User_Camera.h'), ('.\\AgentBridge', 'AgentBridge.h'), ('.\\Animation', 'AnimationSeqAsset.h'), ('.\\Animation', 'AnimationTypes.h'), ('.\\Animation', 'AnimationUtil.h'), ('.\\Animation', 'AnimEvent.h'), ('.\\Animation', 'AnimSeqEditor.h'), ('.\\Animation', 'AnimSidecarFile.h'), ('.\\Animation', 'AnimTreeAsset.h'), ('.\\Animation', 'AnimTreeBuild.h'), ('.\\Animation', 'Event.h'), ('.\\Animation', 'SkeletonData.h'), ('.\\Animation', 'SkeletonEditor.h'), ('.\\Animation\\Editor', 'AnimTreeEditor.h'), ('.\\Animation\\Editor', 'BoneMaskEditor.h'), ('.\\Animation\\Runtime', 'Animation.h'), ('.\\Animation\\Runtime', 'AnimationTreeLocal.h'), ('.\\Animation\\Runtime', 'Easing.h'), ('.\\Animation\\Runtime', 'Percentage.h'), ('.\\Animation\\Runtime', 'RuntimeNodesNew.h'), ('.\\Animation\\Runtime', 'RuntimeNodesNew2.h'), ('.\\Animation\\Runtime', 'SpringBones.h'), ('.\\Animation\\Runtime', 'SyncTime.h'), ('.\\AssetCompile', 'Compiliers.h'), ('.\\AssetCompile', 'GltfExport.h'), ('.\\AssetCompile', 'ModelAsset2.h'), ('.\\AssetCompile', 'ModelCompilierLocal.h'), ('.\\AssetCompile', 'SkeletonAsset.h'), ('.\\AssetCompile', 'Someutils.h'), ('.\\AssetCompile', 'SoundAsset.h'), ('.\\Assets', 'AssetBrowser.h'), ('.\\Assets', 'AssetDatabase.h'), ('.\\Assets', 'AssetInspectorPane.h'), ('.\\Assets', 'AssetReferenceQuery.h'), ('.\\Assets', 'AssetReferenceViewer.h'), ('.\\Assets', 'AssetRegistry.h'), ('.\\Assets', 'AssetRegistryLocal.h'), ('.\\Assets', 'AssetSizeViewer.h'), ('.\\Assets', 'FileWatcher.h'), ('.\\Assets', 'HackedReloader.h'), ('.\\Assets', 'IAsset.h'), ('.\\Assets', 'ScriptableObject.h'), ('.\\AssetTools', 'AssetCompiler.h'), ('.\\AssetTools', 'AssetDiagnostics.h'), ('.\\AssetTools', 'AssetOps.h'), ('.\\AssetTools', 'AssetPackager.h'), ('.\\AssetTools', 'AssetTemplates.h'), ('.\\AssetTools', 'DiagnosticsWindow.h'), ('.\\Framework', 'AddClassToFactory.h'), ('.\\Framework', 'ArenaAllocator.h'), ('.\\Framework', 'ArenaStd.h'), ('.\\Framework', 'ArrayReflection.h'), ('.\\Framework', 'BinaryReadWrite.h'), ('.\\Framework', 'BoolButton.h'), ('.\\Framework', 'BVH.h'), ('.\\Framework', 'Bytepacker.h'), ('.\\Framework', 'ClassBase.h'), ('.\\Framework', 'ClassTypeInfo.h'), ('.\\Framework', 'ClassTypePtr.h'), ('.\\Framework', 'Config.h'), ('.\\Framework', 'ConsoleCmdGroup.h'), ('.\\Framework', 'Curve.h'), ('.\\Framework', 'CurveEditorImgui.h'), ('.\\Framework', 'DictParser.h'), ('.\\Framework', 'DictWriter.h'), ('.\\Framework', 'EditorTheme.h'), ('.\\Framework', 'EnumDefReflection.h'), ('.\\Framework', 'Factory.h'), ('.\\Framework', 'Files.h'), ('.\\Framework', 'FnFactory.h'), ('.\\Framework', 'FreeList.h'), ('.\\Framework', 'GradientEditorImgui.h'), ('.\\Framework', 'Guid.h'), ('.\\Framework', 'Handle.h'), ('.\\Framework', 'Hashmap.h'), ('.\\Framework', 'Hashset.h'), ('.\\Framework', 'InlineVec.h'), ('.\\Framework', 'InterfaceTypeInfo.h'), ('.\\Framework', 'Jobs.h'), ('.\\Framework', 'Log.h'), ('.\\Framework', 'LuaColor.h'), ('.\\Framework', 'MapUtil.h'), ('.\\Framework', 'MathLib.h'), ('.\\Framework', 'MemArena.h'), ('.\\Framework', 'MeshBuilder.h'), ('.\\Framework', 'MeshBuilderImpl.h'), ('.\\Framework', 'MulticastDelegate.h'), ('.\\Framework', 'MyImguiLib.h'), ('.\\Framework', 'NodeCanvasImgui.h'), ('.\\Framework', 'NodeMenuItem.h'), ('.\\Framework', 'Optional.h'), ('.\\Framework', 'PidTuner.h'), ('.\\Framework', 'PoolAllocator.h'), ('.\\Framework', 'Profiler.h'), ('.\\Framework', 'ProfilerUI.h'), ('.\\Framework', 'PropertyEd.h'), ('.\\Framework', 'PropertyPtr.h'), ('.\\Framework', 'PropertyUtil.h'), ('.\\Framework', 'Range.h'), ('.\\Framework', 'Rect2d.h'), ('.\\Framework', 'Reflection2.h'), ('.\\Framework', 'ReflectionMacros.h'), ('.\\Framework', 'ReflectionProp.h'), ('.\\Framework', 'RingBuffer.h'), ('.\\Framework', 'ScopedBoolean.h'), ('.\\Framework', 'SerializedForDiffing.h'), ('.\\Framework', 'Serializer.h'), ('.\\Framework', 'SerializerBinary.h'), ('.\\Framework', 'SerializerJson.h'), ('.\\Framework', 'SerializerJson2.h'), ('.\\Framework', 'SharedPtr.h'), ('.\\Framework', 'StringName.h'), ('.\\Framework', 'StringUtil.h'), ('.\\Framework', 'StringUtils.h'), ('.\\Framework', 'StructReflection.h'), ('.\\Framework', 'SysPrint.h'), ('.\\Framework', 'UniquePtrReflection.h'), ('.\\Framework', 'Util.h'), ('.\\Framework', 'VectorReflect2.h'), ('.\\Game', 'BaseUpdater.h'), ('.\\Game', 'EditorAddMenu.h'), ('.\\Game', 'Entity.h'), ('.\\Game', 'EntityComponent.h'), ('.\\Game', 'EntityPtr.h'), ('.\\Game', 'GameEventBus.h'), ('.\\Game', 'GameplayStatic.h'), ('.\\Game', 'LevelAssets.h'), ('.\\Game', 'Prefab.h'), ('.\\Game\\CarGame', 'CarGame.h'), ('.\\Game\\CarGame', 'CarGui.h'), ('.\\Game\\Components', 'ArrowComponent.h'), ('.\\Game\\Components', 'BillboardComponent.h'), ('.\\Game\\Components', 'CameraComponent.h'), ('.\\Game\\Components', 'DecalComponent.h'), ('.\\Game\\Components', 'GameAnimationMgr.h'), ('.\\Game\\Components', 'GraphCurveComponent.h'), ('.\\Game\\Components', 'GroupComponent.h'), ('.\\Game\\Components', 'LightComponents.h'), ('.\\Game\\Components', 'MeshbuilderComponent.h'), ('.\\Game\\Components', 'MeshComponent.h'), ('.\\Game\\Components', 'NavComps.h'), ('.\\Game\\Components', 'ParticleComponent.h'), ('.\\Game\\Components', 'ParticleMgr.h'), ('.\\Game\\Components', 'ParticleSystemComponent.h'), ('.\\Game\\Components', 'PhysicsComponents.h'), ('.\\Game\\Components', 'PostProcessComponent.h'), ('.\\Game\\Components', 'PostProcessEditorUI.h'), ('.\\Game\\Components', 'PrefabAssetComponent.h'), ('.\\Game\\Components', 'RagdollComponent.h'), ('.\\Game\\Components', 'RagdollConfigComponent.h'), ('.\\Game\\Components', 'RagdollGizmoMesh.h'), ('.\\Game\\Components', 'RagdollJointComponent.h'), ('.\\Game\\Components', 'RagdollPhysicsBodyComponent.h'), ('.\\Game\\Components', 'RagdollSetupComponent.h'), ('.\\Game\\Components', 'RagdollUtil.h'), ('.\\Game\\Components', 'RenderStressTestComponent.h'), ('.\\Game\\Components', 'RoadNetworkComponent.h'), ('.\\Game\\Components', 'SpawnerComponenth.h'), ('.\\Game\\Components', 'SpringBoneManagerComponent.h'), ('.\\Game\\Components', 'SpringBonePreviewComponent.h'), ('.\\Game\\Components', 'SpringBoneSetupComponent.h'), ('.\\Game\\Components', 'SpringBoneSetupUtil.h'), ('.\\Game\\Entities', 'BikeEntity.h'), ('.\\Game\\Entities', 'BikeSystem.h'), ('.\\Game\\Entities', 'CharacterController.h'), ('.\\Game\\Entities', 'Player.h'), ('.\\Game\\Entities', 'PlayerAnimDriver.h'), ('.\\Game\\ObsGame', 'ObsGameHeaders.h'), ('.\\Game\\Particles', 'ParticleAsset.h'), ('.\\Game\\Particles', 'ParticleEditorUI.h'), ('.\\Game\\Particles', 'ParticleModules.h'), ('.\\Game\\Particles', 'ParticleTypes.h'), ('.\\Game\\TopDownShooter', 'TDChest.h'), ('.\\Game\\TopDownShooter', 'TopDownPlayer.h'), ('.\\Game\\TopDownShooter', 'TopDownShooterGame.h'), ('.\\Game\\TP', 'DefaultGameHeader.h'), ('.\\Game\\TP', 'TPGame.h'), ('.\\Input', 'InputSystem.h'), ('.\\Input', 'Sdl2CompatGamepad.h'), ('.\\IntegrationTests', 'EditorTestContext.h'), ('.\\IntegrationTests', 'GpuTimer.h'), ('.\\IntegrationTests', 'RenderDump.h'), ('.\\IntegrationTests', 'Screenshot.h'), ('.\\IntegrationTests', 'StateDump.h'), ('.\\IntegrationTests', 'TestContext.h'), ('.\\IntegrationTests', 'TestGameApp.h'), ('.\\IntegrationTests', 'TestRegistry.h'), ('.\\IntegrationTests', 'TestRunner.h'), ('.\\IntegrationTests', 'TestTask.h'), ('.\\LevelSerialization', 'SerializeNew.h'), ('.\\Navigation', 'LevelNavUtil.h'), ('.\\Navigation', 'NavAgentComponent.h'), ('.\\Navigation', 'NavMeshBaker.h'), ('.\\Navigation', 'NavMeshDebugDraw.h'), ('.\\Navigation', 'NavMeshSettingsComponent.h'), ('.\\Navigation', 'NavMeshVolumeComponent.h'), ('.\\Navigation', 'RuntimeNavManager.h'), ('.\\Physics', 'ChannelsAndPresets.h'), ('.\\Physics', 'Physics2.h'), ('.\\Physics', 'Physics2Local.h'), ('.\\Scripting', 'LuaTestRunner.h'), ('.\\Scripting', 'LuaTransform.h'), ('.\\Scripting', 'LuaVecQuat.h'), ('.\\Scripting', 'ScriptFunctionCodegen.h'), ('.\\Scripting', 'ScriptingStdLib.h'), ('.\\Scripting', 'ScriptManager.h'), ('.\\Sound', 'SoundComponent.h'), ('.\\Sound', 'SoundLocal.h'), ('.\\Sound', 'SoundPublic.h'), ('.\\UI', 'Canvas2d.h'), ('.\\UI', 'FontAsset.h'), ('.\\UI', 'OnScreenLogGui.h'), ('.\\UI', 'UiAnchor.h'), ('.\\UI', 'ViewportSystem.h'), ('.\\UI\\RmlUi', 'RmlUiRenderHook.h'), ('.\\UI\\RmlUi', 'RmlUiSystem.h'), ('.\\UI\\RmlUi', 'RmlUiSystemInterface.h'), ('.\\UI\\Widgets', 'EditorCube.h'), ('.\\UnitTests', 'Unittest.h')]
-[19:04:51]   Cleaning .generated/...
-[19:04:51]   Cleaning .generated/...
-[19:04:51]   Parsing files...
-[19:04:51]   unknown type, assuming struct: Serializer
-[19:04:51]   unknown type, assuming struct: Serializer
-[19:04:51]   Writing output...
-[19:04:51]   Writing generated source ./.generated/MEGA.gen.cpp
-[19:04:51]   Finished in 1033.96 ms
-[19:04:51]   LevelEditor.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\LevelEditor.lib
-[19:04:51]   RaytraceTest_Shade.cpp
-[19:04:51]   MEGA.gen.cpp
-[19:04:51]   pch.cpp
-[19:04:52]   Shadowmap.cpp
-[19:04:52]   Ssao.cpp
-[19:04:53]   Texture.cpp
-[19:04:53]   TextureDDS.cpp
-[19:04:53]   TextureUpload.cpp
-[19:04:53]   Volumetricfog.cpp
-[19:04:53]   RmlUiRenderInterface.cpp
-[19:04:53]   Meshlet.cpp
-[19:04:56]   Render.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\Render.lib
-[19:05:04]   AssetReferenceQuery.cpp
-[19:05:05]   AgentBridge.cpp
-[19:05:05]   AgentBridgeLua.cpp
-[19:05:05]   AssetRegistry.cpp
-[19:05:05]   Files.cpp
-[19:05:05]   FileWatcher.cpp
-[19:05:05]   write_gltf.cpp
-[19:05:05]   AgentBridgeCommands.cpp
-[19:05:08]   AssetInspectorPane.cpp
-[19:05:08]   Util.cpp
-[19:05:08]   unity_JWL580C5051WEOKO.cpp
-[19:05:10]   unity_K0J5DUGQA4G5RSKS.cpp
-[19:05:10]   unity_BF4ZFQHQFUGNQXDC.cpp
-[19:05:10]   unity_44FLZH23V07BSHKJ.cpp
-[19:05:10]   unity_B0YIIF6SH71BGVBH.cpp
-[19:05:10]   unity_ZFHUF0HVTD0KCDJL.cpp
-[19:05:15]   unity_LEKHH7IZ5H4U0AWK.cpp
-[19:05:16]   unity_5A2RLJUZOIBPMWWP.cpp
+FileSys::create_directory: ./Logs
+Created directory ./Logs
+←[32mC:\Users\charl\source\repos\CsRemake\x64\Debug\App.exe --editor --wait-for-debugger
+←[0m←[32m2026-10-15 12:28:17.200
+←[0m--------- Initializing Engine ---------
+←[32minit init commands in  0.000317s
+←[0m←[32mInitialized Classes; num classes: 154
+←[0m←[32minit init class system in  0.017714s
+←[0m←[35m$
+←[0m←[35m$ startup_project "fps_game"
+←[0m←[35m$
+←[0m←[35m$ r_indirect_loop 1
+←[0m←[35m$ gpu.draw_collision_tris 0
+←[0m←[35m$ gpu.draw_sv_colliders 0
+←[0m←[35m$ gpu.draw_viewmodel 1
+←[0m←[35m$ view.tp 0
+←[0m←[35m$ dbg.fly 0
+←[0m←[35m$
+←[0m←[35m$ r.editor_fast_frame_limit_fps 120
+←[0m←[35m$ r.frame_limit_fps 67
+←[0m←[35m$ r.enable_vsync 0
+←[0m←[35m$
+←[0m←[35m$ r.taa 1
+←[0m←[35m$ r.taa_sharpness 0.08
+←[0m←[35m$ r.taa_adaptive_blend 1
+←[0m←[35m$ r.taa_motion_blend 0.6
+←[0m←[35m$ r.taa_stationary_blend 0.9
+←[0m←[35m$
+←[0m←[35m$ dt 1
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$ view.sens 0.005
+←[0m←[35m$
+←[0m←[35m$ g_draw_grid 0
+←[0m←[35m$
+←[0m←[35m$ enable_gl_debug_output 1
+←[0m←[35m$
+←[0m←[35m$ g_draw_physx_scene 0
+←[0m←[35m$
+←[0m←[35m$ disable_texture_loads 0
+←[0m←[35m$ g_debug_skeletons 0
+←[0m←[35m$
+←[0m←[35m$ ed_decal_active 0
+←[0m←[35m$ r.drawdecals 1
+←[0m←[35m$
+←[0m←[35m$ ddgi_probe_debug 0
+←[0m←[35m$
+←[0m←[35m$ ignore_folders 1
+←[0m←[35m$
+←[0m←[35m$ stat.fps 1
+←[0m←[35m$ debug.menu_width 400
+←[0m←[35m$
+←[0m←[35m$ g_lua_cpath_extra "C:/Users/charl/source/vcpkg/installed/x64-windows/bin"
+←[0m←[35m$ g_lua_debug_host "127.0.0.1"
+←[0m←[35m$ g_lua_debug_port 9966
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[32minit execute vars file in  0.040259s
+←[0m←[35m$ g_project_name FpsGame
+←[0m←[35m$ g_project_base "D:/Data"
+←[0m←[35m$ g_application_class "fpsApp"
+←[0m←[32minit execute project file in  0.004475s
+←[0minitializing window...
+←[32mOpenGL loaded
+←[0m←[32mVendor: ATI Technologies Inc.
+←[0m←[32mRenderer: Radeon (TM) RX 480 Graphics
+←[0m←[32mVersion: 4.6.0 Compatibility Profile Context 24.3.1.240216
+
+←[0mdisplay refresh rate: 59.940 hz (1920x1080)
+←[32minit init sdl window in  0.596099s
+←[0m←[35m$ -editor
+←[0m←[35m$ -wait-for-debugger
+←[0magent_bridge: listening on 127.0.0.1:23456
+←[32minit asset init in  0.009364s
+←[0m←[32minit job sys init in  0.002521s
+←[0m←[32mScriptManager::load_script_files
+←[0mScriptManager::reload_all_scripts
+←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/demo/hud_corners_demo.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/demo/rmlui_controls_demo.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/demo/rmlui_lua_demo.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/engine_test_app.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/animated_chest.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/animated_shared.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/animgraph.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/classes.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/console_commands.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/coroutine_test.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/npc.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/npc_animator.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/fps/test_classes.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/globals.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/integration_test_framework.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/script_util.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/sdl_button_enums.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/std/callback_shim.lua
+←[0m←[32mScriptManager::load_script_files: found lua file D:/Data/scripts/std/coroutine_manager.lua
+←[0moneline class
+oneline class
+oneline class
+oneline class
+oneline class
+oneline class
+oneline class
+oneline class
+oneline class
+oneline class
+oneline class
+oneline class
+←[32minit script init in  0.124135s
+←[0m--------- Initializing Renderer ---------
+←[32minit draw:device in  0.000001s
+←[0m←[32m###########################
+←[0m←[32m#### Extension support ####
+←[0m←[32m###########################
+←[0m←[32m-GL_ARB_sparse_texture: yes
+←[0m←[32m-GL_ARB_texture_filter_minmax: yes
+←[0m←[32m-GL_EXT_texture_compression_s3tc: yes
+←[0m←[32m-GL_NV_shader_atomic_int64: yes
+←[0m←[32m-GL_ARB_gpu_shader_int64: no
+←[0m←[32m############################
+←[0m←[32m#### GL Hardware Values ####
+←[0m←[32m############################
+←[0m←[32m-GL_MAX_UNIFORM_BUFFER_BINDINGS: 84
+←[0m←[32m-GL_MAX_TEXTURE_IMAGE_UNITS: 32
+←[0m←[32m-GL_NUM_PROGRAM_BINARY_FORMATS: 1
+←[0m←[32m-GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS: 96
+←[0m←[32m-GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS: 96
+←[0m←[32m-GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS: 96
+←[0m←[32m-GL_MAX_ARRAY_TEXTURE_LAYERS: 2048
+←[0m←[32m-GL_MAX_COLOR_ATTACHMENTS: 8
+←[0m←[32m
+←[0m←[32minit draw:init_state in  0.018786s
+←[0m←[32minit draw:arena in  0.002476s
+←[0m←[32minit draw:create_shaders in  0.202863s
+←[0m←[32minit draw:buffers in  0.002077s
+←[0m←[32minit draw:env_map in  0.146580s
+←[0m←[32minit draw:miscinit in  0.005184s
+←[0m←[32minit draw:lensdirt in  0.000764s
+←[0m←[32minit draw:objects in  0.126284s
+←[0m←[32minit draw init in  0.508269s
+←[0m←[32m0 existing controllers connected
+←[0mInitializing Physics
+←[32minit physics init in  0.013352s
+←[0m←[32minit mat init in  0.008759s
+←[0m←[91merror loading material fallback: couldn't mm/mi open file
+←[0m←[91mmodel doesn't have material fallback
+←[0m←[91mmodel doesn't have material fallback
+←[0m←[91merror loading material fallback.mm: couldn't mm/mi open file
+←[0m←[91mmodel doesn't have material fallback.mm
+←[0m←[32minit init mods,sounds in  0.069665s
+←[0m←[32minit everything in 0.001665
+←[0m←[32minit imgui init in  0.000266s
+←[0m[RmlUi] Loading Lua plugin using the provided Lua state.
+[RmlUi] Loaded font face 'Arial' [regular] from 'ui/fonts/arial.ttf'.
+[RmlUi] Loaded font face 'Inconsolata' [bold] from 'ui/fonts/inconsolata_bold.ttf'.
+[RmlUi] Loaded font face 'Inconsolata' [weight=500] from 'ui/fonts/inconsolata_regular.ttf'.
+←[32minit rmlui init in  0.021461s
+←[0m←[32minit imgui font in  0.060553s
+←[0m←[32mAssetRegistry: reindexed 2033 assets in 578.2 ms
+←[0m←[32meng/icons/publish.png needs compile because texFile==null
+←[0m←[32meng/icons/publish.png compression=UseSourceFile (UI texture), skipping compile
+←[0m←[32meng/icons/filter.png needs compile because texFile==null
+←[0m←[32meng/icons/filter.png compression=UseSourceFile (UI texture), skipping compile
+←[0m←[32minit asset reg and browser init in  2.182041s
+←[0m←[35m$
+←[0m←[35m$ bind 1 "map top_down/map0.tmap"
+←[0m←[35m$ bind 2 "TOGGLE_PLAY_EDIT_MAP"
+←[0m←[35m$ bind 3 "start_ed Prefab fire_emit.pfb"
+←[0m←[35m$ bind 4 "start_ed Prefab top_down/player.pfb"
+←[0m←[35m$ bind 5 "map car/testmap.tmap"
+←[0m←[35m$ bind 9 "start_ed Map car/testmap.tmap"
+←[0m←[35m$ bind 8 "start_ed Map top_down/map0.tmap"
+←[0m←[35m$ bind B Shift "reload_script"
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$ bind , "toggle g_drawdebugmenu"
+←[0m←[35m$ bind . "toggle drawconsole"
+←[0m←[35m$
+←[0m←[35m$ bind [ "print_vertex_usage"
+←[0m←[35m$ bind ] "compact_vertex_buffer"
+←[0m←[35m$
+←[0m←[35m$ bind T "toggle editor_draw_name_text"
+←[0m←[35m$ bind Y "toggle ed.force_guizmo"
+←[0m←[35m$
+←[0m←[35m$ bind F1 "r.debug_mode 0"
+←[0m←[35m$ bind F2 "r.debug_mode 4"
+←[0m←[35m$ bind F3 "r.debug_mode 5"
+←[0m←[35m$ bind F4 "r.debug_mode 8"
+←[0m←[35m$ bind F5 "r.debug_mode 2"
+←[0m←[35m$ bind F6 "r.debug_mode 6"
+←[0m←[35m$ bind F7 "r.debug_mode 7"
+←[0m←[35m$ bind F8 "r.debug_mode 8"
+←[0m←[35m$ bind F9 "r.debug_mode 10"
+←[0m←[35m$
+←[0m←[35m$ bind F11 "toggle vid.fullscreen"
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$ bind "F" SET_ORBIT_TARGET
+←[0m←[35m$
+←[0m←[35m$ bind "Z" Ctrl "anim.undo"
+←[0m←[35m$ bind "D" Shift "anim.dup"
+←[0m←[35m$ bind "Delete" "anim.del"
+←[0m←[35m$ bind "Left" Alt "anim.up_layer"
+←[0m←[35m$ bind "Right" Alt "anim.down_layer"
+←[0m←[35m$ bind "C" Ctrl "anim.copy"
+←[0m←[35m$ bind "V" Ctrl "anim.paste"
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$ bind J "toggle r.taa"
+←[0m←[35m$ bind K "toggle r.taa_flicker_remove"
+←[0m←[35m$ bind L "toggle r.disable_animated_velocity_vector"
+←[0m←[35m$ bind I "toggle r.taa_32f"
+←[0m←[35m$
+←[0m←[35m$ bind O "inc r.taa_jitter_test"
+←[0m←[35m$ bind P "dec r.taa_jitter_test"
+←[0m←[35m$
+←[0m←[35m$ bind H "ed.HideSelected"
+←[0m←[35m$ bind "H" Alt "ed.UnHideAll"
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$ bind "Left" Alt "EDITOR_BACK_ONE_PAGE"
+←[0m←[35m$ bind "Right" Alt "EDITOR_FORWARD_ONE_PAGE"
+←[0m←[35m$
+←[0m←[35m$ bind "Keypad 0" Ctrl "CLEAR_AB_FILTER"
+←[0m←[35m$
+←[0m←[35m$ dbg.fly 1
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$ file_print_all_openfile_fails 0
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$ bind 7 "start_ed AnimGraph beu_character.ag"
+←[0m←[35m$
+←[0m←[35m$
+←[0m←[35m$ r.taa 0
+←[0m←[35m$
+←[0m←[35m$ loglevel 5
+←[0m←[35m$ developer_mode 1
+←[0m←[35m$
+←[0m←[35m$ recent 1
+←[0m←[91merror loading material _NULL: couldn't mm/mi open file
+←[0m←[91mmodel doesn't have material _NULL
+←[0m←[91merror loading material Material.002.mi: couldn't mm/mi open file
+←[0m←[91mmodel doesn't have material Material.002.mi
+←[0m←[91merror loading material Material.mi: couldn't mm/mi open file
+←[0m←[91mmodel doesn't have material Material.mi
+←[0m←[91mmodel doesn't have material _NULL
+←[0m←[91mmodel doesn't have material _NULL
+←[0m←[91mmodel doesn't have material _NULL
+←[0m←[91mmodel doesn't have material _NULL
+←[0m←[33mcouldn't find texture import settings file empire_textures/WoodSiding3Roughness.dds
+←[0m←[33mcouldn't find texture import settings file ScatteredLeaves006_1K-JPG_Color.dds
+←[0m←[33mcouldn't find texture import settings file ScatteredLeaves006_1K-JPG_Opacity.dds
+←[0m←[91mmodel doesn't have material Material.mi
+←[0m←[91mmodel doesn't have material Material.mi
+←[0m←[33mcouldn't find texture import settings file empire_textures/Wood092_1K-JPG_Roughness.dds
+←[0m←[91merror loading material Material.001.mi: couldn't mm/mi open file
+←[0m←[91mmodel doesn't have material Material.001.mi
+←[0m←[33mcouldn't find texture import settings file eng/kloofendal_48d_partly_cloudy_puresky_4k.dds
+←[0m←[91merror loading material *dm: couldn't mm/mi open file
+←[0m←[91mmodel doesn't have material _NULL
+←[0m←[91mmodel doesn't have material _NULL
+←[0m←[91mmodel doesn't have material _NULL
+←[0m←[33mmaps/foliage_examples.tmap: unknown component type 'SpawnerComponent_DOESNTEXIST' ΓÇö preserving as opaque blob for round-trip
+←[0mChanging map: maps/foliage_examples.tmap (for_playing=False)
+←[32meng/icon/_nearest/particle.png needs compile because texFile==null
+←[0m←[32meng/icon/_nearest/particle.png skipping compile because src_file==null
+←[0m←[32meng/icon/trafficcone.png needs compile because texFile==null
+←[0m←[32meng/icon/trafficcone.png compression=UseSourceFile (UI texture), skipping compile
+←[0m←[32meng/icon/_nearest/decal.png needs compile because texFile==null
+←[0m←[32meng/icon/_nearest/decal.png compression=UseSourceFile (UI texture), skipping compile
+←[0m[RmlUi] table: 0000018B3A6C8400
+
+[RmlUi] table: 0000018B3A6C7400
+
+[RmlUi] table: 0000018B3A6C7680
+
+[RmlUi] table: 0000018B3A6C7900
+
+←[32meng/icon/_nearest/skylight.png needs compile because texFile==null
+←[0m←[32meng/icon/_nearest/skylight.png compression=UseSourceFile (UI texture), skipping compile
+←[0m←[32meng/editor/sound.png needs compile because texFile==null
+←[0m←[32meng/editor/sound.png compression=UseSourceFile (UI texture), skipping compile
+←[0m←[32meng/editor/script_lua.png needs compile because texFile==null
+←[0m←[32meng/editor/script_lua.png compression=UseSourceFile (UI texture), skipping compile
+←[0m[RmlUi] REFRESH!
+
+find_components_of_class: took 0.000233
+←[32meng/icon/_nearest/sun.png needs compile because texFile==null
+←[0m←[32meng/icon/_nearest/sun.png compression=UseSourceFile (UI texture), skipping compile
+←[0m←[32meng/icon/_nearest/worldsettings.png needs compile because texFile==null
+←[0m←[32meng/icon/_nearest/worldsettings.png compression=UseSourceFile (UI texture), skipping compile
+←[0m.cmdl version out of data (found 18, current 19), recompiling
+#### Compiling Model work_prop/pallet_drum.mis ####
+←[91mcouldn't open souce file work_prop/work_prop/palletDrum.glb
+←[0m←[91mload_cgltf_data failed
+←[0m←[91mcompilier failed on model work_prop/pallet_drum.mis
+←[0m←[91mout of date format
+←[0m←[32meng/icon/_nearest/flashlight.png needs compile because texFile==null
+←[0m←[32meng/icon/_nearest/flashlight.png compression=UseSourceFile (UI texture), skipping compile
+←[0m←[32mLevel::start: took 0.659473
+←[0m←[33mspecilized format has more than 1 mipmap
+←[0m←[33mspecilized format has more than 1 mipmap
+←[0mcompute_avg_probe_value 14
+changed state to Engine_State::Game
+←[32mOpenMapCommand::execute: took 1.209540
+←[0m←[32mEdit mode: Scene←[0m←[35m$ load_imgui_ini  editor.ini
+←[0m←[35m$
+←[0m←[32minit execute init in  1.330438s
+←[0m←[32minit load default bundle in  0.001049s
+←[0mexecute startup in 4.992818
+←[33mcouldn't find texture import settings file eng/fonts/monospace12_0.dds
+←[0m←[32meng/dashed_line.png needs compile because texFile==null
+←[0m←[32meng/dashed_line.png compression=UseSourceFile (UI texture), skipping compile
+←[0mAssetRegistry: file changed: .asset_diag_cache.json
+←[32mcompiling shader: eng/fontDefault.mm
+←[0m←[32mcompiling shader: eng/fallback.mm
+←[0m←[32mcompiling shader: eng/sky_simple.mm
+←[0m←[32mcompiling shader: eng/skyClouds.mm
+←[0m←[32mcompiling shader: eng/defaultEditorSelect.mm
+←[0m←[32mcompiling shader: parallax_occlusion.mm
+←[0m←[32mcompiling shader: leaves_decal1.mm
+←[0m←[32mcompiling shader: defaultEmpire.mm
+←[0m←[32mcompiling shader: bulletDecal.mm
+←[0m←[32mcompiling shader: transparent_debug.mm
+←[0m←[32mcompiling shader: eng/billboardDefault.mm
+←[0m←[32mcompiling shader: fx/materials/particle_textured.mm
+←[0m←[32mcompiling shader: materials/default_pbr_baked_ao.mm
+←[0m←[32mcompiling shader: default_pbr_trim.mm
+←[0m←[32mcompiling shader: defaultElectrical.mm
+←[0m←[32mcompiling shader: models/blockout_concrete/blob_shadow.mm
+←[0m←[32mcompiling shader: defaultPBRmasked.mm
+←[0m←[32mcompiling shader: orborbmat.mm
+←[0m←[32mcompiling shader: trigger_zone.mm
+←[0m←[32mcompiling shader: defaultPBR.mm
+←[0m←[32mcompiling shader: particle_default.mm
+←[0m←[32mcompiling shader: eng/uiDefault.mm
+←[0m←[32mcompiling shader: eng/dashed_line.mm
+←[0m←[32mcheck_cubemaps_dirty:rendering skylight cubemap
+←[0m←[32mrebuilding fast path model data
+←[0m←[32mcompiling shader: eng/fallback.mm ANIMATED
+←[0m←[32mcompiling shader: eng/sky_simple.mm NO_TAA
+←[0m←[32mRenderer::check_cubemaps_dirty: time 0.165922
+←[0m←[32mcompiling shader: models/blockout_concrete/blob_shadow.mm EDITOR_ID,NO_TAA
+←[0m←[32mcompiling shader: trigger_zone.mm EDITOR_ID,NO_TAA
+←[0m←[32mcompiling shader: eng/sky_simple.mm EDITOR_ID,NO_TAA
+←[0m←[32mcompiling shader: eng/fallback.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: eng/sky_simple.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: parallax_occlusion.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: defaultEmpire.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: eng/billboardDefault.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: materials/default_pbr_baked_ao.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: default_pbr_trim.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: defaultElectrical.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: defaultPBRmasked.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: defaultPBR.mm EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: eng/fallback.mm ANIMATED,EDITOR_ID,MAT_WITH_INST
+←[0m←[32mcompiling shader: eng/fallback.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: eng/sky_simple.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: parallax_occlusion.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: defaultEmpire.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: eng/billboardDefault.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: materials/default_pbr_baked_ao.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: default_pbr_trim.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: defaultElectrical.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: defaultPBRmasked.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: defaultPBR.mm EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m←[32mcompiling shader: eng/fallback.mm ANIMATED,EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+←[0m

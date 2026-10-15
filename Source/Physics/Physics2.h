@@ -6,6 +6,7 @@
 #include <vector>
 #include <span>
 #include "Framework/ClassBase.h"
+#include "Physics/ChannelsAndPresets.h"
 
 namespace physx {
 
@@ -168,6 +169,12 @@ public:
 	// Returns the bitmask of layers that `layer` collides/overlaps with. Used to fill
 	// PxFilterData::word1 when building a shape. layer must be in [0, 32).
 	uint32_t get_collision_mask_for_layer(int layer);
+
+	// Runtime terrain/procedural-world collision. Vertices are local to world_transform;
+	// this owns the cooked PhysX triangle mesh through the returned static actor.
+	physx::PxRigidActor* create_static_triangle_mesh(const std::vector<glm::vec3>& vertices,
+		const std::vector<uint32_t>& indices, const glm::mat4& world_transform, PL layer);
+	void destroy_static_triangle_mesh(physx::PxRigidActor* actor);
 
 private:
 	PhysicsManImpl* impl = nullptr;

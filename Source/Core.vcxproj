@@ -170,6 +170,8 @@
     <ClCompile Include="Game\Components\SpringBoneSetupComponent.cpp" />
     <ClCompile Include="Game\Components\SpringBoneSetupUtil.cpp" />
     <ClCompile Include="Game\Components\SpringBonePreviewComponent.cpp" />
+
+    <ClCompile Include="Game\Components\TerrainComponent.cpp" />
     <ClCompile Include="Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Game\Entities\CharacterController.cpp" />
@@ -208,6 +210,8 @@
     <ClCompile Include="UI\RmlUi\RmlUiDebugMenu.cpp" />
     <ClCompile Include="User_Camera.cpp" />
     <ClInclude Include="Animation\AnimationTypes.h" />
+
+    <ClInclude Include="Game\Components\TerrainComponent.h" />
     <ClInclude Include="Animation\AnimationUtil.h" />
     <ClInclude Include="Animation\Event.h" />
     <ClInclude Include="Animation\Runtime\RuntimeNodesNew.h" />

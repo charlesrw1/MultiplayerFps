@@ -79,7 +79,9 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	if (material_print_debug.get_bool())
 		sys_print(Debug, "compiling shader: %s %s\n", mat->get_name().c_str(), params.c_str());
 
-	const bool is_tesselation = mat->get_master_material()->usage == MaterialUsage::Terrain;
+	// Terrain now uses ordinary vertex displacement on chunk LOD meshes.  The old
+	// terrain master was tessellation-only, which made LOD selection backend-specific.
+	const bool is_tesselation = false;
 	program_handle handle = draw.get_prog_man().create_single_file(name, is_tesselation, params);
 	ASSERT(handle != -1);
 

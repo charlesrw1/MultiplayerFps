@@ -64,6 +64,8 @@
     <ClCompile Include="SceneExport.cpp" />
     <ClCompile Include="SelectionMode.cpp" />
     <ClCompile Include="SelectionState.cpp" />
+
+    <ClCompile Include="TerrainEditorTool.cpp" />
     <ClCompile Include="ViewportHandles.cpp" />
   </ItemGroup>
   <ItemGroup>

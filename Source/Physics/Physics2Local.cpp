@@ -108,6 +108,43 @@ uint32_t PhysicsManager::get_collision_mask_for_layer(int layer) {
 	return impl->layer_collision_masks[layer];
 }
 
+physx::PxRigidActor* PhysicsManager::create_static_triangle_mesh(const std::vector<glm::vec3>& vertices,
+	const std::vector<uint32_t>& indices, const glm::mat4& world_transform, PL layer) {
+	if (vertices.size() < 3 || indices.size() < 3 || indices.size() % 3 != 0)
+		return nullptr;
+	physx::PxTriangleMeshDesc desc;
+	desc.points.count = (physx::PxU32)vertices.size();
+	desc.points.stride = sizeof(glm::vec3);
+	desc.points.data = vertices.data();
+	desc.triangles.count = (physx::PxU32)(indices.size() / 3);
+	desc.triangles.stride = sizeof(uint32_t) * 3;
+	desc.triangles.data = indices.data();
+	physx::PxCookingParams params(impl->physics_factory->getTolerancesScale());
+	physx::PxTriangleMesh* mesh = PxCreateTriangleMesh(params, desc);
+	if (!mesh)
+		return nullptr;
+	physx::PxRigidStatic* actor = impl->physics_factory->createRigidStatic(glm_to_physx(world_transform));
+	physx::PxShape* shape = physx::PxRigidActorExt::createExclusiveShape(
+		*actor, physx::PxTriangleMeshGeometry(mesh), *impl->default_material);
+	mesh->release();
+	physx::PxFilterData filter;
+	filter.word0 = 1u << uint32_t(layer);
+	filter.word1 = get_collision_mask_for_layer((int)layer);
+	shape->setFlags(physx::PxShapeFlag::eSCENE_QUERY_SHAPE | physx::PxShapeFlag::eSIMULATION_SHAPE | physx::PxShapeFlag::eVISUALIZATION);
+	shape->setQueryFilterData(filter);
+	shape->setSimulationFilterData(filter);
+	actor->userData = nullptr;
+	impl->scene->addActor(*actor);
+	return actor;
+}
+
+void PhysicsManager::destroy_static_triangle_mesh(physx::PxRigidActor* actor) {
+	if (!actor)
+		return;
+	impl->scene->removeActor(*(physx::PxActor*)actor);
+	actor->release();
+}
+
 #include "Render/RenderObj.h"
 #include "Physics2Local.h"
 #include <unordered_set>
