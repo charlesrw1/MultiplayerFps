@@ -333,6 +333,9 @@ class MaterialManagerLocal : public MaterialManagerPublic
 {
 public:
 	void init() override;
+	// Loads material/permutation pairs from Shaders/shader_prewarm.txt so the
+	// first scene frame finds cache entries instead of requesting them lazily.
+	void prewarm_manifest();
 	// public interface
 	void pre_render_update() override; // material buffer updates
 	DynamicMatUniquePtr create_dynmaic_material(const MaterialInstance* material) final {
@@ -375,6 +378,7 @@ private:
 	std::unique_ptr<AllMaterialTable> mat_offset_table;
 	TextureBindingHasher binding_hasher;
 	DynamicMaterialAllocator dynamic_mat_allocator;
+	bool is_prewarming_manifest = false;
 };
 
 extern MaterialManagerLocal matman;

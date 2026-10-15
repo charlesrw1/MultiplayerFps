@@ -1,13 +1,16 @@
 #include "MaterialLocal.h"
 #include "Framework/Files.h"
+#include "AssetCompile/Someutils.h"
 #include "DrawLocal.h"
 #include "Render/Texture.h"
 #include "Render/Model.h"
 #include "glad/glad.h"
 #include "IGraphicsDevice.h"
+#include "OpenGlDeviceLocal.h"
 #include "Assets/AssetDatabase.h"
 
 #include <array>
+#include <sstream>
 
 // ---------------------------------------------------------------------------
 // MaterialManagerLocal – dirty list management
@@ -104,6 +107,76 @@ void MaterialManagerLocal::init() {
 	pp_editor_select_mat = g_assets.find_sync_sptr<MaterialInstance>("eng/defaultEditorSelect.mm");
 	if (!pp_editor_select_mat)
 		Fatalf("couldnt load the default editor select material\n");
+
+	prewarm_manifest();
+}
+
+void MaterialManagerLocal::prewarm_manifest() {
+	// Workers read only the cache files named by this manifest. After they
+	// finish, get_mat_shader executes glProgramBinary on this main thread and
+	// installs the result in mat_shader_table.
+	is_prewarming_manifest = true;
+	auto file = FileSys::open_read_engine("Shaders/shader_prewarm.txt");
+	if (!file) {
+		sys_print(Warning, "shader prewarm manifest missing\n");
+		is_prewarming_manifest = false;
+		return;
+	}
+	std::string text(file->size(), '\0');
+	file->read(text.data(), text.size());
+	std::istringstream lines(text);
+	std::string line;
+	int count = 0;
+	auto trim = [](std::string value) {
+		const size_t first = value.find_first_not_of(" \t\r");
+		if (first == std::string::npos) return std::string{};
+		const size_t last = value.find_last_not_of(" \t\r");
+		return value.substr(first, last - first + 1);
+	};
+	auto parse_flags = [](const std::string& value) {
+		int flags = 0;
+		std::istringstream tokens(value);
+		std::string token;
+		while (std::getline(tokens, token, ',')) {
+			if (token == "ANIMATED") flags |= MSF_ANIMATED;
+			else if (token == "EDITOR_ID") flags |= MSF_EDITOR_ID;
+			else if (token == "DEPTH_ONLY") flags |= MSF_DEPTH_ONLY;
+			else if (token == "DITHER") flags |= MSF_DITHER;
+			else if (token == "NO_TAA") flags |= MSF_NO_TAA;
+			else if (token == "MAT_WITH_INST") flags |= MSF_MATERIAL_IN_INSTANCE;
+			else if (!token.empty()) sys_print(Warning, "shader prewarm: unknown flag %s\n", token.c_str());
+		}
+		return flags;
+	};
+	auto make_defines = [](int flags) {
+		std::string defines;
+		auto add = [&](const char* s) { if (!defines.empty()) defines += ','; defines += s; };
+		if (flags & MSF_ANIMATED) add("ANIMATED"); if (flags & MSF_DITHER) add("DITHER");
+		if (flags & MSF_EDITOR_ID) add("EDITOR_ID"); if (flags & MSF_DEPTH_ONLY) add("DEPTH_ONLY");
+		if (flags & MSF_NO_TAA) add("NO_TAA"); if (flags & MSF_MATERIAL_IN_INSTANCE) add("MAT_WITH_INST");
+		return defines;
+	};
+	std::vector<std::pair<std::shared_ptr<MaterialInstance>, int>> entries;
+	while (std::getline(lines, line)) {
+		const size_t comment = line.find('#');
+		if (comment != std::string::npos) line.resize(comment);
+		const size_t split = line.find('|');
+		const std::string path = trim(line.substr(0, split));
+		if (path.empty()) continue;
+		auto material = g_assets.find_sync_sptr<MaterialInstance>(path);
+		if (!material) { sys_print(Warning, "shader prewarm: material not found %s\n", path.c_str()); continue; }
+		const int flags = split == std::string::npos ? 0 : parse_flags(trim(line.substr(split + 1)));
+		if (gfx().get_device_type() == GraphicsDeviceType::OpenGl) {
+			std::string shader_path = FileSys::get_game_path() + std::string("/") + material->get_name();
+			shader_path = strip_extension(shader_path) + "_shader.glsl";
+			opengl_prefetch_program_binary_async(shader_path, make_defines(flags));
+		}
+		entries.emplace_back(std::move(material), flags);
+	}
+	if (gfx().get_device_type() == GraphicsDeviceType::OpenGl) opengl_wait_for_program_binary_prefetch();
+	for (auto& [material, flags] : entries) { get_mat_shader(nullptr, material.get(), flags); ++count; }
+	sys_print(Debug, "shader prewarm: loaded %d material permutations\n", count);
+	is_prewarming_manifest = false;
 }
 
 // ---------------------------------------------------------------------------

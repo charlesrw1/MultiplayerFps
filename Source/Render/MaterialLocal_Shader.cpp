@@ -76,7 +76,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	if (!params.empty())
 		params.pop_back();
 
-	if (material_print_debug.get_bool())
+	if (material_print_debug.get_bool() && !is_prewarming_manifest)
 		sys_print(Debug, "compiling shader: %s %s\n", mat->get_name().c_str(), params.c_str());
 
 	// Terrain now uses ordinary vertex displacement on chunk LOD meshes.  The old

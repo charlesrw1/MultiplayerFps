@@ -1,0 +1,50 @@
+# Material path | comma-separated master-shader flags
+eng/fallback.mm
+eng/sky_simple.mm
+eng/skyClouds.mm
+eng/defaultEditorSelect.mm
+parallax_occlusion.mm
+leaves_decal1.mm
+defaultEmpire.mm
+bulletDecal.mm
+transparent_debug.mm
+eng/billboardDefault.mm
+fx/materials/particle_textured.mm
+materials/default_pbr_baked_ao.mm
+default_pbr_trim.mm
+defaultElectrical.mm
+models/blockout_concrete/blob_shadow.mm
+defaultPBRmasked.mm
+orborbmat.mm
+trigger_zone.mm
+defaultPBR.mm
+particle_default.mm
+eng/uiDefault.mm
+eng/dashed_line.mm
+eng/fallback.mm | ANIMATED
+eng/sky_simple.mm | NO_TAA
+models/blockout_concrete/blob_shadow.mm | EDITOR_ID,NO_TAA
+trigger_zone.mm | EDITOR_ID,NO_TAA
+eng/sky_simple.mm | EDITOR_ID,NO_TAA
+eng/fallback.mm | EDITOR_ID,MAT_WITH_INST
+eng/sky_simple.mm | EDITOR_ID,MAT_WITH_INST
+parallax_occlusion.mm | EDITOR_ID,MAT_WITH_INST
+defaultEmpire.mm | EDITOR_ID,MAT_WITH_INST
+eng/billboardDefault.mm | EDITOR_ID,MAT_WITH_INST
+materials/default_pbr_baked_ao.mm | EDITOR_ID,MAT_WITH_INST
+default_pbr_trim.mm | EDITOR_ID,MAT_WITH_INST
+defaultElectrical.mm | EDITOR_ID,MAT_WITH_INST
+defaultPBRmasked.mm | EDITOR_ID,MAT_WITH_INST
+defaultPBR.mm | EDITOR_ID,MAT_WITH_INST
+eng/fallback.mm | ANIMATED,EDITOR_ID,MAT_WITH_INST
+eng/fallback.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+eng/sky_simple.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+parallax_occlusion.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+defaultEmpire.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+eng/billboardDefault.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+materials/default_pbr_baked_ao.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+default_pbr_trim.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+defaultElectrical.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+defaultPBRmasked.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+defaultPBR.mm | EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST
+eng/fallback.mm | ANIMATED,EDITOR_ID,DEPTH_ONLY,NO_TAA,MAT_WITH_INST

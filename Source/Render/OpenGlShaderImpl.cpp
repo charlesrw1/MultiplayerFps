@@ -9,7 +9,7 @@
 #include "Framework/Files.h"
 #include "Framework/Jobs.h"
 #include "glad/glad.h"
-#include <atomic>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 
@@ -19,33 +19,27 @@ namespace {
 
 struct PrefetchedProgramBinary {
 	uint32_t format = 0;
+	uint64_t timestamp = 0;
 	std::vector<uint8_t> bytes;
 };
 std::mutex prefetched_binary_mutex;
 std::unordered_map<std::string, PrefetchedProgramBinary> prefetched_binaries;
-std::atomic<bool> prefetch_started = false;
-
-void prefetch_program_binaries_job(uintptr_t) {
-	std::unordered_map<std::string, PrefetchedProgramBinary> loaded;
-	for (const auto& full_path : FileTree(FileSys::get_path(FileSys::SHADER_CACHE))) {
-		if (full_path.size() < 4 || full_path.substr(full_path.size() - 4) != ".bin")
-			continue;
-		auto file = FileSys::open_read(full_path.c_str(), FileSys::FULL_SYSTEM);
-		if (!file || file->size() < 8)
-			continue;
-		PrefetchedProgramBinary binary;
-		int32_t byte_count = 0;
-		file->read(&binary.format, sizeof(binary.format));
-		file->read(&byte_count, sizeof(byte_count));
-		if (byte_count <= 0 || (size_t)byte_count + 8 > file->size())
-			continue;
-		binary.bytes.resize(byte_count);
-		file->read(binary.bytes.data(), binary.bytes.size());
-		const size_t slash = full_path.find_last_of("\\/");
-		loaded.emplace(full_path.substr(slash == std::string::npos ? 0 : slash + 1), std::move(binary));
-	}
+JobCounter* prefetch_counter = nullptr;
+struct PrefetchRequest { std::string cache_filename; };
+void prefetch_program_binary_job(uintptr_t arg) {
+	std::unique_ptr<PrefetchRequest> request((PrefetchRequest*)arg);
+	auto file = FileSys::open_read(request->cache_filename.c_str(), FileSys::SHADER_CACHE);
+	if (!file || file->size() < 8) return;
+	PrefetchedProgramBinary binary;
+	binary.timestamp = file->get_timestamp();
+	int32_t byte_count = 0;
+	file->read(&binary.format, sizeof(binary.format));
+	file->read(&byte_count, sizeof(byte_count));
+	if (byte_count <= 0 || (size_t)byte_count + 8 > file->size()) return;
+	binary.bytes.resize(byte_count);
+	file->read(binary.bytes.data(), binary.bytes.size());
 	std::lock_guard lock(prefetched_binary_mutex);
-	prefetched_binaries = std::move(loaded);
+	prefetched_binaries.emplace(request->cache_filename, std::move(binary));
 }
 
 // Same constant as in ShaderSourceLoader.cpp — used here for the binary-cache
@@ -277,30 +271,34 @@ std::string make_cache_filename(std::span<const std::string> inputs) {
 // loaded binary fails to link.
 uint32_t try_load_program_binary(const std::string& cache_filename,
 								 std::span<const std::string> engine_relative_sources) {
-	auto binFile = FileSys::open_read(cache_filename.c_str(), FileSys::SHADER_CACHE);
-	if (!binFile)
+	PrefetchedProgramBinary prefetched;
+	bool has_prefetched_binary = false;
+	{
+		std::lock_guard lock(prefetched_binary_mutex);
+		auto it = prefetched_binaries.find(cache_filename);
+		if (it != prefetched_binaries.end()) {
+			prefetched = it->second;
+			has_prefetched_binary = true;
+		}
+	}
+
+	auto binFile = has_prefetched_binary ? nullptr : FileSys::open_read(cache_filename.c_str(), FileSys::SHADER_CACHE);
+	if (!has_prefetched_binary && !binFile)
 		return 0;
+	const uint64_t binary_timestamp = has_prefetched_binary ? prefetched.timestamp : binFile->get_timestamp();
 
 	for (auto& src : engine_relative_sources) {
 		auto srcFile = FileSys::open_read_engine(src.c_str());
-		if (!srcFile || srcFile->get_timestamp() > binFile->get_timestamp())
+		if (!srcFile || srcFile->get_timestamp() > binary_timestamp)
 			return 0;
 	}
 
 	if (log_shader_compiles.get_bool())
 		sys_print(Debug, "shader-cache load: %s\n", cache_filename.c_str());
 
-	uint32_t sourceType = 0;
-	std::vector<uint8_t> bytes;
-	{
-		std::lock_guard lock(prefetched_binary_mutex);
-		auto it = prefetched_binaries.find(cache_filename);
-		if (it != prefetched_binaries.end()) {
-			sourceType = it->second.format;
-			bytes = it->second.bytes;
-		}
-	}
-	if (bytes.empty()) {
+	uint32_t sourceType = prefetched.format;
+	std::vector<uint8_t> bytes = std::move(prefetched.bytes);
+	if (!has_prefetched_binary) {
 		BinaryReader reader(binFile.get());
 		sourceType = reader.read_int32();
 		auto len = reader.read_int32();
@@ -479,10 +477,15 @@ IGraphicsShader* wrap_or_fail(uint32_t program_id) {
 
 } // namespace
 
-void opengl_prefetch_program_binaries_async() {
-	if (prefetch_started.exchange(true) || !JobSystem::inst)
-		return;
-	JobSystem::inst->add_job_no_counter(prefetch_program_binaries_job, 0);
+void opengl_prefetch_program_binary_async(const std::string& shared_path, const std::string& defines) {
+	if (!JobSystem::inst) return;
+	const std::string inputs[] = {shared_path, defines};
+	auto* request = new PrefetchRequest{make_cache_filename(inputs)};
+	JobSystem::inst->add_job(prefetch_program_binary_job, (uintptr_t)request, prefetch_counter);
+}
+
+void opengl_wait_for_program_binary_prefetch() {
+	if (JobSystem::inst) JobSystem::inst->wait_and_free_counter(prefetch_counter);
 }
 
 // ---------------------------------------------------------------------------
