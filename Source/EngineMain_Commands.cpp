@@ -383,8 +383,11 @@ bool GameEngineLocal::load_level(string mapname) {
 
 	bool success = true;
 	uptr<UnserializedSceneFile> file;
+	double load_asset_time = 0.0;
 	if (!wants_empty) {
+		double phase_start = GetTime();
 		auto val = load_level_asset(mapname);
+		load_asset_time = GetTime() - phase_start;
 		if (val)
 			file = std::move(val);
 		else
@@ -407,17 +410,27 @@ bool GameEngineLocal::load_level(string mapname) {
 			assert(!level);
 		}
 
+		double phase_start = GetTime();
 		g_modelMgr.compact_memory(); // fixme, compacting memory here means newly loaded objs get moved twice, should be
 									 // queuing uploads
+		double compact_time = GetTime() - phase_start;
 		time = 0.0;
 		set_tick_rate(60.f);
 		level = std::make_unique<Level>(!is_for_playing);
+		phase_start = GetTime();
 		level->start(mapname, loadedLevel); // scene will then get destroyed
+		double level_start_time = GetTime() - phase_start;
+		phase_start = GetTime();
 		idraw->on_level_start();
+		double renderer_start_time = GetTime() - phase_start;
 
+		phase_start = GetTime();
 		if (app) {
 			app->on_map_changed();
 		}
+		double app_map_changed_time = GetTime() - phase_start;
+		sys_print(Debug, "OpenMap timing: asset=%.3fs compact=%.3fs level=%.3fs renderer=%.3fs app=%.3fs\n",
+			load_asset_time, compact_time, level_start_time, renderer_start_time, app_map_changed_time);
 		sys_print(Info, "changed state to Engine_State::Game\n");
 	};
 

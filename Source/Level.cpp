@@ -279,6 +279,9 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene,
 															 bool addSpawnNames) // was bool assign_new_ids=false
 {
+	const double profile_begin = GetTime();
+	double profile_mark = profile_begin;
+	double validation_time = 0.0, insert_time = 0.0, activation_time = 0.0;
 #ifndef EDITOR_BUILD
 	assert(!reassign_ids);
 #endif // !EDITOR_BUILD
@@ -299,6 +302,8 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 	}
 
 #endif
+	validation_time += GetTime() - profile_mark;
+	profile_mark = GetTime();
 	// Pre-pass: identify static-prop entities that will be stripped from all_world_ents.
 	// Components are also added to strip_set so the insert+init loops skip them; they get
 	// freed during the bake loop via their owner Entity (we never iterate Components in the
@@ -337,7 +342,11 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 			all_world_ents.insert(o->get_instance_id(), o);
 		}
 	}
+	insert_time = GetTime() - profile_mark;
+	profile_mark = GetTime();
 	validate();
+	validation_time += GetTime() - profile_mark;
+	profile_mark = GetTime();
 
 	for (int i = 0; i < objs.size(); i++) {
 		BaseUpdater* o = objs[i];
@@ -361,7 +370,13 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 				// this loop and destroy already-started sibling entities without stopping them,
 				// tripping the "destroyed while started" assert in ~Entity. Isolate it instead.
 				try {
+					double component_start = GetTime();
 					ec->activate_internal_step2();
+					double component_time = GetTime() - component_start;
+					if (addSpawnNames && component_time > 0.005) {
+						sys_print(Debug, "Level activation slow component: %s %.3fs\n",
+							ec->get_type().classname, component_time);
+					}
 				}
 				catch (LuaRuntimeError& er) {
 					sys_print(Error, "Level::insert_unserialized_entities_into_level: %s\n", er.what());
@@ -370,6 +385,7 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 		} else
 			ASSERT(!"Non Eentity/Component?");
 	}
+	activation_time = GetTime() - profile_mark;
 	// Bake stripped static-prop entities into the pool. Render + (optional) physics handles
 	// outlive the source Entity/Component, which we then free directly — they were never
 	// inserted into all_world_ents and never had start() called, so we bypass destroy().
@@ -432,6 +448,10 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 	scene.unknown_field_warnings.clear();
 	// Ownership of the BaseUpdater* now lives in all_world_ents.
 	scene.mark_ownership_transferred();
+	if (addSpawnNames) {
+		sys_print(Debug, "Level insertion timing: validate=%.3fs insert=%.3fs activate=%.3fs total=%.3fs (%d objects)\n",
+			validation_time, insert_time, activation_time, GetTime() - profile_begin, objs.size());
+	}
 }
 
 void Level::add_and_init_created_runtime_component(Component* c) {

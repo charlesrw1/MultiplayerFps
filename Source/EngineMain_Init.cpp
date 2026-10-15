@@ -612,7 +612,10 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		loaded_in_tool_mode = true;
 		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		AssetDiagnostics::get().load();
-		AssetDiagnostics::get().scan_all();
+		// scan_all walks the complete project (and runs auto-import checks) a
+		// second time immediately after AssetRegistry just indexed it.  Keep the
+		// persisted diagnostics available at boot; an explicit Diagnostics refresh
+		// or asset build performs the expensive validation when it is wanted.
 		AssetCompiler::register_console_commands();
 		print_time("asset reg and browser init");
 	} else {
