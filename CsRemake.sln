@@ -54,6 +54,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Render", "Source\Render\Ren
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cscli", "CLI\cscli.vcxproj", "{2E4B7A10-6C3D-4F19-9E2A-8B1C6D4F0A72}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharp", "LuaSharp\LuaSharp.vcxproj", "{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -194,6 +196,12 @@ Global
 		{2E4B7A10-6C3D-4F19-9E2A-8B1C6D4F0A72}.Release|x64.Build.0 = Release|x64
 		{2E4B7A10-6C3D-4F19-9E2A-8B1C6D4F0A72}.Release|x86.ActiveCfg = Release|Win32
 		{2E4B7A10-6C3D-4F19-9E2A-8B1C6D4F0A72}.Release|x86.Build.0 = Release|Win32
+		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.Debug|x64.ActiveCfg = Debug|x64
+		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.Debug|x64.Build.0 = Debug|x64
+		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.NoEditRelease|x64.ActiveCfg = Release|x64
+		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.NoEditRelease|x64.Build.0 = Release|x64
+		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.Release|x64.ActiveCfg = Release|x64
+		{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
