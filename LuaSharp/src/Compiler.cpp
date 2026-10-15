@@ -20,6 +20,7 @@ struct Statement {
     std::vector<Token> expression;
     std::vector<Statement> body;
     std::vector<Statement> elseBody;
+    size_t sourceOffset{};
 };
 struct Function { std::string name; std::string returnType; bool isConstructor{}; std::vector<Parameter> parameters; std::vector<Statement> body; };
 struct Class { std::string name; std::vector<Field> fields; std::vector<Function> functions; };
@@ -108,18 +109,20 @@ private:
         return body;
     }
     Statement ParseStatement() {
+        const size_t sourceOffset = Current().offset;
         if (Is("if")) {
             Take("if"); Take("("); Statement statement{Statement::Kind::If}; statement.expression = Until(")"); Take(")"); statement.body = Block();
             if (Is("else")) { Take("else"); statement.elseBody = Is("if") ? std::vector<Statement>{ParseStatement()} : Block(); }
+            statement.sourceOffset = sourceOffset;
             return statement;
         }
-        if (Is("return")) { Take("return"); Statement statement{Statement::Kind::Return}; statement.expression = Until(";"); Take(";"); return statement; }
+        if (Is("return")) { Take("return"); Statement statement{Statement::Kind::Return}; statement.expression = Until(";"); Take(";"); statement.sourceOffset = sourceOffset; return statement; }
         if (Is("auto")) {
             Take("auto"); Statement statement{Statement::Kind::Local}; statement.name = Identifier();
             if (Is("=")) { Take("="); statement.expression = Until(";"); }
-            Take(";"); return statement;
+            Take(";"); statement.sourceOffset = sourceOffset; return statement;
         }
-        Statement statement{Statement::Kind::Expression}; statement.expression = Until(";"); Take(";"); return statement;
+        Statement statement{Statement::Kind::Expression}; statement.expression = Until(";"); Take(";"); statement.sourceOffset = sourceOffset; return statement;
     }
     Function ParseFunction(std::string name, std::string returnType, bool isConstructor) {
         Function function{std::move(name), std::move(returnType), isConstructor}; Take("(");
@@ -175,20 +178,31 @@ std::string Expression(const std::vector<Token>& tokens) {
     return out;
 }
 
-void EmitStatements(std::string& output, const std::vector<Statement>& statements, std::string indent) {
+struct Emitter {
+    std::string output;
+    std::vector<SourceMapEntry> sourceMap;
+
+    void Line(std::string text, size_t sourceOffset = 0) {
+        sourceMap.push_back({1 + static_cast<size_t>(std::count(output.begin(), output.end(), '\n')), sourceOffset});
+        output += text + "\n";
+    }
+};
+
+void EmitStatements(Emitter& emitter, const std::vector<Statement>& statements, std::string indent) {
     for (const auto& statement : statements) {
         if (statement.kind == Statement::Kind::If) {
-            output += indent + "if " + Expression(statement.expression) + " then\n";
-            EmitStatements(output, statement.body, indent + "    ");
-            if (!statement.elseBody.empty()) { output += indent + "else\n"; EmitStatements(output, statement.elseBody, indent + "    "); }
-            output += indent + "end\n";
-        } else if (statement.kind == Statement::Kind::Return) output += indent + "return " + Expression(statement.expression) + "\n";
-        else if (statement.kind == Statement::Kind::Local) output += indent + "local " + statement.name + (statement.expression.empty() ? "\n" : " = " + Expression(statement.expression) + "\n");
-        else output += indent + Expression(statement.expression) + "\n";
+            emitter.Line(indent + "if " + Expression(statement.expression) + " then", statement.sourceOffset);
+            EmitStatements(emitter, statement.body, indent + "    ");
+            if (!statement.elseBody.empty()) { emitter.Line(indent + "else", statement.sourceOffset); EmitStatements(emitter, statement.elseBody, indent + "    "); }
+            emitter.Line(indent + "end", statement.sourceOffset);
+        } else if (statement.kind == Statement::Kind::Return) emitter.Line(indent + "return " + Expression(statement.expression), statement.sourceOffset);
+        else if (statement.kind == Statement::Kind::Local) emitter.Line(indent + "local " + statement.name + (statement.expression.empty() ? "" : " = " + Expression(statement.expression)), statement.sourceOffset);
+        else emitter.Line(indent + Expression(statement.expression), statement.sourceOffset);
     }
 }
 
-void EmitClass(std::string& output, const Class& value) {
+void EmitClass(Emitter& emitter, const Class& value) {
+    auto& output = emitter.output;
     output += "---@class " + value.name + "\n";
     for (const auto& field : value.fields) {
         output += "---@field " + field.access + " " + field.name + " " + LuaType(field.type);
@@ -198,7 +212,7 @@ void EmitClass(std::string& output, const Class& value) {
     output += "local " + value.name + " = {}\n" + value.name + ".__index = " + value.name + "\n\n";
     output += "function " + value.name + ".new()\n    local self = setmetatable({}, " + value.name + ")\n";
     for (const auto& field : value.fields) if (!field.initializer.empty()) output += "    self." + field.name + " = " + Expression(field.initializer) + "\n";
-    if (const auto constructor = std::find_if(value.functions.begin(), value.functions.end(), [](const Function& f) { return f.isConstructor; }); constructor != value.functions.end()) EmitStatements(output, constructor->body, "    ");
+    if (const auto constructor = std::find_if(value.functions.begin(), value.functions.end(), [](const Function& f) { return f.isConstructor; }); constructor != value.functions.end()) EmitStatements(emitter, constructor->body, "    ");
     output += "    return self\nend\n\n";
     for (const auto& function : value.functions) {
         if (function.isConstructor) continue;
@@ -206,18 +220,22 @@ void EmitClass(std::string& output, const Class& value) {
         if (!function.returnType.empty() && function.returnType != "void") output += "---@return " + LuaType(function.returnType) + "\n";
         output += "function " + value.name + ":" + function.name + "(";
         for (size_t i = 0; i < function.parameters.size(); ++i) { if (i != 0) output += ", "; output += function.parameters[i].name; }
-        output += ")\n"; EmitStatements(output, function.body, "    "); output += "end\n\n";
+        output += ")\n"; EmitStatements(emitter, function.body, "    "); output += "end\n\n";
     }
 }
 
 } // namespace
 
 std::string Compile(std::string_view source) {
+    return CompileWithSourceMap(source).lua;
+}
+
+CompilationResult CompileWithSourceMap(std::string_view source) {
     const auto program = Parser(Lex(source)).Parse();
-    std::string output;
-    for (const auto& value : program.classes) EmitClass(output, value);
-    EmitStatements(output, program.topLevel, {});
-    return output;
+    Emitter emitter;
+    for (const auto& value : program.classes) EmitClass(emitter, value);
+    EmitStatements(emitter, program.topLevel, {});
+    return {std::move(emitter.output), std::move(emitter.sourceMap)};
 }
 
 } // namespace luasharp

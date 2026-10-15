@@ -13,6 +13,8 @@ void RunTests() {
     assert(lua.find("function Thing:get(e)") != std::string::npos);
     assert(lua.find("return e:blah()") != std::string::npos);
     assert(lua.find("local t = Thing.new()") != std::string::npos);
+    const auto mapped = luasharp::CompileWithSourceMap("auto value = 1;");
+    assert(mapped.sourceMap.size() == 1 && mapped.sourceMap.front().generatedLine == 1);
     std::cout << "Tests passed\n";
 }
 }
