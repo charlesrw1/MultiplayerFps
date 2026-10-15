@@ -269,7 +269,9 @@ ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags doc
 	PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 	PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	PushStyleColor(ImGuiCol_MenuBarBg, ImVec4(1.f, 1.f, 1.f, 1.f));
 	Begin("MAIN DOCKWIN", NULL, host_window_flags);
+	PopStyleColor();
 	PopStyleVar(3);
 
 	ImGuiID dockspace_id = GetID("DockSpace");

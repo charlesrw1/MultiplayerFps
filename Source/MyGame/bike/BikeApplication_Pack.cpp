@@ -15,7 +15,7 @@
 // Group context
 // ============================================================
 
-static constexpr float GROUP_GAP_M = 8.f;  // gap > this splits riders into separate groups
+static constexpr float GROUP_GAP_M =5.f;  // gap > this splits riders into separate groups
 static bool show_bike_groups = true;
 void BikeGameApplication::update_groups()
 {

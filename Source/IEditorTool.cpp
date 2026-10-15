@@ -63,9 +63,28 @@ void IEditorTool::draw_imgui_public() {
 	imgui_draw();
 }
 #include "Game/LevelAssets.h"
+
+bool begin_main_menu_bar_menu(const char* label) {
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.06f, 0.06f, 0.06f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.90f, 0.90f, 0.90f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.79f, 0.87f, 0.95f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.67f, 0.81f, 0.93f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.94f, 0.94f, 0.94f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.68f, 0.68f, 0.68f, 1.f));
+	const bool open = ImGui::BeginMenu(label);
+	if (!open)
+		ImGui::PopStyleColor(6);
+	return open;
+}
+
+void end_main_menu_bar_menu() {
+	ImGui::EndMenu();
+	ImGui::PopStyleColor(6);
+}
+
 void IEditorTool::draw_menu_bar() {
 	if (ImGui::BeginMenuBar()) {
-		if (ImGui::BeginMenu("File")) {
+		if (begin_main_menu_bar_menu("File")) {
 			if (ImGui::MenuItem("Save", "Ctrl+S")) {
 				save();
 			}
@@ -80,19 +99,19 @@ void IEditorTool::draw_menu_bar() {
 
 			hook_menu_bar_file_menu();
 
-			ImGui::EndMenu();
+			end_main_menu_bar_menu();
 		}
 
 		hook_menu_bar();
 
-		if (ImGui::BeginMenu("Layout")) {
+		if (begin_main_menu_bar_menu("Layout")) {
 			if (ImGui::MenuItem("Save Layout")) {
 				Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini layout.ini");
 			}
 			if (ImGui::MenuItem("Load Layout")) {
 				Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini layout.ini");
 			}
-			ImGui::EndMenu();
+			end_main_menu_bar_menu();
 		}
 
 		ImGui::EndMenuBar();

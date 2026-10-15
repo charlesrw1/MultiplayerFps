@@ -13,6 +13,11 @@ struct View_Setup;
 #include "Game/EntityPtr.h"
 
 class IEditorApi2;
+
+// Begin a top-level item in the editor's main menu bar using its light-bar styling.
+bool begin_main_menu_bar_menu(const char* label);
+void end_main_menu_bar_menu();
+
 class IEditorTool
 {
 public:

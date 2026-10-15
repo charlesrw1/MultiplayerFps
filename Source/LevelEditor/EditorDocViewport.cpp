@@ -34,6 +34,13 @@
 #include "Game/Components/PrefabAssetComponent.h"
 #include "Game/Prefab.h"
 #include "Game/Components/LightComponents.h"
+#include "Navigation/LevelNavUtil.h"
+#include "Navigation/NavMeshSettingsComponent.h"
+#include "Navigation/NavMeshVolumeComponent.h"
+#include "Navigation/RuntimeNavManager.h"
+#include "Render/DrawLocal.h"
+#include "Render/RenderGiManager.h"
+#include "Render/RT/RaytraceTest.h"
 #include "Framework/Files.h"
 #include "Debug.h"
 #include <glm/gtc/type_ptr.hpp>
@@ -45,6 +52,7 @@ extern void start_play_process(const std::string& play_map_path, bool lua_debug,
 extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL, "");
+extern ConfigVar ddgi_probe_debug;
 
 // ---------------------------------------------------------------------------
 // Coordinate helpers
@@ -110,6 +118,7 @@ void EditorDoc::imgui_draw() {
 	check_inputs();
 	draw_recent_switcher_popup();
 	draw_backup_browser_window();
+	draw_baking_window();
 	draw_handles->tick();
 	vis_filter.tick();
 
@@ -955,7 +964,7 @@ void EditorDoc::set_camera_target_to_sel() {
 
 void EditorDoc::hook_menu_bar() {
 	ASSERT(eng);
-	if (ImGui::BeginMenu("Commands")) {
+	if (begin_main_menu_bar_menu("Commands")) {
 		if (ImGui::MenuItem("Export as .glb")) {
 			export_level_scene();
 		}
@@ -1036,9 +1045,13 @@ void EditorDoc::hook_menu_bar() {
 			}
 		}
 
-		ImGui::EndMenu();
+		end_main_menu_bar_menu();
 	}
-	if (ImGui::BeginMenu("Tools")) {
+	if (begin_main_menu_bar_menu("Tools")) {
+		if (ImGui::MenuItem("Baking", nullptr, show_baking_window)) {
+			show_baking_window = !show_baking_window;
+		}
+		ImGui::Separator();
 		if (ImGui::MenuItem("Asset Size Viewer")) {
 			AssetSizeViewer::get().open();
 		}
@@ -1048,9 +1061,9 @@ void EditorDoc::hook_menu_bar() {
 		if (ImGui::MenuItem("Profiler", nullptr, stat_profiler.get_bool())) {
 			stat_profiler.set_bool(!stat_profiler.get_bool());
 		}
-		ImGui::EndMenu();
+		end_main_menu_bar_menu();
 	}
-	if (ImGui::BeginMenu("Mode")) {
+	if (begin_main_menu_bar_menu("Mode")) {
 		if (ImGui::MenuItem("Default", nullptr, active_mode == selection_mode.get())) {
 			active_mode = selection_mode.get();
 		}
@@ -1060,8 +1073,116 @@ void EditorDoc::hook_menu_bar() {
 		if (ImGui::MenuItem("Decal Stamp", nullptr, active_mode == stamp_tool.get())) {
 			active_mode = stamp_tool.get();
 		}
-		ImGui::EndMenu();
+		end_main_menu_bar_menu();
 	}
+}
+
+void EditorDoc::draw_baking_window() {
+	if (!show_baking_window)
+		return;
+
+	ImGui::SetNextWindowSize(ImVec2(460, 0), ImGuiCond_FirstUseEver);
+	if (!ImGui::Begin("Baking", &show_baking_window)) {
+		ImGui::End();
+		return;
+	}
+
+	auto* level = eng ? eng->get_level() : nullptr;
+	int authored_ddgi_volumes = 0;
+	int authored_cubemap_volumes = 0;
+	int navmesh_volumes = 0;
+	int navmesh_settings = 0;
+	if (level) {
+		for (auto* object : level->get_all_objects()) {
+			authored_ddgi_volumes += object->cast_to<GiVolumeComponent>() != nullptr;
+			authored_cubemap_volumes += object->cast_to<CubemapComponent>() != nullptr;
+			navmesh_volumes += object->cast_to<NavMeshVolumeComponent>() != nullptr;
+			navmesh_settings += object->cast_to<NavMeshSettingsComponent>() != nullptr;
+		}
+	}
+
+	const int baked_ddgi_volumes = draw.ddgi ? (int)draw.ddgi->myvolumes.size() : 0;
+	const int baked_ddgi_probes = draw.ddgi ? (int)draw.ddgi->temp_probe_relocate_thing.size() : 0;
+	const int baked_cubemaps = RenderGiManager::inst ? RenderGiManager::inst->get_num_cubemaps() : 0;
+	const bool has_navmesh = RuntimeNavManager::inst && RuntimeNavManager::inst->has_navmesh();
+
+	ImGui::TextDisabled("Bake data for the active level. Baking changes runtime data; save writes sidecars.");
+	ImGui::Separator();
+
+	if (ImGui::CollapsingHeader("DDGI Probes", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Text("Authored volumes: %d", authored_ddgi_volumes);
+		ImGui::Text("Baked volumes: %d", baked_ddgi_volumes);
+		ImGui::Text("Baked probes: %d", baked_ddgi_probes);
+		bool show_ddgi_probes = ddgi_probe_debug.get_bool();
+		if (ImGui::Checkbox("Show probe visualization", &show_ddgi_probes))
+			ddgi_probe_debug.set_bool(show_ddgi_probes);
+		const bool can_bake_ddgi = level && draw.ddgi && authored_ddgi_volumes > 0;
+		ImGui::BeginDisabled(!can_bake_ddgi);
+		if (ImGui::Button("Bake DDGI", ImVec2(140, 0)))
+			draw.ddgi->execute();
+		ImGui::EndDisabled();
+		if (!can_bake_ddgi)
+			ImGui::TextDisabled("Requires a level, DDGI renderer, and at least one GI Volume.");
+	}
+
+	if (ImGui::CollapsingHeader("Cubemap Probes", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Text("Authored volumes: %d", authored_cubemap_volumes);
+		ImGui::Text("Baked cubemaps: %d", baked_cubemaps);
+		const bool can_bake_cubemaps = level && RenderGiManager::inst && authored_cubemap_volumes > 0;
+		ImGui::BeginDisabled(!can_bake_cubemaps);
+		if (ImGui::Button("Bake Cubemaps", ImVec2(140, 0)))
+			GameSceneGiUtil::bake_all_cubemaps();
+		ImGui::EndDisabled();
+		if (!can_bake_cubemaps)
+			ImGui::TextDisabled("Requires a level and at least one Cubemap Volume.");
+	}
+
+	if (ImGui::CollapsingHeader("Navigation Mesh", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Text("Nav mesh volumes: %d", navmesh_volumes);
+		ImGui::Text("Settings components: %d", navmesh_settings);
+		ImGui::Text("Runtime nav mesh: %s", has_navmesh ? "present" : "not present");
+		ConfigVar* navmesh_debug = VarMan::get()->find("nav.debug.navmesh");
+		bool show_navmesh_debug = navmesh_debug && navmesh_debug->get_bool();
+		ImGui::BeginDisabled(!navmesh_debug || !has_navmesh);
+		if (ImGui::Checkbox("Show nav mesh debug", &show_navmesh_debug))
+			navmesh_debug->set_bool(show_navmesh_debug);
+		ImGui::EndDisabled();
+		const bool can_bake_nav = level && navmesh_volumes > 0 && navmesh_settings > 0;
+		ImGui::BeginDisabled(!can_bake_nav);
+		if (ImGui::Button("Bake Nav Mesh", ImVec2(140, 0)))
+			LevelNavUtil::bake_all_volumes();
+		ImGui::EndDisabled();
+		if (!can_bake_nav)
+			ImGui::TextDisabled("Requires at least one NavMesh Volume and one NavMesh Settings component.");
+	}
+
+	ImGui::Separator();
+	const bool can_save_gi = level && RenderGiManager::inst && RenderGiManager::inst->get_cubemap_array_texture() && draw.ddgi;
+	ImGui::BeginDisabled(!can_save_gi);
+	if (ImGui::Button("Save GI to Disk", ImVec2(140, 0)))
+		GameSceneGiUtil::save_to_disk();
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	ImGui::BeginDisabled(!level || !has_navmesh);
+	if (ImGui::Button("Save Nav Mesh to Disk", ImVec2(170, 0)))
+		LevelNavUtil::save_to_disk();
+	ImGui::EndDisabled();
+	if (!can_save_gi)
+		ImGui::TextDisabled("GI save requires baked cubemaps and initialized DDGI.");
+
+	ImGui::BeginDisabled(!level);
+	if (ImGui::Button("Reload Baked Data from Disk", ImVec2(-1, 0))) {
+		const string source_name = level->get_source_asset_name();
+		GameSceneGiUtil::on_scene_exit();
+		LevelNavUtil::on_scene_exit();
+		GameSceneGiUtil::on_scene_load_gi(source_name);
+		LevelNavUtil::on_scene_load_nav(source_name);
+	}
+	ImGui::EndDisabled();
+	if (!level)
+		ImGui::TextDisabled("Open a level to bake, save, or reload baked data.");
+
+	ImGui::End();
 }
 
 void EditorDoc::hook_menu_bar_file_menu() {

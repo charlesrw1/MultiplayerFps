@@ -244,6 +244,7 @@ public:
 	void tick(float dt) final;
 	void imgui_draw() final;
 	void draw_backup_browser_window();
+	void draw_baking_window();
 	const View_Setup* get_vs() final { return &vs_setup; }
 
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
@@ -351,6 +352,7 @@ private:
 	static constexpr int BACKUP_RETENTION_COUNT = 8;
 	float time_since_last_backup = 0.f;
 	bool show_backup_browser_window = false;
+	bool show_baking_window = false;
 	// Set by check_inputs() on Ctrl+P / Alt+P; consumed in the viewport menu-bar draw where the
 	// parenting popups live (must OpenPopup in the same imgui window as their BeginPopup).
 	bool want_open_parent_menu = false;

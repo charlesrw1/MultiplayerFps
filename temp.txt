@@ -1,48 +1,246 @@
-[16:15:51] Repository: C:\Users\charl\source\repos\CsRemake
-[16:16:00] > MSBuild.exe "C:\Users\charl\source\repos\CsRemake\CsRemake.sln" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:BuildingInsideVisualStudio=true /p:PreferredToolArchitecture=x64 /v:minimal
-[16:16:01] MSBuild version 18.11.0-1.26427.13+9353559c2 for .NET Framework
-[16:16:01] 
-[16:16:01]   External.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\External.lib
-[16:16:01]   cscli.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\cscli.exe
-[16:16:01] C:\Users\charl\source\repos\CsRemake\Launcher\CsRemakeLauncher.csproj : error : Could not resolve SDK "Microsoft.NET.Sdk". Exactly one of the probing messages below indicates why we could not resolve the SDK. Investigate and resolve that message to correctly specify the SDK.
-[16:16:01] C:\Users\charl\source\repos\CsRemake\Launcher\CsRemakeLauncher.csproj : error :   The NuGetSdkResolver did not resolve this SDK because there was no version specified in the project or global.json.
-[16:16:01] C:\Users\charl\source\repos\CsRemake\Launcher\CsRemakeLauncher.csproj : error :   MSB4276: The default SDK resolver failed to resolve SDK "Microsoft.NET.Sdk" because directory "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Sdks\Microsoft.NET.Sdk\Sdk" did not exist.
-[16:16:01] C:\Users\charl\source\repos\CsRemake\Launcher\CsRemakeLauncher.csproj : error MSB4236: The SDK 'Microsoft.NET.Sdk' specified could not be found.
-[16:16:01]   MyGame.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\MyGame.lib
-[16:16:01]   LevelEditor.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\LevelEditor.lib
-[16:16:02]   Render.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\Render.lib
-[16:16:02]   AssetTools.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\AssetTools.lib
-[16:16:03]   Core.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\Core.lib
-[16:16:03]   IntegrationTests.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\IntegrationTests.lib
-[16:16:03]   SlimRenderApp.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\SlimRenderApp.exe
-[16:16:03]   App.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\App.exe
-[16:16:03]   Copy vcpkg DLL deps to output (vcpkg's AppLocalFromInstalled hook is broken on this toolset)
-[16:16:04]   UnitTests.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\UnitTests.exe
-[16:16:04]   Copy vcpkg DLL deps to output (Debug)
-[16:16:04] Process exited with code 1.
-[16:16:04] Build failed (exit 1); instances will not be restarted.
-[16:16:12] Started App.exe (PID 20324).
-[16:16:26] Stopping 1 running engine instance(s) before build...
-[16:16:26] Stopping App.exe (PID 20324)...
-[16:16:27] > MSBuild.exe "C:\Users\charl\source\repos\CsRemake\CsRemake.sln" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:BuildingInsideVisualStudio=true /p:PreferredToolArchitecture=x64 /v:minimal
-[16:16:27] MSBuild version 18.11.0-1.26427.13+9353559c2 for .NET Framework
-[16:16:27] 
-[16:16:28] C:\Users\charl\source\repos\CsRemake\Launcher\CsRemakeLauncher.csproj : error : Could not resolve SDK "Microsoft.NET.Sdk". Exactly one of the probing messages below indicates why we could not resolve the SDK. Investigate and resolve that message to correctly specify the SDK.
-[16:16:28] C:\Users\charl\source\repos\CsRemake\Launcher\CsRemakeLauncher.csproj : error :   The NuGetSdkResolver did not resolve this SDK because there was no version specified in the project or global.json.
-[16:16:28] C:\Users\charl\source\repos\CsRemake\Launcher\CsRemakeLauncher.csproj : error :   MSB4276: The default SDK resolver failed to resolve SDK "Microsoft.NET.Sdk" because directory "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Sdks\Microsoft.NET.Sdk\Sdk" did not exist.
-[16:16:28] C:\Users\charl\source\repos\CsRemake\Launcher\CsRemakeLauncher.csproj : error MSB4236: The SDK 'Microsoft.NET.Sdk' specified could not be found.
-[16:16:28]   External.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\External.lib
-[16:16:28]   MyGame.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\MyGame.lib
-[16:16:28]   Render.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\Render.lib
-[16:16:28]   LevelEditor.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\LevelEditor.lib
-[16:16:28]   cscli.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\cscli.exe
-[16:16:29]   AssetTools.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\AssetTools.lib
-[16:16:29]   Core.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\Core.lib
-[16:16:29]   IntegrationTests.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\IntegrationTests.lib
-[16:16:29]   SlimRenderApp.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\SlimRenderApp.exe
-[16:16:29]   App.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\App.exe
-[16:16:30]   Copy vcpkg DLL deps to output (vcpkg's AppLocalFromInstalled hook is broken on this toolset)
-[16:16:30]   UnitTests.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\UnitTests.exe
-[16:16:30]   Copy vcpkg DLL deps to output (Debug)
-[16:16:30] Process exited with code 1.
-[16:16:30] Build failed (exit 1); instances will not be restarted.
+[19:03:40] > MSBuild.exe "C:\Users\charl\source\repos\CsRemake\CsRemake.sln" /m /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /p:BuildingInsideVisualStudio=true /p:PreferredToolArchitecture=x64 /v:minimal /p:CodegenFullRebuild=true
+[19:03:40] MSBuild version 18.11.0-1.26427.13+9353559c2 for .NET Framework
+[19:03:40] 
+[19:03:40]   Running codegen for MyGame (inputs changed)...
+[19:03:40]   cgltf_write_impl.cpp
+[19:03:40]   External.cpp
+[19:03:40]   imgui.cpp
+[19:03:40]   imgui_demo.cpp
+[19:03:40]   imgui_draw.cpp
+[19:03:40]   main.cpp
+[19:03:40]   imgui_impl_dx11.cpp
+[19:03:40]   imgui_impl_opengl3.cpp
+[19:03:40]   imgui_impl_sdl3.cpp
+[19:03:40]   Running codegen for LevelEditor (inputs changed)...
+[19:03:41]   imgui_tables.cpp
+[19:03:42]   unity_W0DOSTQLKFGFPQD5.cpp
+[19:03:42]   unity_3TM04PIJB9RQY4YG.cpp
+[19:03:42]   unity_MM7J5S1X83S2QR33.cpp
+[19:03:42]   unity_1OC9XRK8PMQPEQC8.cpp
+[19:03:42]   unity_1Q0QHAUSWXEXOGE2.cpp
+[19:03:42]   unity_G267RJCW44ECDPV5.cpp
+[19:03:42]   unity_V14MG96MTPLXY7HD.cpp
+[19:03:42]   imgui_widgets.cpp
+[19:03:42]   ImGuizmo.cpp
+[19:03:42]   ImSequencer.cpp
+[19:03:42]   imnodes.cpp
+[19:03:42]   Running codegen for Render (inputs changed)...
+[19:03:43]   BridgeClient.cpp
+[19:03:43]   doing full rebuild
+[19:03:44]   TracyClient.cpp
+[19:03:44]   Starting codegen script... fullrebuild=True
+[19:03:44]   fixing pts in typenames
+[19:03:44]   read enums and structs in 422.59 ms
+[19:03:44]   mega file time 0.0
+[19:03:44]   [('./MyGame', 'pch.h'), ('./MyGame\\bike', 'BikeCourse.h'), ('./MyGame\\bike', 'BikeCourseHilly.h'), ('./MyGame\\bike', 'BikeCourseTurtle.h'), ('./MyGame\\bike', 'BikeDebugger.h'), ('./MyGame\\bike', 'BikeHeaders.h'), ('./MyGame\\bike', 'BikeObject_Local.h'), ('./MyGame\\bike', 'BikeTerrainNoise.h'), ('./MyGame\\fps', 'AnimGraphTester.h'), ('./MyGame\\fps', 'AnimGraphTesterEditorUI.h'), ('./MyGame\\fps', 'fpsApp.h'), ('./MyGame\\fps', 'fpsDebugCamera.h'), ('./MyGame\\fps', 'fpsObjects.h'), ('./MyGame\\fps', 'fpsTestObjects.h')]
+[19:03:44]   Cleaning .generated/...
+[19:03:44]   Cleaning .generated/...
+[19:03:44]   Parsing files...
+[19:03:44]   Writing output...
+[19:03:44]   Writing generated source ./MyGame/.generated/MyGameMEGA.gen.cpp
+[19:03:44]   Finished in 508.00 ms
+[19:03:45]   doing full rebuild
+[19:03:45]   Starting codegen script... fullrebuild=True
+[19:03:45]   fixing pts in typenames
+[19:03:45]   read enums and structs in 330.73 ms
+[19:03:45]   mega file time 0.0
+[19:03:45]   [('./LevelEditor', 'AllHeader.h'), ('./LevelEditor', 'Commands.h'), ('./LevelEditor', 'DragDetector.h'), ('./LevelEditor', 'DragDropPreview.h'), ('./LevelEditor', 'EditorDocLocal.h'), ('./LevelEditor', 'EditorInputs.h'), ('./LevelEditor', 'EditorModes.h'), ('./LevelEditor', 'EditorRecents.h'), ('./LevelEditor', 'EditorUILayout.h'), ('./LevelEditor', 'EdPropertyGrid.h'), ('./LevelEditor', 'IEditorApi.h'), ('./LevelEditor', 'IInputReciever.h'), ('./LevelEditor', 'LevelEditorCamera.h'), ('./LevelEditor', 'ManipulateTransformTool.h'), ('./LevelEditor', 'ObjectOutlineFilter.h'), ('./LevelEditor', 'OrthoCamera.h'), ('./LevelEditor', 'pch.h'), ('./LevelEditor', 'PropertyEditors.h'), ('./LevelEditor', 'RoadBuilderTool.h'), ('./LevelEditor', 'SelectionState.h'), ('./LevelEditor', 'ViewportHandles.h')]
+[19:03:45]   Cleaning .generated/...
+[19:03:45]   Cleaning .generated/...
+[19:03:45]   Parsing files...
+[19:03:45]   Writing output...
+[19:03:45]   Writing generated source ./LevelEditor/.generated/LevelEditorMEGA.gen.cpp
+[19:03:45]   Finished in 345.62 ms
+[19:03:45]   doing full rebuild
+[19:03:45]   Starting codegen script... fullrebuild=True
+[19:03:45]   fixing pts in typenames
+[19:03:45]   read enums and structs in 342.66 ms
+[19:03:45]   mega file time 0.0
+[19:03:45]   [('./Render', 'Canvas2dBackendLocal.h'), ('./Render', 'Canvas2dGpuMesh.h'), ('./Render', 'Canvas2dRecorder.h'), ('./Render', 'Canvas2dTypes.h'), ('./Render', 'Canvas2dVertexArray.h'), ('./Render', 'CompactInstancePack.h'), ('./Render', 'DrawLocal.h'), ('./Render', 'DrawLocalConfigVars.h'), ('./Render', 'DrawLocal_Batching.h'), ('./Render', 'DrawLocal_Device.h'), ('./Render', 'DrawLocal_Helpers.h'), ('./Render', 'DrawPublic.h'), ('./Render', 'DrawTypedefs.h'), ('./Render', 'DynamicMaterialPtr.h'), ('./Render', 'DynamicModelPtr.h'), ('./Render', 'EnvProbe.h'), ('./Render', 'FrameCapture.h'), ('./Render', 'Frustum.h'), ('./Render', 'GpuAllocator.h'), ('./Render', 'GpuCullingTest.h'), ('./Render', 'IGraphicsDevice.h'), ('./Render', 'MaterialLocal.h'), ('./Render', 'MaterialPublic.h'), ('./Render', 'Meshlet.h'), ('./Render', 'Model.h'), ('./Render', 'ModelManager.h'), ('./Render', 'OpenGlDeviceLocal.h'), ('./Render', 'pch.h'), ('./Render', 'PostProcessSettings.h'), ('./Render', 'PPManager.h'), ('./Render', 'RectPackerUtil.h'), ('./Render', 'RenderConfigVars.h'), ('./Render', 'RenderExtra.h'), ('./Render', 'RenderGiManager.h'), ('./Render', 'RenderLevelParams.h'), ('./Render', 'RenderObj.h'), ('./Render', 'RenderScene.h'), ('./Render', 'Render_Decal.h'), ('./Render', 'Render_Light.h'), ('./Render', 'Render_Sun.h'), ('./Render', 'Render_Volumes.h'), ('./Render', 'RmlUiRenderInterface.h'), ('./Render', 'ShaderSourceLoader.h'), ('./Render', 'SpirvCompile.h'), ('./Render', 'TaaManager.h'), ('./Render', 'Texture.h'), ('./Render', 'ViewSetup.h'), ('./Render\\Dx11', 'Dx11Local.h'), ('./Render\\Editor', 'TextureEditor.h'), ('./Render\\RT', 'RaytraceTest.h'), ('./Render\\RT', 'RaytraceTest_internal.h')]
+[19:03:45]   Cleaning .generated/...
+[19:03:45]   Cleaning .generated/...
+[19:03:45]   Parsing files...
+[19:03:45]   pch.cpp
+[19:03:45]   Writing output...
+[19:03:45]   Writing generated source ./Render/.generated/RenderMEGA.gen.cpp
+[19:03:45]   Finished in 588.70 ms
+[19:03:45]   pch.cpp
+[19:03:46]   pch.cpp
+[19:03:49]   glad.c
+[19:03:49]   miniz.c
+[19:03:53]   External.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\External.lib
+[19:03:53]   Discovery.cpp
+[19:03:55]   SoundCompilier.cpp
+[19:03:55]   AssetCompiler.cpp
+[19:03:55]   AssetOps.cpp
+[19:03:55]   unity_HPFB3FNX1PRUEHO9.cpp
+[19:03:55]   unity_9C82JBTKCB0ZATEE.cpp
+[19:03:55]   unity_J2O94AE275UD4Y1H.cpp
+[19:03:55]   unity_9S1JK07O6P3HY72K.cpp
+[19:03:56]   unity_X9BP7BAD50AEE9B1.cpp
+[19:04:01]   RenderMEGA.gen.cpp
+[19:04:02]   LevelEditorMEGA.gen.cpp
+[19:04:03]   MyGameMEGA.gen.cpp
+[19:04:04]   Commands.cpp
+[19:04:10]   AddEditorCommands.cpp
+[19:04:10]   Commands.cpp
+[19:04:11]   CommandsComponent.cpp
+[19:04:11]   CommandsParenting.cpp
+[19:04:11]   CommandsPrefab.cpp
+[19:04:11]   CommandsUndoRedo.cpp
+[19:04:11]   DecalStampTool.cpp
+[19:04:11]   DragDetector.cpp
+[19:04:11]   DragDropPreview.cpp
+[19:04:13]   EditorDocLocal.cpp
+[19:04:13]   DdsExport.cpp
+[19:04:13]   DecalBatcher.cpp
+[19:04:13]   DrawLocal_Misc.cpp
+[19:04:13]   DrawLocal_Device.cpp
+[19:04:13]   DrawLocal_Init.cpp
+[19:04:13]   IntegrationTests.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\IntegrationTests.lib
+[19:04:14]   DrawLocal_RenderPass.cpp
+[19:04:14]   EditorDocInput.cpp
+[19:04:14]   EditorRecents.cpp
+[19:04:14]   DrawLocal_Scene.cpp
+[19:04:14]   DrawLocal_Lighting.cpp
+[19:04:16]   EditorDocScene.cpp
+[19:04:16]   EditorDocViewport.cpp
+[19:04:17]   EditorUILayout.cpp
+[19:04:17]   EdPropertyGrid.cpp
+[19:04:18]   ProjectCommands.cpp
+[19:04:19]   FoliagePaintTool.cpp
+[19:04:19]   LevelEditorCamera.cpp
+[19:04:20]   DrawLocal_Editor.cpp
+[19:04:20]   DrawLocal_SceneDraw.cpp
+[19:04:27]   DrawLocal_SceneDrawInternal.cpp
+[19:04:27]   DrawLocal_Debug.cpp
+[19:04:27]   DrawLocal_BatchScene.cpp
+[19:04:27]   ManipulateTransformTool.cpp
+[19:04:28]   DrawLocal_CullShadow.cpp
+[19:04:28]   ObjectOutliner.cpp
+[19:04:28]   EnvProbe.cpp
+[19:04:29]   ObjectOutlinerContextMenu.cpp
+[19:04:29]   ObjectOutlinerDraw.cpp
+[19:04:29]   ObjectOutlinerFilter.cpp
+[19:04:30]   OrthoCamera.cpp
+[19:04:30]   Frustum.cpp
+[19:04:31]   PropertyEditors.cpp
+[19:04:31]   FrameCapture.cpp
+[19:04:31]   Generating Code...
+[19:04:32]   GpuAllocator.cpp
+[19:04:33]   GpuCullingTest.cpp
+[19:04:33]   fpsApp.cpp
+[19:04:33]   fpsDebugCamera.cpp
+[19:04:33]   AnimGraphTester.cpp
+[19:04:33]   SceneExport.cpp
+[19:04:33]   AnimGraphTesterEditorUI.cpp
+[19:04:34]   fpsObjects.cpp
+[19:04:34]   fpsTestObjects.cpp
+[19:04:34]   BikeAI.cpp
+[19:04:34]   BikeApplication.cpp
+[19:04:34]   SelectionMode.cpp
+[19:04:34]   BikeApplication_AIDebug.cpp
+[19:04:35]   MaterialLocal.cpp
+[19:04:35]   MaterialLocal_Loading.cpp
+[19:04:35]   MaterialLocal_Manager.cpp
+[19:04:35]   MaterialLocal_Shader.cpp
+[19:04:37]   SelectionState.cpp
+[19:04:37]   BikeApplication_Debug.cpp
+[19:04:37]   Model.cpp
+[19:04:37]   BikeApplication_Pack.cpp
+[19:04:37]   ViewportHandles.cpp
+[19:04:37]   ModelGpuUpload.cpp
+[19:04:37]   BikeApplication_Player.cpp
+[19:04:38]   ModelLoad.cpp
+[19:04:38]   BikeCamera.cpp
+[19:04:38]   BikeCourse.cpp
+[19:04:39]   BikeCourseDebug.cpp
+[19:04:39]   BikeCourseHardcoded.cpp
+[19:04:40]   ModelDynamic.cpp
+[19:04:40]   BikeCourseHilly.cpp
+[19:04:40]   BikeCourseMesh.cpp
+[19:04:41]   BikeCourseRacingLine.cpp
+[19:04:41]   BikeCourseRoadNetwork.cpp
+[19:04:41]   OpenGlDevice.cpp
+[19:04:42]   OpenGlBufferImpl.cpp
+[19:04:42]   BikeCourseTerrainMesh.cpp
+[19:04:42]   AssetTools.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\AssetTools.lib
+[19:04:42]   OpenGlShaderImpl.cpp
+[19:04:42]   BikeDebugger.cpp
+[19:04:42]   BikeObject.cpp
+[19:04:42]   BikeObject_Physics.cpp
+[19:04:42]   Running codegen for Core (inputs changed)...
+[19:04:43]   BikeObject_Steer.cpp
+[19:04:43]   BikeUI.cpp
+[19:04:43]   OpenGlTextureImpl.cpp
+[19:04:44]   BikeWind.cpp
+[19:04:44]   GraphicsDeviceCommon.cpp
+[19:04:45]   Dx11Device.cpp
+[19:04:45]   Dx11TextureImpl.cpp
+[19:04:46]   Dx11BufferImpl.cpp
+[19:04:46]   Dx11ShaderImpl.cpp
+[19:04:47]   cscli.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\cscli.exe
+[19:04:47]   Dx11PipelineImpl.cpp
+[19:04:47]   PPManager.cpp
+[19:04:47]   PostProcessSettings.cpp
+[19:04:47]   'pwsh.exe' is not recognized as an internal or external command,
+[19:04:47]   operable program or batch file.
+[19:04:48]   RenderExtra.cpp
+[19:04:49]   RenderExtra_LightCookieAtlas.cpp
+[19:04:49]   MyGame.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\MyGame.lib
+[19:04:49]   RenderExtra_SSR.cpp
+[19:04:49]   RenderGiManager.cpp
+[19:04:49]   RenderScene.cpp
+[19:04:50]   Canvas2dTypes.cpp
+[19:04:50]   Canvas2dGpuMesh.cpp
+[19:04:50]   doing full rebuild
+[19:04:50]   Starting codegen script... fullrebuild=True
+[19:04:50]   fixing pts in typenames
+[19:04:50]   read enums and structs in 283.46 ms
+[19:04:50]   mega file time 0.0
+[19:04:50]   Canvas2dRecorder.cpp
+[19:04:50]   Canvas2dVertexArray.cpp
+[19:04:50]   Canvas2dBackendLocal.cpp
+[19:04:51]   RaytraceTest.cpp
+[19:04:51]   RaytraceTest_BVH.cpp
+[19:04:51]   RaytraceTest_Probe.cpp
+[19:04:51]   [('.', 'Debug.h'), ('.', 'DebugConsole.h'), ('.', 'EditorPopups.h'), ('.', 'EditorPopupTemplate.h'), ('.', 'EngineMain.h'), ('.', 'GameEngineLocal.h'), ('.', 'GameEnginePublic.h'), ('.', 'IEditorTool.h'), ('.', 'ITestRunner.h'), ('.', 'Level.h'), ('.', 'Logging.h'), ('.', 'pch.h'), ('.', 'Testheader.h'), ('.', 'User_Camera.h'), ('.\\AgentBridge', 'AgentBridge.h'), ('.\\Animation', 'AnimationSeqAsset.h'), ('.\\Animation', 'AnimationTypes.h'), ('.\\Animation', 'AnimationUtil.h'), ('.\\Animation', 'AnimEvent.h'), ('.\\Animation', 'AnimSeqEditor.h'), ('.\\Animation', 'AnimSidecarFile.h'), ('.\\Animation', 'AnimTreeAsset.h'), ('.\\Animation', 'AnimTreeBuild.h'), ('.\\Animation', 'Event.h'), ('.\\Animation', 'SkeletonData.h'), ('.\\Animation', 'SkeletonEditor.h'), ('.\\Animation\\Editor', 'AnimTreeEditor.h'), ('.\\Animation\\Editor', 'BoneMaskEditor.h'), ('.\\Animation\\Runtime', 'Animation.h'), ('.\\Animation\\Runtime', 'AnimationTreeLocal.h'), ('.\\Animation\\Runtime', 'Easing.h'), ('.\\Animation\\Runtime', 'Percentage.h'), ('.\\Animation\\Runtime', 'RuntimeNodesNew.h'), ('.\\Animation\\Runtime', 'RuntimeNodesNew2.h'), ('.\\Animation\\Runtime', 'SpringBones.h'), ('.\\Animation\\Runtime', 'SyncTime.h'), ('.\\AssetCompile', 'Compiliers.h'), ('.\\AssetCompile', 'GltfExport.h'), ('.\\AssetCompile', 'ModelAsset2.h'), ('.\\AssetCompile', 'ModelCompilierLocal.h'), ('.\\AssetCompile', 'SkeletonAsset.h'), ('.\\AssetCompile', 'Someutils.h'), ('.\\AssetCompile', 'SoundAsset.h'), ('.\\Assets', 'AssetBrowser.h'), ('.\\Assets', 'AssetDatabase.h'), ('.\\Assets', 'AssetInspectorPane.h'), ('.\\Assets', 'AssetReferenceQuery.h'), ('.\\Assets', 'AssetReferenceViewer.h'), ('.\\Assets', 'AssetRegistry.h'), ('.\\Assets', 'AssetRegistryLocal.h'), ('.\\Assets', 'AssetSizeViewer.h'), ('.\\Assets', 'FileWatcher.h'), ('.\\Assets', 'HackedReloader.h'), ('.\\Assets', 'IAsset.h'), ('.\\Assets', 'ScriptableObject.h'), ('.\\AssetTools', 'AssetCompiler.h'), ('.\\AssetTools', 'AssetDiagnostics.h'), ('.\\AssetTools', 'AssetOps.h'), ('.\\AssetTools', 'AssetPackager.h'), ('.\\AssetTools', 'AssetTemplates.h'), ('.\\AssetTools', 'DiagnosticsWindow.h'), ('.\\Framework', 'AddClassToFactory.h'), ('.\\Framework', 'ArenaAllocator.h'), ('.\\Framework', 'ArenaStd.h'), ('.\\Framework', 'ArrayReflection.h'), ('.\\Framework', 'BinaryReadWrite.h'), ('.\\Framework', 'BoolButton.h'), ('.\\Framework', 'BVH.h'), ('.\\Framework', 'Bytepacker.h'), ('.\\Framework', 'ClassBase.h'), ('.\\Framework', 'ClassTypeInfo.h'), ('.\\Framework', 'ClassTypePtr.h'), ('.\\Framework', 'Config.h'), ('.\\Framework', 'ConsoleCmdGroup.h'), ('.\\Framework', 'Curve.h'), ('.\\Framework', 'CurveEditorImgui.h'), ('.\\Framework', 'DictParser.h'), ('.\\Framework', 'DictWriter.h'), ('.\\Framework', 'EditorTheme.h'), ('.\\Framework', 'EnumDefReflection.h'), ('.\\Framework', 'Factory.h'), ('.\\Framework', 'Files.h'), ('.\\Framework', 'FnFactory.h'), ('.\\Framework', 'FreeList.h'), ('.\\Framework', 'GradientEditorImgui.h'), ('.\\Framework', 'Guid.h'), ('.\\Framework', 'Handle.h'), ('.\\Framework', 'Hashmap.h'), ('.\\Framework', 'Hashset.h'), ('.\\Framework', 'InlineVec.h'), ('.\\Framework', 'InterfaceTypeInfo.h'), ('.\\Framework', 'Jobs.h'), ('.\\Framework', 'Log.h'), ('.\\Framework', 'LuaColor.h'), ('.\\Framework', 'MapUtil.h'), ('.\\Framework', 'MathLib.h'), ('.\\Framework', 'MemArena.h'), ('.\\Framework', 'MeshBuilder.h'), ('.\\Framework', 'MeshBuilderImpl.h'), ('.\\Framework', 'MulticastDelegate.h'), ('.\\Framework', 'MyImguiLib.h'), ('.\\Framework', 'NodeCanvasImgui.h'), ('.\\Framework', 'NodeMenuItem.h'), ('.\\Framework', 'Optional.h'), ('.\\Framework', 'PidTuner.h'), ('.\\Framework', 'PoolAllocator.h'), ('.\\Framework', 'Profiler.h'), ('.\\Framework', 'ProfilerUI.h'), ('.\\Framework', 'PropertyEd.h'), ('.\\Framework', 'PropertyPtr.h'), ('.\\Framework', 'PropertyUtil.h'), ('.\\Framework', 'Range.h'), ('.\\Framework', 'Rect2d.h'), ('.\\Framework', 'Reflection2.h'), ('.\\Framework', 'ReflectionMacros.h'), ('.\\Framework', 'ReflectionProp.h'), ('.\\Framework', 'RingBuffer.h'), ('.\\Framework', 'ScopedBoolean.h'), ('.\\Framework', 'SerializedForDiffing.h'), ('.\\Framework', 'Serializer.h'), ('.\\Framework', 'SerializerBinary.h'), ('.\\Framework', 'SerializerJson.h'), ('.\\Framework', 'SerializerJson2.h'), ('.\\Framework', 'SharedPtr.h'), ('.\\Framework', 'StringName.h'), ('.\\Framework', 'StringUtil.h'), ('.\\Framework', 'StringUtils.h'), ('.\\Framework', 'StructReflection.h'), ('.\\Framework', 'SysPrint.h'), ('.\\Framework', 'UniquePtrReflection.h'), ('.\\Framework', 'Util.h'), ('.\\Framework', 'VectorReflect2.h'), ('.\\Game', 'BaseUpdater.h'), ('.\\Game', 'EditorAddMenu.h'), ('.\\Game', 'Entity.h'), ('.\\Game', 'EntityComponent.h'), ('.\\Game', 'EntityPtr.h'), ('.\\Game', 'GameEventBus.h'), ('.\\Game', 'GameplayStatic.h'), ('.\\Game', 'LevelAssets.h'), ('.\\Game', 'Prefab.h'), ('.\\Game\\CarGame', 'CarGame.h'), ('.\\Game\\CarGame', 'CarGui.h'), ('.\\Game\\Components', 'ArrowComponent.h'), ('.\\Game\\Components', 'BillboardComponent.h'), ('.\\Game\\Components', 'CameraComponent.h'), ('.\\Game\\Components', 'DecalComponent.h'), ('.\\Game\\Components', 'GameAnimationMgr.h'), ('.\\Game\\Components', 'GraphCurveComponent.h'), ('.\\Game\\Components', 'GroupComponent.h'), ('.\\Game\\Components', 'LightComponents.h'), ('.\\Game\\Components', 'MeshbuilderComponent.h'), ('.\\Game\\Components', 'MeshComponent.h'), ('.\\Game\\Components', 'NavComps.h'), ('.\\Game\\Components', 'ParticleComponent.h'), ('.\\Game\\Components', 'ParticleMgr.h'), ('.\\Game\\Components', 'ParticleSystemComponent.h'), ('.\\Game\\Components', 'PhysicsComponents.h'), ('.\\Game\\Components', 'PostProcessComponent.h'), ('.\\Game\\Components', 'PostProcessEditorUI.h'), ('.\\Game\\Components', 'PrefabAssetComponent.h'), ('.\\Game\\Components', 'RagdollComponent.h'), ('.\\Game\\Components', 'RagdollConfigComponent.h'), ('.\\Game\\Components', 'RagdollGizmoMesh.h'), ('.\\Game\\Components', 'RagdollJointComponent.h'), ('.\\Game\\Components', 'RagdollPhysicsBodyComponent.h'), ('.\\Game\\Components', 'RagdollSetupComponent.h'), ('.\\Game\\Components', 'RagdollUtil.h'), ('.\\Game\\Components', 'RenderStressTestComponent.h'), ('.\\Game\\Components', 'RoadNetworkComponent.h'), ('.\\Game\\Components', 'SpawnerComponenth.h'), ('.\\Game\\Components', 'SpringBoneManagerComponent.h'), ('.\\Game\\Components', 'SpringBonePreviewComponent.h'), ('.\\Game\\Components', 'SpringBoneSetupComponent.h'), ('.\\Game\\Components', 'SpringBoneSetupUtil.h'), ('.\\Game\\Entities', 'BikeEntity.h'), ('.\\Game\\Entities', 'BikeSystem.h'), ('.\\Game\\Entities', 'CharacterController.h'), ('.\\Game\\Entities', 'Player.h'), ('.\\Game\\Entities', 'PlayerAnimDriver.h'), ('.\\Game\\ObsGame', 'ObsGameHeaders.h'), ('.\\Game\\Particles', 'ParticleAsset.h'), ('.\\Game\\Particles', 'ParticleEditorUI.h'), ('.\\Game\\Particles', 'ParticleModules.h'), ('.\\Game\\Particles', 'ParticleTypes.h'), ('.\\Game\\TopDownShooter', 'TDChest.h'), ('.\\Game\\TopDownShooter', 'TopDownPlayer.h'), ('.\\Game\\TopDownShooter', 'TopDownShooterGame.h'), ('.\\Game\\TP', 'DefaultGameHeader.h'), ('.\\Game\\TP', 'TPGame.h'), ('.\\Input', 'InputSystem.h'), ('.\\Input', 'Sdl2CompatGamepad.h'), ('.\\IntegrationTests', 'EditorTestContext.h'), ('.\\IntegrationTests', 'GpuTimer.h'), ('.\\IntegrationTests', 'RenderDump.h'), ('.\\IntegrationTests', 'Screenshot.h'), ('.\\IntegrationTests', 'StateDump.h'), ('.\\IntegrationTests', 'TestContext.h'), ('.\\IntegrationTests', 'TestGameApp.h'), ('.\\IntegrationTests', 'TestRegistry.h'), ('.\\IntegrationTests', 'TestRunner.h'), ('.\\IntegrationTests', 'TestTask.h'), ('.\\LevelSerialization', 'SerializeNew.h'), ('.\\Navigation', 'LevelNavUtil.h'), ('.\\Navigation', 'NavAgentComponent.h'), ('.\\Navigation', 'NavMeshBaker.h'), ('.\\Navigation', 'NavMeshDebugDraw.h'), ('.\\Navigation', 'NavMeshSettingsComponent.h'), ('.\\Navigation', 'NavMeshVolumeComponent.h'), ('.\\Navigation', 'RuntimeNavManager.h'), ('.\\Physics', 'ChannelsAndPresets.h'), ('.\\Physics', 'Physics2.h'), ('.\\Physics', 'Physics2Local.h'), ('.\\Scripting', 'LuaTestRunner.h'), ('.\\Scripting', 'LuaTransform.h'), ('.\\Scripting', 'LuaVecQuat.h'), ('.\\Scripting', 'ScriptFunctionCodegen.h'), ('.\\Scripting', 'ScriptingStdLib.h'), ('.\\Scripting', 'ScriptManager.h'), ('.\\Sound', 'SoundComponent.h'), ('.\\Sound', 'SoundLocal.h'), ('.\\Sound', 'SoundPublic.h'), ('.\\UI', 'Canvas2d.h'), ('.\\UI', 'FontAsset.h'), ('.\\UI', 'OnScreenLogGui.h'), ('.\\UI', 'UiAnchor.h'), ('.\\UI', 'ViewportSystem.h'), ('.\\UI\\RmlUi', 'RmlUiRenderHook.h'), ('.\\UI\\RmlUi', 'RmlUiSystem.h'), ('.\\UI\\RmlUi', 'RmlUiSystemInterface.h'), ('.\\UI\\Widgets', 'EditorCube.h'), ('.\\UnitTests', 'Unittest.h')]
+[19:04:51]   Cleaning .generated/...
+[19:04:51]   Cleaning .generated/...
+[19:04:51]   Parsing files...
+[19:04:51]   unknown type, assuming struct: Serializer
+[19:04:51]   unknown type, assuming struct: Serializer
+[19:04:51]   Writing output...
+[19:04:51]   Writing generated source ./.generated/MEGA.gen.cpp
+[19:04:51]   Finished in 1033.96 ms
+[19:04:51]   LevelEditor.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\LevelEditor.lib
+[19:04:51]   RaytraceTest_Shade.cpp
+[19:04:51]   MEGA.gen.cpp
+[19:04:51]   pch.cpp
+[19:04:52]   Shadowmap.cpp
+[19:04:52]   Ssao.cpp
+[19:04:53]   Texture.cpp
+[19:04:53]   TextureDDS.cpp
+[19:04:53]   TextureUpload.cpp
+[19:04:53]   Volumetricfog.cpp
+[19:04:53]   RmlUiRenderInterface.cpp
+[19:04:53]   Meshlet.cpp
+[19:04:56]   Render.vcxproj -> C:\Users\charl\source\repos\CsRemake\x64\Debug\Render.lib
+[19:05:04]   AssetReferenceQuery.cpp
+[19:05:05]   AgentBridge.cpp
+[19:05:05]   AgentBridgeLua.cpp
+[19:05:05]   AssetRegistry.cpp
+[19:05:05]   Files.cpp
+[19:05:05]   FileWatcher.cpp
+[19:05:05]   write_gltf.cpp
+[19:05:05]   AgentBridgeCommands.cpp
+[19:05:08]   AssetInspectorPane.cpp
+[19:05:08]   Util.cpp
+[19:05:08]   unity_JWL580C5051WEOKO.cpp
+[19:05:10]   unity_K0J5DUGQA4G5RSKS.cpp
+[19:05:10]   unity_BF4ZFQHQFUGNQXDC.cpp
+[19:05:10]   unity_44FLZH23V07BSHKJ.cpp
+[19:05:10]   unity_B0YIIF6SH71BGVBH.cpp
+[19:05:10]   unity_ZFHUF0HVTD0KCDJL.cpp
+[19:05:15]   unity_LEKHH7IZ5H4U0AWK.cpp
+[19:05:16]   unity_5A2RLJUZOIBPMWWP.cpp
