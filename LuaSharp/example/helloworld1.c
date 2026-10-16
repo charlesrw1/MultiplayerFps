@@ -38,40 +38,448 @@ static ls_bool ls_string_contains(ls_string s, ls_string p) { ls_int i,j; if(!s|
 static ls_bool ls_string_equal(ls_string a, ls_string b) { return a==b; }
 static ls_bool ls_string_truthy(ls_string s) { return s && s->length != 0; }
 
-typedef struct LS_Main LS_Main;
+typedef struct LS_Random LS_Random;
+typedef struct LS_Point LS_Point;
+typedef struct LS_Calculator LS_Calculator;
+typedef struct LS_Stats LS_Stats;
+typedef struct LS_Shapes LS_Shapes;
+typedef struct LS_Primes LS_Primes;
+typedef struct LS_Fib LS_Fib;
+typedef struct LS_Text LS_Text;
 
-struct LS_Main {
+#define LS_Shape_Circle ((ls_int)0)
+#define LS_Shape_Square ((ls_int)1)
+#define LS_Shape_Triangle ((ls_int)10)
+#define LS_Op_Add ((ls_int)0)
+#define LS_Op_Sub ((ls_int)1)
+#define LS_Op_Mul ((ls_int)2)
+#define LS_Op_Div ((ls_int)3)
+
+struct LS_Random {
+    ls_int state;
+};
+struct LS_Point {
+    ls_int x;
+    ls_int y;
+};
+struct LS_Calculator {
+    ls_int value;
+    ls_int operations;
+};
+struct LS_Stats {
+    ls_int count;
+    ls_int total;
+    ls_int minimum;
+    ls_int maximum;
+};
+struct LS_Shapes {
+    unsigned char _unused;
+};
+struct LS_Primes {
+    unsigned char _unused;
+};
+struct LS_Fib {
+    unsigned char _unused;
+};
+struct LS_Text {
     unsigned char _unused;
 };
 
-static void ls_trace_Main(void* runtime_context, void* object) {
-    LS_Main* self = (LS_Main*)object;
+static void ls_trace_Random(void* runtime_context, void* object) {
+    LS_Random* self = (LS_Random*)object;
+    (void)runtime_context; (void)self;
+}
+static void ls_trace_Point(void* runtime_context, void* object) {
+    LS_Point* self = (LS_Point*)object;
+    (void)runtime_context; (void)self;
+}
+static void ls_trace_Calculator(void* runtime_context, void* object) {
+    LS_Calculator* self = (LS_Calculator*)object;
+    (void)runtime_context; (void)self;
+}
+static void ls_trace_Stats(void* runtime_context, void* object) {
+    LS_Stats* self = (LS_Stats*)object;
+    (void)runtime_context; (void)self;
+}
+static void ls_trace_Shapes(void* runtime_context, void* object) {
+    LS_Shapes* self = (LS_Shapes*)object;
+    (void)runtime_context; (void)self;
+}
+static void ls_trace_Primes(void* runtime_context, void* object) {
+    LS_Primes* self = (LS_Primes*)object;
+    (void)runtime_context; (void)self;
+}
+static void ls_trace_Fib(void* runtime_context, void* object) {
+    LS_Fib* self = (LS_Fib*)object;
+    (void)runtime_context; (void)self;
+}
+static void ls_trace_Text(void* runtime_context, void* object) {
+    LS_Text* self = (LS_Text*)object;
     (void)runtime_context; (void)self;
 }
 typedef struct LS_ModuleState {
-    LS_Main* m;
+    LS_Random* rng;
+    LS_Stats* stats;
+    LS_Point* origin;
+    LS_Point* target;
+    LS_Calculator* calc;
+    LS_Shapes* shapes;
+    LS_Primes* primes;
+    LS_Fib* fib;
+    LS_Text* text;
+    ls_table inventory;
+    ls_int base;
+    LS_Closure* scale;
+    LS_Closure* hypot2;
+    LS_Closure* isEven;
+    ls_table log;
+    LS_Closure* record;
+    ls_int evens;
+    ls_int odds;
+    ls_int checksum;
 } LS_ModuleState;
 static LS_ModuleState ls_state;
 void ls_module_trace_roots(void* runtime_context) {
-    ls_runtime->mark(runtime_context, ls_state.m);
+    ls_runtime->mark(runtime_context, ls_state.rng);
+    ls_runtime->mark(runtime_context, ls_state.stats);
+    ls_runtime->mark(runtime_context, ls_state.origin);
+    ls_runtime->mark(runtime_context, ls_state.target);
+    ls_runtime->mark(runtime_context, ls_state.calc);
+    ls_runtime->mark(runtime_context, ls_state.shapes);
+    ls_runtime->mark(runtime_context, ls_state.primes);
+    ls_runtime->mark(runtime_context, ls_state.fib);
+    ls_runtime->mark(runtime_context, ls_state.text);
+    ls_runtime->mark(runtime_context, ls_state.inventory);
+    ls_runtime->mark(runtime_context, ls_state.scale);
+    ls_runtime->mark(runtime_context, ls_state.hypot2);
+    ls_runtime->mark(runtime_context, ls_state.isEven);
+    ls_runtime->mark(runtime_context, ls_state.log);
+    ls_runtime->mark(runtime_context, ls_state.record);
 }
+
+static void ls_lambda_0(void* environment, const LS_Value* arguments, LS_Value* result);
+static void ls_lambda_1(void* environment, const LS_Value* arguments, LS_Value* result);
+static void ls_lambda_2(void* environment, const LS_Value* arguments, LS_Value* result);
+static void ls_lambda_3(void* environment, const LS_Value* arguments, LS_Value* result);
 
 ls_int ls_module_abi_version(void) { return 4; }
 int ls_module_bind(LS_RuntimeApi* runtime) { if (!runtime || runtime->abi_version != 4 || !runtime->allocate || !runtime->mark || !runtime->intern || !runtime->table_create || !runtime->table_get || !runtime->table_set || !runtime->print || !runtime->report_error) return -1; ls_runtime = runtime; return 0; }
-void* ls_global_m(void) { return &ls_state.m; }
-LS_Main* ls_Main_new(void);
-void ls_Main_main(LS_Main* self);
+void* ls_global_rng(void) { return &ls_state.rng; }
+void* ls_global_stats(void) { return &ls_state.stats; }
+void* ls_global_origin(void) { return &ls_state.origin; }
+void* ls_global_target(void) { return &ls_state.target; }
+void* ls_global_calc(void) { return &ls_state.calc; }
+void* ls_global_shapes(void) { return &ls_state.shapes; }
+void* ls_global_primes(void) { return &ls_state.primes; }
+void* ls_global_fib(void) { return &ls_state.fib; }
+void* ls_global_text(void) { return &ls_state.text; }
+void* ls_global_inventory(void) { return &ls_state.inventory; }
+void* ls_global_base(void) { return &ls_state.base; }
+void* ls_global_scale(void) { return &ls_state.scale; }
+void* ls_global_hypot2(void) { return &ls_state.hypot2; }
+void* ls_global_isEven(void) { return &ls_state.isEven; }
+void* ls_global_log(void) { return &ls_state.log; }
+void* ls_global_record(void) { return &ls_state.record; }
+void* ls_global_evens(void) { return &ls_state.evens; }
+void* ls_global_odds(void) { return &ls_state.odds; }
+void* ls_global_checksum(void) { return &ls_state.checksum; }
+LS_Random* ls_Random_new(ls_int seed);
+ls_int ls_Random_next(LS_Random* self);
+ls_int ls_Random_range(LS_Random* self, ls_int low, ls_int high);
+LS_Point* ls_Point_new(ls_int px, ls_int py);
+ls_int ls_Point_manhattan(LS_Point* self, LS_Point* other);
+ls_int ls_Point_dot(LS_Point* self, LS_Point* other);
+LS_Calculator* ls_Calculator_new(ls_int initial);
+ls_int ls_Calculator_apply(LS_Calculator* self, ls_int op, ls_int amount);
+LS_Stats* ls_Stats_new(void);
+void ls_Stats_add(LS_Stats* self, ls_int sample);
+ls_float ls_Stats_mean(LS_Stats* self);
+LS_Shapes* ls_Shapes_new(void);
+ls_float ls_Shapes_area(LS_Shapes* self, ls_int shape, ls_float size);
+LS_Primes* ls_Primes_new(void);
+ls_bool ls_Primes_isPrime(LS_Primes* self, ls_int n);
+ls_int ls_Primes_countBelow(LS_Primes* self, ls_int limit);
+LS_Fib* ls_Fib_new(void);
+ls_int ls_Fib_iterative(LS_Fib* self, ls_int n);
+ls_int ls_Fib_recursive(LS_Fib* self, ls_int n);
+LS_Text* ls_Text_new(void);
+ls_int ls_Text_score(LS_Text* self, ls_string word);
 
-LS_Main* ls_Main_new(void) {
-    LS_Main* self = (LS_Main*)ls_alloc(sizeof(LS_Main), ls_trace_Main);
-    if (!self) return (LS_Main*)0;
+LS_Random* ls_Random_new(ls_int seed) {
+    LS_Random* self = (LS_Random*)ls_alloc(sizeof(LS_Random), ls_trace_Random);
+    if (!self) return (LS_Random*)0;
+    self->state = 0;
+    (self->state = seed);
     return self;
 }
-void ls_Main_main(LS_Main* self) {
-    ls_printf(ls_intern("hello world"), 0, (const LS_Value*)0);
+ls_int ls_Random_next(LS_Random* self) {
+    (self->state = ls_int_mod((ls_int_add(ls_int_mul(self->state, 1103515245), 12345)), 2147483648));
+    if ((self->state < 0)) {
+        (self->state = ls_int_neg(self->state));
+    }
+    return self->state;
 }
+ls_int ls_Random_range(LS_Random* self, ls_int low, ls_int high) {
+    return ls_int_add(low, ls_int_mod(ls_Random_next(self), (ls_int_add(ls_int_sub(high, low), 1))));
+}
+LS_Point* ls_Point_new(ls_int px, ls_int py) {
+    LS_Point* self = (LS_Point*)ls_alloc(sizeof(LS_Point), ls_trace_Point);
+    if (!self) return (LS_Point*)0;
+    self->x = 0;
+    self->y = 0;
+    (self->x = px);
+    (self->y = py);
+    return self;
+}
+ls_int ls_Point_manhattan(LS_Point* self, LS_Point* other) {
+    ls_int dx = ls_int_sub(self->x, other->x);
+    ls_int dy = ls_int_sub(self->y, other->y);
+    if ((dx < 0)) {
+        (dx = ls_int_neg(dx));
+    }
+    if ((dy < 0)) {
+        (dy = ls_int_neg(dy));
+    }
+    return ls_int_add(dx, dy);
+}
+ls_int ls_Point_dot(LS_Point* self, LS_Point* other) {
+    return ls_int_add(ls_int_mul(self->x, other->x), ls_int_mul(self->y, other->y));
+}
+LS_Calculator* ls_Calculator_new(ls_int initial) {
+    LS_Calculator* self = (LS_Calculator*)ls_alloc(sizeof(LS_Calculator), ls_trace_Calculator);
+    if (!self) return (LS_Calculator*)0;
+    self->value = 0;
+    self->operations = 0;
+    (self->value = initial);
+    return self;
+}
+ls_int ls_Calculator_apply(LS_Calculator* self, ls_int op, ls_int amount) {
+    (self->operations = ls_int_add(self->operations, 1));
+    if ((op == LS_Op_Add)) {
+        (self->value = ls_int_add(self->value, amount));
+    }
+    else {
+        if ((op == LS_Op_Sub)) {
+            (self->value = ls_int_sub(self->value, amount));
+        }
+        else {
+            if ((op == LS_Op_Mul)) {
+                (self->value = ls_int_mul(self->value, amount));
+            }
+            else {
+                if ((amount != 0)) {
+                    (self->value = ls_int_mod(self->value, amount));
+                }
+            }
+        }
+    }
+    return self->value;
+}
+LS_Stats* ls_Stats_new(void) {
+    LS_Stats* self = (LS_Stats*)ls_alloc(sizeof(LS_Stats), ls_trace_Stats);
+    if (!self) return (LS_Stats*)0;
+    self->count = 0;
+    self->total = 0;
+    self->minimum = 0;
+    self->maximum = 0;
+    return self;
+}
+void ls_Stats_add(LS_Stats* self, ls_int sample) {
+    if (((self->count == 0) || (sample < self->minimum))) {
+        (self->minimum = sample);
+    }
+    if (((self->count == 0) || (sample > self->maximum))) {
+        (self->maximum = sample);
+    }
+    (self->count = ls_int_add(self->count, 1));
+    (self->total = ls_int_add(self->total, sample));
+}
+ls_float ls_Stats_mean(LS_Stats* self) {
+    if ((self->count == 0)) {
+        return 0.0;
+    }
+    return ls_int_div(self->total, self->count);
+}
+LS_Shapes* ls_Shapes_new(void) {
+    LS_Shapes* self = (LS_Shapes*)ls_alloc(sizeof(LS_Shapes), ls_trace_Shapes);
+    if (!self) return (LS_Shapes*)0;
+    return self;
+}
+ls_float ls_Shapes_area(LS_Shapes* self, ls_int shape, ls_float size) {
+    if ((shape == LS_Shape_Circle)) {
+        return ((3.14159 * size) * size);
+    }
+    else {
+        if ((shape == LS_Shape_Square)) {
+            return (size * size);
+        }
+    }
+    return ((size * size) * 0.5);
+}
+LS_Primes* ls_Primes_new(void) {
+    LS_Primes* self = (LS_Primes*)ls_alloc(sizeof(LS_Primes), ls_trace_Primes);
+    if (!self) return (LS_Primes*)0;
+    return self;
+}
+ls_bool ls_Primes_isPrime(LS_Primes* self, ls_int n) {
+    if ((n < 2)) {
+        return 0;
+    }
+    {
+        ls_int d = 2;
+        while ((ls_int_mul(d, d) <= n)) {
+            if ((ls_int_mod(n, d) == 0)) {
+                return 0;
+            }
+            ls_continue_0:;
+            (d = ls_int_add(d, 1));
+        }
+    }
+    return 1;
+}
+ls_int ls_Primes_countBelow(LS_Primes* self, ls_int limit) {
+    ls_int found = 0;
+    {
+        ls_int n = 0;
+        while ((n < limit)) {
+            if ((!ls_Primes_isPrime(self, n))) {
+                goto ls_continue_1;
+            }
+            (found = ls_int_add(found, 1));
+            ls_continue_1:;
+            (n = ls_int_add(n, 1));
+        }
+    }
+    return found;
+}
+LS_Fib* ls_Fib_new(void) {
+    LS_Fib* self = (LS_Fib*)ls_alloc(sizeof(LS_Fib), ls_trace_Fib);
+    if (!self) return (LS_Fib*)0;
+    return self;
+}
+ls_int ls_Fib_iterative(LS_Fib* self, ls_int n) {
+    ls_int a = 0;
+    ls_int b = 1;
+    ls_int i = 0;
+    while (1) {
+        if ((i >= n)) {
+            break;
+        }
+        ls_int next = ls_int_add(a, b);
+        (a = b);
+        (b = next);
+        (i = ls_int_add(i, 1));
+    }
+    return a;
+}
+ls_int ls_Fib_recursive(LS_Fib* self, ls_int n) {
+    if ((n < 2)) {
+        return n;
+    }
+    return ls_int_add(ls_Fib_recursive(self, ls_int_sub(n, 1)), ls_Fib_recursive(self, ls_int_sub(n, 2)));
+}
+LS_Text* ls_Text_new(void) {
+    LS_Text* self = (LS_Text*)ls_alloc(sizeof(LS_Text), ls_trace_Text);
+    if (!self) return (LS_Text*)0;
+    return self;
+}
+ls_int ls_Text_score(LS_Text* self, ls_string word) {
+    ls_int result = ls_string_length(word);
+    if (ls_string_starts_with(word, ls_intern("hel"))) {
+        (result = ls_int_add(result, 10));
+    }
+    if (ls_string_ends_with(word, ls_intern("ld"))) {
+        (result = ls_int_add(result, 20));
+    }
+    if (ls_string_contains(word, ls_intern("o w"))) {
+        (result = ls_int_add(result, 40));
+    }
+    return result;
+}
+static void ls_lambda_0(void* environment, const LS_Value* arguments, LS_Value* result) {
+    (void)environment;
+    (void)arguments;
+    LS_Value n=arguments[0];
+    if(result) *result = ({ LS_Value ls_left=n,ls_right=((LS_Value){.kind=1,.as.integer=(ls_state.base)}),ls_result={0}; ls_value_arithmetic(&ls_left,2,&ls_right,&ls_result); ls_result; });
+}
+static void ls_lambda_1(void* environment, const LS_Value* arguments, LS_Value* result) {
+    (void)environment;
+    (void)arguments;
+    LS_Value a=arguments[0];
+    LS_Value b=arguments[1];
+    if(result) *result = ({ LS_Value ls_left=({ LS_Value ls_left=a,ls_right=a,ls_result={0}; ls_value_arithmetic(&ls_left,2,&ls_right,&ls_result); ls_result; }),ls_right=({ LS_Value ls_left=b,ls_right=b,ls_result={0}; ls_value_arithmetic(&ls_left,2,&ls_right,&ls_result); ls_result; }),ls_result={0}; ls_value_arithmetic(&ls_left,0,&ls_right,&ls_result); ls_result; });
+}
+static void ls_lambda_2(void* environment, const LS_Value* arguments, LS_Value* result) {
+    (void)environment;
+    (void)arguments;
+    LS_Value n=arguments[0];
+    if(result) *result = ((LS_Value){.kind=3,.as.boolean=(({ LS_Value ls_left=({ LS_Value ls_left=n,ls_right=((LS_Value){.kind=1,.as.integer=(2)}),ls_result={0}; ls_value_arithmetic(&ls_left,4,&ls_right,&ls_result); ls_result; }),ls_right=((LS_Value){.kind=1,.as.integer=(0)}); ls_value_equal(&ls_left,&ls_right); }))});
+}
+static void ls_lambda_3(void* environment, const LS_Value* arguments, LS_Value* result) {
+    (void)environment;
+    (void)arguments;
+    (void)result;
+    ls_table_set(ls_state.log, &(((LS_Value){.kind=4,.as.pointer=(ls_intern("done"))})), &(((LS_Value){.kind=1,.as.integer=(1)})));
+}
+
 int ls_module_init(void) {
-    ls_state.m = ls_Main_new();
-    ls_Main_main(ls_state.m);
+    ls_printf(ls_intern("hello world\n"), 0, (const LS_Value*)0);
+    ls_state.rng = ls_Random_new(1234);
+    ls_state.stats = ls_Stats_new();
+    {
+        ls_int i = 0;
+        while ((i < 1000)) {
+            ls_Stats_add(ls_state.stats, ls_Random_range(ls_state.rng, 1, 100));
+            ls_continue_2:;
+            (i = ls_int_add(i, 1));
+        }
+    }
+    ({ LS_Value ls_printf_arguments_3[4]; ls_printf_arguments_3[0]=((LS_Value){.kind=1,.as.integer=(ls_state.stats->count)}); ls_printf_arguments_3[1]=((LS_Value){.kind=1,.as.integer=(ls_state.stats->minimum)}); ls_printf_arguments_3[2]=((LS_Value){.kind=1,.as.integer=(ls_state.stats->maximum)}); ls_printf_arguments_3[3]=((LS_Value){.kind=2,.as.number=(ls_Stats_mean(ls_state.stats))}); ls_printf(ls_intern("stats: count=%d min=%d max=%d mean=%f\n"), 4, ls_printf_arguments_3); });
+    ls_state.origin = ls_Point_new(0, 0);
+    ls_state.target = ls_Point_new(7, ls_int_neg(3));
+    ({ LS_Value ls_printf_arguments_4[2]; ls_printf_arguments_4[0]=((LS_Value){.kind=1,.as.integer=(ls_Point_manhattan(ls_state.origin, ls_state.target))}); ls_printf_arguments_4[1]=((LS_Value){.kind=1,.as.integer=(ls_Point_dot(ls_state.target, ls_Point_new(2, 5)))}); ls_printf(ls_intern("points: manhattan=%d dot=%d\n"), 2, ls_printf_arguments_4); });
+    ls_state.calc = ls_Calculator_new(10);
+    ls_Calculator_apply(ls_state.calc, LS_Op_Add, 5);
+    ls_Calculator_apply(ls_state.calc, LS_Op_Mul, 4);
+    ls_Calculator_apply(ls_state.calc, LS_Op_Sub, 7);
+    ls_Calculator_apply(ls_state.calc, LS_Op_Div, 9);
+    ({ LS_Value ls_printf_arguments_5[2]; ls_printf_arguments_5[0]=((LS_Value){.kind=1,.as.integer=(ls_state.calc->value)}); ls_printf_arguments_5[1]=((LS_Value){.kind=1,.as.integer=(ls_state.calc->operations)}); ls_printf(ls_intern("calculator: value=%d ops=%d\n"), 2, ls_printf_arguments_5); });
+    ls_state.shapes = ls_Shapes_new();
+    ({ LS_Value ls_printf_arguments_6[3]; ls_printf_arguments_6[0]=((LS_Value){.kind=2,.as.number=(ls_Shapes_area(ls_state.shapes, LS_Shape_Circle, 2.0))}); ls_printf_arguments_6[1]=((LS_Value){.kind=2,.as.number=(ls_Shapes_area(ls_state.shapes, LS_Shape_Square, 3.0))}); ls_printf_arguments_6[2]=((LS_Value){.kind=2,.as.number=(ls_Shapes_area(ls_state.shapes, LS_Shape_Triangle, 4.0))}); ls_printf(ls_intern("areas: circle=%f square=%f triangle=%f\n"), 3, ls_printf_arguments_6); });
+    ls_state.primes = ls_Primes_new();
+    ({ LS_Value ls_printf_arguments_7[1]; ls_printf_arguments_7[0]=((LS_Value){.kind=1,.as.integer=(ls_Primes_countBelow(ls_state.primes, 1000))}); ls_printf(ls_intern("primes below 1000: %d\n"), 1, ls_printf_arguments_7); });
+    ls_state.fib = ls_Fib_new();
+    ({ LS_Value ls_printf_arguments_8[2]; ls_printf_arguments_8[0]=((LS_Value){.kind=1,.as.integer=(ls_Fib_iterative(ls_state.fib, 40))}); ls_printf_arguments_8[1]=((LS_Value){.kind=1,.as.integer=(ls_Fib_recursive(ls_state.fib, 20))}); ls_printf(ls_intern("fib: iterative(40)=%d recursive(20)=%d\n"), 2, ls_printf_arguments_8); });
+    ls_state.text = ls_Text_new();
+    ({ LS_Value ls_printf_arguments_9[1]; ls_printf_arguments_9[0]=((LS_Value){.kind=1,.as.integer=(ls_Text_score(ls_state.text, ls_intern("hello world")))}); ls_printf(ls_intern("text score: %d\n"), 1, ls_printf_arguments_9); });
+    ls_state.inventory = ({ ls_table ls_literal_10 = ls_table_create(0, (const LS_Value*)0); ls_table_set(ls_literal_10, &(((LS_Value){.kind=4,.as.pointer=ls_intern("name")})), &(((LS_Value){.kind=4,.as.pointer=(ls_intern("crate"))}))); ls_table_set(ls_literal_10, &(((LS_Value){.kind=4,.as.pointer=(ls_intern("weight"))})), &(((LS_Value){.kind=1,.as.integer=(12)}))); ls_table_set(ls_literal_10, &(((LS_Value){.kind=1,.as.integer=(1)})), &(((LS_Value){.kind=5,.as.pointer=(ls_Point_new(1, 2))}))); ls_literal_10; });
+    ls_table_set(ls_state.inventory, &(((LS_Value){.kind=4,.as.pointer=(ls_intern("opened"))})), &(((LS_Value){.kind=3,.as.boolean=(1)})));
+    ({ LS_Value ls_printf_arguments_11[2]; ls_printf_arguments_11[0]=((LS_Value){.kind=4,.as.pointer=(ls_intern("crate"))}); ls_printf_arguments_11[1]=((LS_Value){.kind=3,.as.boolean=(1)}); ls_printf(ls_intern("inventory: %s opened=%b\n"), 2, ls_printf_arguments_11); });
+    ls_state.base = 3;
+    ls_state.scale = ls_closure_create(ls_lambda_0, (void*)0);
+    ls_state.hypot2 = ls_closure_create(ls_lambda_1, (void*)0);
+    ls_state.isEven = ls_closure_create(ls_lambda_2, (void*)0);
+    ls_state.log = ls_table_create(0, (const LS_Value*)0);
+    ls_state.record = ls_closure_create(ls_lambda_3, (void*)0);
+    ({ ls_closure_call(ls_state.record, (const LS_Value*)0, (LS_Value*)0); });
+    ({ LS_Value ls_printf_arguments_12[3]; ls_printf_arguments_12[0]=({ LS_Value ls_arguments_13[1]; ls_arguments_13[0]=((LS_Value){.kind=1,.as.integer=(14)}); LS_Value ls_result = {0}; ls_closure_call(ls_state.scale, ls_arguments_13, &ls_result); ls_result; }); ls_printf_arguments_12[1]=({ LS_Value ls_arguments_14[2]; ls_arguments_14[0]=((LS_Value){.kind=1,.as.integer=(3)}); ls_arguments_14[1]=((LS_Value){.kind=1,.as.integer=(4)}); LS_Value ls_result = {0}; ls_closure_call(ls_state.hypot2, ls_arguments_14, &ls_result); ls_result; }); ls_printf_arguments_12[2]=((LS_Value){.kind=3,.as.boolean=(({ LS_Value ls_arguments_15[1]; ls_arguments_15[0]=((LS_Value){.kind=1,.as.integer=(10)}); LS_Value ls_result = {0}; ls_closure_call(ls_state.isEven, ls_arguments_15, &ls_result); ls_result.as.boolean; }))}); ls_printf(ls_intern("closures: scale=%d hypot2=%d even=%b\n"), 3, ls_printf_arguments_12); });
+    ls_state.evens = 0;
+    ls_state.odds = 0;
+    ls_state.checksum = 0;
+    {
+        ls_int i = 0;
+        while ((i < 500)) {
+            if (({ LS_Value ls_arguments_17[1]; ls_arguments_17[0]=((LS_Value){.kind=1,.as.integer=(i)}); LS_Value ls_result = {0}; ls_closure_call(ls_state.isEven, ls_arguments_17, &ls_result); ls_result.as.boolean; })) {
+                (ls_state.evens = ls_int_add(ls_state.evens, 1));
+            }
+            else {
+                (ls_state.odds = ls_int_add(ls_state.odds, 1));
+            }
+            (ls_state.checksum = ls_int_mod((ls_int_add(ls_int_mul(ls_state.checksum, 31), i)), 1000003));
+            ls_continue_16:;
+            (i = ls_int_add(i, 1));
+        }
+    }
+    ({ LS_Value ls_printf_arguments_18[3]; ls_printf_arguments_18[0]=((LS_Value){.kind=1,.as.integer=(ls_state.evens)}); ls_printf_arguments_18[1]=((LS_Value){.kind=1,.as.integer=(ls_state.odds)}); ls_printf_arguments_18[2]=((LS_Value){.kind=1,.as.integer=(ls_state.checksum)}); ls_printf(ls_intern("loop: evens=%d odds=%d checksum=%d\n"), 3, ls_printf_arguments_18); });
     return 0;
 }
