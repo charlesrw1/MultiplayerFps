@@ -158,22 +158,10 @@ struct ExpressionTree {
     [[nodiscard]] const SyntaxExpression& Root() const { return tree.Expression(root); }
 };
 
-struct SourceMapEntry {
-    size_t generatedLine{};
-    size_t sourceOffset{};
-};
-struct CompilationResult {
-    std::string lua;
-    std::vector<SourceMapEntry> sourceMap;
-};
-
 // ParseTree is error-tolerant and is the entry point for editor tooling.
 SyntaxTree ParseTree(std::string_view source);
 // Helpers for callers that require valid syntax; they throw on the first syntax error.
 SyntaxTree ParseSyntax(std::string_view source);
 ExpressionTree ParseExpression(const std::vector<SyntaxToken>& tokens);
-
-std::string Compile(std::string_view source);
-CompilationResult CompileWithSourceMap(std::string_view source);
 
 } // namespace luasharp

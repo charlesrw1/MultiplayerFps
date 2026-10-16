@@ -2,7 +2,6 @@
 #include "CBackend.h"
 #include "Semantic.h"
 
-#include <cassert>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -69,26 +68,13 @@ void Usage() {
               << "  luasharp <file.ls> [-o generated.c]       Emit C, compile, and run\n"
               << "  luasharp run <file.ls> [-o generated.c]   Emit C, compile, and run\n"
               << "  luasharp emit-c <file.ls> [-o output.c]   Emit C only\n"
-              << "  luasharp emit-lua <file.ls> [-o output.lua]\n"
               << "  luasharp check <file.ls> [more files]\n";
-}
-
-void RunTests() {
-    const auto lua = luasharp::Compile(R"(class Value {} class Thing { private: Value value = null; public: Thing() {} int get(Value v) { if (v != null) { return v.read(); } return 0; } } auto t = new Thing();)");
-    assert(lua.find("---@field private value Value?") != std::string::npos);
-    assert(lua.find("function Thing:get(v)") != std::string::npos);
-    assert(lua.find("return v:read()") != std::string::npos);
-    assert(lua.find("local t = Thing.new()") != std::string::npos);
-    const auto mapped = luasharp::CompileWithSourceMap("auto value = 1;");
-    assert(mapped.sourceMap.size() == 1 && mapped.sourceMap.front().generatedLine == 1);
-    std::cout << "Tests passed\n";
 }
 }
 
 int main(int argc, char** argv) {
     const auto cliStart = std::chrono::steady_clock::now();
     try {
-        if (argc == 2 && std::string_view(argv[1]) == "--test") { RunTests(); return 0; }
         if (argc < 2) { Usage(); return 2; }
         if (std::string_view(argv[1]) == "check") {
             if (argc < 3) { Usage(); return 2; }
@@ -106,13 +92,6 @@ int main(int argc, char** argv) {
             const std::filesystem::path input = argv[2];
             const auto output = OutputArgument(argc, argv, 3, input.parent_path() / (input.stem().string() + ".c"));
             return CompileNative(input, output, command != "emit-c", cliStart);
-        }
-        if (command == "emit-lua") {
-            if (argc < 3) { Usage(); return 2; }
-            const std::filesystem::path input = argv[2]; const auto source = ReadSource(input); const auto analysis = luasharp::Analyze(source);
-            if (ReportDiagnostics(input, analysis)) return 1;
-            const auto output = OutputArgument(argc, argv, 3, input.parent_path() / (input.stem().string() + ".lua"));
-            WriteOutput(output, luasharp::Compile(source)); std::cout << "Wrote " << output.string() << '\n'; return 0;
         }
         const std::filesystem::path input = argv[1];
         const auto output = OutputArgument(argc, argv, 2, input.parent_path() / (input.stem().string() + ".c"));

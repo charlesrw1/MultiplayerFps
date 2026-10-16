@@ -1,6 +1,5 @@
 #include "Compiler.h"
 #include "CBackend.h"
-#include "LspBridge.h"
 #include "Semantic.h"
 
 #include <algorithm>
@@ -25,52 +24,13 @@ const std::string& VariableType(const luasharp::Analysis& analysis, std::string_
     return analysis.types.Name(found->second);
 }
 
-void TestTopLevelConstructorCall() {
-    const auto lua = luasharp::Compile("class MyClass {}\nauto m = new MyClass();");
-    Require(lua.find("local m = MyClass.new()\n") != std::string::npos, "new expression was not lowered to .new()");
-}
-
-void TestClassEmission() {
-    const auto lua = luasharp::Compile(R"(class Entity { int getScore() { return 0; } }
-class Player {
-private:
-Entity target = null;
-table data = {};
-public:
-Player() {}
-int score(Entity entity) {
-    if (entity != null) { return entity.getScore(); }
-    return 0;
-}
-})");
-    Require(lua.find("---@field private target Entity?") != std::string::npos, "nullable field annotation missing");
-    Require(lua.find("self.data = {}") != std::string::npos, "table field initializer missing");
-    Require(lua.find("function Player:score(entity)") != std::string::npos, "method declaration missing");
-    Require(lua.find("if entity ~= nil then") != std::string::npos, "if condition was not lowered to Lua");
-    Require(lua.find("return entity:getScore()") != std::string::npos, "method call was not lowered to colon syntax");
-}
-
-void TestStatementSourceMap() {
-    constexpr std::string_view source = "auto first = 1;\nauto second = 2;";
-    const auto result = luasharp::CompileWithSourceMap(source);
-    Require(result.sourceMap.size() == 2, "each source statement must have a mapping");
-    Require(result.sourceMap[0].generatedLine == 1 && result.sourceMap[0].sourceOffset == 0, "first mapping is incorrect");
-    Require(result.sourceMap[1].generatedLine == 2 && result.sourceMap[1].sourceOffset == 16, "second mapping is incorrect");
-}
-
 void TestInvalidSyntax() {
     try {
-        static_cast<void>(luasharp::Compile("class Broken { int field }"));
+        static_cast<void>(luasharp::ParseSyntax("class Broken { int field }"));
     } catch (const std::runtime_error&) {
         return;
     }
     throw std::runtime_error("invalid class field did not produce a compiler error");
-}
-
-void TestLspPositionTranslation() {
-    const auto document = luasharp::CreateVirtualDocument("file:///test.ls", "auto first = 1;\nauto second = 2;");
-    Require(luasharp::ToGeneratedPosition(document, {1, 4}).line == 1, "source position did not map to generated line");
-    Require(luasharp::ToSourcePosition(document, {1, 0}).line == 1, "generated position did not map back to source line");
 }
 
 void TestSemanticAnalysis() {
@@ -198,19 +158,6 @@ int get() { return "wrong"; }
     Require(has("Cannot return"), "return type mismatch was not diagnosed");
 }
 
-void TestConstructorAndGroupingEmission() {
-    const auto lua = luasharp::Compile(R"(class Point {
-int x;
-Point(int initial) { x = initial; }
-}
-auto point = new Point(2);
-auto result = (1 + 2) * 3;
-)");
-    Require(lua.find("function Point.new(initial)") != std::string::npos, "constructor parameters were not emitted");
-    Require(lua.find("Point.new(2)") != std::string::npos, "constructor arguments were not emitted");
-    Require(lua.find("(1 + 2) * 3") != std::string::npos, "parenthesized expression semantics were lost");
-}
-
 void TestCallDiagnostics() {
     const auto analysis = luasharp::Analyze(R"(class Receiver {
 void send(string message, int count) {}
@@ -232,8 +179,6 @@ void update() {
 })");
     Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Cannot assign 'string' to 'int'") != std::string::npos; }), "reassignment to a different type was not diagnosed");
     Require(std::none_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Unknown identifier 'this'") != std::string::npos; }), "this was not bound in a method");
-    const auto lua = luasharp::Compile(R"(class Example { string name; void update() { this.name = "right"; } })");
-    Require(lua.find("self.name = \"right\"") != std::string::npos, "this was not lowered to Lua self");
 }
 
 void TestUnknownNameAndMissingReturn() {
@@ -264,10 +209,6 @@ Item[] tail = items[1:3];
     Require(analysis.diagnostics.empty(), "valid list operations produced diagnostics");
     Require(VariableType(analysis, "first") == "Item", "list indexing did not return the element type");
     Require(VariableType(analysis, "tail") == "Item[]", "list slicing did not preserve the list type");
-    const auto lua = luasharp::Compile(source);
-    Require(lua.find("table.insert(items, Item.new())") != std::string::npos, "push_back was not lowered to table.insert");
-    Require(lua.find("#(items)") != std::string::npos, "list size was not lowered");
-    Require(lua.find("i + 1") != std::string::npos, "zero-based list indexing was not lowered");
     const auto invalid = luasharp::Analyze("int[] values = {};\nvalues.no_such_method();");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Unknown member 'no_such_method'") != std::string::npos; }), "unknown list method was not diagnosed");
 }
@@ -284,11 +225,6 @@ string printed = string(enabled);
 )";
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid string methods or casts produced diagnostics");
-    const auto lua = luasharp::Compile(source);
-    Require(lua.find("string.find(text, \"ell\", 1, true) ~= nil") != std::string::npos, "string contains was not lowered");
-    Require(lua.find("math.floor") != std::string::npos, "float-to-int cast was not lowered");
-    Require(lua.find("whole ~= 0") != std::string::npos, "number-to-bool cast was not lowered");
-    Require(lua.find("tostring(enabled)") != std::string::npos, "string cast was not lowered");
 }
 
 void TestDynamicTableSemantics() {
@@ -300,6 +236,8 @@ auto arbitrary = values.any_key;
 )");
     Require(analysis.diagnostics.empty(), "table rejected heterogeneous keys or values");
     Require(VariableType(analysis, "first") == "any" && VariableType(analysis, "arbitrary") == "any", "table reads did not produce dynamic values");
+    const auto invalid = luasharp::Analyze("table t = {}; int n = 1; n /= t.x;");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& value) { return value.message.find("'/=' is 'float'") != std::string::npos; }), "int /= any was accepted");
 }
 
 void TestNativeMathTypesAndOperators() {
@@ -315,9 +253,6 @@ Vec3 point = transform * rotated;
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid native math operations produced diagnostics");
     Require(VariableType(analysis, "rotated") == "Vec3" && VariableType(analysis, "point") == "Vec3", "native operator result types were wrong");
-    const auto lua = luasharp::Compile(source);
-    Require(lua.find("Vec3.new(1, 2, 3)") != std::string::npos && lua.find("Vec3:new") == std::string::npos, "native static call used method-call syntax");
-    Require(lua.find("rotation * sum") != std::string::npos && lua.find("transform * rotated") != std::string::npos, "native operators were not preserved for Lua metatables");
     const auto invalid = luasharp::Analyze("Quat q = Quat.identity();\nfloat bad = q + q;");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Operator '+' is not defined") != std::string::npos; }), "invalid native operator was not diagnosed");
 }
@@ -345,10 +280,6 @@ void update() { value = value + 1; helper(); }
     Require(analysis.bound.classes.size() == 1 && analysis.bound.classes[0].functions.size() == 3, "bound semantic class tree was not built");
     const auto& program = analysis.bound;
     Require(program.Statements(program.Statements(program.classes[0].functions[1].body)[0].elseBody)[0].kind == luasharp::SyntaxStatement::Kind::If, "else-if chain was not retained in the bound tree");
-    const auto lua = luasharp::Compile(source);
-    Require(lua.find("elseif input == 2 then") != std::string::npos, "else-if was not lowered to Lua elseif");
-    Require(lua.find("self.value = self.value + 1") != std::string::npos, "implicit field access was not lowered through self");
-    Require(lua.find("self:helper()") != std::string::npos, "implicit method call was not lowered through self");
 }
 
 void TestCoreSemanticGuards() {
@@ -364,7 +295,7 @@ void run() {
     Require(has("If condition must be 'bool'"), "non-boolean if condition was accepted");
     Require(has("Invalid assignment target"), "non-lvalue assignment target was accepted");
     Require(has("is not callable"), "non-callable value invocation was accepted");
-    try { static_cast<void>(luasharp::Compile("int value = \"wrong\";")); }
+    try { static_cast<void>(luasharp::CompileToC("int value = \"wrong\";")); }
     catch (const std::runtime_error&) { return; }
     throw std::runtime_error("transpilation did not stop on semantic errors");
 }
@@ -382,32 +313,11 @@ class Child : Base { string read(int value) { return "bad"; } }
 )");
     Require(std::any_of(overrideMismatch.diagnostics.begin(), overrideMismatch.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("does not match the inherited signature") != std::string::npos; }), "incompatible override was accepted");
 
-    const auto lua = luasharp::Compile(R"(class Base { int inherited = 1; }
-class Child : Base {}
-auto child = new Child();
-)");
-    Require(lua.find("local self = setmetatable(Base.new(), Child)") != std::string::npos, "derived constructor did not initialize its base class");
-
     const auto requiredBase = luasharp::Analyze("class Base { Base(int value) {} } class Child : Base {}");
     Require(std::any_of(requiredBase.diagnostics.begin(), requiredBase.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("requires constructor arguments") != std::string::npos; }), "unsupported required base constructor was silently ignored");
 }
 
-void TestTypedDefaultsAndNullability() {
-    const auto lua = luasharp::Compile(R"(class Reference {}
-class Defaults {
-int count;
-float ratio;
-bool enabled;
-string name;
-table values;
-int[] items;
-Vec3 position;
-Reference reference;
-void locals() { int localCount; string localName; Reference localReference; }
-}
-)");
-    for (const auto& expected : {"self.count = 0", "self.ratio = 0.0", "self.enabled = false", "self.name = \"\"", "self.values = {}", "self.items = {}", "self.position = Vec3.new()", "self.reference = nil", "local localCount = 0", "local localName = \"\"", "local localReference = nil"})
-        Require(lua.find(expected) != std::string::npos, std::string("missing typed default: ") + expected);
+void TestBuiltinNullability() {
     const auto invalid = luasharp::Analyze("string text = null; Vec3 point = null;");
     Require(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Cannot assign") != std::string::npos; }) == 2, "null was accepted for non-null built-in value types");
 }
@@ -421,9 +331,6 @@ while (index < values.size()) {
 )";
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid while loop or populated list produced diagnostics");
-    const auto lua = luasharp::Compile(source);
-    Require(lua.find("local values = {1, 2, 3}") != std::string::npos, "populated list literal was not emitted");
-    Require(lua.find("while index < #(values) do") != std::string::npos, "while loop was not lowered");
     const auto invalid = luasharp::Analyze("string[] values = {\"ok\", 2}; while (1) {}");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("List element 2 expects 'string'") != std::string::npos; }), "list element type mismatch was not diagnosed");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("While condition must be 'bool'") != std::string::npos; }), "non-boolean while condition was accepted");
@@ -440,17 +347,12 @@ vector *= 2;
 )");
     Require(std::none_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.severity == luasharp::DiagnosticSeverity::Error; }), "valid compound assignment produced an error");
     Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.severity == luasharp::DiagnosticSeverity::Warning && diagnostic.message.find("Unreachable code") != std::string::npos; }), "unreachable statement was not warned");
-    const auto lua = luasharp::Compile(R"(string text = "a"; text += "b"; Vec3 vector = Vec3.new(); vector *= 2;)");
-    Require(lua.find("text = text .. \"b\"") != std::string::npos, "string compound concatenation used numeric addition");
-    Require(lua.find("vector = vector * 2") != std::string::npos, "native compound operator was not emitted");
 }
 
 void TestKeyedTableLiterals() {
     constexpr std::string_view source = R"(table value = {name = "thing"; ["count"] = 2, [1 + 2] = true, 4};)";
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid keyed table literal produced diagnostics");
-    const auto lua = luasharp::Compile(source);
-    Require(lua.find("{name = \"thing\", [\"count\"] = 2, [1 + 2] = true, 4}") != std::string::npos, "keyed table entries were not emitted as Lua fields");
 
     const auto invalid = luasharp::Analyze("int[] values = {first = 1};");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("cannot contain keyed entries") != std::string::npos; }), "keyed entry was accepted in a typed list literal");
@@ -466,11 +368,6 @@ while (true) { break; }
 )";
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid for/break/continue statements produced diagnostics");
-    const auto lua = luasharp::Compile(source);
-    Require(lua.find("local i = 0") != std::string::npos && lua.find("while i < 3 do") != std::string::npos, "for loop was not lowered");
-    Require(lua.find("goto __luasharp_continue_") != std::string::npos, "continue was not lowered to a scoped label");
-    Require(lua.find("i = i + 1") != std::string::npos, "for increment was not emitted after the continue label");
-    Require(lua.find("break") != std::string::npos, "break was not emitted");
 
     const auto outOfScope = luasharp::Analyze("for (int i = 0; i < 1; i += 1) {} i = 2;");
     Require(std::any_of(outOfScope.diagnostics.begin(), outOfScope.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Unknown identifier 'i'") != std::string::npos; }), "for initializer escaped its loop scope");
@@ -493,12 +390,6 @@ for (i in 1..10) {
 )";
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid list, table, or range loop produced diagnostics");
-    const auto lua = luasharp::Compile(source);
-    Require(lua.find("for _, value in ipairs(values) do") != std::string::npos, "list range loop did not use ipairs");
-    Require(lua.find("in ipairs(values) do") != std::string::npos && lua.find("local index = __luasharp_index_") != std::string::npos, "indexed list loop did not expose a zero-based index");
-    Require(lua.find("for key, value in pairs(entries) do") != std::string::npos, "table range loop did not use pairs");
-    Require(lua.find("for i = 1, 10 do") != std::string::npos, "integer range loop was not emitted inclusively");
-    Require(lua.find("goto __luasharp_continue_") != std::string::npos, "continue did not work in a range loop");
 
     const auto invalid = luasharp::Analyze(R"(int[] values = {};
 table entries = {};
@@ -527,9 +418,9 @@ bool east = direction == Direction.East;
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid enum declaration or access produced diagnostics");
     Require(analysis.members.contains("$type:Direction") && analysis.members.at("$type:Direction").size() == 4, "enum members were not registered for completion");
-    const auto lua = luasharp::Compile(source);
-    for (const auto expected : {"---@enum Direction", "North = 0", "East = 5", "South = 6", "Reverse = -2", "local direction = Direction.North", "local defaultDirection = 0"})
-        Require(lua.find(expected) != std::string::npos, std::string("missing enum lowering: ") + expected);
+    const auto generated = luasharp::CompileToC(source);
+    for (const auto expected : {"#define LS_Direction_North ((ls_int)0)", "#define LS_Direction_East ((ls_int)5)", "#define LS_Direction_South ((ls_int)6)", "#define LS_Direction_Reverse ((ls_int)-2)"})
+        Require(generated.c.find(expected) != std::string::npos, std::string("missing enum lowering: ") + expected);
 
     const auto invalid = luasharp::Analyze(R"(enum Empty {}
 enum Bad { Same, Same, Fraction = 1.5 }
@@ -570,12 +461,6 @@ auto distance = distanceSquared(3, 4);
     Require(analysis.diagnostics.empty(), "valid lambdas, calls, or captures produced diagnostics");
     const auto evenType = luasharp::ResolveVariableType(analysis, "even", source.find("even(4)"));
     Require(evenType && evenType->find("$function:1:bool") == 0, "lambda return type was not inferred");
-    const auto lua = luasharp::Compile(source);
-    for (const auto expected : {"local even = function(n) return n % 2 == 0 end", "local getter = function(ent) return ent:get_value() end", "local distanceSquared = function(x, y) return x * x + y * y end", "local captured = function(n) return n > threshold end"})
-        Require(lua.find(expected) != std::string::npos, std::string("missing lambda lowering: ") + expected);
-    Require(lua.find("local classify = function(n)\n") != std::string::npos && lua.find("return \"large\"") != std::string::npos && lua.find("return label") != std::string::npos, "multiline lambda body was not emitted");
-    Require(lua.find("local noop = function()\n") != std::string::npos, "empty-return block lambda was not emitted");
-    Require(lua.find("local func4 = function()\n    mytable2[\"abc\"] = 0\nend") != std::string::npos, "captured table assignment in a void block lambda was not emitted");
 
     const auto invalid = luasharp::Analyze(R"(auto pair = (x, x) => x;
 pair(1);
@@ -1123,19 +1008,10 @@ int total = counter.total;
     Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "closure cells were not reclaimed after module unload");
 }
 
-void TestDynamicLuaEmission() {
-    const auto lua = luasharp::Compile("table t = {}; t.n += 1; t.s += \"x\"; string[] words = {\"a\"}; words[0] += \"b\"; int n = int(t.n); bool b = bool(t.s);");
-    for (const auto expected : {"t.n = t.n + 1", "t.s = t.s .. \"x\"", "a[i + 1] = a[i + 1] .. v", "local b = (not not t.s)"})
-        Require(lua.find(expected) != std::string::npos, std::string("missing dynamic Lua lowering: ") + expected + "\n" + lua);
-    const auto invalid = luasharp::Analyze("table t = {}; int n = 1; n /= t.x;");
-    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& value) { return value.message.find("'/=' is 'float'") != std::string::npos; }), "int /= any was accepted");
-}
-
 void TestPrintfBuiltin() {
     constexpr std::string_view source = R"(printf("i=%d f=%f s=%s b=%b %%\n", -7, 2.5, "ok", true);)";
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid printf call produced diagnostics");
-    Require(luasharp::Compile(source).find("io.write(string.format(") != std::string::npos, "printf was not lowered for Lua");
     const auto invalid = luasharp::Analyze("printf(1);");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& value) { return value.message.find("expects 'string'") != std::string::npos; }), "printf accepted a non-string format");
     if (!luasharp::NativeModule::IsLibTccAvailable()) return;
@@ -1152,11 +1028,7 @@ void TestPrintfBuiltin() {
 
 int main() {
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests{
-        {"top-level constructor call", TestTopLevelConstructorCall},
-        {"class emission", TestClassEmission},
-        {"statement source map", TestStatementSourceMap},
         {"invalid syntax", TestInvalidSyntax},
-        {"LSP position translation", TestLspPositionTranslation},
         {"semantic analysis", TestSemanticAnalysis},
         {"semantic diagnostics and parameters", TestSemanticDiagnosticsAndParameters},
         {"shared syntax tree", TestSharedSyntaxTree},
@@ -1166,7 +1038,6 @@ int main() {
         {"scope-aware binding", TestScopeAwareBinding},
         {"bound member chain", TestBoundMemberChain},
         {"semantic errors", TestSemanticErrors},
-        {"constructor and grouping emission", TestConstructorAndGroupingEmission},
         {"call diagnostics", TestCallDiagnostics},
         {"reassignment and this", TestReassignmentAndThis},
         {"unknown name and missing return", TestUnknownNameAndMissingReturn},
@@ -1179,7 +1050,7 @@ int main() {
         {"bound tree, else-if, and implicit members", TestBoundTreeElseIfAndImplicitMembers},
         {"core semantic guards", TestCoreSemanticGuards},
         {"class contracts", TestClassContracts},
-        {"typed defaults and nullability", TestTypedDefaultsAndNullability},
+        {"built-in nullability", TestBuiltinNullability},
         {"loops and populated lists", TestLoopsAndPopulatedLists},
         {"compound assignments and flow warnings", TestCompoundAssignmentsAndFlowWarnings},
         {"keyed table literals", TestKeyedTableLiterals},
@@ -1187,7 +1058,6 @@ int main() {
         {"foreach and range loops", TestForEachAndRangeLoops},
         {"enums", TestEnums},
         {"lambdas", TestLambdas},
-        {"dynamic Lua emission", TestDynamicLuaEmission},
         {"C backend emission", TestCBackendEmission},
         {"libtcc integration", TestLibTccIntegrationWhenAvailable},
         {"libtcc errors do not crash host", TestLibTccErrorsDoNotCrashHost},

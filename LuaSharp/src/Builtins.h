@@ -50,6 +50,5 @@ const BuiltinOperator* FindBuiltinOperator(std::string_view left, std::string_vi
 const std::vector<BuiltinFunction>& BuiltinFunctions();
 const BuiltinFunction* FindBuiltinFunction(std::string_view name);
 std::optional<Lowering> BuiltinCastLowering(std::string_view target, std::string_view source);
-std::optional<std::string> BuiltinDefaultValue(std::string_view type);
 
 } // namespace luasharp

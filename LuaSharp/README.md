@@ -1,22 +1,20 @@
 # LuaSharp
 
-A standalone C++20 compiler for a typed, brace-based language. It emits Lua and has an experimental native C/libtcc backend. It does not include, link to, or otherwise depend on CsRemake engine source.
+A standalone C++20 compiler for a typed, brace-based language. It transpiles to C and compiles that C in memory with libtcc. It does not include, link to, or otherwise depend on CsRemake engine source.
 
 Build the `LuaSharp` project in Visual Studio, or from the repository root:
 
 ```powershell
 & 'C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\MSBuild.exe' LuaSharp\LuaSharp.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64
-.\x64\Debug\LuaSharp.exe --test
 .\x64\Debug\LuaSharp.exe .\LuaSharp\native-example.ls
 .\x64\Debug\LuaSharp.exe .\LuaSharp\native-example.ls -o .\x64\Debug\native-example.generated.c
 .\x64\Debug\LuaSharp.exe emit-c .\LuaSharp\example.ls
-.\x64\Debug\LuaSharp.exe emit-lua .\LuaSharp\example.ls
 .\x64\Debug\LuaSharpTests.exe
 ```
 
-Passing a `.ls` file directly checks it, prints all errors and warnings with line/column locations, writes generated C beside the script (or to `-o`), compiles it in memory with libtcc, and runs its module initializer. `run` and `run-native` are explicit aliases for that workflow. `emit-c` and `emit-lua` only generate their respective output.
+Passing a `.ls` file directly checks it, prints all errors and warnings with line/column locations, writes generated C beside the script (or to `-o`), compiles it in memory with libtcc, and runs its module initializer. `run` and `run-native` are explicit aliases for that workflow. `emit-c` only writes the generated C.
 
-The compiler supports the syntax in `example.ls`: classes and inheritance, enums with inferred or explicit integer values, expression-bodied and multiline brace-bodied lambdas, enforced public/private sections, typed fields, parameters and locals, constructors, methods, `auto`, `if`/`else if`/`else`, `while`, C-style `for`, value or zero-based index/value iteration over lists, key/value iteration over tables, inclusive integer ranges such as `1..10`, `break`, `continue`, `return`, `new`, `null`, arrays, indexing/slices, populated list literals, and Lua-style positional/keyed table values. It also emits EmmyLua/LuaLS annotations for fields, parameters, and returns.
+The compiler supports the syntax in `example.ls`: classes and inheritance, enums with inferred or explicit integer values, expression-bodied and multiline brace-bodied lambdas, enforced public/private sections, typed fields, parameters and locals, constructors, methods, `auto`, `if`/`else if`/`else`, `while`, C-style `for`, value or zero-based index/value iteration over lists, key/value iteration over tables, inclusive integer ranges such as `1..10`, `break`, `continue`, `return`, `new`, `null`, arrays, indexing/slices, populated list literals, and Lua-style positional/keyed table values.
 
 ## Native backend
 
@@ -54,11 +52,11 @@ These features fail with an explicit backend error:
 - conversions between `table` and list values other than literals
 - native `Vec3`/`Quat`/`Transform` ABIs
 
-Lua emission continues to support all of them.
+Semantic analysis accepts them, so they type-check in the editor.
 
 The C helpers that every generated module uses live in [`runtime/luasharp/runtime.h`](runtime/luasharp/runtime.h). Generated C includes this header. The build copies it to `tcc\include\luasharp\`, where TinyCC finds it.
 
-The lexer produces a source-located token stream and recoverable diagnostics. The parser builds an error-tolerant syntax tree, and semantic analysis produces a separate bound tree containing resolved expression types, symbols, children, and lowering operations. The transpiler consumes that bound tree directly. Both trees store their nodes in flat pools (expressions and statements) that link by index. The parser adds child nodes before their parent and records child ids in `SyntaxTree::links`. Types are interned in `Analysis::types` and nodes refer to them by `TypeId`. Semantic analysis binds scoped locals and parameters, resolves inherited members, validates calls/operators/assignment targets/control-flow conditions/access/overrides, warns about unreachable code, and blocks Lua emission when errors remain.
+The lexer produces a source-located token stream and recoverable diagnostics. The parser builds an error-tolerant syntax tree, and semantic analysis produces a separate bound tree containing resolved expression types, symbols, children, and lowering operations. The transpiler consumes that bound tree directly. Both trees store their nodes in flat pools (expressions and statements) that link by index. The parser adds child nodes before their parent and records child ids in `SyntaxTree::links`. Types are interned in `Analysis::types` and nodes refer to them by `TypeId`. Semantic analysis binds scoped locals and parameters, resolves inherited members, validates calls/operators/assignment targets/control-flow conditions/access/overrides, warns about unreachable code, and blocks C emission when errors remain.
 
 The primitive types are `int`, `float`, `string`, `table`, and `bool`. `T[]` is a typed, zero-based list with negative indexing, slicing, and `push_back`, `pop_back`, `size`, `empty`, and `clear`. Strings expose `length`/`size`, `contains`, `starts_with`, `ends_with`, `substring`, `lower`, and `upper`. Primitive conversion uses ordinary call syntax such as `int(value)`, `float(value)`, `bool(value)`, and `string(value)`.
 

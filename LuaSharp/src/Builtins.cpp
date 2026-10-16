@@ -149,17 +149,4 @@ std::optional<Lowering> BuiltinCastLowering(std::string_view target, std::string
     return std::nullopt;
 }
 
-std::optional<std::string> BuiltinDefaultValue(std::string_view type) {
-    if (type.ends_with("[]")) return "{}";
-    if (type == "int") return "0";
-    if (type == "float") return "0.0";
-    if (type == "bool") return "false";
-    if (type == "string") return "\"\"";
-    if (type == "table") return "{}";
-    if (type == "Vec3") return "Vec3.new()";
-    if (type == "Quat") return "Quat.identity()";
-    if (type == "Transform") return "Transform.identity()";
-    return std::nullopt;
-}
-
 } // namespace luasharp

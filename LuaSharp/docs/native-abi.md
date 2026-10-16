@@ -134,6 +134,6 @@ Module-global values are not migrated yet, and retired generations are intention
 ## Command line and printf
 
 - `LuaSharp <file.ls> [-o out.c]` checks the file, writes the C output, compiles it with libtcc, and runs the module initializer. `run` and `run-native` do the same.
-- `emit-c` and `emit-lua` only write generated code.
+- `emit-c` only writes the generated C.
 - The CLI exits with a non-zero code when a diagnostic is an error.
 - `printf(format, values...)` does not append a newline. It accepts `%d`/`%i` (int), `%f` (numeric), `%s` (string), `%b` (bool), `%p` (managed reference), and `%%`.

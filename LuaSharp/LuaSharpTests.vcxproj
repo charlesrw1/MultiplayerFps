@@ -23,7 +23,6 @@
     <ClCompile Include="src\Builtins.cpp" />
     <ClCompile Include="src\CBackend.cpp" />
     <ClCompile Include="src\Compiler.cpp" />
-    <ClCompile Include="src\LspBridge.cpp" />
     <ClCompile Include="src\NativeCompiler.cpp" />
     <ClCompile Include="src\NativeRuntime.cpp" />
     <ClCompile Include="src\Semantic.cpp" />
@@ -32,7 +31,6 @@
     <ClInclude Include="src\CBackend.h" />
     <ClInclude Include="src\NativeRuntime.h" />
     <ClInclude Include="src\Compiler.h" />
-    <ClInclude Include="src\LspBridge.h" />
     <ClInclude Include="src\Semantic.h" />
     <None Include="runtime\luasharp\runtime.h" />
   </ItemGroup>
