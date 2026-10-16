@@ -18,7 +18,7 @@ try {
     assert.match(run.stdout, /answer=42/);
     assert.match(run.stdout, /Wrote .*valid\.generated\.c/);
     assert.match(run.stdout, /Ran .*valid\.ls/);
-    assert.match(run.stdout, /Compiled in \d+\.\d ms[\s\S]*answer=42/, "compile time must print before the program runs");
+    assert.match(run.stdout, /Compiled in \d+\.\d ms \(frontend \d+\.\d ms, write C \d+\.\d ms, tcc \d+\.\d ms\)[\s\S]*answer=42/, "compile time must print before the program runs");
     assert.match(run.stderr, /warning: Unreachable code/);
     assert.ok(fs.readFileSync(generated, "utf8").includes("int ls_module_init(void)"), "CLI did not emit generated C");
 

@@ -41,17 +41,23 @@ std::filesystem::path OutputArgument(int argc, char** argv, int start, const std
 }
 
 int CompileNative(const std::filesystem::path& input, const std::filesystem::path& output, bool execute, std::chrono::steady_clock::time_point cliStart) {
+    using Clock = std::chrono::steady_clock;
+    const auto milliseconds = [](Clock::time_point from, Clock::time_point to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
     const auto source = ReadSource(input);
     const auto analysis = luasharp::Analyze(source);
     if (ReportDiagnostics(input, analysis)) return 1;
-    auto generated = luasharp::CompileToC(source);
+    auto generated = luasharp::CompileToC(analysis);
+    const auto frontendEnd = Clock::now();
     WriteOutput(output, generated.c);
+    const auto writeEnd = Clock::now();
     std::cout << "Wrote " << output.string() << '\n';
     if (execute) {
         luasharp::NativeCompileOptions options; options.initialize = false;
         auto module = luasharp::NativeModule::Load(std::move(generated), options);
-        const std::chrono::duration<double, std::milli> compileTime = std::chrono::steady_clock::now() - cliStart;
-        std::cout << "Compiled in " << std::fixed << std::setprecision(1) << compileTime.count() << " ms" << std::endl;
+        const auto tccEnd = Clock::now();
+        std::cout << std::fixed << std::setprecision(1) << "Compiled in " << milliseconds(cliStart, tccEnd) << " ms (frontend "
+                  << milliseconds(cliStart, frontendEnd) << " ms, write C " << milliseconds(frontendEnd, writeEnd) << " ms, tcc "
+                  << milliseconds(writeEnd, tccEnd) << " ms)" << std::endl;
         module.Initialize();
         std::cout << "\nRan " << input.string() << '\n';
     }

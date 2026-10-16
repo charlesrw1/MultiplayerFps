@@ -61,6 +61,8 @@ struct NativeCompileOptions {
 // does not support yet; it never emits a knowingly incorrect approximation.
 CCompilationResult CompileToC(std::string_view source);
 CCompilationResult CompileToC(std::string_view source, const std::vector<ExternalType>& externalTypes);
+// For an analysis the caller already has; externalTypes must match the ones it was analyzed with.
+CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes = {});
 
 class NativeModule {
 public:

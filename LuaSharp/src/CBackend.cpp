@@ -560,7 +560,10 @@ CCompilationResult CompileToC(std::string_view source) {
 }
 
 CCompilationResult CompileToC(std::string_view source, const std::vector<ExternalType>& externalTypes) {
-    auto analysis = Analyze(source, externalTypes);
+    return CompileToC(Analyze(source, externalTypes), externalTypes);
+}
+
+CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes) {
     if (!analysis.syntax.diagnostics.empty()) throw SyntaxError(analysis.syntax.diagnostics.front());
     const auto error = std::find_if(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& value) { return value.severity == DiagnosticSeverity::Error; });
     if (error != analysis.diagnostics.end()) throw std::runtime_error(error->message + " at " + std::to_string(error->span.offset));
