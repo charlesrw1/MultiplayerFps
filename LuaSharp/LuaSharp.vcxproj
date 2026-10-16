@@ -80,6 +80,7 @@
     <ClInclude Include="src\Compiler.h" />
     <ClInclude Include="src\LspBridge.h" />
     <ClInclude Include="src\Semantic.h" />
+    <None Include="runtime\luasharp\runtime.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="TinyCC.targets" />

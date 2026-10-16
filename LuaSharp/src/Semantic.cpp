@@ -304,7 +304,7 @@ private:
         for (size_t i{}; i < count; ++i) {
             const std::string_view label = callable.parameters[i];
             const auto expected = types_.Intern(label.substr(0, label.find(' '))), actual = Node(arguments + static_cast<NodeId>(i)).type;
-            if (!Assignable(expected, actual)) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + callable.name + "' expects '" + Name(expected) + "', got " + DisplayType(actual), Syntax().Child(call, i + 1).span);
+            if (!Accepts(expected, arguments + static_cast<NodeId>(i))) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + callable.name + "' expects '" + Name(expected) + "', got " + DisplayType(actual), Syntax().Child(call, i + 1).span);
         }
     }
     void CheckBuiltinArguments(std::string_view name, std::span<const BuiltinParameter> parameters, bool variadic, const SyntaxExpression& call, NodeId arguments, size_t count) {
@@ -317,7 +317,7 @@ private:
         const auto checked = (std::min)(count, parameters.size());
         for (size_t i{}; i < checked; ++i) {
             const auto actual = Node(arguments + static_cast<NodeId>(i)).type;
-            if (!Assignable(types_.Intern(parameters[i].type), actual)) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + std::string(name) + "' expects '" + parameters[i].type + "', got " + DisplayType(actual), Syntax().Child(call, i + 1).span);
+            if (!Accepts(types_.Intern(parameters[i].type), arguments + static_cast<NodeId>(i))) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + std::string(name) + "' expects '" + parameters[i].type + "', got " + DisplayType(actual), Syntax().Child(call, i + 1).span);
         }
     }
     const Local* FindLocal(const std::vector<Local>& locals, std::string_view name) const {
@@ -359,7 +359,7 @@ private:
                 if (childCount != expected) AddDiagnostic("Expected " + std::to_string(expected) + " constructor argument(s) for '" + expression.text + "', got " + std::to_string(childCount), expression.span);
                 else for (size_t i{}; i < expected; ++i) {
                     const auto actual = Node(first + static_cast<NodeId>(i)).type;
-                    if (!Assignable(types_.Intern(constructor->parameters[i].type), actual)) AddDiagnostic("Constructor argument " + std::to_string(i + 1) + " for '" + expression.text + "' expects '" + constructor->parameters[i].type + "', got " + DisplayType(actual), syntaxChild(i).span);
+                    if (!Accepts(types_.Intern(constructor->parameters[i].type), first + static_cast<NodeId>(i))) AddDiagnostic("Constructor argument " + std::to_string(i + 1) + " for '" + expression.text + "' expects '" + constructor->parameters[i].type + "', got " + DisplayType(actual), syntaxChild(i).span);
                 }
             }
             break;
@@ -478,7 +478,7 @@ private:
             if (targetKind != Kind::Identifier && targetKind != Kind::Member && targetKind != Kind::Index) AddDiagnostic("Invalid assignment target", syntaxChild(0).span);
             if (targetKind == Kind::Index && types_.IsList(ChildType(first, 0))) lowering = Lowering::ListSet;
             if (expression.text == "=") {
-                if (!Assignable(left, right)) AddDiagnostic("Cannot assign " + DisplayType(right) + " to " + DisplayType(left), syntaxChild(1).span);
+                if (!Accepts(left, first + 1)) AddDiagnostic("Cannot assign " + DisplayType(right) + " to " + DisplayType(left), syntaxChild(1).span);
             } else if (const auto* builtin = FindBuiltinOperator(Name(left), std::string_view(expression.text).substr(0, 1), Name(right))) {
                 if (!Assignable(left, types_.Intern(builtin->result))) AddDiagnostic("Result of '" + expression.text + "' is '" + builtin->result + "', which cannot be assigned to '" + Name(left) + "'", expression.span);
                 if (builtin->lowering == Lowering::Concat) lowering = Lowering::CompoundConcat;
@@ -522,6 +522,19 @@ private:
     std::string DisplayType(TypeId type) const {
         if (types_.IsFunction(type)) return "'lambda with " + std::to_string(types_.Arity(type)) + " parameter(s) returning " + Name(types_.Element(type)) + "'";
         return type == TypeTable::Unknown ? "unknown value" : "'" + Name(type) + "'";
+    }
+    // A table literal in a list context becomes a list literal, nested literals included.
+    void CoerceLiteral(NodeId slot, TypeId expected) {
+        auto& node = Node(slot);
+        if (node.kind != SyntaxExpression::Kind::Table || !types_.IsList(expected)) return;
+        node.type = expected;
+        const auto element = types_.Element(expected);
+        for (NodeId i{}; i < node.children.count; ++i) CoerceLiteral(node.children.first + i, element);
+    }
+    // Checks the value bound at slot against expected, after list-literal coercion.
+    bool Accepts(TypeId expected, NodeId slot) {
+        CoerceLiteral(slot, expected);
+        return Assignable(expected, Node(slot).type);
     }
     bool Assignable(TypeId expected, TypeId actual) const {
         if (expected == TypeTable::Unknown || actual == TypeTable::Unknown || expected == TypeTable::Any || actual == TypeTable::Any || expected == actual) return true;
@@ -572,7 +585,7 @@ private:
                 const auto actual = infer(expression, bound.expression); const auto type = statement.inferredType ? actual : types_.Intern(statement.type); bound.type = type;
                 const TextSpan nameSpan = statement.nameSpan;
                 if (!statement.inferredType) {
-                    CheckType(type, nameSpan); if (expression.kind != SyntaxExpression::Kind::Missing && !Assignable(type, actual)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + Name(type) + "'", expression.span);
+                    CheckType(type, nameSpan); if (expression.kind != SyntaxExpression::Kind::Missing && !Accepts(type, bound.expression)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + Name(type) + "'", expression.span);
                     if (types_.IsList(type) && expression.kind == SyntaxExpression::Kind::Table) {
                         const auto element = types_.Element(type); const auto entries = Node(bound.expression).children;
                         for (NodeId i{}; i < entries.count; ++i) {
@@ -591,7 +604,7 @@ private:
                 if (returnType == InferReturn) { }
                 else if (returnType == TypeTable::Void && hasValue) AddDiagnostic("Void function cannot return a value", expression.span);
                 else if (returnType != TypeTable::Void && !hasValue) AddDiagnostic("Function returning '" + Name(returnType) + "' must return a value", statement.span);
-                else if (returnType != TypeTable::Void && !Assignable(returnType, actual)) AddDiagnostic("Cannot return " + DisplayType(actual) + " from function returning '" + Name(returnType) + "'", expression.span);
+                else if (returnType != TypeTable::Void && !Accepts(returnType, bound.expression)) AddDiagnostic("Cannot return " + DisplayType(actual) + " from function returning '" + Name(returnType) + "'", expression.span);
             } else if (statement.kind == StatementKind::Break || statement.kind == StatementKind::Continue) {
                 if (loopDepth == 0) AddDiagnostic(std::string(statement.kind == StatementKind::Break ? "'break'" : "'continue'") + " can only be used inside a loop", statement.span);
             } else if (statement.kind == StatementKind::For) {
@@ -666,7 +679,7 @@ private:
                 if (initializer.kind != SyntaxExpression::Kind::Missing) {
                     std::vector<Local> none; boundField.initializer = AllocateExpressions(1);
                     const auto actual = Infer(initializer, none, &value, boundField.initializer);
-                    if (!Assignable(types_.Intern(field.type), actual)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + field.type + "'", initializer.span);
+                    if (!Accepts(types_.Intern(field.type), boundField.initializer)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + field.type + "'", initializer.span);
                 }
                 boundClass.fields.push_back(std::move(boundField));
             }

@@ -22,7 +22,8 @@ TextSpan Cover(TextSpan first, TextSpan last) {
 
 class Lexer {
 public:
-    explicit Lexer(std::string_view source) : source_(source) {}
+    // Skips a UTF-8 byte order mark; spans still index the full source.
+    explicit Lexer(std::string_view source) : source_(source), position_(source.starts_with("\xEF\xBB\xBF") ? 3 : 0) {}
 
     SyntaxTree Run() {
         SyntaxTree tree;

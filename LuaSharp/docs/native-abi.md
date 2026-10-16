@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `4`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `5`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -11,6 +11,7 @@ This document defines the native backend contract. The ABI version is currently 
 | `bool` | 8-bit `ls_bool` | `0` is false and `1` is true at API boundaries |
 | `string` | `LS_String*` | Interned immutable UTF-8 object containing a signed 64-bit byte length and zero-terminated data |
 | `table` | opaque `LS_Table*` | GC-managed dynamic table with tagged keys and values |
+| `T[]` | `LS_List*` | GC-managed dynamic array of unboxed `T` elements, zero-based |
 | `any` | 16-byte `LS_Value` | 64-bit kind tag plus a 64-bit scalar or managed pointer payload |
 | class reference | `LS_Type*` | Nullable, stable for the lifetime of its owning runtime heap |
 | enum | signed 64-bit `ls_int` | Values use the declaration's resolved integer value |
@@ -21,24 +22,42 @@ Source expressions are defined to evaluate left-to-right. The C emitter must int
 
 ## Runtime API
 
-Generated code does not call the C allocator directly. The host binds a versioned table:
+Generated code does not call the C allocator directly. The host binds a versioned `LS_RuntimeApi` table. The table, the shared layouts (`LS_String`, `LS_List`, `LS_Value`, `LS_Closure`) and all C helpers are in [`runtime/luasharp/runtime.h`](../runtime/luasharp/runtime.h). Every generated module includes that header, and it also defines `ls_module_abi_version` and `ls_module_bind`. `NativeRuntime.cpp` implements the table, and the two sides must change together.
 
-```c
-typedef struct LS_RuntimeApi {
-    unsigned long long abi_version;
-    void* context;
-    void* (*allocate)(void* context, unsigned long long size, LS_TraceFunction trace);
-    void (*mark)(void* context, void* object);
-    void* (*intern)(void* context, const char* value);
-    void* (*table_create)(void* context, unsigned long long count, const LS_Value* pairs);
-    void (*table_get)(void* context, void* table, const LS_Value* key, LS_Value* out);
-    void (*table_set)(void* context, void* table, const LS_Value* key, const LS_Value* value);
-    void (*print)(void* context, void* format, unsigned long long count, const LS_Value* arguments);
-    void (*report_error)(void* context, const char* message);
-} LS_RuntimeApi;
-```
+The table contains these groups:
+- allocation, marking and error reports
+- string interning, plus string operations that make new strings: concatenation, substring, case conversion, `tostring` and `tonumber`
+- table creation, get, set and iteration (`table_next`)
+- list creation, growth (`list_reserve`) and slices
+- `print`
 
-`NativeRuntime` owns zeroed, non-moving allocations and performs precise stop-the-world mark-and-sweep collection. Generated trace functions cover class reference fields and closure environments; the runtime traces tagged table keys and values. Module globals are registered as roots while their module is loaded, and host code can keep returned objects alive with `Pin`/`Unpin`. Collection currently occurs only when the host calls `Collect`, so it must not run concurrently with generated code. There is consequently no write barrier or generated stack-map requirement yet.
+## Lists
+
+A list is one GC allocation with this layout: `count`, `capacity`, `element_size`, `element_kind` and `data`. The runtime owns the element buffer and frees it when it collects the list. Generated code reads and writes elements in `data` directly, but only the runtime resizes the buffer. Push doubles the capacity when the list is full.
+
+`element_kind` tells the collector how to trace elements:
+- `0`: plain scalars
+- `1`: managed pointers
+- `2`: `LS_Value`
+
+A negative index counts from the end. An index that is out of range, a `pop_back` on an empty list, or the use of a null list reports a runtime error, and the operation continues on a zeroed scratch value. Lua returns `nil` in these cases. A list boxes into `LS_Value` as kind `8`.
+
+In the language, a `table` value can go where a list is expected and the opposite. Natively, lists and tables are separate objects. A table literal in a list context becomes a list literal, and the native backend rejects all other conversions between the two.
+
+## Strings
+
+Strings are immutable and interned, so `==` compares pointers. Every operation that makes a string (`+`, `+=`, `substring`, `lower`, `upper`, `string(x)`) interns its result. These operations follow Lua 5.4:
+- `substring` follows `string.sub`.
+- `string(x)` follows `tostring`. For example, `string(3.0)` is `"3.0"`.
+- `int(s)` and `float(s)` follow `tonumber`. A string that is not a number reports a runtime error and gives `0`.
+
+## Loops
+
+- A list foreach loop reads `count` again before each pass, the same as `ipairs`.
+- A range loop evaluates its inclusive bounds once. A change to the loop variable does not change the iteration.
+- A table foreach loop visits non-null entries in insertion order.
+
+`NativeRuntime` owns zeroed, non-moving allocations and performs precise stop-the-world mark-and-sweep collection. Generated trace functions cover class reference fields and closure environments; the runtime traces tagged table keys and values and list elements. Module globals are registered as roots while their module is loaded, and host code can keep returned objects alive with `Pin`/`Unpin`. Collection currently occurs only when the host calls `Collect`, so it must not run concurrently with generated code. There is consequently no write barrier or generated stack-map requirement yet.
 
 Interning is weak: identical live strings share one object, but the intern table does not itself keep strings alive. Sweeping a string removes its intern-table entry. ABI changes increment `abi_version`; generated code must never guess the layout of a different version.
 

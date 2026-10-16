@@ -1,5 +1,9 @@
 #include "NativeRuntime.h"
 
+#include <algorithm>
+#include <cassert>
+#include <charconv>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -7,6 +11,7 @@
 #include <new>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -26,8 +31,11 @@ struct RuntimeString {
     char data[1]{};
 };
 
+constexpr unsigned long long AbiVersion = 5;
+
+// Field order must match LS_RuntimeApi in the generated C preamble.
 struct RuntimeAbi {
-    unsigned long long abiVersion{4};
+    unsigned long long abiVersion{AbiVersion};
     void* context{};
     void* (*allocate)(void*, unsigned long long, NativeTraceFunction){};
     void (*mark)(void*, void*){};
@@ -37,9 +45,23 @@ struct RuntimeAbi {
     void (*tableSet)(void*, void*, const NativeValue*, const NativeValue*){};
     void (*print)(void*, void*, unsigned long long, const NativeValue*){};
     void (*reportError)(void*, const char*){};
+    int (*tableNext)(void*, void*, unsigned long long*, NativeValue*, NativeValue*){};
+    void* (*listCreate)(void*, unsigned long long, unsigned long long, unsigned long long){};
+    void (*listReserve)(void*, void*, unsigned long long){};
+    void* (*listSlice)(void*, void*, std::int64_t, std::int64_t){};
+    void* (*stringConcat)(void*, void*, void*){};
+    void* (*stringSubstring)(void*, void*, std::int64_t, std::int64_t, int){};
+    void* (*stringCase)(void*, void*, int){};
+    void* (*toString)(void*, const NativeValue*){};
+    void (*toNumber)(void*, void*, NativeValue*){};
 };
 
 struct RuntimeTable { std::vector<std::pair<NativeValue, NativeValue>> entries; };
+// header must stay first: generated code reads it as LS_List.
+struct RuntimeList {
+    NativeList header;
+    std::vector<std::byte> storage;
+};
 
 bool ValueEqual(const NativeValue& left, const NativeValue& right) {
     if (left.kind != right.kind) return false;
@@ -53,17 +75,65 @@ bool ValueEqual(const NativeValue& left, const NativeValue& right) {
 }
 
 bool IsManaged(const NativeValue& value) {
-    return value.kind == NativeValueKind::String || value.kind == NativeValueKind::Object || value.kind == NativeValueKind::Table || value.kind == NativeValueKind::Closure;
+    return value.kind >= NativeValueKind::String && value.kind <= NativeValueKind::List;
 }
 
 void* Payload(Allocation* allocation) { return allocation + 1; }
 Allocation* Header(void* payload) { return static_cast<Allocation*>(payload) - 1; }
+
+std::string_view View(const void* string) {
+    if (!string) return {};
+    const auto* value = static_cast<const RuntimeString*>(string);
+    return {value->data, static_cast<size_t>(value->length)};
+}
+
+// Lua 5.4 tostring() spelling of a float.
+std::string FormatFloat(double value) {
+    char buffer[64];
+    std::snprintf(buffer, sizeof(buffer), "%.14g", value);
+    std::string result = buffer;
+    if (result.find_first_not_of("-0123456789") == std::string::npos) result += ".0";
+    return result;
+}
+
+// Lua tonumber() on a string: optional surrounding space, decimal or 0x hex integer, or decimal float.
+NativeValue ParseNumber(std::string_view text) {
+    constexpr std::string_view space = " \f\n\r\t\v";
+    const auto first = text.find_first_not_of(space);
+    if (first == std::string_view::npos) return {};
+    text = text.substr(first, text.find_last_not_of(space) - first + 1);
+    const bool negative = text.front() == '-';
+    auto magnitude = text.front() == '-' || text.front() == '+' ? text.substr(1) : text;
+    if (magnitude.empty()) return {};
+    NativeValue result;
+    if (magnitude.size() > 2 && magnitude[0] == '0' && (magnitude[1] == 'x' || magnitude[1] == 'X')) {
+        std::uint64_t bits{};
+        const auto digits = magnitude.substr(2);
+        const auto [end, error] = std::from_chars(digits.data(), digits.data() + digits.size(), bits, 16);
+        if (error != std::errc{} || end != digits.data() + digits.size()) return {};
+        result.kind = NativeValueKind::Int; result.as.integer = static_cast<std::int64_t>(negative ? 0 - bits : bits);
+        return result;
+    }
+    if (magnitude.find_first_of("iInN") != std::string_view::npos) return {}; // no inf/nan spellings
+    std::int64_t integer{};
+    if (const auto [end, error] = std::from_chars(text.data() + (text.front() == '+'), text.data() + text.size(), integer); error == std::errc{} && end == text.data() + text.size()) {
+        result.kind = NativeValueKind::Int; result.as.integer = integer;
+        return result;
+    }
+    double number{};
+    if (const auto [end, error] = std::from_chars(magnitude.data(), magnitude.data() + magnitude.size(), number); error == std::errc{} && end == magnitude.data() + magnitude.size()) {
+        result.kind = NativeValueKind::Float; result.as.number = negative ? -number : number;
+        return result;
+    }
+    return {};
+}
 
 } // namespace
 
 struct NativeRuntime::Impl {
     mutable std::recursive_mutex mutex;
     Allocation* allocations{};
+    std::unordered_set<const Allocation*> live; // validates pointers passed to Mark
     size_t allocationCount{};
     size_t allocatedBytes{};
     std::unordered_map<void*, size_t> pins;
@@ -149,10 +219,125 @@ void AbiPrint(void* context, void* formatObject, unsigned long long count, const
 }
 void AbiReportError(void* context, const char* message) { static_cast<NativeRuntime*>(context)->ReportError(message ? message : "unknown native runtime error"); }
 
+// Yields the next non-null entry after *cursor in insertion order.
+int AbiTableNext(void* context, void* object, unsigned long long* cursor, NativeValue* key, NativeValue* value) {
+    assert(cursor && key && value);
+    if (!object) { static_cast<NativeRuntime*>(context)->ReportError("attempt to iterate a null table"); return 0; }
+    const auto& entries = static_cast<RuntimeTable*>(object)->entries;
+    while (*cursor < entries.size()) {
+        const auto& entry = entries[(*cursor)++];
+        if (entry.second.kind == NativeValueKind::Null) continue;
+        *key = entry.first; *value = entry.second;
+        return 1;
+    }
+    return 0;
+}
+
+void TraceList(void* context, void* object) {
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    const auto& list = static_cast<RuntimeList*>(object)->header;
+    if (list.elementKind == NativeElementKind::Plain) return;
+    for (std::int64_t i{}; i < list.count; ++i) {
+        const std::byte* slot = list.data + i * list.elementSize;
+        if (list.elementKind == NativeElementKind::Managed) { void* pointer; std::memcpy(&pointer, slot, sizeof(pointer)); runtime.Mark(pointer); }
+        else { NativeValue item; std::memcpy(&item, slot, sizeof(item)); if (IsManaged(item)) runtime.Mark(item.as.pointer); }
+    }
+}
+void FinalizeList(void* object) { static_cast<RuntimeList*>(object)->~RuntimeList(); }
+void ReserveList(RuntimeList& list, std::int64_t capacity) {
+    if (capacity <= list.header.capacity) return;
+    list.storage.resize(static_cast<size_t>(capacity) * list.header.elementSize);
+    list.header.data = list.storage.data();
+    list.header.capacity = capacity;
+}
+void* AbiListCreate(void* context, unsigned long long elementSize, unsigned long long elementKind, unsigned long long capacity) {
+    assert(elementSize > 0 && elementSize <= sizeof(NativeValue) && elementKind <= static_cast<unsigned long long>(NativeElementKind::Value));
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    auto* list = static_cast<RuntimeList*>(runtime.Allocate(sizeof(RuntimeList), TraceList, FinalizeList));
+    if (!list) return nullptr;
+    new (list) RuntimeList();
+    list->header.elementSize = elementSize;
+    list->header.elementKind = static_cast<NativeElementKind>(elementKind);
+    ReserveList(*list, static_cast<std::int64_t>(capacity));
+    return list;
+}
+void AbiListReserve(void*, void* object, unsigned long long capacity) {
+    assert(object);
+    ReserveList(*static_cast<RuntimeList*>(object), static_cast<std::int64_t>(capacity));
+}
+// Elements [start, end); negative bounds count from the end, and out-of-range bounds clamp.
+void* AbiListSlice(void* context, void* object, std::int64_t start, std::int64_t end) {
+    if (!object) { static_cast<NativeRuntime*>(context)->ReportError("attempt to slice a null list"); return nullptr; }
+    const auto& source = static_cast<RuntimeList*>(object)->header;
+    if (start < 0) start += source.count;
+    if (end < 0) end += source.count;
+    start = (std::max)(start, std::int64_t{}); end = (std::min)(end, source.count);
+    const auto count = (std::max)(end - start, std::int64_t{});
+    auto* result = static_cast<RuntimeList*>(AbiListCreate(context, source.elementSize, static_cast<unsigned long long>(source.elementKind), static_cast<unsigned long long>(count)));
+    if (!result) return nullptr;
+    if (count) std::memcpy(result->header.data, source.data + start * source.elementSize, static_cast<size_t>(count) * source.elementSize);
+    result->header.count = count;
+    return result;
+}
+
+void* AbiStringConcat(void* context, void* left, void* right) {
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    if (!left || !right) runtime.ReportError("attempt to concatenate a null string");
+    std::string joined;
+    joined.reserve(View(left).size() + View(right).size());
+    joined.append(View(left)).append(View(right));
+    return runtime.Intern(joined);
+}
+// Lua string.sub(value, start + 1, hasCount ? start + count : -1).
+void* AbiStringSubstring(void* context, void* value, std::int64_t start, std::int64_t count, int hasCount) {
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    if (!value) { runtime.ReportError("attempt to take a substring of a null string"); return runtime.Intern({}); }
+    const auto text = View(value);
+    const auto length = static_cast<std::int64_t>(text.size());
+    std::int64_t first = start + 1, last = hasCount ? start + count : -1;
+    if (first == 0 || first < -length) first = 1;
+    else if (first < 0) first += length + 1;
+    if (last > length) last = length;
+    else if (last < -length) last = 0;
+    else if (last < 0) last += length + 1;
+    if (first > last) return runtime.Intern({});
+    return runtime.Intern(text.substr(static_cast<size_t>(first - 1), static_cast<size_t>(last - first + 1)));
+}
+void* AbiStringCase(void* context, void* value, int upper) {
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    if (!value) { runtime.ReportError("attempt to change the case of a null string"); return runtime.Intern({}); }
+    std::string text(View(value));
+    for (char& character : text) {
+        if (upper && character >= 'a' && character <= 'z') character = static_cast<char>(character - 'a' + 'A');
+        else if (!upper && character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
+    }
+    return runtime.Intern(text);
+}
+void* AbiToString(void* context, const NativeValue* value) {
+    assert(value);
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    const auto reference = [&](const char* prefix) { char buffer[64]; std::snprintf(buffer, sizeof(buffer), "%s: %p", prefix, value->as.pointer); return runtime.Intern(buffer); };
+    switch (value->kind) {
+    case NativeValueKind::Null: return runtime.Intern("nil");
+    case NativeValueKind::Int: return runtime.Intern(std::to_string(value->as.integer));
+    case NativeValueKind::Float: return runtime.Intern(FormatFloat(value->as.number));
+    case NativeValueKind::Bool: return runtime.Intern(value->as.boolean ? "true" : "false");
+    case NativeValueKind::String: return value->as.pointer;
+    case NativeValueKind::Closure: return reference("function");
+    default: return reference("table");
+    }
+}
+void AbiToNumber(void* context, void* value, NativeValue* out) {
+    assert(out);
+    if (!value) { *out = {}; static_cast<NativeRuntime*>(context)->ReportError("attempt to convert a null string to a number"); return; }
+    *out = ParseNumber(View(value));
+}
+
 } // namespace
 
 NativeRuntime::NativeRuntime() : impl_(std::make_unique<Impl>()) {
-    impl_->abi = {4, this, AbiAllocate, AbiMark, AbiIntern, AbiTableCreate, AbiTableGet, AbiTableSet, AbiPrint, AbiReportError};
+    impl_->abi = {AbiVersion, this, AbiAllocate, AbiMark, AbiIntern, AbiTableCreate, AbiTableGet, AbiTableSet, AbiPrint, AbiReportError,
+        AbiTableNext, AbiListCreate, AbiListReserve, AbiListSlice, AbiStringConcat, AbiStringSubstring, AbiStringCase, AbiToString, AbiToNumber};
 }
 
 NativeRuntime::~NativeRuntime() {
@@ -168,7 +353,7 @@ void* NativeRuntime::Allocate(size_t size, NativeTraceFunction trace, NativeFina
     auto* allocation = static_cast<Allocation*>(std::calloc(1, sizeof(Allocation) + actual));
     if (!allocation) { ReportError("LuaSharp allocation failed"); return nullptr; }
     allocation->next = impl_->allocations; allocation->size = actual; allocation->trace = trace; allocation->finalize = finalize;
-    impl_->allocations = allocation; ++impl_->allocationCount; impl_->allocatedBytes += actual;
+    impl_->allocations = allocation; impl_->live.insert(allocation); ++impl_->allocationCount; impl_->allocatedBytes += actual;
     return Payload(allocation);
 }
 
@@ -176,9 +361,7 @@ void NativeRuntime::Mark(void* object) {
     if (!object) return;
     std::scoped_lock lock(impl_->mutex);
     auto* allocation = Header(object);
-    bool found = false;
-    for (auto* current = impl_->allocations; current; current = current->next) if (current == allocation) { found = true; break; }
-    if (!found || allocation->marked) return;
+    if (!impl_->live.contains(allocation) || allocation->marked) return;
     allocation->marked = true;
     if (allocation->trace) allocation->trace(this, object);
 }
@@ -195,6 +378,7 @@ size_t NativeRuntime::Collect() {
         auto* current = *link;
         if (current->marked) { link = &current->next; continue; }
         *link = current->next;
+        impl_->live.erase(current);
         if (const auto key = impl_->stringKeys.find(Payload(current)); key != impl_->stringKeys.end()) {
             impl_->strings.erase(key->second);
             impl_->stringKeys.erase(key);

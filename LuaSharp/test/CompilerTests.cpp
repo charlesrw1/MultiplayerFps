@@ -151,6 +151,8 @@ void TestRecoveringSyntaxTree() {
 }
 
 void TestLexerTriviaAndSpans() {
+    const auto bom = luasharp::ParseSyntax("\xEF\xBB\xBFint x = 1;");
+    Require(bom.diagnostics.empty() && bom.tokens.front().span.offset == 3, "lexer did not skip a UTF-8 byte order mark");
     const auto tree = luasharp::ParseTree("/* header */\nclass Thing { // field\n int value = 12; }");
     Require(tree.diagnostics.empty(), "comments caused lexer diagnostics");
     Require(tree.root.classes[0].span.offset == 19, "class name span is incorrect");
@@ -619,12 +621,20 @@ class Calculator {
         Require(generated.c.find(expected) != std::string::npos, std::string("missing native C lowering: ") + expected);
     Require(std::any_of(generated.exports.begin(), generated.exports.end(), [](const auto& value) { return value.symbolName == "ls_Calculator_add" && value.returnType == "int"; }), "native method export metadata is missing");
 
-    try { static_cast<void>(luasharp::CompileToC("int[] values = {};")); }
-    catch (const std::runtime_error& error) {
-        Require(std::string_view(error.what()).find("Native C backend does not support") != std::string_view::npos, "native unsupported-type error is unclear");
-        return;
-    }
-    throw std::runtime_error("native backend silently accepted an unsupported list");
+    const auto lists = luasharp::CompileToC("int[] values = {1, 2}; int[][] grid = {{1}, {}};");
+    Require(lists.c.find("ls_list_create(sizeof(ls_int), 0, 2)") != std::string::npos && lists.c.find("ls_list_create(sizeof(LS_List*), 1, 2)") != std::string::npos, "list literals were not typed from their declarations");
+
+    const auto rejects = [](std::string_view source, std::string_view message) {
+        try { static_cast<void>(luasharp::CompileToC(source)); }
+        catch (const std::runtime_error& error) {
+            Require(std::string_view(error.what()).find(message) != std::string_view::npos, std::string("unclear native error: ") + error.what());
+            return;
+        }
+        throw std::runtime_error("native backend silently accepted: " + std::string(source));
+    };
+    rejects("class Base {} class Derived : Base {}", "does not support class inheritance");
+    rejects("table t = {}; int[] values = t;", "cannot convert between 'table' and 'int[]'");
+    rejects("int[] values = {}; table t = values;", "cannot convert between 'table' and 'int[]'");
 }
 
 void TestLibTccIntegrationWhenAvailable() {
@@ -858,6 +868,142 @@ auto squared = sumSquares(3, 4);
     Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "native closure graph was not reclaimed after module unload");
 }
 
+struct NativeString { long long length; char data[1]; };
+
+template <typename T> T NativeGlobal(const luasharp::NativeModule& module, std::string_view name) {
+    const auto* address = static_cast<const T*>(module.FindGlobal(name));
+    Require(address != nullptr, "missing native global " + std::string(name));
+    return *address;
+}
+std::string_view NativeText(const luasharp::NativeModule& module, std::string_view name) {
+    const auto* text = NativeGlobal<const NativeString*>(module, name);
+    Require(text != nullptr, "null native string " + std::string(name));
+    return {text->data, static_cast<size_t>(text->length)};
+}
+void RequireNativeError(std::string_view source, std::string_view message) {
+    try { static_cast<void>(luasharp::NativeModule::Compile(source)); }
+    catch (const std::runtime_error& error) {
+        Require(std::string_view(error.what()).find(message) != std::string_view::npos, std::string("unexpected native error: ") + error.what());
+        return;
+    }
+    throw std::runtime_error("native module did not report: " + std::string(message));
+}
+
+void TestNativeLists() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        auto module = luasharp::NativeModule::Compile(R"(
+class Bag {
+    int[] numbers = {1, 2, 3};
+    string[] names;
+    int total() { int sum = 0; for (n in numbers) { sum += n; } return sum; }
+}
+int[] values = {10, 20, 30};
+values.push_back(40);
+values[0] = 5;
+values[-1] += 2;
+int popped = values.pop_back();
+int size = values.size();
+int last = values[-1];
+int[] middle = values[1:3];
+int middleSize = middle.size();
+int middleFirst = middle[0];
+middle.clear();
+bool cleared = middle.empty();
+int[][] grid = {{1, 2}, {3}};
+int gridValue = grid[1][0];
+string[] words = {};
+for (int i = 0; i < 100; i += 1) { words.push_back("w" + string(i)); }
+Bag bag = new Bag();
+int bagTotal = bag.total();
+int defaultNames = bag.names.size();
+float[] floats = {1, 2.5};
+float floatSum = floats[0] + floats[1];
+)", options);
+        const auto* values = NativeGlobal<const luasharp::NativeList*>(module, "values");
+        Require(values && values->count == 3 && values->elementSize == 8 && values->elementKind == luasharp::NativeElementKind::Plain, "native int list has the wrong layout");
+        const auto* numbers = reinterpret_cast<const long long*>(values->data);
+        Require(numbers[0] == 5 && numbers[1] == 20 && numbers[2] == 30, "native list writes or push/pop were wrong");
+        Require(NativeGlobal<long long>(module, "popped") == 42, "compound list assignment or pop_back was wrong");
+        Require(NativeGlobal<long long>(module, "size") == 3 && NativeGlobal<long long>(module, "last") == 30, "list size or negative index was wrong");
+        Require(NativeGlobal<long long>(module, "middleSize") == 2 && NativeGlobal<long long>(module, "middleFirst") == 20, "list slice was wrong");
+        Require(NativeGlobal<unsigned char>(module, "cleared") == 1, "list clear was wrong");
+        Require(NativeGlobal<long long>(module, "gridValue") == 3, "nested list literal was wrong");
+        Require(NativeGlobal<long long>(module, "bagTotal") == 6 && NativeGlobal<long long>(module, "defaultNames") == 0, "list fields or their defaults were wrong");
+        Require(NativeGlobal<double>(module, "floatSum") == 3.5, "float list was wrong");
+
+        runtime->Collect();
+        const auto* words = NativeGlobal<const luasharp::NativeList*>(module, "words");
+        Require(words && words->count == 100 && words->elementKind == luasharp::NativeElementKind::Managed, "string list grew incorrectly");
+        const auto* word = reinterpret_cast<NativeString* const*>(words->data)[99];
+        Require(std::string_view(word->data, static_cast<size_t>(word->length)) == "w99", "collection freed strings that a rooted list holds");
+    }
+    Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "list graph was not reclaimed after module unload");
+    RequireNativeError("int[] values = {1}; int bad = values[5];", "list index out of range");
+    RequireNativeError("int[] values = {}; int bad = values.pop_back();", "pop_back on an empty list");
+}
+
+void TestNativeStrings() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(
+string a = "foo";
+string joined = a + "bar";
+bool interned = joined == "foobar";
+string grown = "x";
+grown += "yz";
+string word = "hello";
+string middle = word.substring(1, 3);
+string tail = word.substring(2);
+string clamped = word.substring(3, 50);
+string upper = "MiXed".upper();
+string lower = "MiXed".lower();
+string fromInt = string(42);
+string fromFloat = string(2.5);
+string fromWhole = string(3.0);
+string fromBool = string(true);
+int parsed = int("123");
+float parsedFloat = float(" 1.5 ");
+int parsedHex = int("0x10");
+)");
+    Require(NativeText(module, "joined") == "foobar" && NativeGlobal<unsigned char>(module, "interned") == 1, "string concatenation was wrong or not interned");
+    Require(NativeText(module, "grown") == "xyz", "string += was wrong");
+    Require(NativeText(module, "middle") == "ell" && NativeText(module, "tail") == "llo" && NativeText(module, "clamped") == "lo", "substring did not match Lua string.sub");
+    Require(NativeText(module, "upper") == "MIXED" && NativeText(module, "lower") == "mixed", "string case conversion was wrong");
+    Require(NativeText(module, "fromInt") == "42" && NativeText(module, "fromFloat") == "2.5" && NativeText(module, "fromWhole") == "3.0" && NativeText(module, "fromBool") == "true", "string() did not match Lua tostring");
+    Require(NativeGlobal<long long>(module, "parsed") == 123 && NativeGlobal<double>(module, "parsedFloat") == 1.5 && NativeGlobal<long long>(module, "parsedHex") == 16, "string to number was wrong");
+    RequireNativeError("int bad = int(\"abc\");", "string is not a number");
+}
+
+void TestNativeLoops() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(
+int rangeSum = 0;
+for (i in 1..4) { rangeSum += i; }
+int filtered = 0;
+for (i in 1..10) { if (i % 2 == 0) { continue; } if (i > 7) { break; } filtered += i; }
+int emptyRange = 0;
+for (i in 3..1) { emptyRange += 1; }
+int[] items = {4, 5, 6};
+int indexSum = 0;
+int valueSum = 0;
+for (index, item in items) { indexSum += index; valueSum += item; }
+int nestedSum = 0;
+for (item in items) { for (int j = 0; j < 2; j += 1) { if (j == 1) { continue; } nestedSum += item; } }
+table scores = { a = 1, b = 2 };
+int keyCount = 0;
+bool foundTwo = false;
+for (key, score in scores) { keyCount += 1; if (score == 2) { foundTwo = true; } }
+)");
+    Require(NativeGlobal<long long>(module, "rangeSum") == 10 && NativeGlobal<long long>(module, "emptyRange") == 0, "range loop was wrong");
+    Require(NativeGlobal<long long>(module, "filtered") == 16, "continue or break in a range loop was wrong");
+    Require(NativeGlobal<long long>(module, "indexSum") == 3 && NativeGlobal<long long>(module, "valueSum") == 15, "index/value list loop was wrong");
+    Require(NativeGlobal<long long>(module, "nestedSum") == 15, "loop nested in a list loop was wrong");
+    Require(NativeGlobal<long long>(module, "keyCount") == 2 && NativeGlobal<unsigned char>(module, "foundTwo") == 1, "table loop was wrong");
+}
+
 void TestPrintfBuiltin() {
     constexpr std::string_view source = R"(printf("i=%d f=%f s=%s b=%b %%\n", -7, 2.5, "ok", true);)";
     const auto analysis = luasharp::Analyze(source);
@@ -917,6 +1063,9 @@ int main() {
         {"C backend emission", TestCBackendEmission},
         {"libtcc integration", TestLibTccIntegrationWhenAvailable},
         {"libtcc errors do not crash host", TestLibTccErrorsDoNotCrashHost},
+        {"native lists", TestNativeLists},
+        {"native strings", TestNativeStrings},
+        {"native loops", TestNativeLoops},
         {"native state, arithmetic, and host symbols", TestNativeStateArithmeticAndHostSymbols},
         {"native reload slots", TestNativeReloadSlots},
         {"native garbage collection", TestNativeGarbageCollection},

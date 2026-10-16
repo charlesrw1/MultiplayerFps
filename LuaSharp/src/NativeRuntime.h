@@ -12,10 +12,21 @@ using NativeTraceFunction = void (*)(void* runtimeContext, void* object);
 using NativeFinalizeFunction = void (*)(void* object);
 using NativeRootTraceFunction = void (*)(void* runtimeContext);
 
-enum class NativeValueKind : std::uint64_t { Null, Int, Float, Bool, String, Object, Table, Closure };
+enum class NativeValueKind : std::uint64_t { Null, Int, Float, Bool, String, Object, Table, Closure, List };
 struct NativeValue {
     NativeValueKind kind{NativeValueKind::Null};
     union { std::int64_t integer; double number; std::uint64_t boolean; void* pointer; } as{};
+};
+
+// How a list traces its elements.
+enum class NativeElementKind : std::uint64_t { Plain, Managed, Value };
+// GC-managed dynamic array. Generated code reads data directly; only the runtime resizes it.
+struct NativeList {
+    std::int64_t count{};
+    std::int64_t capacity{};
+    std::uint64_t elementSize{};
+    NativeElementKind elementKind{};
+    std::byte* data{};
 };
 
 // Shared, non-moving native heap. Collection is stop-the-world: callers must

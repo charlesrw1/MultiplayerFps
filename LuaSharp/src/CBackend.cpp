@@ -57,8 +57,7 @@ std::optional<std::string_view> ScalarCType(std::string_view type, const StringS
 
 void AppendCType(std::string& out, std::string_view type, const StringSet& enums) {
     if (const auto scalar = ScalarCType(type, enums)) { out += *scalar; return; }
-    if (type.ends_with("[]"))
-        throw std::runtime_error("Native C backend does not support type '" + std::string(type) + "' yet");
+    if (type.ends_with("[]")) { out += "LS_List*"; return; }
     if (IsBuiltinType(type)) throw std::runtime_error("Native C backend requires a registered ABI for builtin type '" + std::string(type) + "'");
     out += "LS_"; AppendIdentifier(out, type); out += '*';
 }
@@ -81,6 +80,7 @@ struct CEmitter {
     std::unordered_map<const BoundExpression*, size_t> lambdaIndices;
     std::vector<std::vector<const VariableBinding*>> lambdaCaptures;
     std::optional<size_t> activeLambda;
+    TypeId functionReturn = TypeTable::Unknown; // return type of the method being emitted
     std::string output;
     size_t nextLabel{};
 
@@ -171,12 +171,49 @@ struct CEmitter {
     }
     auto Emitted(const BoundExpression& value, std::string_view owner) { return [this, &value, owner] { Expression(value, owner); }; }
     auto Boxed(const BoundExpression& value, std::string_view owner) { return [this, &value, owner] { Box(value, owner); }; }
+    // Unique statement-expression temporary "ls_<name>_<label>".
+    auto Temp(std::string_view name, size_t label) { return [this, name, label] { Put("ls_", name, '_', label); }; }
 
     const std::string& Name(TypeId type) const { return types.Name(type); }
     CTypeName Type(TypeId type) const { return {Name(type)}; }
+    TypeId Find(std::string_view type) const { return types.Find(type).value_or(TypeTable::Unknown); }
     bool IsEnum(TypeId type) const { return enums.contains(Name(type)); }
-    bool IsManagedObject(std::string_view type) const { return type == "string" || type == "table" || type == "any" || type.starts_with("$function:") || classes.contains(type); }
+    bool IsManagedObject(std::string_view type) const { return type == "string" || type == "table" || type == "any" || type.starts_with("$function:") || type.ends_with("[]") || classes.contains(type); }
+    // NativeElementKind: 0 plain, 1 managed pointer, 2 LS_Value.
+    int ElementKind(std::string_view element) const { return element == "any" ? 2 : IsManagedObject(element) ? 1 : 0; }
+    void NewList(std::string_view element, size_t capacity) { Put("ls_list_create(sizeof(", CTypeName{element}, "), ", ElementKind(element), ", ", capacity, ')'); }
     const BoundExpression& Child(const BoundExpression& value, size_t index) const { return program.Child(value, index); }
+    const BoundExpression& ListIndex(const BoundExpression& index) const {
+        if (index.type != TypeTable::Int) throw std::runtime_error("Native list indices must have type 'int', got '" + Name(index.type) + "'");
+        return index;
+    }
+    // Lists and tables are separate native objects, although the language lets either flow into the other.
+    void CheckFlow(TypeId target, TypeId source) const {
+        if ((types.IsList(target) && source == TypeTable::Table) || (target == TypeTable::Table && types.IsList(source)))
+            throw std::runtime_error("Native C backend cannot convert between 'table' and '" + Name(types.IsList(target) ? target : source) + "'");
+    }
+    const BoundFunction* FindFunction(std::string_view type, std::string_view name, bool constructor = false) const {
+        const auto found = classes.find(type);
+        if (found == classes.end()) return nullptr;
+        const auto& functions = found->second->functions;
+        const auto function = std::find_if(functions.begin(), functions.end(), [&](const auto& item) { return constructor ? item.isConstructor : !item.isConstructor && item.name == name; });
+        return function == functions.end() ? nullptr : &*function;
+    }
+    // Arguments start at child `first` of value.
+    void CheckArguments(const BoundFunction* function, const BoundExpression& value, size_t first) const {
+        if (!function) return;
+        for (size_t i{}; i < function->parameters.size() && first + i < value.children.count; ++i)
+            CheckFlow(Find(function->parameters[i].type), Child(value, first + i).type);
+    }
+    // lhs <op>= rhs for one-character op.
+    void Combine(TypeId type, char operation, const auto& left, const auto& right) {
+        if (type == TypeTable::String && operation == '+') return Put("ls_string_concat(", left, ", ", right, ')');
+        if (type == TypeTable::Int) {
+            const auto function = operation == '+' ? "ls_int_add" : operation == '-' ? "ls_int_sub" : operation == '*' ? "ls_int_mul" : operation == '%' ? "ls_int_mod" : nullptr;
+            if (function) return Put(function, '(', left, ", ", right, ')');
+        }
+        Put('(', left, ' ', operation, ' ', right, ')');
+    }
     const Symbol* ExternalMember(std::string_view owner, std::string_view name) const {
         const auto type = std::find_if(externalTypes.begin(), externalTypes.end(), [&](const auto& value) { return value.name == owner; });
         if (type == externalTypes.end()) return nullptr;
@@ -190,6 +227,7 @@ struct CEmitter {
         if (type == "table") return Put("((ls_table)0)");
         if (type == "any") return Put("((LS_Value){0})");
         if (type.starts_with("$function:")) return Put("((LS_Closure*)0)");
+        if (type.ends_with("[]")) return NewList(type.substr(0, type.size() - 2), 0);
         if (type == "int" || type == "bool" || enums.contains(type)) return Put('0');
         if (!type.empty() && !IsBuiltinType(type)) return Put("((", CTypeName{type}, ")0)");
         throw std::runtime_error("Native C backend cannot default-initialize type '" + std::string(type) + "'");
@@ -206,6 +244,7 @@ struct CEmitter {
         if (type == TypeTable::String) return boxed("((LS_Value){.kind=4,.as.pointer=(");
         if (type == TypeTable::Table) return boxed("((LS_Value){.kind=6,.as.pointer=(");
         if (types.IsFunction(type)) return boxed("((LS_Value){.kind=7,.as.pointer=(");
+        if (types.IsList(type)) return boxed("((LS_Value){.kind=8,.as.pointer=(");
         if (classes.contains(Name(type))) return boxed("((LS_Value){.kind=5,.as.pointer=(");
         throw std::runtime_error("Native C backend cannot box type '" + Name(type) + "'");
     }
@@ -229,6 +268,7 @@ struct CEmitter {
         case SyntaxExpression::Kind::Null: return Put("((void*)0)");
         case SyntaxExpression::Kind::Parenthesized: return Put('(', child(0), ')');
         case SyntaxExpression::Kind::New:
+            CheckArguments(FindFunction(text, {}, true), value, 0);
             Put(Fn{text, "new"}, '(');
             for (size_t i{}; i < childCount; ++i) { if (i) Put(", "); Expression(Child(value, i), owner); }
             return Put(')');
@@ -244,7 +284,7 @@ struct CEmitter {
             if (text == "-" && value.type == TypeTable::Int) return Put("ls_int_neg(", child(0), ')');
             return Put('(', text, child(0), ')');
         case SyntaxExpression::Kind::Binary: {
-            if (value.lowering == Lowering::Concat) throw std::runtime_error("Native C backend does not support allocating string concatenation yet");
+            if (value.lowering == Lowering::Concat) return Put("ls_string_concat(", child(0), ", ", child(1), ')');
             const auto left = Child(value, 0).type, right = Child(value, 1).type;
             if (left == TypeTable::Any || right == TypeTable::Any) {
                 const auto boxedLeft = Boxed(Child(value, 0), owner), boxedRight = Boxed(Child(value, 1), owner);
@@ -270,14 +310,31 @@ struct CEmitter {
                 if (text != "=") throw std::runtime_error("Native C backend does not support compound table assignment yet");
                 return Put("ls_table_set(", Emitted(Child(target, 0), owner), ", &(", Boxed(Child(target, 1), owner), "), &(", Boxed(Child(value, 1), owner), "))");
             }
-            if (value.lowering == Lowering::ListSet) throw std::runtime_error("Native C backend does not support list assignment yet");
-            if (target.type == TypeTable::Int && text.size() == 2) {
-                const auto operation = text.front() == '+' ? "ls_int_add" : text.front() == '-' ? "ls_int_sub" : text.front() == '*' ? "ls_int_mul" : "";
-                if (*operation) return Put('(', child(0), " = ", operation, '(', child(0), ", ", child(1), "))");
+            const bool compound = text != "=";
+            assert(!compound || text.size() == 2);
+            if (!compound) CheckFlow(target.type, Child(value, 1).type);
+            const auto label = nextLabel++;
+            const auto slot = Temp("slot", label), update = Temp("value", label);
+            const auto store = [&] { if (compound) Combine(target.type, text.front(), [&] { Put('*', slot); }, update); else Put(update); };
+            if (value.lowering == Lowering::ListSet) {
+                const auto list = Temp("list", label), index = Temp("index", label);
+                // Evaluates list, index, then value; the slot address is taken last because the value may grow the list.
+                return Put("({ LS_List* ", list, " = ", Emitted(Child(target, 0), owner), "; ls_int ", index, " = ", Emitted(ListIndex(Child(target, 1)), owner), "; ",
+                    Type(target.type), ' ', update, " = ", child(1), "; ", Type(target.type), "* ", slot, " = (", Type(target.type), "*)ls_list_at(", list, ", ", index, "); *", slot, " = ", store, "; })");
             }
-            return Put('(', child(0), ' ', text, ' ', child(1), ')');
+            if (!compound) return Put('(', child(0), " = ", child(1), ')');
+            if (target.kind == SyntaxExpression::Kind::Identifier) return Put('(', child(0), " = ", [&] { Combine(target.type, text.front(), child(0), child(1)); }, ')');
+            return Put("({ ", Type(target.type), "* ", slot, " = &(", child(0), "); ", Type(target.type), ' ', update, " = ", child(1), "; *", slot, " = ", store, "; })");
         }
         case SyntaxExpression::Kind::Table: {
+            if (types.IsList(value.type)) {
+                const auto& element = Name(types.Element(value.type));
+                if (!childCount) return NewList(element, 0);
+                const auto literal = Temp("literal", nextLabel++);
+                Put("({ LS_List* ", literal, " = "); NewList(element, childCount); Put("; ");
+                for (size_t i{}; i < childCount; ++i) Put("*(", CTypeName{element}, "*)ls_list_push(", literal, ") = ", child(i), "; ");
+                return Put(literal, "; })");
+            }
             if (!childCount) return Put("ls_table_create(0, (const LS_Value*)0)");
             const auto label = nextLabel++;
             const auto temporary = [&] { Put("ls_literal_", label); };
@@ -296,6 +353,7 @@ struct CEmitter {
             return Put(temporary, "; })");
         }
         case SyntaxExpression::Kind::Index:
+            if (value.lowering == Lowering::ListIndex) return Put("(*(", Type(value.type), "*)ls_list_at(", child(0), ", ", Emitted(ListIndex(Child(value, 1)), owner), "))");
             if (Child(value, 0).type == TypeTable::Table) throw std::runtime_error("Native table reads are currently only supported in variable initializers");
             throw std::runtime_error("Native C backend does not support indexing type '" + Name(Child(value, 0).type) + "'");
         case SyntaxExpression::Kind::Lambda: {
@@ -313,8 +371,8 @@ struct CEmitter {
             }
             return Put("ls_closure_create(ls_lambda_", index, ", ", temporary, "); })");
         }
-        case SyntaxExpression::Kind::TableEntry:
-        case SyntaxExpression::Kind::Slice: case SyntaxExpression::Kind::Range:
+        case SyntaxExpression::Kind::Slice: return Put("ls_list_slice(", child(0), ", ", child(1), ", ", child(2), ')');
+        case SyntaxExpression::Kind::TableEntry: case SyntaxExpression::Kind::Range:
             throw std::runtime_error("Native C backend does not support this expression kind yet (type '" + Name(value.type) + "')");
         }
         throw std::runtime_error("Native C backend encountered an unknown expression");
@@ -354,19 +412,40 @@ struct CEmitter {
         case Lowering::CastIdentity: case Lowering::CastIntFloat: case Lowering::CastNumberBool: return Put('(', Type(value.type), ")(", argument(0), ')');
         case Lowering::CastBoolNumber: return Put('(', argument(0), " != 0)");
         case Lowering::CastBoolString: return Put("ls_string_truthy(", argument(0), ')');
-        case Lowering::CastNumberString: throw std::runtime_error("Native C backend does not support parsing numeric strings yet");
+        case Lowering::CastNumberString: return Put(value.type == TypeTable::Int ? "ls_string_to_int(" : "ls_string_to_float(", argument(0), ')');
+        case Lowering::CastString: {
+            const auto boxed = Temp("boxed", nextLabel++);
+            return Put("({ LS_Value ", boxed, " = ", Boxed(Child(value, 1), owner), "; ls_to_string(&", boxed, "); })");
+        }
         case Lowering::StringLength: return Put("ls_string_length(", receiver, ')');
         case Lowering::StringContains: return Put("ls_string_contains(", receiver, ", ", argument(0), ')');
         case Lowering::StringStartsWith: return Put("ls_string_starts_with(", receiver, ", ", argument(0), ')');
         case Lowering::StringEndsWith: return Put("ls_string_ends_with(", receiver, ", ", argument(0), ')');
-        case Lowering::CastString: case Lowering::StringSubstring: case Lowering::StringLower: case Lowering::StringUpper:
-            throw std::runtime_error("Native C backend does not support allocating string operation '" + std::string(LoweringName(value.lowering)) + "' yet");
+        case Lowering::StringSubstring:
+            if (childCount == 3) return Put("ls_string_substring(", receiver, ", ", argument(0), ", ", argument(1), ", 1)");
+            return Put("ls_string_substring(", receiver, ", ", argument(0), ", 0, 0)");
+        case Lowering::StringLower: return Put("ls_string_case(", receiver, ", 0)");
+        case Lowering::StringUpper: return Put("ls_string_case(", receiver, ", 1)");
+        case Lowering::ListPushBack: {
+            const auto element = types.Element(Child(callee, 0).type);
+            CheckFlow(element, Child(value, 1).type);
+            const auto label = nextLabel++;
+            const auto list = Temp("list", label), pushed = Temp("value", label);
+            return Put("({ LS_List* ", list, " = ", receiver, "; ", Type(element), ' ', pushed, " = ", argument(0), "; *(", Type(element), "*)ls_list_push(", list, ") = ", pushed, "; })");
+        }
+        case Lowering::ListPopBack: return Put("(*(", Type(value.type), "*)ls_list_pop(", receiver, "))");
+        case Lowering::ListSize: return Put("ls_list_size(", receiver, ')');
+        case Lowering::ListEmpty: return Put("(ls_list_size(", receiver, ") == 0)");
+        case Lowering::ListClear: return Put("ls_list_clear(", receiver, ')');
         default: break;
         }
         bool hasReceiver = true;
-        if (callee.lowering == Lowering::ImplicitMethod) Put(Fn{owner, callee.Text()}, "(self");
-        else if (callee.kind == SyntaxExpression::Kind::Member && value.lowering != Lowering::StaticCall) {
+        if (callee.lowering == Lowering::ImplicitMethod) {
+            CheckArguments(FindFunction(owner, callee.Text()), value, 1);
+            Put(Fn{owner, callee.Text()}, "(self");
+        } else if (callee.kind == SyntaxExpression::Kind::Member && value.lowering != Lowering::StaticCall) {
             const auto& target = Child(callee, 0);
+            CheckArguments(FindFunction(Name(target.type), callee.Text()), value, 1);
             Put(Fn{Name(target.type), callee.Text()}, '(', Emitted(target, owner));
         } else { Put(Emitted(callee, owner), '('); hasReceiver = false; }
         for (size_t i = 1; i < childCount; ++i) {
@@ -384,6 +463,7 @@ struct CEmitter {
             {
                 const auto target = [&] { if (moduleTopLevel) Put("ls_state."); Put(Id{statement.Name()}); };
                 const auto declaration = [&] { if (!moduleTopLevel) Put(Type(statement.type), ' '); };
+                CheckFlow(statement.type, expression.type);
                 if (statement.type == TypeTable::Any && expression.kind == SyntaxExpression::Kind::Index && Child(expression, 0).type == TypeTable::Table) {
                     Line(depth, declaration, target, " = (LS_Value){0};");
                     Line(depth, "ls_table_get(", Emitted(Child(expression, 0), owner), ", &(", Boxed(Child(expression, 1), owner), "), &", target, ");");
@@ -394,7 +474,7 @@ struct CEmitter {
             case SyntaxStatement::Kind::Expression: Line(depth, Emitted(expression, owner), ';'); break;
             case SyntaxStatement::Kind::Return:
                 if (expression.kind == SyntaxExpression::Kind::Missing) Line(depth, "return;");
-                else Line(depth, "return ", Emitted(expression, owner), ';');
+                else { CheckFlow(functionReturn, expression.type); Line(depth, "return ", Emitted(expression, owner), ';'); }
                 break;
             case SyntaxStatement::Kind::Break: Line(depth, "break;"); break;
             case SyntaxStatement::Kind::Continue:
@@ -418,10 +498,46 @@ struct CEmitter {
                 if (increment.kind != SyntaxExpression::Kind::Missing) Line(depth + 2, Emitted(increment, owner), ';');
                 Line(depth + 1, '}'); Line(depth, '}'); break;
             }
-            case SyntaxStatement::Kind::ForEach:
-                throw std::runtime_error("Native C backend does not support foreach/range loops yet");
+            case SyntaxStatement::Kind::ForEach: ForEach(statement, depth, owner); break;
             }
         }
+    }
+
+    void ForEach(const BoundStatement& statement, size_t depth, std::string_view owner) {
+        const auto& iterable = program.Expression(statement.expression);
+        const auto label = nextLabel++;
+        const auto name = Id{statement.Name()}, secondName = Id{statement.SecondName()};
+        const bool hasSecond = !statement.SecondName().empty();
+        Line(depth, '{');
+        if (iterable.kind == SyntaxExpression::Kind::Range) {
+            // Inclusive bounds, evaluated once; the counter is separate so the body cannot change the iteration.
+            const auto counter = Temp("counter", label), last = Temp("last", label);
+            Line(depth + 1, "ls_int ", counter, " = ", Emitted(Child(iterable, 0), owner), ", ", last, " = ", Emitted(Child(iterable, 1), owner), ';');
+            Line(depth + 1, "if (", counter, " <= ", last, ") for (;;) {");
+            Line(depth + 2, "ls_int ", name, " = ", counter, ';');
+            Statements(statement.body, depth + 2, owner, label);
+            Line(depth + 2, "ls_continue_", label, ":;");
+            Line(depth + 2, "if (", counter, " == ", last, ") break;");
+            Line(depth + 2, "++", counter, ';');
+        } else if (types.IsList(iterable.type)) {
+            // Reads the count on every pass, like ipairs.
+            const auto element = types.Element(iterable.type);
+            const auto list = Temp("list", label), index = Temp("index", label);
+            Line(depth + 1, "LS_List* ", list, " = ", Emitted(iterable, owner), "; ls_int ", index, ';');
+            Line(depth + 1, "for (", index, " = 0; ", index, " < ls_list_size(", list, "); ++", index, ") {");
+            if (hasSecond) Line(depth + 2, "ls_int ", name, " = ", index, ';');
+            Line(depth + 2, Type(element), ' ', hasSecond ? secondName : name, " = *(", Type(element), "*)(", list, "->data + ", index, " * (ls_int)", list, "->element_size);");
+            Statements(statement.body, depth + 2, owner);
+        } else if (iterable.type == TypeTable::Table) {
+            assert(hasSecond);
+            const auto table = Temp("table", label), cursor = Temp("cursor", label), key = Temp("key", label), item = Temp("item", label);
+            Line(depth + 1, "ls_table ", table, " = ", Emitted(iterable, owner), "; ls_wrap_bits ", cursor, " = 0; LS_Value ", key, ", ", item, ';');
+            Line(depth + 1, "while (ls_table_next(", table, ", &", cursor, ", &", key, ", &", item, ")) {");
+            Line(depth + 2, "LS_Value ", name, " = ", key, "; LS_Value ", secondName, " = ", item, ';');
+            Statements(statement.body, depth + 2, owner);
+        } else throw std::runtime_error("Native C backend cannot iterate a value of type '" + Name(iterable.type) + "'");
+        Line(depth + 1, '}');
+        Line(depth, '}');
     }
 
     void Parameters(const BoundFunction& function) {
@@ -450,41 +566,7 @@ struct CEmitter {
 
     CCompilationResult Run() {
         Line(0, "/* generated by LuaSharp; C11 */");
-        Line(0, "typedef signed long long ls_int; /* public LuaSharp int: signed 64-bit */"); Line(0, "typedef unsigned long long ls_wrap_bits; /* internal arithmetic bits; never a LuaSharp value */"); Line(0, "typedef double ls_float;"); Line(0, "typedef unsigned char ls_bool;");
-        Line(0, "typedef struct LS_String { ls_int length; char data[1]; } LS_String;");
-        Line(0, "typedef LS_String* ls_string;");
-        Line(0, "typedef void LS_Table; typedef LS_Table* ls_table;");
-        Line(0, "typedef struct LS_Value { ls_wrap_bits kind; union { ls_int integer; ls_float number; ls_wrap_bits boolean; void* pointer; } as; } LS_Value;");
-        Line(0, "typedef struct LS_Closure { void (*invoke)(void* environment, const LS_Value* arguments, LS_Value* result); void* environment; } LS_Closure;");
-        Line(0, "typedef void (*LS_TraceFunction)(void* runtime_context, void* object);");
-        Line(0, "typedef struct LS_RuntimeApi { ls_wrap_bits abi_version; void* context; void* (*allocate)(void* context, ls_wrap_bits size, LS_TraceFunction trace); void (*mark)(void* context, void* object); void* (*intern)(void* context, const char* value); void* (*table_create)(void* context, ls_wrap_bits count, const LS_Value* pairs); void (*table_get)(void* context, void* table, const LS_Value* key, LS_Value* out); void (*table_set)(void* context, void* table, const LS_Value* key, const LS_Value* value); void (*print)(void* context, void* format, ls_wrap_bits count, const LS_Value* arguments); void (*report_error)(void* context, const char* message); } LS_RuntimeApi;");
-        Line(0, "static LS_RuntimeApi* ls_runtime;");
-        Line(0, "static void ls_report_error(const char* message) { if (ls_runtime && ls_runtime->report_error) ls_runtime->report_error(ls_runtime->context, message); }");
-        Line(0, "static void* ls_alloc(ls_wrap_bits size, LS_TraceFunction trace) { void* value; if (!ls_runtime || !ls_runtime->allocate) return (void*)0; value = ls_runtime->allocate(ls_runtime->context, size, trace); if (!value) ls_report_error(\"LuaSharp allocation failed\"); return value; }");
-        Line(0, "static ls_string ls_intern(const char* value) { return ls_runtime && ls_runtime->intern ? (ls_string)ls_runtime->intern(ls_runtime->context, value) : (ls_string)0; }");
-        Line(0, "static void ls_mark_value(void* context, const LS_Value* value) { if (value && value->kind >= 4 && value->kind <= 7) ls_runtime->mark(context, value->as.pointer); }");
-        Line(0, "static void ls_trace_closure(void* context, void* object) { LS_Closure* closure=(LS_Closure*)object; if(closure->environment) ls_runtime->mark(context, closure->environment); }");
-        Line(0, "static LS_Closure* ls_closure_create(void (*invoke)(void*, const LS_Value*, LS_Value*), void* environment) { LS_Closure* closure=(LS_Closure*)ls_alloc(sizeof(LS_Closure), ls_trace_closure); if(!closure)return (LS_Closure*)0; closure->invoke=invoke; closure->environment=environment; return closure; }");
-        Line(0, "static void ls_closure_call(LS_Closure* closure, const LS_Value* arguments, LS_Value* result) { if(!closure||!closure->invoke){ls_report_error(\"attempt to call null closure\");return;} closure->invoke(closure->environment,arguments,result); }");
-        Line(0, "static ls_table ls_table_create(ls_wrap_bits count, const LS_Value* pairs) { return ls_runtime && ls_runtime->table_create ? (ls_table)ls_runtime->table_create(ls_runtime->context, count, pairs) : (ls_table)0; }");
-        Line(0, "static void ls_table_get(ls_table table, const LS_Value* key, LS_Value* out) { if (ls_runtime && ls_runtime->table_get) ls_runtime->table_get(ls_runtime->context, table, key, out); }");
-        Line(0, "static void ls_table_set(ls_table table, const LS_Value* key, const LS_Value* value) { if (ls_runtime && ls_runtime->table_set) ls_runtime->table_set(ls_runtime->context, table, key, value); }");
-        Line(0, "static void ls_printf(ls_string format, ls_wrap_bits count, const LS_Value* arguments) { if (ls_runtime && ls_runtime->print) ls_runtime->print(ls_runtime->context, format, count, arguments); }");
-        Line(0, "static ls_int ls_int_add(ls_int a, ls_int b) { return (ls_int)((ls_wrap_bits)a + (ls_wrap_bits)b); }");
-        Line(0, "static ls_int ls_int_sub(ls_int a, ls_int b) { return (ls_int)((ls_wrap_bits)a - (ls_wrap_bits)b); }");
-        Line(0, "static ls_int ls_int_mul(ls_int a, ls_int b) { return (ls_int)((ls_wrap_bits)a * (ls_wrap_bits)b); }");
-        Line(0, "static ls_int ls_int_neg(ls_int a) { return (ls_int)(0ULL - (ls_wrap_bits)a); }");
-        Line(0, "static ls_float ls_int_div(ls_int a, ls_int b) { return (ls_float)a / (ls_float)b; }");
-        Line(0, "static ls_int ls_int_mod(ls_int a, ls_int b) { ls_int r; if (!b) { ls_report_error(\"integer remainder by zero\"); return 0; } if (b == -1) return 0; r = a % b; if (r && ((r < 0) != (b < 0))) r = ls_int_add(r, b); return r; }");
-        Line(0, "static ls_bool ls_value_equal(const LS_Value* a, const LS_Value* b) { if(a->kind==1&&b->kind==2)return (ls_float)a->as.integer==b->as.number; if(a->kind==2&&b->kind==1)return a->as.number==(ls_float)b->as.integer; if(a->kind!=b->kind)return 0; if(a->kind==0)return 1; if(a->kind==1)return a->as.integer==b->as.integer; if(a->kind==2)return a->as.number==b->as.number; if(a->kind==3)return a->as.boolean==b->as.boolean; return a->as.pointer==b->as.pointer; }");
-        Line(0, "static ls_bool ls_value_compare(const LS_Value* a, int operation, const LS_Value* b) { ls_float left,right; if((a->kind!=1&&a->kind!=2)||(b->kind!=1&&b->kind!=2)){ls_report_error(\"dynamic comparison requires numbers\");return 0;} left=a->kind==1?(ls_float)a->as.integer:a->as.number; right=b->kind==1?(ls_float)b->as.integer:b->as.number; return operation==0?left<right:operation==1?left<=right:operation==2?left>right:left>=right; }");
-        Line(0, "static void ls_value_arithmetic(const LS_Value* a, int operation, const LS_Value* b, LS_Value* out) { if((a->kind!=1&&a->kind!=2)||(b->kind!=1&&b->kind!=2)){ls_report_error(\"dynamic arithmetic requires numbers\");*out=(LS_Value){0};return;} if(operation==4){if(a->kind!=1||b->kind!=1){ls_report_error(\"dynamic remainder requires integers\");*out=(LS_Value){0};return;} out->kind=1;out->as.integer=ls_int_mod(a->as.integer,b->as.integer);return;} if(operation==3||a->kind==2||b->kind==2){ls_float left=a->kind==1?(ls_float)a->as.integer:a->as.number,right=b->kind==1?(ls_float)b->as.integer:b->as.number;out->kind=2;out->as.number=operation==0?left+right:operation==1?left-right:operation==2?left*right:left/right;return;} out->kind=1;out->as.integer=operation==0?ls_int_add(a->as.integer,b->as.integer):operation==1?ls_int_sub(a->as.integer,b->as.integer):ls_int_mul(a->as.integer,b->as.integer); }");
-        Line(0, "static ls_int ls_string_length(ls_string s) { return s ? s->length : 0; }");
-        Line(0, "static ls_bool ls_string_starts_with(ls_string s, ls_string p) { ls_int i; if (!s || !p || p->length > s->length) return 0; for (i=0;i<p->length;++i) if (s->data[i]!=p->data[i]) return 0; return 1; }");
-        Line(0, "static ls_bool ls_string_ends_with(ls_string s, ls_string p) { ls_int i,offset; if (!s || !p || p->length > s->length) return 0; offset=s->length-p->length; for(i=0;i<p->length;++i) if(s->data[offset+i]!=p->data[i]) return 0; return 1; }");
-        Line(0, "static ls_bool ls_string_contains(ls_string s, ls_string p) { ls_int i,j; if(!s||!p)return 0; if(!p->length)return 1; for(i=0;i+p->length<=s->length;++i){for(j=0;j<p->length&&s->data[i+j]==p->data[j];++j){} if(j==p->length)return 1;} return 0; }");
-        Line(0, "static ls_bool ls_string_equal(ls_string a, ls_string b) { return a==b; }");
-        Line(0, "static ls_bool ls_string_truthy(ls_string s) { return s && s->length != 0; }");
+        Line(0, "#include <luasharp/runtime.h>");
         Line(0);
         for (const auto& value : program.classes) Line(0, "typedef struct LS_", Id{value.name}, " LS_", Id{value.name}, ';');
         for (const auto& value : externalTypes) if (!classes.contains(value.name) && !value.isEnum) Line(0, "typedef struct LS_", Id{value.name}, " LS_", Id{value.name}, ';');
@@ -568,8 +650,6 @@ struct CEmitter {
             for (const auto& field : value.fields) layout.fields.push_back({field.name, field.type});
             result.types.push_back(std::move(layout));
         }
-        Line(0, "ls_int ls_module_abi_version(void) { return 4; }");
-        Line(0, "int ls_module_bind(LS_RuntimeApi* runtime) { if (!runtime || runtime->abi_version != 4 || !runtime->allocate || !runtime->mark || !runtime->intern || !runtime->table_create || !runtime->table_get || !runtime->table_set || !runtime->print || !runtime->report_error) return -1; ls_runtime = runtime; return 0; }");
         result.exports.push_back({"$abi_version", "ls_module_abi_version", "int", {}});
         result.exports.push_back({"$module_bind", "ls_module_bind", "int", {"$runtime_api"}});
         for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local) {
@@ -589,8 +669,10 @@ struct CEmitter {
             Line(1, "if (!self) return (LS_", Id{value.name}, "*)0;");
             for (const auto& field : value.fields) {
                 const auto& initializer = program.Expression(field.initializer);
+                CheckFlow(Find(field.type), initializer.type);
                 Line(1, "self->", Id{field.name}, " = ", [&] { if (initializer.kind == SyntaxExpression::Kind::Missing) Default(field.type); else Expression(initializer, value.name); }, ';');
             }
+            functionReturn = TypeTable::Void;
             if (constructor) Statements(constructor->body, 1, value.name);
             Line(1, "return self;"); Line(0, '}');
             std::vector<std::string> constructorParameters;
@@ -599,7 +681,9 @@ struct CEmitter {
             for (const auto& function : value.functions) {
                 if (function.isConstructor) continue;
                 Line(0, [&] { MethodSignature(value, function); }, " {");
+                functionReturn = Find(function.returnType);
                 Statements(function.body, 1, value.name); Line(0, '}');
+                functionReturn = TypeTable::Unknown;
                 std::vector<std::string> parameters{value.name}; for (const auto& p : function.parameters) parameters.push_back(p.type);
                 result.exports.push_back({value.name + "." + function.name, FunctionName(value.name, function.name), function.returnType, std::move(parameters)});
             }

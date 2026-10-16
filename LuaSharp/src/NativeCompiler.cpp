@@ -61,6 +61,9 @@ void RequireTccRuntime(HMODULE library) {
     const auto runtime = ModulePath(library).parent_path() / "lib" / "libtcc1-64.a";
     if (!std::filesystem::exists(runtime))
         throw std::runtime_error("TinyCC runtime not found at '" + runtime.string() + "'. libtcc.dll must sit in a full TinyCC install (run LuaSharp/scripts/install-libtcc.ps1 and rebuild)");
+    const auto header = ModulePath(library).parent_path() / "include" / "luasharp" / "runtime.h";
+    if (!std::filesystem::exists(header))
+        throw std::runtime_error("LuaSharp C runtime header not found at '" + header.string() + "'. The build copies LuaSharp/runtime/ into tcc/include/");
 }
 
 // The official libtcc.dll passes its stack pointer to msvcrt's _setjmp as jmp_buf.Frame, so tcc_error's
@@ -192,7 +195,7 @@ NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompil
         throw std::runtime_error("TinyCC relocation failed" + (errors.empty() ? std::string{} : ":\n" + errors));
 
     const auto abiVersion = reinterpret_cast<long long (*)()>(impl->getSymbol(impl->state, "ls_module_abi_version"));
-    if (!abiVersion || abiVersion() != 4) throw std::runtime_error("LuaSharp native module ABI version mismatch");
+    if (!abiVersion || abiVersion() != 5) throw std::runtime_error("LuaSharp native module ABI version mismatch");
     const auto bind = reinterpret_cast<int (*)(void*)>(impl->getSymbol(impl->state, "ls_module_bind"));
     if (!bind || bind(impl->runtime->Abi()) != 0) throw std::runtime_error("LuaSharp native module rejected the runtime ABI");
     const auto traceRoots = reinterpret_cast<NativeRootTraceFunction>(impl->getSymbol(impl->state, "ls_module_trace_roots"));

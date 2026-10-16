@@ -35,7 +35,30 @@ The versioned runtime contract, scalar semantics, module state, external-symbol 
 
 LuaSharp `int` is a signed 64-bit native value. Generated arithmetic uses private unsigned bit operations only to guarantee two's-complement wrapping without invoking C signed-overflow undefined behavior; unsigned integers are not exposed as a LuaSharp type. `ReloadableNativeProgram` provides stable atomic function slots, validates signatures/class layouts/global types, and retains old code generations so already-loaded calls can finish safely.
 
-The native slice supports primitives, enums, classes without inheritance, constructors, methods, top-level initialization, `if`, `while`, C-style `for`, `break`/`continue`, arithmetic, interned strings and their non-allocating queries, mixed-key/mixed-value tables, and closures with tagged parameters and by-value local captures. The shared runtime uses a precise, non-moving mark-and-sweep heap and traces module globals, class fields, table contents, closure environments, and explicit host pins. Lists, dynamic member calls on untyped closure parameters, value-returning block closures, foreach/range loops, inheritance, allocating string operations, and native `Vec3`/`Quat`/`Transform` ABIs currently fail with an explicit backend error. Lua emission continues to support all of them.
+The native slice supports these features:
+- primitives, enums, and classes without inheritance, with constructors and methods
+- top-level initialization
+- `if`, `while`, C-style `for`, `break` and `continue`
+- foreach loops over lists (values, or index and value), over tables (key and value), and over inclusive ranges such as `1..10`
+- arithmetic
+- interned strings, including concatenation, `substring`, `lower`, `upper`, and `string()`/`int()`/`float()` conversions
+- typed dynamic lists (`T[]`) with literals, indexing, slices and all list methods
+- mixed-key/mixed-value tables
+- closures with tagged parameters and by-value local captures
+
+The shared runtime uses a precise, non-moving mark-and-sweep heap. It traces module globals, class fields, list elements, table contents, closure environments, and explicit host pins.
+
+These features fail with an explicit backend error:
+- dynamic member calls on untyped closure parameters
+- block closures that return values
+- foreach over `any`
+- inheritance
+- conversions between `table` and list values other than literals
+- native `Vec3`/`Quat`/`Transform` ABIs
+
+Lua emission continues to support all of them.
+
+The C helpers that every generated module uses live in [`runtime/luasharp/runtime.h`](runtime/luasharp/runtime.h). Generated C includes this header. The build copies it to `tcc\include\luasharp\`, where TinyCC finds it.
 
 The lexer produces a source-located token stream and recoverable diagnostics. The parser builds an error-tolerant syntax tree, and semantic analysis produces a separate bound tree containing resolved expression types, symbols, children, and lowering operations. The transpiler consumes that bound tree directly. Both trees store their nodes in flat pools (expressions and statements) that link by index. The parser adds child nodes before their parent and records child ids in `SyntaxTree::links`. Types are interned in `Analysis::types` and nodes refer to them by `TypeId`. Semantic analysis binds scoped locals and parameters, resolves inherited members, validates calls/operators/assignment targets/control-flow conditions/access/overrides, warns about unreachable code, and blocks Lua emission when errors remain.
 
