@@ -78,6 +78,7 @@ struct NativeModule::Impl {
     CCompilationResult generated;
     std::shared_ptr<NativeRuntime> runtime;
     size_t rootRegistration{};
+    bool initialized{};
 
     ~Impl() {
         if (runtime && rootRegistration) runtime->UnregisterRoots(rootRegistration);
@@ -103,8 +104,12 @@ NativeModule NativeModule::Compile(std::string_view source, std::string_view lib
 }
 
 NativeModule NativeModule::Compile(std::string_view source, const NativeCompileOptions& options) {
+    return Load(CompileToC(source, options.externalTypes), options);
+}
+
+NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompileOptions& options) {
     auto impl = std::make_unique<Impl>();
-    impl->generated = CompileToC(source, options.externalTypes);
+    impl->generated = std::move(generated);
     impl->runtime = options.runtime ? options.runtime : NativeRuntime::Create();
     impl->library = LoadLibTcc(options.libtccPath);
     if (!impl->library) {
@@ -150,12 +155,20 @@ NativeModule NativeModule::Compile(std::string_view source, const NativeCompileO
     if (!traceRoots) throw std::runtime_error("TinyCC output did not contain ls_module_trace_roots");
     impl->rootRegistration = impl->runtime->RegisterRoots(traceRoots);
 
-    const auto initializer = reinterpret_cast<int (*)()>(impl->getSymbol(impl->state, "ls_module_init"));
+    NativeModule module(std::move(impl));
+    if (options.initialize) module.Initialize();
+    return module;
+}
+
+void NativeModule::Initialize() {
+    if (!impl_) throw std::runtime_error("Cannot initialize an empty native module");
+    if (impl_->initialized) throw std::runtime_error("Native module is already initialized");
+    const auto initializer = reinterpret_cast<int (*)()>(impl_->getSymbol(impl_->state, "ls_module_init"));
     if (!initializer) throw std::runtime_error("TinyCC output did not contain ls_module_init");
+    impl_->initialized = true;
     const int result = initializer();
     if (result != 0) throw std::runtime_error("LuaSharp native module initializer returned " + std::to_string(result));
-    if (const auto error = impl->runtime->LastError(); !error.empty()) throw std::runtime_error("LuaSharp native runtime error: " + error);
-    return NativeModule(std::move(impl));
+    if (const auto error = impl_->runtime->LastError(); !error.empty()) throw std::runtime_error("LuaSharp native runtime error: " + error);
 }
 
 void* NativeModule::FindSymbol(std::string_view symbol) const {

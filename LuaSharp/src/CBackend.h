@@ -53,6 +53,7 @@ struct NativeCompileOptions {
     std::vector<ExternalType> externalTypes;
     std::vector<NativeSymbol> symbols;
     std::shared_ptr<NativeRuntime> runtime;
+    bool initialize{true}; // false: caller runs NativeModule::Initialize() itself
 };
 
 // Emits C11 from the same checked bound tree used by the Lua backend.
@@ -74,8 +75,12 @@ public:
     // libtccPath may name libtcc.dll or be empty to use normal discovery.
     static NativeModule Compile(std::string_view source, std::string_view libtccPath = {});
     static NativeModule Compile(std::string_view source, const NativeCompileOptions& options);
+    // Same as Compile, for C already produced by CompileToC.
+    static NativeModule Load(CCompilationResult generated, const NativeCompileOptions& options);
     static bool IsLibTccAvailable(std::string_view libtccPath = {});
 
+    // Runs the module initializer (top-level code). Compile does this unless options.initialize is false.
+    void Initialize();
     [[nodiscard]] void* FindSymbol(std::string_view symbol) const;
     [[nodiscard]] void* FindGlobal(std::string_view name) const;
     [[nodiscard]] std::string LastError() const;

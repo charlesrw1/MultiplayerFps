@@ -3,8 +3,10 @@
 #include "Semantic.h"
 
 #include <cassert>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 
@@ -38,16 +40,20 @@ std::filesystem::path OutputArgument(int argc, char** argv, int start, const std
     throw std::runtime_error("Expected -o <output-file>");
 }
 
-int CompileNative(const std::filesystem::path& input, const std::filesystem::path& output, bool execute) {
+int CompileNative(const std::filesystem::path& input, const std::filesystem::path& output, bool execute, std::chrono::steady_clock::time_point cliStart) {
     const auto source = ReadSource(input);
     const auto analysis = luasharp::Analyze(source);
     if (ReportDiagnostics(input, analysis)) return 1;
-    const auto generated = luasharp::CompileToC(source);
+    auto generated = luasharp::CompileToC(source);
     WriteOutput(output, generated.c);
     std::cout << "Wrote " << output.string() << '\n';
     if (execute) {
-        auto module = luasharp::NativeModule::Compile(source);
-        std::cout << "Ran " << input.string() << '\n';
+        luasharp::NativeCompileOptions options; options.initialize = false;
+        auto module = luasharp::NativeModule::Load(std::move(generated), options);
+        const std::chrono::duration<double, std::milli> compileTime = std::chrono::steady_clock::now() - cliStart;
+        std::cout << "Compiled in " << std::fixed << std::setprecision(1) << compileTime.count() << " ms" << std::endl;
+        module.Initialize();
+        std::cout << "\nRan " << input.string() << '\n';
     }
     return 0;
 }
@@ -74,6 +80,7 @@ void RunTests() {
 }
 
 int main(int argc, char** argv) {
+    const auto cliStart = std::chrono::steady_clock::now();
     try {
         if (argc == 2 && std::string_view(argv[1]) == "--test") { RunTests(); return 0; }
         if (argc < 2) { Usage(); return 2; }
@@ -92,7 +99,7 @@ int main(int argc, char** argv) {
             if (argc < 3) { Usage(); return 2; }
             const std::filesystem::path input = argv[2];
             const auto output = OutputArgument(argc, argv, 3, input.parent_path() / (input.stem().string() + ".c"));
-            return CompileNative(input, output, command != "emit-c");
+            return CompileNative(input, output, command != "emit-c", cliStart);
         }
         if (command == "emit-lua") {
             if (argc < 3) { Usage(); return 2; }
@@ -103,7 +110,7 @@ int main(int argc, char** argv) {
         }
         const std::filesystem::path input = argv[1];
         const auto output = OutputArgument(argc, argv, 2, input.parent_path() / (input.stem().string() + ".c"));
-        return CompileNative(input, output, true);
+        return CompileNative(input, output, true, cliStart);
     } catch (const std::exception& error) {
         std::cerr << "luasharp: " << error.what() << '\n';
         return 1;
