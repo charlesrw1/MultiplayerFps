@@ -2,6 +2,8 @@
 #include "Builtins.h"
 
 #include <algorithm>
+#include <cassert>
+#include <map>
 #include <unordered_set>
 #include <utility>
 
@@ -18,13 +20,15 @@ struct Local {
 class Analyzer {
 public:
     Analyzer(std::string_view source, SyntaxTree syntax, const std::vector<ExternalType>& externalTypes = {}) : source_(source) {
+        lineStarts_.push_back(0);
+        for (size_t at{}; (at = source_.find('\n', at)) != std::string_view::npos; ++at) lineStarts_.push_back(at + 1);
         result_.syntax = std::move(syntax);
         for (const auto& type : BuiltinTypes()) knownTypes_.insert(type);
         RegisterBuiltinType("string"); RegisterBuiltinType("Vec3"); RegisterBuiltinType("Quat"); RegisterBuiltinType("Transform");
         for (const auto& external : externalTypes) {
             knownTypes_.insert(external.name); declaredTypes_.insert(external.name);
             if (external.isEnum) enumTypes_.insert(external.name);
-            result_.symbols.push_back({external.name, external.name, external.isEnum ? SymbolKind::Enum : SymbolKind::Class, 0, 0, {source_.size(), 0}, {}, external.name, "public"});
+            PushSymbol({external.name, external.name, external.isEnum ? SymbolKind::Enum : SymbolKind::Class, 0, 0, {source_.size(), 0}, {}, external.name, "public"});
             if (!external.baseType.empty()) result_.baseTypes[external.name] = external.baseType;
             for (auto member : external.members) { member.span = {source_.size(), 0}; result_.members[external.isEnum ? "$type:" + external.name : external.name].push_back(std::move(member)); }
         }
@@ -48,14 +52,21 @@ private:
     static size_t FunctionArity(const std::string& type) { const auto end = type.find(':', 10); return static_cast<size_t>(std::stoull(type.substr(10, end - 10))); }
     static std::string FunctionResult(const std::string& type) { const auto end = type.find(':', 10); return end == std::string::npos ? "any" : type.substr(end + 1); }
     std::pair<size_t, size_t> Position(size_t offset) const {
-        offset = (std::min)(offset, source_.size()); size_t line{}, lineStart{};
-        for (size_t at{}; at < offset;) { const auto next = source_.find('\n', at); if (next == std::string_view::npos || next >= offset) break; ++line; at = lineStart = next + 1; }
-        return {line, offset - lineStart};
+        offset = (std::min)(offset, source_.size());
+        const auto next = std::upper_bound(lineStarts_.begin(), lineStarts_.end(), offset);
+        assert(next != lineStarts_.begin());
+        const auto line = static_cast<size_t>(next - lineStarts_.begin()) - 1;
+        return {line, offset - lineStarts_[line]};
+    }
+    size_t PushSymbol(Symbol symbol) {
+        const auto index = result_.symbols.size();
+        symbolIndices_.try_emplace({symbol.span.offset, symbol.name}, index);
+        result_.symbols.push_back(std::move(symbol));
+        return index;
     }
     size_t AddSymbol(std::string name, std::string type, SymbolKind kind, TextSpan span, std::vector<std::string> parameters = {}) {
         const auto [line, character] = Position(span.offset);
-        result_.symbols.push_back({std::move(name), std::move(type), kind, line, character, span, std::move(parameters)});
-        return result_.symbols.size() - 1;
+        return PushSymbol({std::move(name), std::move(type), kind, line, character, span, std::move(parameters)});
     }
     void AddDiagnostic(std::string message, TextSpan span, DiagnosticSeverity severity = DiagnosticSeverity::Error) {
         const auto [line, character] = Position(span.offset); result_.diagnostics.push_back({std::move(message), line, character, severity, span});
@@ -156,8 +167,8 @@ private:
         return member == found->second.end() ? nullptr : &*member;
     }
     std::string ExpressionType(TextSpan span) const {
-        const auto found = std::find_if(result_.expressions.rbegin(), result_.expressions.rend(), [&](const ExpressionInfo& value) { return value.span.offset == span.offset && value.span.length == span.length; });
-        return found == result_.expressions.rend() ? std::string{} : found->type;
+        const auto found = latestExpressions_.find({span.offset, span.length});
+        return found == latestExpressions_.end() ? std::string{} : result_.expressions[found->second].type;
     }
     void CheckArguments(const Symbol& callable, const SyntaxExpression& call, const std::vector<std::string>& actual) {
         if (actual.size() != callable.parameters.size()) {
@@ -359,6 +370,7 @@ private:
         }
         }
         bound.type = type; bound.symbolIndex = symbol; bound.lowering = lowering;
+        latestExpressions_[{expression.span.offset, expression.span.length}] = result_.expressions.size();
         result_.expressions.push_back({expression.span, type, symbol, lowering}); return type;
     }
     static std::string DisplayType(const std::string& type) {
@@ -383,8 +395,8 @@ private:
         return AddSymbol(builtin.name, builtin.returnType, SymbolKind::Function, {source_.size(), 0}, std::move(parameters));
     }
     std::optional<size_t> SymbolIndex(const Symbol& symbol) const {
-        for (size_t i{}; i < result_.symbols.size(); ++i) if (&result_.symbols[i] == &symbol || (result_.symbols[i].span.offset == symbol.span.offset && result_.symbols[i].name == symbol.name)) return i;
-        return std::nullopt;
+        const auto found = symbolIndices_.find({symbol.span.offset, symbol.name});
+        return found == symbolIndices_.end() ? std::nullopt : std::optional<size_t>(found->second);
     }
     TextSpan MemberNameSpan(const SyntaxExpression& expression) const { return {expression.span.End() - expression.text.size(), expression.text.size()}; }
     void AddLocal(std::vector<Local>& locals, std::string name, std::string type, SymbolKind kind, TextSpan declaration, TextSpan visibility, size_t depth) {
@@ -532,6 +544,9 @@ private:
     }
 
     std::string_view source_;
+    std::vector<size_t> lineStarts_;
+    std::map<std::pair<size_t, std::string>, size_t> symbolIndices_; // (span offset, name) -> first symbol
+    std::map<std::pair<size_t, size_t>, size_t> latestExpressions_; // (span offset, length) -> latest expression
     Analysis result_;
     std::unordered_set<std::string> knownTypes_;
     std::unordered_set<std::string> declaredTypes_;
