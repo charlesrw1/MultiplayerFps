@@ -119,7 +119,6 @@ struct Local {
     size_t depth{};
 };
 
-using StringSet = std::unordered_set<std::string, StringHash, std::equal_to<>>;
 constexpr TypeId InferReturn = std::numeric_limits<TypeId>::max(); // lambda bodies infer their return type
 
 class Analyzer {

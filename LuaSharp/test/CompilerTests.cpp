@@ -861,10 +861,12 @@ void TestPrintfBuiltin() {
     if (!luasharp::NativeModule::IsLibTccAvailable()) return;
     std::ostringstream output;
     auto* previous = std::cout.rdbuf(output.rdbuf());
-    try { auto module = luasharp::NativeModule::Compile(source); }
-    catch (...) { std::cout.rdbuf(previous); throw; }
+    try {
+        auto module = luasharp::NativeModule::Compile(source);
+        auto lambda = luasharp::NativeModule::Compile(R"(auto say = () => printf("from lambda\n"); say();)");
+    } catch (...) { std::cout.rdbuf(previous); throw; }
     std::cout.rdbuf(previous);
-    Require(output.str() == "i=-7 f=2.5 s=ok b=true %\n", "native printf produced unexpected output: " + output.str());
+    Require(output.str() == "i=-7 f=2.5 s=ok b=true %\nfrom lambda\n", "native printf produced unexpected output: " + output.str());
 }
 }
 

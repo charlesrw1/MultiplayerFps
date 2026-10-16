@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace luasharp {
@@ -19,6 +20,7 @@ struct StringHash {
     size_t operator()(std::string_view value) const { return std::hash<std::string_view>{}(value); }
 };
 template <typename T> using StringMap = std::unordered_map<std::string, T, StringHash, std::equal_to<>>;
+using StringSet = std::unordered_set<std::string, StringHash, std::equal_to<>>;
 
 using TypeId = uint32_t;
 enum class TypeKind : uint8_t { Unknown, Void, Null, Any, Table, Int, Float, Bool, String, Range, Named, List, Function, Meta, Builtin };
