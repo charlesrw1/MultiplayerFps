@@ -2,6 +2,7 @@
 #include "LspBridge.h"
 #include "Semantic.h"
 
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <stdexcept>
@@ -77,6 +78,20 @@ int invalid = "text";
     Require(analysis.variableTypes.at("player") == "Player", "auto new type was not inferred");
     Require(!analysis.diagnostics.empty(), "type mismatch was not diagnosed");
 }
+
+void TestSemanticDiagnosticsAndParameters() {
+    const auto analysis = luasharp::Analyze(R"(class Player {
+void move(int speed, float seconds) {}
+}
+UnknownType value;
+auto player = new Player();
+player.missing();
+)");
+    const auto move = std::find_if(analysis.members.at("Player").begin(), analysis.members.at("Player").end(), [](const auto& symbol) { return symbol.name == "move"; });
+    Require(move != analysis.members.at("Player").end() && move->parameters.size() == 2, "method parameter information was not retained");
+    Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& d) { return d.message.find("Unknown type") != std::string::npos; }), "unknown type was not diagnosed");
+    Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& d) { return d.message.find("Unknown member") != std::string::npos && d.severity == luasharp::DiagnosticSeverity::Warning; }), "unknown member was not warned");
+}
 }
 
 int main() {
@@ -87,6 +102,7 @@ int main() {
         {"invalid syntax", TestInvalidSyntax},
         {"LSP position translation", TestLspPositionTranslation},
         {"semantic analysis", TestSemanticAnalysis},
+        {"semantic diagnostics and parameters", TestSemanticDiagnosticsAndParameters},
     };
 
     for (const auto& [name, test] : tests) {

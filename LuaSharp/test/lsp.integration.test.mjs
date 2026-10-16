@@ -39,7 +39,7 @@ try {
     send({ jsonrpc: "2.0", id: 2, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: completionLine, character: 2 } } });
     const completion = await waitFor(m => m.id === 2, "member completion");
     const labels = completion.result.map(item => item.label);
-    assert.ok(labels.includes("myfunc") && labels.includes("integer"), `expected MyClass members, got: ${labels.join(", ")}`);
+    assert.ok(labels.some(label => label.startsWith("myfunc(")) && labels.includes("integer"), `expected MyClass members, got: ${labels.join(", ")}`);
     send({ jsonrpc: "2.0", id: 3, method: "textDocument/semanticTokens/full", params: { textDocument: { uri } } });
     const tokens = await waitFor(m => m.id === 3, "semantic tokens");
     assert.ok(tokens.result.data.length >= 5, "semantic tokens were empty");
@@ -48,8 +48,21 @@ try {
     send({ jsonrpc: "2.0", id: 4, method: "textDocument/definition", params: { textDocument: { uri }, position: { line: referenceLine, character: 2 } } });
     const definition = await waitFor(m => m.id === 4, "definition");
     assert.equal(definition.result[0].range.start.line, 0, "class definition location was incorrect");
-    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 4 }, contentChanges: [{ text: `${source}\nint invalid = \"bad\";` }] } });
+    const signatureLine = source.split("\n").length;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 4 }, contentChanges: [{ text: `${source}\nm.myfunc(` }] } });
+    send({ jsonrpc: "2.0", id: 5, method: "textDocument/signatureHelp", params: { textDocument: { uri }, position: { line: signatureLine, character: 9 } } });
+    const signature = await waitFor(m => m.id === 5, "signature help");
+    assert.match(signature.result.signatures[0].label, /myfunc\(Entity e\)/, "method parameter signature missing");
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 5 }, contentChanges: [{ text: `${source}\nint invalid = \"bad\";` }] } });
     const mismatch = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.diagnostics.some(d => /Cannot assign/.test(d.message)), "type mismatch diagnostic");
     assert.ok(mismatch.params.diagnostics.some(d => /Cannot assign/.test(d.message)));
-    console.log("PASS native LSP: fixture diagnostics, inferred members, definitions, semantic tokens, type errors");
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 6 }, contentChanges: [{ text: `${source}\nUnknownType value;\nm.missing();` }] } });
+    const unknowns = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.diagnostics.some(d => /Unknown type/.test(d.message)) && m.params.diagnostics.some(d => /Unknown member/.test(d.message)), "unknown type and member diagnostics");
+    assert.ok(unknowns.params.diagnostics.some(d => /Unknown type/.test(d.message) && d.severity === 1));
+    assert.ok(unknowns.params.diagnostics.some(d => /Unknown member/.test(d.message) && d.severity === 2));
+    const brokenLine = source.split("\n").length;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 7 }, contentChanges: [{ text: `${source}\nclass Broken` }] } });
+    const syntax = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.diagnostics.some(d => /Expected '\{'/.test(d.message)), "syntax diagnostic");
+    assert.equal(syntax.params.diagnostics.find(d => /Expected '\{'/.test(d.message)).range.start.line, brokenLine, "syntax error was not mapped to its source line");
+    console.log("PASS native LSP: fixture diagnostics, members, definitions, semantic tokens, signatures, type/member/syntax errors");
 } finally { child.kill(); }
