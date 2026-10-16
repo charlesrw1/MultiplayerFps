@@ -83,6 +83,7 @@ void TestSemanticDiagnosticsAndParameters() {
     const auto analysis = luasharp::Analyze(R"(class Player {
 void move(int speed, float seconds) {}
 }
+
 UnknownType value;
 auto player = new Player();
 player.missing();
@@ -91,6 +92,19 @@ player.missing();
     Require(move != analysis.members.at("Player").end() && move->parameters.size() == 2, "method parameter information was not retained");
     Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& d) { return d.message.find("Unknown type") != std::string::npos; }), "unknown type was not diagnosed");
     Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& d) { return d.message.find("Unknown member") != std::string::npos && d.severity == luasharp::DiagnosticSeverity::Warning; }), "unknown member was not warned");
+}
+
+void TestSharedSyntaxTree() {
+    const auto syntax = luasharp::ParseSyntax(R"(class Child : Component {
+int health = 10;
+void move(int speed) { int distance = speed; }
+}
+auto child = new Child();
+)");
+    Require(syntax.classes.size() == 1 && syntax.classes[0].baseName == "Component", "class inheritance was not parsed into syntax tree");
+    Require(syntax.classes[0].fields.size() == 1 && syntax.classes[0].functions.size() == 1, "class members were not parsed into syntax tree");
+    Require(syntax.classes[0].functions[0].parameters[0].name == "speed", "function parameter was not parsed into syntax tree");
+    Require(syntax.classes[0].functions[0].body[0].type == "int", "typed local was not parsed into syntax tree");
 }
 }
 
@@ -103,6 +117,7 @@ int main() {
         {"LSP position translation", TestLspPositionTranslation},
         {"semantic analysis", TestSemanticAnalysis},
         {"semantic diagnostics and parameters", TestSemanticDiagnosticsAndParameters},
+        {"shared syntax tree", TestSharedSyntaxTree},
     };
 
     for (const auto& [name, test] : tests) {

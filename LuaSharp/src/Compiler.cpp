@@ -12,18 +12,19 @@ namespace {
 
 enum class TokenKind { Identifier, Number, String, Symbol, End };
 struct Token { TokenKind kind; std::string text; size_t offset; };
-struct Parameter { std::string type; std::string name; };
-struct Field { std::string access; std::string type; std::string name; std::vector<Token> initializer; };
+struct Parameter { std::string type; std::string name; size_t offset{}; };
+struct Field { std::string access; std::string type; std::string name; std::vector<Token> initializer; size_t offset{}; };
 struct Statement {
     enum class Kind { If, Return, Local, Expression } kind;
     std::string name;
+    std::string type;
     std::vector<Token> expression;
     std::vector<Statement> body;
     std::vector<Statement> elseBody;
     size_t sourceOffset{};
 };
-struct Function { std::string name; std::string returnType; bool isConstructor{}; std::vector<Parameter> parameters; std::vector<Statement> body; };
-struct Class { std::string name; std::string baseName; std::vector<Field> fields; std::vector<Function> functions; };
+struct Function { std::string name; std::string returnType; bool isConstructor{}; std::vector<Parameter> parameters; std::vector<Statement> body; size_t offset{}; };
+struct Class { std::string name; std::string baseName; std::vector<Field> fields; std::vector<Function> functions; size_t offset{}; };
 struct Program { std::vector<Class> classes; std::vector<Statement> topLevel; };
 
 std::vector<Token> Lex(std::string_view source) {
@@ -128,7 +129,7 @@ private:
             size_t lookahead = index_ + 1;
             while (tokens_[lookahead].text == "[" && tokens_[lookahead + 1].text == "]") lookahead += 2;
             if (tokens_[lookahead].kind == TokenKind::Identifier && (tokens_[lookahead + 1].text == "=" || tokens_[lookahead + 1].text == ";")) {
-                static_cast<void>(Type()); Statement statement{Statement::Kind::Local}; statement.name = Identifier();
+                const auto type = Type(); Statement statement{Statement::Kind::Local}; statement.type = type; statement.name = Identifier();
                 if (Is("=")) { Take("="); statement.expression = Until(";"); }
                 Take(";"); statement.sourceOffset = sourceOffset; return statement;
             }
@@ -136,23 +137,23 @@ private:
         Statement statement{Statement::Kind::Expression}; statement.expression = Until(";"); Take(";"); statement.sourceOffset = sourceOffset; return statement;
     }
     Function ParseFunction(std::string name, std::string returnType, bool isConstructor) {
-        Function function{std::move(name), std::move(returnType), isConstructor}; Take("(");
-        while (!Is(")")) { function.parameters.push_back({Type(), Identifier()}); if (!Is(",")) break; Take(","); }
+        Function function{std::move(name), std::move(returnType), isConstructor}; function.offset = Current().offset; Take("(");
+        while (!Is(")")) { const auto type = Type(); const auto offset = Current().offset; function.parameters.push_back({type, Identifier(), offset}); if (!Is(",")) break; Take(","); }
         Take(")"); function.body = Block();
         return function;
     }
     Class ParseClass() {
-        Take("class"); Class result; result.name = Identifier();
+        const auto classToken = Take("class"); Class result; result.offset = classToken.offset; result.name = Identifier();
         if (Is(":")) { Take(":"); result.baseName = Identifier(); }
         Take("{"); std::string access = "public";
         while (!Is("}")) {
             if ((Is("public") || Is("private")) && tokens_[index_ + 1].text == ":") { access = Take().text; Take(":"); continue; }
             const auto first = Identifier();
             if (Is("(")) { result.functions.push_back(ParseFunction(first, {}, true)); continue; }
-            const auto type = Type(first); const auto name = Identifier();
+            const auto type = Type(first); const auto fieldOffset = Current().offset; const auto name = Identifier();
             if (Is("(")) result.functions.push_back(ParseFunction(name, type, false));
             else {
-                Field field{access, type, name};
+                Field field{access, type, name, {}, fieldOffset};
                 if (Is("=")) { Take("="); field.initializer = Until(";"); }
                 Take(";"); result.fields.push_back(std::move(field));
             }
@@ -238,6 +239,37 @@ void EmitClass(Emitter& emitter, const Class& value) {
 }
 
 } // namespace
+
+namespace {
+SyntaxToken ToSyntaxToken(const Token& value) { return {value.text, value.offset}; }
+SyntaxStatement ToSyntaxStatement(const Statement& value) {
+    SyntaxStatement result{static_cast<SyntaxStatement::Kind>(value.kind), value.name, value.type, {}, {}, {}, value.sourceOffset};
+    for (const auto& token : value.expression) result.expression.push_back(ToSyntaxToken(token));
+    for (const auto& statement : value.body) result.body.push_back(ToSyntaxStatement(statement));
+    for (const auto& statement : value.elseBody) result.elseBody.push_back(ToSyntaxStatement(statement));
+    return result;
+}
+SyntaxFunction ToSyntaxFunction(const Function& value) {
+    SyntaxFunction result{value.name, value.returnType, value.isConstructor, {}, {}, value.offset};
+    for (const auto& parameter : value.parameters) result.parameters.push_back({parameter.type, parameter.name, parameter.offset});
+    for (const auto& statement : value.body) result.body.push_back(ToSyntaxStatement(statement));
+    return result;
+}
+SyntaxClass ToSyntaxClass(const Class& value) {
+    SyntaxClass result{value.name, value.baseName, {}, {}, value.offset};
+    for (const auto& field : value.fields) { SyntaxField converted{field.access, field.type, field.name, {}, field.offset}; for (const auto& token : field.initializer) converted.initializer.push_back(ToSyntaxToken(token)); result.fields.push_back(std::move(converted)); }
+    for (const auto& function : value.functions) result.functions.push_back(ToSyntaxFunction(function));
+    return result;
+}
+}
+
+SyntaxProgram ParseSyntax(std::string_view source) {
+    const auto parsed = Parser(Lex(source)).Parse();
+    SyntaxProgram result;
+    for (const auto& value : parsed.classes) result.classes.push_back(ToSyntaxClass(value));
+    for (const auto& statement : parsed.topLevel) result.topLevel.push_back(ToSyntaxStatement(statement));
+    return result;
+}
 
 std::string Compile(std::string_view source) {
     return CompileWithSourceMap(source).lua;

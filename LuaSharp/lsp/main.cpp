@@ -17,6 +17,16 @@ using json = nlohmann::json;
 namespace {
 std::unordered_map<std::string, std::string> documents;
 
+luasharp::Analysis AnalyzeForEditor(std::string text) {
+    // Requests are sent before a user has finished a statement. Recover just
+    // its trailing delimiters for semantic queries; diagnostics stay strict.
+    int parentheses = 0;
+    for (const char character : text) { if (character == '(') ++parentheses; else if (character == ')' && parentheses > 0) --parentheses; }
+    text.append(static_cast<size_t>(parentheses), ')');
+    if (!text.empty() && text.back() != ';' && text.back() != '}') text += ';';
+    return luasharp::Analyze(text);
+}
+
 bool ReadExact(char* buffer, DWORD count) {
     while (count != 0) { DWORD read{}; if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), buffer, count, &read, nullptr) || read == 0) return false; buffer += read; count -= read; }
     return true;
@@ -81,7 +91,7 @@ void PublishDiagnostics(const std::string& uri) {
     Send({{"jsonrpc", "2.0"}, {"method", "textDocument/publishDiagnostics"}, {"params", {{"uri", uri}, {"diagnostics", diagnostics}}}});
 }
 json Completions(const std::string& text, const json& position) {
-    const auto analysis = luasharp::Analyze(text); const auto line = LineAt(text, position.value("line", 0U)); const auto character = (std::min)(static_cast<size_t>(position.value("character", 0U)), line.size());
+    const auto analysis = AnalyzeForEditor(text); const auto line = LineAt(text, position.value("line", 0U)); const auto character = (std::min)(static_cast<size_t>(position.value("character", 0U)), line.size());
     json result = json::array();
     if (character > 0 && line[character - 1] == '.') {
         size_t end = character - 1, begin = end; while (begin > 0 && (std::isalnum(static_cast<unsigned char>(line[begin - 1])) || line[begin - 1] == '_')) --begin;
@@ -106,7 +116,7 @@ json SignatureHelp(const std::string& text, const json& position) {
     const auto line = LineAt(text, position.value("line", 0U)); const auto prefix = line.substr(0, (std::min)(static_cast<size_t>(position.value("character", 0U)), line.size()));
     const std::regex callPattern(R"((\w+)\.(\w+)\s*\(([^()]*)$)"); std::smatch match;
     if (!std::regex_search(prefix, match, callPattern)) return nullptr;
-    const auto analysis = luasharp::Analyze(text); const auto type = analysis.variableTypes.find(match[1]); if (type == analysis.variableTypes.end()) return nullptr;
+    const auto analysis = AnalyzeForEditor(text); const auto type = analysis.variableTypes.find(match[1]); if (type == analysis.variableTypes.end()) return nullptr;
     const auto members = analysis.members.find(type->second); if (members == analysis.members.end()) return nullptr;
     const auto member = std::find_if(members->second.begin(), members->second.end(), [&](const auto& symbol) { return symbol.name == match[2] && symbol.kind == luasharp::SymbolKind::Method; });
     if (member == members->second.end()) return nullptr;
@@ -115,7 +125,7 @@ json SignatureHelp(const std::string& text, const json& position) {
     return {{"signatures", json::array({{{"label", label}, {"parameters", parameters}}})}, {"activeSignature", 0}, {"activeParameter", static_cast<int>(std::count(match[3].first, match[3].second, ','))}};
 }
 json SemanticTokens(const std::string& text) {
-    const auto analysis = luasharp::Analyze(text);
+    const auto analysis = AnalyzeForEditor(text);
     std::unordered_map<std::string, luasharp::SymbolKind> known;
     for (const auto& symbol : analysis.symbols) known.emplace(symbol.name, symbol.kind);
     json data = json::array(); size_t previousLine{}, previousCharacter{};
@@ -147,7 +157,7 @@ int main() {
         else if (method == "textDocument/signatureHelp") { const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", SignatureHelp(documents[uri], p["position"])}}); }
         else if (method == "textDocument/semanticTokens/full") { const auto& p = (*message)["params"]; Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", SemanticTokens(documents[p["textDocument"].value("uri", "")])}}); }
         else if (method == "textDocument/hover" || method == "textDocument/definition") {
-            const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto word = WordAt(documents[uri], p["position"]); const auto analysis = luasharp::Analyze(documents[uri]);
+            const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto word = WordAt(documents[uri], p["position"]); const auto analysis = AnalyzeForEditor(documents[uri]);
             const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& symbol) { return symbol.name == word; });
             if (method == "textDocument/definition") Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", found == analysis.symbols.end() ? json::array() : json::array({Location(uri, *found)})}});
             else Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", found == analysis.symbols.end() ? json(nullptr) : json{{"contents", {{"kind", "markdown"}, {"value", "`" + found->name + "` : `" + found->type + "`"}}}}}});
