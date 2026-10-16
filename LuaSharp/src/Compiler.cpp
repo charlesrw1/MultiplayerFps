@@ -171,25 +171,30 @@ std::string LuaType(const std::string& type) {
     return type;
 }
 
-std::string Expression(const std::vector<Token>& tokens) {
-    std::string out;
-    for (size_t i = 0; i < tokens.size(); ++i) {
-        const auto& token = tokens[i];
-        const bool methodCall = token.text == "." && i + 2 < tokens.size() && tokens[i + 1].kind == TokenKind::Identifier && tokens[i + 2].text == "(";
-        if (token.text == "new") {
-            if (i + 1 >= tokens.size() || tokens[i + 1].kind != TokenKind::Identifier) throw std::runtime_error("Expected class name after 'new'");
-            out += tokens[++i].text + ".new";
-            continue;
-        }
-        if (token.text == "null") out += "nil";
-        else if (token.text == "!=") out += "~=";
-        else if (token.text == "&&") out += " and ";
-        else if (token.text == "||") out += " or ";
-        else if (methodCall) out += ":";
-        else out += token.text;
-        if (token.text == ",") out += ' ';
+std::string Expression(const SyntaxExpression& value) {
+    const auto child = [&](size_t index) -> std::string { return Expression(value.children.at(index)); };
+    switch (value.kind) {
+    case SyntaxExpression::Kind::Identifier: case SyntaxExpression::Kind::Number: case SyntaxExpression::Kind::String: case SyntaxExpression::Kind::Boolean: case SyntaxExpression::Kind::Table: return value.text;
+    case SyntaxExpression::Kind::Null: return "nil";
+    case SyntaxExpression::Kind::New: { std::string out = value.text + ".new("; for (size_t i{}; i < value.children.size(); ++i) { if (i) out += ", "; out += Expression(value.children[i]); } return out + ")"; }
+    case SyntaxExpression::Kind::Member: return child(0) + "." + value.text;
+    case SyntaxExpression::Kind::Call: {
+        std::string out; const auto& callee = value.children.at(0);
+        if (callee.kind == SyntaxExpression::Kind::Member) out = Expression(callee.children.at(0)) + ":" + callee.text;
+        else out = Expression(callee);
+        out += "("; for (size_t i = 1; i < value.children.size(); ++i) { if (i != 1) out += ", "; out += Expression(value.children[i]); } return out + ")";
     }
-    return out;
+    case SyntaxExpression::Kind::Index: return child(0) + "[" + child(1) + "]";
+    case SyntaxExpression::Kind::Slice: return "LuaSharp.slice(" + child(0) + ", " + child(1) + ", " + child(2) + ")";
+    case SyntaxExpression::Kind::Unary: return (value.text == "!" ? "not " : value.text) + child(0);
+    case SyntaxExpression::Kind::Assignment: return child(0) + " = " + child(1);
+    case SyntaxExpression::Kind::Binary: { const auto op = value.text == "!=" ? "~=" : value.text == "&&" ? "and" : value.text == "||" ? "or" : value.text; return child(0) + " " + op + " " + child(1); }
+    }
+    throw std::runtime_error("Unknown expression node");
+}
+std::string Expression(const std::vector<Token>& tokens) {
+    std::vector<SyntaxToken> syntax; for (const auto& token : tokens) syntax.push_back({token.text, token.offset});
+    return Expression(ParseExpression(syntax));
 }
 
 struct Emitter {
@@ -241,10 +246,73 @@ void EmitClass(Emitter& emitter, const Class& value) {
 } // namespace
 
 namespace {
+class ExpressionParser {
+public:
+    explicit ExpressionParser(const std::vector<SyntaxToken>& tokens) : tokens_(tokens) {}
+    SyntaxExpression Parse() {
+        if (tokens_.empty()) return {SyntaxExpression::Kind::Table, "", 0, {}};
+        auto result = ParseBinary(0);
+        if (index != tokens_.size()) throw std::runtime_error("Unexpected token in expression at " + std::to_string(tokens_[index].offset));
+        return result;
+    }
+private:
+    const SyntaxToken& Current() const { if (index >= tokens_.size()) throw std::runtime_error("Unexpected end of expression"); return tokens_[index]; }
+    bool Is(std::string_view text) const { return index < tokens_.size() && tokens_[index].text == text; }
+    SyntaxToken Take() { const auto token = Current(); ++index; return token; }
+    static int Precedence(std::string_view value) {
+        if (value == "=") return 1; if (value == "||") return 2; if (value == "&&") return 3; if (value == "==" || value == "!=") return 4;
+        if (value == "<" || value == ">" || value == "<=" || value == ">=") return 5; if (value == "+" || value == "-") return 6; if (value == "*" || value == "/") return 7; return -1;
+    }
+    SyntaxExpression ParseBinary(int minimum) {
+        auto left = ParseUnary();
+        while (index < tokens_.size()) {
+            const auto operation = Current(); const int precedence = Precedence(operation.text); if (precedence < minimum) break; ++index;
+            auto right = ParseBinary(precedence + (operation.text == "=" ? 0 : 1));
+            left = {operation.text == "=" ? SyntaxExpression::Kind::Assignment : SyntaxExpression::Kind::Binary, operation.text, operation.offset, {std::move(left), std::move(right)}};
+        }
+        return left;
+    }
+    SyntaxExpression ParseUnary() {
+        if (Is("!") || Is("-")) { const auto operation = Take(); return {SyntaxExpression::Kind::Unary, operation.text, operation.offset, {ParseUnary()}}; }
+        return ParsePostfix(ParsePrimary());
+    }
+    SyntaxExpression ParsePrimary() {
+        const auto token = Take();
+        if (token.text == "new") { const auto type = Take(); if (!std::isalpha(static_cast<unsigned char>(type.text[0])) && type.text[0] != '_') throw std::runtime_error("Expected type after new at " + std::to_string(type.offset)); SyntaxExpression result{SyntaxExpression::Kind::New, type.text, token.offset, {}}; if (Is("(")) result.children = ParseArguments(); return result; }
+        if (token.text == "(") { auto result = ParseBinary(0); if (!Is(")")) throw std::runtime_error("Expected ')' at " + std::to_string(token.offset)); ++index; return result; }
+        if (token.text == "{") { if (!Is("}")) throw std::runtime_error("Only empty table literals are currently supported at " + std::to_string(token.offset)); ++index; return {SyntaxExpression::Kind::Table, "{}", token.offset, {}}; }
+        if (token.text == "null") return {SyntaxExpression::Kind::Null, token.text, token.offset, {}};
+        if (token.text == "true" || token.text == "false") return {SyntaxExpression::Kind::Boolean, token.text, token.offset, {}};
+        if (!token.text.empty() && (std::isdigit(static_cast<unsigned char>(token.text[0])))) return {SyntaxExpression::Kind::Number, token.text, token.offset, {}};
+        if (!token.text.empty() && (token.text[0] == '\"' || token.text[0] == '\'')) return {SyntaxExpression::Kind::String, token.text, token.offset, {}};
+        return {SyntaxExpression::Kind::Identifier, token.text, token.offset, {}};
+    }
+    std::vector<SyntaxExpression> ParseArguments() {
+        ++index; std::vector<SyntaxExpression> arguments;
+        while (!Is(")")) { arguments.push_back(ParseBinary(0)); if (Is(",")) ++index; else if (!Is(")")) throw std::runtime_error("Expected ',' or ')' in argument list"); }
+        ++index; return arguments;
+    }
+    SyntaxExpression ParsePostfix(SyntaxExpression value) {
+        while (index < tokens_.size()) {
+            if (Is(".")) { const auto dot = Take(); const auto name = Take(); value = {SyntaxExpression::Kind::Member, name.text, dot.offset, {std::move(value)}}; }
+            else if (Is("(")) { const auto offset = Current().offset; value = {SyntaxExpression::Kind::Call, "", offset, {std::move(value)}}; auto arguments = ParseArguments(); value.children.insert(value.children.end(), std::make_move_iterator(arguments.begin()), std::make_move_iterator(arguments.end())); }
+            else if (Is("[")) {
+                const auto offset = Take().offset; auto first = ParseBinary(0);
+                if (Is(":")) { ++index; auto last = ParseBinary(0); if (!Is("]")) throw std::runtime_error("Expected ']' at " + std::to_string(offset)); ++index; value = {SyntaxExpression::Kind::Slice, "", offset, {std::move(value), std::move(first), std::move(last)}}; }
+                else { if (!Is("]")) throw std::runtime_error("Expected ']' at " + std::to_string(offset)); ++index; value = {SyntaxExpression::Kind::Index, "", offset, {std::move(value), std::move(first)}}; }
+            }
+            else break;
+        }
+        return value;
+    }
+    const std::vector<SyntaxToken>& tokens_; size_t index{};
+};
+
 SyntaxToken ToSyntaxToken(const Token& value) { return {value.text, value.offset}; }
 SyntaxStatement ToSyntaxStatement(const Statement& value) {
-    SyntaxStatement result{static_cast<SyntaxStatement::Kind>(value.kind), value.name, value.type, {}, {}, {}, value.sourceOffset};
-    for (const auto& token : value.expression) result.expression.push_back(ToSyntaxToken(token));
+    SyntaxStatement result{static_cast<SyntaxStatement::Kind>(value.kind), value.name, value.type, {}, {}, {}, {}, value.sourceOffset};
+    for (const auto& token : value.expression) result.expressionTokens.push_back(ToSyntaxToken(token));
+    if (!result.expressionTokens.empty()) result.expression = ExpressionParser(result.expressionTokens).Parse();
     for (const auto& statement : value.body) result.body.push_back(ToSyntaxStatement(statement));
     for (const auto& statement : value.elseBody) result.elseBody.push_back(ToSyntaxStatement(statement));
     return result;
@@ -257,11 +325,13 @@ SyntaxFunction ToSyntaxFunction(const Function& value) {
 }
 SyntaxClass ToSyntaxClass(const Class& value) {
     SyntaxClass result{value.name, value.baseName, {}, {}, value.offset};
-    for (const auto& field : value.fields) { SyntaxField converted{field.access, field.type, field.name, {}, field.offset}; for (const auto& token : field.initializer) converted.initializer.push_back(ToSyntaxToken(token)); result.fields.push_back(std::move(converted)); }
+    for (const auto& field : value.fields) { SyntaxField converted{field.access, field.type, field.name, {}, {}, field.offset}; for (const auto& token : field.initializer) converted.initializerTokens.push_back(ToSyntaxToken(token)); if (!converted.initializerTokens.empty()) converted.initializer = ExpressionParser(converted.initializerTokens).Parse(); result.fields.push_back(std::move(converted)); }
     for (const auto& function : value.functions) result.functions.push_back(ToSyntaxFunction(function));
     return result;
 }
 }
+
+SyntaxExpression ParseExpression(const std::vector<SyntaxToken>& tokens) { return ExpressionParser(tokens).Parse(); }
 
 SyntaxProgram ParseSyntax(std::string_view source) {
     const auto parsed = Parser(Lex(source)).Parse();

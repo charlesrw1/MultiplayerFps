@@ -20,6 +20,7 @@ std::unordered_map<std::string, std::string> documents;
 luasharp::Analysis AnalyzeForEditor(std::string text) {
     // Requests are sent before a user has finished a statement. Recover just
     // its trailing delimiters for semantic queries; diagnostics stay strict.
+    if (!text.empty() && text.back() == '.') text += "__incomplete";
     int parentheses = 0;
     for (const char character : text) { if (character == '(') ++parentheses; else if (character == ')' && parentheses > 0) --parentheses; }
     text.append(static_cast<size_t>(parentheses), ')');

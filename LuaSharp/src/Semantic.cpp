@@ -10,7 +10,7 @@ struct Analyzer {
     std::string_view source;
     Analysis result;
     std::unordered_set<std::string> knownTypes{"int", "float", "bool", "string", "table", "void", "Entity", "Component"};
-    std::vector<std::vector<SyntaxToken>> expressions;
+    std::vector<SyntaxExpression> expressions;
 
     std::pair<size_t, size_t> Position(size_t offset) const {
         offset = (std::min)(offset, source.size()); size_t line{}, character{}, start{};
@@ -25,29 +25,30 @@ struct Analyzer {
     }
     static std::string BaseType(std::string type) { while (type.ends_with("[]")) type.resize(type.size() - 2); return type; }
     static bool External(const std::string& type) { static const std::unordered_set<std::string> types{"int", "float", "bool", "string", "table", "Entity", "Component"}; return types.contains(BaseType(type)); }
-    static bool IsNumber(const std::vector<SyntaxToken>& expression) { return expression.size() == 1 && !expression[0].text.empty() && std::all_of(expression[0].text.begin(), expression[0].text.end(), [](unsigned char c) { return (c >= '0' && c <= '9') || c == '.' || c == '-'; }); }
-    bool Assignable(const std::string& expected, const std::vector<SyntaxToken>& expression) const {
-        if (expression.empty() || expression[0].text == "null" || expression[0].text == "{" || expression[0].text == "new") return true;
-        if (expected == "int") return IsNumber(expression) && expression[0].text.find('.') == std::string::npos;
+    static bool IsNumber(const SyntaxExpression& expression) { return expression.kind == SyntaxExpression::Kind::Number; }
+    bool Assignable(const std::string& expected, const SyntaxExpression& expression) const {
+        if (expression.kind == SyntaxExpression::Kind::Null || expression.kind == SyntaxExpression::Kind::Table || expression.kind == SyntaxExpression::Kind::New) return true;
+        if (expected == "int") return IsNumber(expression) && expression.text.find('.') == std::string::npos;
         if (expected == "float") return IsNumber(expression);
-        if (expected == "string") return expression[0].text.size() >= 2 && (expression[0].text.front() == '\"' || expression[0].text.front() == '\'');
-        if (expected == "bool") return expression[0].text == "true" || expression[0].text == "false";
+        if (expected == "string") return expression.kind == SyntaxExpression::Kind::String;
+        if (expected == "bool") return expression.kind == SyntaxExpression::Kind::Boolean;
         return true;
     }
-    void AddExpressionDiagnostics(const std::vector<SyntaxToken>& expression) {
-        for (size_t i{}; i + 2 < expression.size(); ++i) {
-            if (expression[i + 1].text != ".") continue;
-            const auto variable = result.variableTypes.find(expression[i].text); if (variable == result.variableTypes.end() || External(variable->second)) continue;
-            const auto members = result.members.find(BaseType(variable->second));
-            const bool exists = members != result.members.end() && std::any_of(members->second.begin(), members->second.end(), [&](const Symbol& member) { return member.name == expression[i + 2].text; });
-            if (!exists) Diagnostic("Unknown member '" + expression[i + 2].text + "' on " + BaseType(variable->second), expression[i + 2].offset, DiagnosticSeverity::Warning);
+    void AddExpressionDiagnostics(const SyntaxExpression& expression) {
+        if (expression.kind == SyntaxExpression::Kind::Member && !expression.children.empty() && expression.children[0].kind == SyntaxExpression::Kind::Identifier) {
+            const auto variable = result.variableTypes.find(expression.children[0].text);
+            if (variable != result.variableTypes.end() && !External(variable->second)) {
+                const auto members = result.members.find(BaseType(variable->second)); const bool exists = members != result.members.end() && std::any_of(members->second.begin(), members->second.end(), [&](const Symbol& member) { return member.name == expression.text; });
+                if (!exists) Diagnostic("Unknown member '" + expression.text + "' on " + BaseType(variable->second), expression.offset, DiagnosticSeverity::Warning);
+            }
         }
+        for (const auto& child : expression.children) AddExpressionDiagnostics(child);
     }
     void VisitStatement(const SyntaxStatement& statement) {
         if (statement.kind == SyntaxStatement::Kind::Local) {
             std::string type = statement.type;
-            if (type.empty() && statement.expression.size() >= 2 && statement.expression[0].text == "new") type = statement.expression[1].text;
-            if (!type.empty()) { AddSymbol(statement.name, type, SymbolKind::Variable, statement.offset); result.variableTypes[statement.name] = type; if (!Assignable(type, statement.expression)) Diagnostic("Cannot assign value to " + type, statement.expression.empty() ? statement.offset : statement.expression.front().offset); }
+            if (type.empty() && statement.expression.kind == SyntaxExpression::Kind::New) type = statement.expression.text;
+            if (!type.empty()) { AddSymbol(statement.name, type, SymbolKind::Variable, statement.offset); result.variableTypes[statement.name] = type; if (!Assignable(type, statement.expression)) Diagnostic("Cannot assign value to " + type, statement.expression.offset ? statement.expression.offset : statement.offset); }
         }
         expressions.push_back(statement.expression);
         for (const auto& child : statement.body) VisitStatement(child);
@@ -56,7 +57,7 @@ struct Analyzer {
     void VisitClass(const SyntaxClass& value) {
         knownTypes.insert(value.name); AddSymbol(value.name, value.name, SymbolKind::Class, value.offset);
         if (!value.baseName.empty()) result.baseTypes[value.name] = value.baseName;
-        for (const auto& field : value.fields) { AddSymbol(field.name, field.type, SymbolKind::Field, field.offset); result.variableTypes[field.name] = field.type; result.members[value.name].push_back(result.symbols.back()); expressions.push_back(field.initializer); if (!Assignable(field.type, field.initializer)) Diagnostic("Cannot assign value to " + field.type, field.initializer.empty() ? field.offset : field.initializer.front().offset); }
+        for (const auto& field : value.fields) { AddSymbol(field.name, field.type, SymbolKind::Field, field.offset); result.variableTypes[field.name] = field.type; result.members[value.name].push_back(result.symbols.back()); expressions.push_back(field.initializer); if (!field.initializerTokens.empty() && !Assignable(field.type, field.initializer)) Diagnostic("Cannot assign value to " + field.type, field.initializer.offset); }
         for (const auto& function : value.functions) {
             std::vector<std::string> parameters; for (const auto& parameter : function.parameters) parameters.push_back(parameter.type + " " + parameter.name);
             AddSymbol(function.name, function.returnType.empty() ? value.name : function.returnType, SymbolKind::Method, function.offset, parameters); result.members[value.name].push_back(result.symbols.back());

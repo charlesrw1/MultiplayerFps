@@ -34,7 +34,7 @@ int score(Entity entity) {
     Require(lua.find("---@field private target Entity?") != std::string::npos, "nullable field annotation missing");
     Require(lua.find("self.data = {}") != std::string::npos, "table field initializer missing");
     Require(lua.find("function Player:score(entity)") != std::string::npos, "method declaration missing");
-    Require(lua.find("if entity~=nil then") != std::string::npos, "if condition was not lowered to Lua");
+    Require(lua.find("if entity ~= nil then") != std::string::npos, "if condition was not lowered to Lua");
     Require(lua.find("return entity:getScore()") != std::string::npos, "method call was not lowered to colon syntax");
 }
 
@@ -99,12 +99,22 @@ void TestSharedSyntaxTree() {
 int health = 10;
 void move(int speed) { int distance = speed; }
 }
+
 auto child = new Child();
 )");
     Require(syntax.classes.size() == 1 && syntax.classes[0].baseName == "Component", "class inheritance was not parsed into syntax tree");
     Require(syntax.classes[0].fields.size() == 1 && syntax.classes[0].functions.size() == 1, "class members were not parsed into syntax tree");
     Require(syntax.classes[0].functions[0].parameters[0].name == "speed", "function parameter was not parsed into syntax tree");
     Require(syntax.classes[0].functions[0].body[0].type == "int", "typed local was not parsed into syntax tree");
+}
+
+void TestExpressionTree() {
+    const std::vector<luasharp::SyntaxToken> tokens{{"player", 0}, {".", 6}, {"move", 7}, {"(", 11}, {"1", 12}, {"+", 14}, {"2", 16}, {")", 17}, {"[", 18}, {"0", 19}, {"]", 20}};
+    const auto expression = luasharp::ParseExpression(tokens);
+    Require(expression.kind == luasharp::SyntaxExpression::Kind::Index, "index expression was not parsed");
+    Require(expression.children[0].kind == luasharp::SyntaxExpression::Kind::Call, "call expression was not parsed");
+    Require(expression.children[0].children[0].kind == luasharp::SyntaxExpression::Kind::Member, "member expression was not parsed");
+    Require(expression.children[0].children[1].kind == luasharp::SyntaxExpression::Kind::Binary, "binary precedence expression was not parsed");
 }
 }
 
@@ -118,6 +128,7 @@ int main() {
         {"semantic analysis", TestSemanticAnalysis},
         {"semantic diagnostics and parameters", TestSemanticDiagnosticsAndParameters},
         {"shared syntax tree", TestSharedSyntaxTree},
+        {"expression tree", TestExpressionTree},
     };
 
     for (const auto& [name, test] : tests) {
