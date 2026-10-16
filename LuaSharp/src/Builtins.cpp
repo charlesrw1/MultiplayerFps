@@ -69,6 +69,10 @@ const std::vector<BuiltinOperator> Operators{
     {"Transform", "*", "Transform", "Transform", {}}, {"Transform", "*", "Vec3", "Vec3", {}},
 };
 
+const std::vector<BuiltinFunction> Functions{
+    {"printf", "void", {{"string", "format"}}, true, "printf"},
+};
+
 std::string ElementType(std::string_view array) { return std::string(array.substr(0, array.size() - 2)); }
 
 } // namespace
@@ -105,6 +109,12 @@ std::optional<BuiltinOperator> FindBuiltinOperator(std::string_view left, std::s
     return found == Operators.end() ? std::nullopt : std::optional<BuiltinOperator>(*found);
 }
 
+const std::vector<BuiltinFunction>& BuiltinFunctions() { return Functions; }
+std::optional<BuiltinFunction> FindBuiltinFunction(std::string_view name) {
+    const auto found = std::find_if(Functions.begin(), Functions.end(), [&](const auto& value) { return value.name == name; });
+    return found == Functions.end() ? std::nullopt : std::optional<BuiltinFunction>(*found);
+}
+
 std::optional<std::string> BuiltinCastLowering(std::string_view target, std::string_view source) {
     if (target == source) return "cast_identity";
     if (target == "string") return "cast_string";
@@ -123,6 +133,19 @@ std::optional<std::string> BuiltinCastLowering(std::string_view target, std::str
         if (source == "bool") return "cast_number_bool";
         if (source == "string") return "cast_number_string";
     }
+    return std::nullopt;
+}
+
+std::optional<std::string> BuiltinDefaultValue(std::string_view type) {
+    if (type.ends_with("[]")) return "{}";
+    if (type == "int") return "0";
+    if (type == "float") return "0.0";
+    if (type == "bool") return "false";
+    if (type == "string") return "\"\"";
+    if (type == "table") return "{}";
+    if (type == "Vec3") return "Vec3.new()";
+    if (type == "Quat") return "Quat.identity()";
+    if (type == "Transform") return "Transform.identity()";
     return std::nullopt;
 }
 

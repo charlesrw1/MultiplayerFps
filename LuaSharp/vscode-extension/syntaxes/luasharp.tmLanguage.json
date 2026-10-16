@@ -6,6 +6,7 @@
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#declarations" },
+    { "include": "#members" },
     { "include": "#keywords" },
     { "include": "#types" },
     { "include": "#constants" },
@@ -33,13 +34,26 @@
             "1": { "name": "keyword.declaration.class.luasharp" },
             "3": { "name": "entity.name.type.class.luasharp" }
           }
+        },
+        {
+          "match": "\\b(enum)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.enum.luasharp" },
+            "3": { "name": "entity.name.type.enum.luasharp" }
+          }
         }
+      ]
+    },
+    "members": {
+      "patterns": [
+        { "match": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()", "name": "entity.name.function.method.luasharp" },
+        { "match": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*", "name": "variable.other.property.luasharp" }
       ]
     },
     "keywords": {
       "patterns": [
         { "match": "\\b(?:public|private)\\b", "name": "storage.modifier.luasharp" },
-        { "match": "\\b(?:if|else|return|new|auto)\\b", "name": "keyword.control.luasharp" },
+        { "match": "\\b(?:if|else|while|for|in|break|continue|return|new|auto)\\b", "name": "keyword.control.luasharp" },
         { "match": "\\bvoid\\b", "name": "keyword.other.void.luasharp" },
         { "match": "\\bthis\\b", "name": "variable.language.this.luasharp" }
       ]
@@ -62,7 +76,7 @@
     },
     "operators": {
       "patterns": [
-        { "match": "!=|==|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|[+\\-*/%=!<>]", "name": "keyword.operator.luasharp" }
+        { "match": "=>|\\.\\.|!=|==|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|[+\\-*/%=!<>]", "name": "keyword.operator.luasharp" }
       ]
     }
   }

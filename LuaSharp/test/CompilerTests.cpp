@@ -1,10 +1,12 @@
 #include "Compiler.h"
+#include "CBackend.h"
 #include "LspBridge.h"
 #include "Semantic.h"
 
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -15,12 +17,16 @@ void Require(bool condition, std::string_view message) {
     if (!condition) throw std::runtime_error(std::string(message));
 }
 
+long long NativeScale(void*, long long value) { return value * 3; }
+
 void TestTopLevelConstructorCall() {
-    Require(luasharp::Compile("auto m = new MyClass();") == "local m = MyClass.new()\n", "new expression was not lowered to .new()");
+    const auto lua = luasharp::Compile("class MyClass {}\nauto m = new MyClass();");
+    Require(lua.find("local m = MyClass.new()\n") != std::string::npos, "new expression was not lowered to .new()");
 }
 
 void TestClassEmission() {
-    const auto lua = luasharp::Compile(R"(class Player {
+    const auto lua = luasharp::Compile(R"(class Entity { int getScore() { return 0; } }
+class Player {
 private:
 Entity target = null;
 table data = {};
@@ -307,6 +313,539 @@ void TestNullAndOperatorDiagnostics() {
     const auto invalid = luasharp::Analyze("int value = null;\nbool missing = value != null;");
     Require(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.severity == luasharp::DiagnosticSeverity::Error; }) >= 2, "null was accepted for a primitive value");
 }
+
+void TestBoundTreeElseIfAndImplicitMembers() {
+    constexpr std::string_view source = R"(class Example {
+int value = 0;
+void helper() {}
+int classify(int input) {
+    if (input == 1) { return 10; }
+    else if (input == 2) { return 20; }
+    else { return 30; }
+}
+void update() { value = value + 1; helper(); }
+})";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid else-if or implicit members produced diagnostics");
+    Require(analysis.bound.classes.size() == 1 && analysis.bound.classes[0].functions.size() == 3, "bound semantic class tree was not built");
+    Require(analysis.bound.classes[0].functions[1].body[0].elseBody[0].kind == luasharp::SyntaxStatement::Kind::If, "else-if chain was not retained in the bound tree");
+    const auto lua = luasharp::Compile(source);
+    Require(lua.find("elseif input == 2 then") != std::string::npos, "else-if was not lowered to Lua elseif");
+    Require(lua.find("self.value = self.value + 1") != std::string::npos, "implicit field access was not lowered through self");
+    Require(lua.find("self:helper()") != std::string::npos, "implicit method call was not lowered through self");
+}
+
+void TestCoreSemanticGuards() {
+    const auto analysis = luasharp::Analyze(R"(class Invalid {
+void run() {
+    if (1) {}
+    1 = 2;
+    int value = 1;
+    value();
+}
+})");
+    const auto has = [&](std::string_view text) { return std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [&](const auto& diagnostic) { return diagnostic.message.find(text) != std::string::npos; }); };
+    Require(has("If condition must be 'bool'"), "non-boolean if condition was accepted");
+    Require(has("Invalid assignment target"), "non-lvalue assignment target was accepted");
+    Require(has("is not callable"), "non-callable value invocation was accepted");
+    try { static_cast<void>(luasharp::Compile("int value = \"wrong\";")); }
+    catch (const std::runtime_error&) { return; }
+    throw std::runtime_error("transpilation did not stop on semantic errors");
+}
+
+void TestClassContracts() {
+    const auto access = luasharp::Analyze(R"(class Base { private: int secret = 1; }
+class Child : Base { int reveal() { return secret; } }
+auto item = new Base();
+int leaked = item.secret;
+)");
+    Require(std::count_if(access.diagnostics.begin(), access.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("is private") != std::string::npos; }) == 2, "private access was not enforced for derived and external callers");
+
+    const auto overrideMismatch = luasharp::Analyze(R"(class Base { int read(int value) { return value; } }
+class Child : Base { string read(int value) { return "bad"; } }
+)");
+    Require(std::any_of(overrideMismatch.diagnostics.begin(), overrideMismatch.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("does not match the inherited signature") != std::string::npos; }), "incompatible override was accepted");
+
+    const auto lua = luasharp::Compile(R"(class Base { int inherited = 1; }
+class Child : Base {}
+auto child = new Child();
+)");
+    Require(lua.find("local self = setmetatable(Base.new(), Child)") != std::string::npos, "derived constructor did not initialize its base class");
+
+    const auto requiredBase = luasharp::Analyze("class Base { Base(int value) {} } class Child : Base {}");
+    Require(std::any_of(requiredBase.diagnostics.begin(), requiredBase.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("requires constructor arguments") != std::string::npos; }), "unsupported required base constructor was silently ignored");
+}
+
+void TestTypedDefaultsAndNullability() {
+    const auto lua = luasharp::Compile(R"(class Reference {}
+class Defaults {
+int count;
+float ratio;
+bool enabled;
+string name;
+table values;
+int[] items;
+Vec3 position;
+Reference reference;
+void locals() { int localCount; string localName; Reference localReference; }
+}
+)");
+    for (const auto& expected : {"self.count = 0", "self.ratio = 0.0", "self.enabled = false", "self.name = \"\"", "self.values = {}", "self.items = {}", "self.position = Vec3.new()", "self.reference = nil", "local localCount = 0", "local localName = \"\"", "local localReference = nil"})
+        Require(lua.find(expected) != std::string::npos, std::string("missing typed default: ") + expected);
+    const auto invalid = luasharp::Analyze("string text = null; Vec3 point = null;");
+    Require(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Cannot assign") != std::string::npos; }) == 2, "null was accepted for non-null built-in value types");
+}
+
+void TestLoopsAndPopulatedLists() {
+    constexpr std::string_view source = R"(int[] values = {1, 2, 3};
+int index = 0;
+while (index < values.size()) {
+    index += 1;
+}
+)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid while loop or populated list produced diagnostics");
+    const auto lua = luasharp::Compile(source);
+    Require(lua.find("local values = {1, 2, 3}") != std::string::npos, "populated list literal was not emitted");
+    Require(lua.find("while index < #(values) do") != std::string::npos, "while loop was not lowered");
+    const auto invalid = luasharp::Analyze("string[] values = {\"ok\", 2}; while (1) {}");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("List element 2 expects 'string'") != std::string::npos; }), "list element type mismatch was not diagnosed");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("While condition must be 'bool'") != std::string::npos; }), "non-boolean while condition was accepted");
+}
+
+void TestCompoundAssignmentsAndFlowWarnings() {
+    const auto analysis = luasharp::Analyze(R"(class Flow {
+int run() { return 1; int unreachable = 2; }
+}
+string text = "a";
+text += "b";
+Vec3 vector = Vec3.new();
+vector *= 2;
+)");
+    Require(std::none_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.severity == luasharp::DiagnosticSeverity::Error; }), "valid compound assignment produced an error");
+    Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.severity == luasharp::DiagnosticSeverity::Warning && diagnostic.message.find("Unreachable code") != std::string::npos; }), "unreachable statement was not warned");
+    const auto lua = luasharp::Compile(R"(string text = "a"; text += "b"; Vec3 vector = Vec3.new(); vector *= 2;)");
+    Require(lua.find("text = text .. \"b\"") != std::string::npos, "string compound concatenation used numeric addition");
+    Require(lua.find("vector = vector * 2") != std::string::npos, "native compound operator was not emitted");
+}
+
+void TestKeyedTableLiterals() {
+    constexpr std::string_view source = R"(table value = {name = "thing"; ["count"] = 2, [1 + 2] = true, 4};)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid keyed table literal produced diagnostics");
+    const auto lua = luasharp::Compile(source);
+    Require(lua.find("{name = \"thing\", [\"count\"] = 2, [1 + 2] = true, 4}") != std::string::npos, "keyed table entries were not emitted as Lua fields");
+
+    const auto invalid = luasharp::Analyze("int[] values = {first = 1};");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("cannot contain keyed entries") != std::string::npos; }), "keyed entry was accepted in a typed list literal");
+}
+
+void TestForBreakAndContinue() {
+    constexpr std::string_view source = R"(int sum = 0;
+for (int i = 0; i < 3; i += 1) {
+    if (i == 1) { continue; }
+    sum += i;
+}
+while (true) { break; }
+)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid for/break/continue statements produced diagnostics");
+    const auto lua = luasharp::Compile(source);
+    Require(lua.find("local i = 0") != std::string::npos && lua.find("while i < 3 do") != std::string::npos, "for loop was not lowered");
+    Require(lua.find("goto __luasharp_continue_") != std::string::npos, "continue was not lowered to a scoped label");
+    Require(lua.find("i = i + 1") != std::string::npos, "for increment was not emitted after the continue label");
+    Require(lua.find("break") != std::string::npos, "break was not emitted");
+
+    const auto outOfScope = luasharp::Analyze("for (int i = 0; i < 1; i += 1) {} i = 2;");
+    Require(std::any_of(outOfScope.diagnostics.begin(), outOfScope.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Unknown identifier 'i'") != std::string::npos; }), "for initializer escaped its loop scope");
+    const auto invalid = luasharp::Analyze("break; continue;");
+    Require(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("inside a loop") != std::string::npos; }) == 2, "out-of-loop break/continue were not diagnosed");
+}
+
+void TestForEachAndRangeLoops() {
+    constexpr std::string_view source = R"(int[] values = {1, 2, 3};
+table entries = {one = 1, two = 2};
+int total = 0;
+for (value in values) { total += value; }
+for (index, value in values) { total += index; total += value; }
+for (key, value in entries) { key = key; value = value; }
+for (i in 1..10) {
+    if (i == 3) { continue; }
+    if (i == 8) { break; }
+    total += i;
+}
+)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid list, table, or range loop produced diagnostics");
+    const auto lua = luasharp::Compile(source);
+    Require(lua.find("for _, value in ipairs(values) do") != std::string::npos, "list range loop did not use ipairs");
+    Require(lua.find("in ipairs(values) do") != std::string::npos && lua.find("local index = __luasharp_index_") != std::string::npos, "indexed list loop did not expose a zero-based index");
+    Require(lua.find("for key, value in pairs(entries) do") != std::string::npos, "table range loop did not use pairs");
+    Require(lua.find("for i = 1, 10 do") != std::string::npos, "integer range loop was not emitted inclusively");
+    Require(lua.find("goto __luasharp_continue_") != std::string::npos, "continue did not work in a range loop");
+
+    const auto invalid = luasharp::Analyze(R"(int[] values = {};
+table entries = {};
+for (value in entries) {}
+for (i in 1.5..3) {}
+for (value in 4) {}
+value = 1;
+)");
+    for (const auto message : {"Table loops require key and value", "Range bounds must be 'int'", "is not iterable", "Unknown identifier 'value'"}) {
+        Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [&](const auto& diagnostic) { return diagnostic.message.find(message) != std::string::npos; }), std::string("missing foreach diagnostic: ") + message);
+    }
+}
+
+void TestEnums() {
+    constexpr std::string_view source = R"(enum Direction {
+    North,
+    East = 5;
+    South,
+    Reverse = -2
+}
+Direction direction = Direction.North;
+Direction defaultDirection;
+direction = Direction.South;
+bool east = direction == Direction.East;
+)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid enum declaration or access produced diagnostics");
+    Require(analysis.members.contains("$type:Direction") && analysis.members.at("$type:Direction").size() == 4, "enum members were not registered for completion");
+    const auto lua = luasharp::Compile(source);
+    for (const auto expected : {"---@enum Direction", "North = 0", "East = 5", "South = 6", "Reverse = -2", "local direction = Direction.North", "local defaultDirection = 0"})
+        Require(lua.find(expected) != std::string::npos, std::string("missing enum lowering: ") + expected);
+
+    const auto invalid = luasharp::Analyze(R"(enum Empty {}
+enum Bad { Same, Same, Fraction = 1.5 }
+Bad value = 1;
+Bad missing = Bad.Nope;
+Bad nilValue = null;
+Bad constructed = new Bad();
+)");
+    for (const auto message : {"must declare at least one member", "already declared", "integer constants", "Cannot assign", "Unknown member", "cannot be constructed"})
+        Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [&](const auto& diagnostic) { return diagnostic.message.find(message) != std::string::npos; }), std::string("missing enum diagnostic: ") + message);
+}
+
+void TestLambdas() {
+    constexpr std::string_view source = R"(int threshold = 2;
+auto even = n => n % 2 == 0;
+auto getter = ent => ent.get_value();
+auto distanceSquared = (x, y) => x * x + y * y;
+auto captured = n => n > threshold;
+auto classify = n => {
+    string label = "small";
+    if (n > 10) { return "large"; }
+    return label;
+};
+auto noop = () => {
+    int localValue = threshold;
+};
+table mytable2 = {};
+auto func4 = () => {
+    mytable2["abc"] = 0;
+};
+bool isEven = even(4);
+string category = classify(12);
+noop();
+auto value = getter({});
+auto distance = distanceSquared(3, 4);
+)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid lambdas, calls, or captures produced diagnostics");
+    const auto evenType = luasharp::ResolveVariableType(analysis, "even", source.find("even(4)"));
+    Require(evenType && evenType->find("$function:1:bool") == 0, "lambda return type was not inferred");
+    const auto lua = luasharp::Compile(source);
+    for (const auto expected : {"local even = function(n) return n % 2 == 0 end", "local getter = function(ent) return ent:get_value() end", "local distanceSquared = function(x, y) return x * x + y * y end", "local captured = function(n) return n > threshold end"})
+        Require(lua.find(expected) != std::string::npos, std::string("missing lambda lowering: ") + expected);
+    Require(lua.find("local classify = function(n)\n") != std::string::npos && lua.find("return \"large\"") != std::string::npos && lua.find("return label") != std::string::npos, "multiline lambda body was not emitted");
+    Require(lua.find("local noop = function()\n") != std::string::npos, "empty-return block lambda was not emitted");
+    Require(lua.find("local func4 = function()\n    mytable2[\"abc\"] = 0\nend") != std::string::npos, "captured table assignment in a void block lambda was not emitted");
+
+    const auto invalid = luasharp::Analyze(R"(auto pair = (x, x) => x;
+pair(1);
+pair(1, 2, 3);
+auto inconsistent = n => { if (true) { return 1; } return "bad"; };
+auto incomplete = n => { if (true) { return 1; } };
+auto mixed = n => { if (true) { return; } return 1; };
+auto empty = () => {};
+auto invalidVoid = empty();
+)" );
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("already declared") != std::string::npos; }), "duplicate lambda parameter was not diagnosed");
+    Require(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("argument(s) for lambda") != std::string::npos; }) == 2, "lambda arity mismatches were not diagnosed");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("return types are inconsistent") != std::string::npos; }), "inconsistent block-lambda returns were not diagnosed");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Not all lambda code paths") != std::string::npos; }), "missing block-lambda return path was not diagnosed");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("mix value and valueless") != std::string::npos; }), "mixed block-lambda returns were not diagnosed");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("void expression") != std::string::npos; }), "void lambda result was accepted as an auto initializer");
+}
+
+void TestCBackendEmission() {
+    constexpr std::string_view source = R"(enum Mode { Off, On = 4 }
+class Calculator {
+    int base = 3;
+    Calculator(int initial) { base = initial; }
+    int add(int value) {
+        if (value < 0) { return base; }
+        int total = base;
+        for (int i = 0; i < value; i += 1) { total += 1; }
+        return total;
+    }
+    bool has(string text, string part) { return text.contains(part); }
+}
+)";
+    const auto generated = luasharp::CompileToC(source);
+    for (const auto expected : {
+        "#define LS_Mode_On ((ls_int)4)",
+        "struct LS_Calculator",
+        "LS_Calculator* ls_Calculator_new(ls_int initial)",
+        "ls_int ls_Calculator_add(LS_Calculator* self, ls_int value)",
+        "self->base = initial",
+        "while ((i < value))",
+        "ls_string_contains(text, part)",
+        "int ls_module_init(void)"})
+        Require(generated.c.find(expected) != std::string::npos, std::string("missing native C lowering: ") + expected);
+    Require(std::any_of(generated.exports.begin(), generated.exports.end(), [](const auto& value) { return value.symbolName == "ls_Calculator_add" && value.returnType == "int"; }), "native method export metadata is missing");
+
+    try { static_cast<void>(luasharp::CompileToC("int[] values = {};")); }
+    catch (const std::runtime_error& error) {
+        Require(std::string_view(error.what()).find("Native C backend does not support") != std::string_view::npos, "native unsupported-type error is unclear");
+        return;
+    }
+    throw std::runtime_error("native backend silently accepted an unsupported list");
+}
+
+void TestLibTccIntegrationWhenAvailable() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(class Calculator {
+        int base = 1;
+        Calculator(int initial) { base = initial; }
+        int add(int value) { return base + value; }
+    })");
+    using Create = void* (*)(long long);
+    using Add = long long (*)(void*, long long);
+    const auto create = reinterpret_cast<Create>(module.FindSymbol("ls_Calculator_new"));
+    const auto add = reinterpret_cast<Add>(module.FindSymbol("ls_Calculator_add"));
+    Require(create && add, "libtcc module symbols were not exported");
+    Require(add(create(7), 5) == 12, "libtcc-compiled LuaSharp method returned the wrong result");
+}
+
+void TestNativeStateArithmeticAndHostSymbols() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+
+    auto state = luasharp::NativeModule::Compile(R"(int counter = 40;
+counter += 2;
+float fraction = 5 / 2;
+int remainder = -5 % 3;
+int wrapped = 9223372036854775807 + 1;
+)");
+    const auto counter = static_cast<long long*>(state.FindGlobal("counter"));
+    const auto fraction = static_cast<double*>(state.FindGlobal("fraction"));
+    const auto remainder = static_cast<long long*>(state.FindGlobal("remainder"));
+    const auto wrapped = static_cast<long long*>(state.FindGlobal("wrapped"));
+    Require(counter && *counter == 42, "persistent native module integer state is wrong");
+    Require(fraction && *fraction == 2.5, "native int division did not preserve LuaSharp's float result");
+    Require(remainder && *remainder == 1, "native modulo does not match Lua semantics for negative values");
+    Require(wrapped && *wrapped == (-9223372036854775807LL - 1), "native integer overflow did not wrap deterministically");
+    Require(state.FindGlobal("missing") == nullptr, "missing native global unexpectedly resolved");
+
+    luasharp::ExternalType engine; engine.name = "EngineApi";
+    luasharp::Symbol scale; scale.name = "scale"; scale.type = "int"; scale.kind = luasharp::SymbolKind::Method; scale.parameters = {"int value"}; scale.owner = engine.name;
+    engine.members.push_back(scale);
+    luasharp::NativeCompileOptions options;
+    options.externalTypes.push_back(engine);
+    options.symbols.push_back({"ls_EngineApi_scale", reinterpret_cast<const void*>(&NativeScale)});
+    auto external = luasharp::NativeModule::Compile(R"(class Runner {
+        int invoke(EngineApi api, int value) { return api.scale(value); }
+    })", options);
+    using Create = void* (*)();
+    using Invoke = long long (*)(void*, void*, long long);
+    const auto create = reinterpret_cast<Create>(external.FindSymbol("ls_Runner_new"));
+    const auto invoke = reinterpret_cast<Invoke>(external.FindSymbol("ls_Runner_invoke"));
+    Require(create && invoke && invoke(create(), nullptr, 7) == 21, "registered native host symbol was not called correctly");
+
+    auto errors = luasharp::NativeModule::Compile(R"(class Arithmetic {
+        int remainder(int left, int right) { return left % right; }
+    })");
+    using Remainder = long long (*)(void*, long long, long long);
+    const auto makeArithmetic = reinterpret_cast<Create>(errors.FindSymbol("ls_Arithmetic_new"));
+    const auto remainderFunction = reinterpret_cast<Remainder>(errors.FindSymbol("ls_Arithmetic_remainder"));
+    Require(makeArithmetic && remainderFunction && remainderFunction(makeArithmetic(), 8, 0) == 0, "remainder-by-zero fallback result is wrong");
+    Require(errors.LastError() == "integer remainder by zero", "native runtime error was not reported");
+    errors.ClearError();
+    Require(errors.LastError().empty(), "native runtime error could not be cleared");
+
+    try { static_cast<void>(luasharp::NativeModule::Compile("int invalid = 1 % 0;")); }
+    catch (const std::runtime_error& error) {
+        Require(std::string_view(error.what()).find("integer remainder by zero") != std::string_view::npos, "module initialization runtime error lost its cause");
+        return;
+    }
+    throw std::runtime_error("module initialization ignored a native runtime error");
+}
+
+void TestNativeReloadSlots() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto program = luasharp::ReloadableNativeProgram::Compile("class ReloadValue { int stored = 0; int read() { return 1; } }");
+    auto createSlot = program.FindFunction("ReloadValue.new");
+    auto readSlot = program.FindFunction("ReloadValue.read");
+    Require(createSlot && readSlot && readSlot.ReturnType() == "int" && readSlot.ParameterTypes() == std::vector<std::string>{"ReloadValue"}, "initial reload slots have incorrect metadata");
+    using Create = void* (*)();
+    using Read = long long (*)(void*);
+    auto create = reinterpret_cast<Create>(createSlot.Load());
+    void* instance = create();
+    Require(reinterpret_cast<Read>(readSlot.Load())(instance) == 1, "initial function slot called the wrong implementation");
+
+    program.Reload("class ReloadValue { int stored = 0; int read() { return 2; } int added() { return 3; } }");
+    Require(program.Generation() == 2, "native reload generation did not advance");
+    Require(reinterpret_cast<Read>(readSlot.Load())(instance) == 2, "stable function slot did not switch implementations");
+    Require(static_cast<bool>(program.FindFunction("ReloadValue.added")), "new export was not added during reload");
+
+    bool rejectedLayout = false;
+    try { program.Reload("class ReloadValue { string stored = \"\"; int read() { return 2; } int added() { return 3; } }"); }
+    catch (const std::runtime_error& error) {
+        rejectedLayout = std::string_view(error.what()).find("changed native layout") != std::string_view::npos;
+    }
+    Require(rejectedLayout && program.Generation() == 2 && reinterpret_cast<Read>(readSlot.Load())(instance) == 2, "layout-changing reload mutated the active program");
+
+    try { program.Reload("class ReloadValue { int stored = 0; float read() { return 2.0; } int added() { return 3; } }"); }
+    catch (const std::runtime_error& error) {
+        Require(std::string_view(error.what()).find("changed native signature") != std::string_view::npos, "signature-changing reload produced the wrong error");
+        Require(program.Generation() == 2 && reinterpret_cast<Read>(readSlot.Load())(instance) == 2, "failed reload mutated the active program");
+        return;
+    }
+    throw std::runtime_error("signature-changing native reload was accepted");
+}
+
+void TestNativeGarbageCollection() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    luasharp::NativeCompileOptions options;
+    options.runtime = runtime;
+    auto module = luasharp::NativeModule::Compile(R"(
+class Leaf {}
+class Holder { Leaf leaf = new Leaf(); }
+Leaf rooted = new Leaf();
+)", options);
+
+    Require(runtime->AllocationCount() == 1, "module initialization did not allocate its rooted object");
+    Require(runtime->Collect() == 0 && runtime->AllocationCount() == 1, "module object global was not traced as a GC root");
+
+    using Create = void* (*)();
+    const auto createHolder = reinterpret_cast<Create>(module.FindSymbol("ls_Holder_new"));
+    Require(createHolder != nullptr, "GC test constructor was not exported");
+    void* holder = createHolder();
+    Require(runtime->AllocationCount() == 3, "nested managed objects were not allocated through NativeRuntime");
+    runtime->Pin(holder);
+    Require(runtime->Collect() == 0 && runtime->AllocationCount() == 3, "pinned object graph was not traced transitively");
+    runtime->Unpin(holder);
+    Require(runtime->Collect() == 2 && runtime->AllocationCount() == 1, "unreachable managed object graph was not reclaimed");
+}
+
+void TestNativeInternedStrings() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    struct NativeString { long long length; char data[1]; };
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        auto module = luasharp::NativeModule::Compile(R"(
+string first = "shared";
+string second = "shared";
+bool same = first == second;
+bool contains = first.contains("are");
+)", options);
+        const auto first = *static_cast<NativeString**>(module.FindGlobal("first"));
+        const auto second = *static_cast<NativeString**>(module.FindGlobal("second"));
+        Require(first && first == second, "equal native strings were not interned to one object");
+        Require(first->length == 6 && std::string_view(first->data, 6) == "shared", "interned native string has the wrong layout or contents");
+        Require(*static_cast<unsigned char*>(module.FindGlobal("same")) == 1, "interned string equality failed");
+        Require(*static_cast<unsigned char*>(module.FindGlobal("contains")) == 1, "managed string method failed");
+        Require(runtime->AllocationCount() == 2, "string interning did not deduplicate repeated literals");
+        Require(runtime->Collect() == 1 && runtime->AllocationCount() == 1, "string GC did not preserve rooted globals and reclaim temporary literals");
+    }
+    Require(runtime->Collect() == 1 && runtime->AllocationCount() == 0, "unreferenced interned strings were not collectible");
+}
+
+void TestNativeTables() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    struct NativeString { long long length; char data[1]; };
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        constexpr std::string_view tableSource = R"(
+class Item { int value = 9; }
+table values = { name = "bob", ["score"] = 4, [2] = new Item() };
+values["updated"] = "yes";
+auto name = values["name"];
+auto score = values["score"];
+auto object = values[2];
+)";
+        auto module = luasharp::NativeModule::Compile(tableSource, options);
+        const auto name = *static_cast<luasharp::NativeValue*>(module.FindGlobal("name"));
+        const auto score = *static_cast<luasharp::NativeValue*>(module.FindGlobal("score"));
+        const auto object = *static_cast<luasharp::NativeValue*>(module.FindGlobal("object"));
+        Require(name.kind == luasharp::NativeValueKind::String && name.as.pointer, "table string value was not tagged correctly");
+        const auto text = static_cast<NativeString*>(name.as.pointer);
+        Require(text->length == 3 && std::string_view(text->data, 3) == "bob", "table returned the wrong string value");
+        Require(score.kind == luasharp::NativeValueKind::Int && score.as.integer == 4, "table returned the wrong integer value");
+        Require(object.kind == luasharp::NativeValueKind::Object && object.as.pointer, "table returned the wrong managed object value");
+        Require(runtime->Collect() == 0, "rooted table did not trace its managed keys and values");
+    }
+    Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "table object graph was not reclaimed after module unload");
+}
+
+void TestNativeClosures() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        auto module = luasharp::NativeModule::Compile(R"(
+class Capture {
+    int run() {
+        int base = 5;
+        auto get = () => base;
+        return get();
+    }
+}
+table values = {};
+auto setter = () => { values["abc"] = 7; };
+auto even = n => n % 2 == 0;
+auto sumSquares = (x, y) => x * x + y * y;
+setter();
+auto result = values["abc"];
+bool isEven = even(8);
+auto squared = sumSquares(3, 4);
+)", options);
+        const auto result = *static_cast<luasharp::NativeValue*>(module.FindGlobal("result"));
+        Require(result.kind == luasharp::NativeValueKind::Int && result.as.integer == 7, "native closure did not execute its body");
+        Require(*static_cast<unsigned char*>(module.FindGlobal("isEven")) == 1, "parameterized native closure returned the wrong boolean");
+        const auto squared = *static_cast<luasharp::NativeValue*>(module.FindGlobal("squared"));
+        Require(squared.kind == luasharp::NativeValueKind::Int && squared.as.integer == 25, "dynamic closure arithmetic returned the wrong value");
+        using Create = void* (*)();
+        using Run = long long (*)(void*);
+        const auto create = reinterpret_cast<Create>(module.FindSymbol("ls_Capture_new"));
+        const auto run = reinterpret_cast<Run>(module.FindSymbol("ls_Capture_run"));
+        Require(create && run && run(create()) == 5, "native closure did not retain its local capture");
+        Require(runtime->Collect() == 3, "collection did not reclaim the temporary instance, closure, and capture environment");
+    }
+    Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "native closure graph was not reclaimed after module unload");
+}
+
+void TestPrintfBuiltin() {
+    constexpr std::string_view source = R"(printf("i=%d f=%f s=%s b=%b %%\n", -7, 2.5, "ok", true);)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid printf call produced diagnostics");
+    Require(luasharp::Compile(source).find("io.write(string.format(") != std::string::npos, "printf was not lowered for Lua");
+    const auto invalid = luasharp::Analyze("printf(1);");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& value) { return value.message.find("expects 'string'") != std::string::npos; }), "printf accepted a non-string format");
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    std::ostringstream output;
+    auto* previous = std::cout.rdbuf(output.rdbuf());
+    try { auto module = luasharp::NativeModule::Compile(source); }
+    catch (...) { std::cout.rdbuf(previous); throw; }
+    std::cout.rdbuf(previous);
+    Require(output.str() == "i=-7 f=2.5 s=ok b=true %\n", "native printf produced unexpected output: " + output.str());
+}
 }
 
 int main() {
@@ -335,6 +874,26 @@ int main() {
         {"dynamic table semantics", TestDynamicTableSemantics},
         {"native math types and operators", TestNativeMathTypesAndOperators},
         {"null and operator diagnostics", TestNullAndOperatorDiagnostics},
+        {"bound tree, else-if, and implicit members", TestBoundTreeElseIfAndImplicitMembers},
+        {"core semantic guards", TestCoreSemanticGuards},
+        {"class contracts", TestClassContracts},
+        {"typed defaults and nullability", TestTypedDefaultsAndNullability},
+        {"loops and populated lists", TestLoopsAndPopulatedLists},
+        {"compound assignments and flow warnings", TestCompoundAssignmentsAndFlowWarnings},
+        {"keyed table literals", TestKeyedTableLiterals},
+        {"for, break, and continue", TestForBreakAndContinue},
+        {"foreach and range loops", TestForEachAndRangeLoops},
+        {"enums", TestEnums},
+        {"lambdas", TestLambdas},
+        {"C backend emission", TestCBackendEmission},
+        {"libtcc integration", TestLibTccIntegrationWhenAvailable},
+        {"native state, arithmetic, and host symbols", TestNativeStateArithmeticAndHostSymbols},
+        {"native reload slots", TestNativeReloadSlots},
+        {"native garbage collection", TestNativeGarbageCollection},
+        {"native interned strings", TestNativeInternedStrings},
+        {"native tables", TestNativeTables},
+        {"native closures", TestNativeClosures},
+        {"printf builtin", TestPrintfBuiltin},
     };
 
     for (const auto& [name, test] : tests) {

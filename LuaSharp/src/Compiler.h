@@ -26,17 +26,21 @@ struct SyntaxDiagnostic {
     TextSpan span;
 };
 
+struct SyntaxParameter { std::string type; std::string name; TextSpan span; };
+struct SyntaxStatement;
 struct SyntaxExpression {
     enum class Kind {
-        Missing, Identifier, Number, String, Null, Boolean, Table, New,
-        Member, Call, Index, Slice, Unary, Binary, Assignment, Parenthesized
+        Missing, Identifier, Number, String, Null, Boolean, Table, TableEntry, New,
+        Member, Call, Index, Slice, Range, Lambda, Unary, Binary, Assignment, Parenthesized
     } kind{Kind::Missing};
     std::string text;
     TextSpan span;
     std::vector<SyntaxExpression> children;
+    std::vector<SyntaxParameter> parameters;
+    std::vector<SyntaxStatement> lambdaBody;
+    bool lambdaIsBlock{};
 };
 
-struct SyntaxParameter { std::string type; std::string name; TextSpan span; };
 struct SyntaxField {
     std::string access;
     std::string type;
@@ -45,12 +49,16 @@ struct SyntaxField {
     TextSpan span;
 };
 struct SyntaxStatement {
-    enum class Kind { If, Return, Local, Expression } kind{Kind::Expression};
+    enum class Kind { If, While, For, ForEach, Break, Continue, Return, Local, Expression } kind{Kind::Expression};
     std::string name;
+    std::string secondName;
     std::string type;
     TextSpan nameSpan;
+    TextSpan secondNameSpan;
     bool inferredType{};
     SyntaxExpression expression;
+    SyntaxExpression increment;
+    std::vector<SyntaxStatement> initializer;
     std::vector<SyntaxStatement> body;
     std::vector<SyntaxStatement> elseBody;
     TextSpan span;
@@ -71,7 +79,20 @@ struct SyntaxClass {
     std::vector<SyntaxFunction> functions;
     TextSpan span;
 };
+struct SyntaxEnumMember {
+    std::string name;
+    TextSpan nameSpan;
+    SyntaxExpression initializer;
+    TextSpan span;
+};
+struct SyntaxEnum {
+    std::string name;
+    TextSpan nameSpan;
+    std::vector<SyntaxEnumMember> members;
+    TextSpan span;
+};
 struct SyntaxProgram {
+    std::vector<SyntaxEnum> enums;
     std::vector<SyntaxClass> classes;
     std::vector<SyntaxStatement> topLevel;
     TextSpan span;

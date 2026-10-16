@@ -1,0 +1,57 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <string_view>
+
+namespace luasharp {
+
+using NativeTraceFunction = void (*)(void* runtimeContext, void* object);
+using NativeFinalizeFunction = void (*)(void* object);
+using NativeRootTraceFunction = void (*)(void* runtimeContext);
+
+enum class NativeValueKind : std::uint64_t { Null, Int, Float, Bool, String, Object, Table, Closure };
+struct NativeValue {
+    NativeValueKind kind{NativeValueKind::Null};
+    union { std::int64_t integer; double number; std::uint64_t boolean; void* pointer; } as{};
+};
+
+// Shared, non-moving native heap. Collection is stop-the-world: callers must
+// not execute generated code concurrently with Collect().
+class NativeRuntime : public std::enable_shared_from_this<NativeRuntime> {
+public:
+    NativeRuntime();
+    ~NativeRuntime();
+    NativeRuntime(const NativeRuntime&) = delete;
+    NativeRuntime& operator=(const NativeRuntime&) = delete;
+
+    static std::shared_ptr<NativeRuntime> Create();
+
+    void* Allocate(size_t size, NativeTraceFunction trace = nullptr, NativeFinalizeFunction finalize = nullptr);
+    void Mark(void* object);
+    size_t Collect();
+
+    void Pin(void* object);
+    void Unpin(void* object);
+    size_t RegisterRoots(NativeRootTraceFunction trace);
+    void UnregisterRoots(size_t registration);
+
+    void* Intern(std::string_view utf8);
+    [[nodiscard]] size_t AllocationCount() const;
+    [[nodiscard]] size_t AllocatedBytes() const;
+
+    void ReportError(std::string_view message);
+    [[nodiscard]] std::string LastError() const;
+    void ClearError();
+
+    // Internal ABI table passed to generated modules.
+    [[nodiscard]] void* Abi();
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+} // namespace luasharp

@@ -19,6 +19,14 @@ child.stdout.on("data", chunk => {
     while (true) { const split = buffer.indexOf("\r\n\r\n"); if (split < 0) return; const length = Number(/Content-Length:\s*(\d+)/i.exec(buffer.subarray(0, split).toString("ascii"))?.[1]); if (!Number.isFinite(length) || buffer.length < split + 4 + length) return; messages.push(JSON.parse(buffer.subarray(split + 4, split + 4 + length).toString("utf8"))); buffer = buffer.subarray(split + 4 + length); }
 });
 function send(message) { const body = JSON.stringify(message); child.stdin.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`); }
+function decodeSemanticTokens(data) {
+    const result = []; let line = 0; let character = 0;
+    for (let index = 0; index < data.length; index += 5) {
+        line += data[index]; character = data[index] === 0 ? character + data[index + 1] : data[index + 1];
+        result.push({ line, character, length: data[index + 2], type: data[index + 3] });
+    }
+    return result;
+}
 async function waitFor(predicate, description) {
     const deadline = Date.now() + 10000;
     while (Date.now() < deadline) { const message = messages.find(predicate); if (message) return message; if (child.exitCode !== null) throw new Error(`Server exited ${child.exitCode}: ${stderr}`); await new Promise(resolve => setTimeout(resolve, 20)); }
@@ -44,6 +52,16 @@ try {
     send({ jsonrpc: "2.0", id: 3, method: "textDocument/semanticTokens/full", params: { textDocument: { uri } } });
     const tokens = await waitFor(m => m.id === 3, "semantic tokens");
     assert.ok(tokens.result.data.length >= 5, "semantic tokens were empty");
+    const decodedTokens = decodeSemanticTokens(tokens.result.data);
+    const sourceLines = source.split("\n");
+    for (const [lineText, occurrence] of [["Entity e = null;", "field"], ["Entity[] array = null;", "list field"], ["int myfunc(Entity e) {", "parameter"], ["auto m = new MyClass();", "constructor"]]) {
+        const line = sourceLines.indexOf(lineText); const name = lineText.includes("MyClass") ? "MyClass" : "Entity"; const character = lineText.indexOf(name);
+        assert.ok(decodedTokens.some(token => token.line === line && token.character === character && token.length === name.length && token.type === 1), `${occurrence} class type reference was not emitted as a semantic type token`);
+    }
+    for (const lineText of ["int integer;", "float number;", "table mytable = {};"]) {
+        const line = sourceLines.indexOf(lineText); const name = lineText.split(" ")[0];
+        assert.equal(decodedTokens.some(token => token.line === line && token.character === 0 && token.length === name.length && token.type === 1), false, `${name} must retain grammar-provided built-in coloring`);
+    }
     const referenceLine = source.split("\n").length;
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 3 }, contentChanges: [{ text: `${source}\nMyClass` }] } });
     send({ jsonrpc: "2.0", id: 4, method: "textDocument/definition", params: { textDocument: { uri }, position: { line: referenceLine, character: 2 } } });
@@ -81,5 +99,72 @@ try {
     send({ jsonrpc: "2.0", id: 8, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: nativeCompletionSource.split("\n").length - 1, character: 5 } } });
     const nativeCompletion = await waitFor(m => m.id === 8, "native static completion");
     assert.ok(nativeCompletion.result.some(item => item.label.startsWith("new(")) && nativeCompletion.result.some(item => item.label.startsWith("splat(")), "native static methods missing from completion");
-    console.log("PASS native LSP: diagnostics, definitions, tokens, signatures, and class/string/list/native completions");
+    const listHoverSource = `${source}\nint[] values = {};\nvalues.push_back(1);`;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 11 }, contentChanges: [{ text: listHoverSource }] } });
+    send({ jsonrpc: "2.0", id: 9, method: "textDocument/hover", params: { textDocument: { uri }, position: { line: listHoverSource.split("\n").length - 1, character: 10 } } });
+    const listHover = await waitFor(m => m.id === 9, "list method hover");
+    assert.match(listHover.result.contents.value, /void push_back\(int value\)/, "list method hover must include its return type and parameters");
+    const partialSource = `${source}\nint[] partialValues = {};\npartialValues.pu`;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 12 }, contentChanges: [{ text: partialSource }] } });
+    send({ jsonrpc: "2.0", id: 10, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: partialSource.split("\n").length - 1, character: "partialValues.pu".length } } });
+    const partialCompletion = await waitFor(m => m.id === 10, "partial member completion");
+    assert.ok(partialCompletion.result.some(item => item.label.startsWith("push_back(")), "member completion failed after a typed prefix");
+
+    const constructorSource = `${source}\nnew MyClass(`;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 13 }, contentChanges: [{ text: constructorSource }] } });
+    send({ jsonrpc: "2.0", id: 11, method: "textDocument/signatureHelp", params: { textDocument: { uri }, position: { line: constructorSource.split("\n").length - 1, character: "new MyClass(".length } } });
+    const constructorSignature = await waitFor(m => m.id === 11, "constructor signature");
+    assert.match(constructorSignature.result.signatures[0].label, /MyClass\(\) -> MyClass/, "constructor signature help was missing");
+
+    const implicitSource = "class Signatures { void target(int count) {} void caller() { target( } }";
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 14 }, contentChanges: [{ text: implicitSource }] } });
+    send({ jsonrpc: "2.0", id: 12, method: "textDocument/signatureHelp", params: { textDocument: { uri }, position: { line: 0, character: implicitSource.indexOf("target(", 30) + "target(".length } } });
+    const implicitSignature = await waitFor(m => m.id === 12, "implicit method signature");
+    assert.match(implicitSignature.result.signatures[0].label, /target\(int count\) -> void/, "implicit method signature help was missing");
+
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 15 }, contentChanges: [{ text: source }] } });
+    const entityFieldLine = source.split("\n").indexOf("Entity e = null;");
+    send({ jsonrpc: "2.0", id: 13, method: "textDocument/references", params: { textDocument: { uri }, position: { line: entityFieldLine, character: 2 }, context: { includeDeclaration: true } } });
+    const references = await waitFor(m => m.id === 13, "class references");
+    assert.ok(references.result.length >= 4, "class type references were not returned");
+    send({ jsonrpc: "2.0", id: 14, method: "textDocument/rename", params: { textDocument: { uri }, position: { line: entityFieldLine, character: 2 }, newName: "Actor" } });
+    const rename = await waitFor(m => m.id === 14, "class rename");
+    assert.equal(rename.result.changes[uri].length, references.result.length, "rename did not cover every class reference");
+    send({ jsonrpc: "2.0", id: 15, method: "textDocument/documentSymbol", params: { textDocument: { uri } } });
+    const documentSymbols = await waitFor(m => m.id === 15, "document symbols");
+    assert.ok(documentSymbols.result.some(symbol => symbol.name === "MyClass") && documentSymbols.result.some(symbol => symbol.name === "myfunc"), "document symbols omitted class members");
+    send({ jsonrpc: "2.0", id: 16, method: "workspace/symbol", params: { query: "MyClass" } });
+    const workspaceSymbols = await waitFor(m => m.id === 16, "workspace symbols");
+    assert.ok(workspaceSymbols.result.some(symbol => symbol.name === "MyClass"), "workspace symbol search omitted an open document class");
+
+    const unicodeSource = 'string emoji = "😀"; int bad = "x";';
+    messages.splice(0);
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 16 }, contentChanges: [{ text: unicodeSource }] } });
+    const unicodeDiagnostics = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.diagnostics.some(d => /Cannot assign/.test(d.message)), "UTF-16 diagnostic");
+    assert.equal(unicodeDiagnostics.params.diagnostics.find(d => /Cannot assign/.test(d.message)).range.start.character, unicodeSource.indexOf('"x"'), "diagnostic character was not encoded as UTF-16");
+
+    const sharedUri = pathToFileURL(path.join(root, "LuaSharp", "shared-test.ls")).toString();
+    const consumerUri = pathToFileURL(path.join(root, "LuaSharp", "consumer-test.ls")).toString();
+    const sharedSource = "class Shared { int value; void set(int next) { value = next; } }";
+    const consumerSource = "Shared item = new Shared(); int current = item.value; item.set(2);";
+    messages.splice(0);
+    send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri: sharedUri, languageId: "luasharp", version: 1, text: sharedSource } } });
+    await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === sharedUri, "shared document diagnostics");
+    send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri: consumerUri, languageId: "luasharp", version: 1, text: consumerSource } } });
+    const consumerDiagnostics = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === consumerUri, "cross-file diagnostics");
+    assert.equal(consumerDiagnostics.params.diagnostics.some(d => /Unknown type|Unknown member/.test(d.message)), false, "cross-file types or members were not indexed");
+    send({ jsonrpc: "2.0", id: 17, method: "textDocument/definition", params: { textDocument: { uri: consumerUri }, position: { line: 0, character: 2 } } });
+    const crossDefinition = await waitFor(m => m.id === 17, "cross-file definition");
+    assert.equal(crossDefinition.result[0].uri, sharedUri, "cross-file type definition resolved to the wrong document");
+    send({ jsonrpc: "2.0", id: 18, method: "textDocument/references", params: { textDocument: { uri: consumerUri }, position: { line: 0, character: 2 }, context: { includeDeclaration: true } } });
+    const crossReferences = await waitFor(m => m.id === 18, "cross-file references");
+    assert.ok(crossReferences.result.some(location => location.uri === sharedUri) && crossReferences.result.some(location => location.uri === consumerUri), "cross-file references did not cover declaration and use sites");
+    const indexedUri = pathToFileURL(path.join(root, "LuaSharp", "indexed-test.ls")).toString();
+    const indexedConsumerUri = pathToFileURL(path.join(root, "LuaSharp", "indexed-consumer-test.ls")).toString();
+    send({ jsonrpc: "2.0", method: "luasharp/indexWorkspace", params: { documents: [{ uri: indexedUri, text: "class IndexedType { string label; }" }] } });
+    messages.splice(0);
+    send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri: indexedConsumerUri, languageId: "luasharp", version: 1, text: "IndexedType value = new IndexedType(); string label = value.label;" } } });
+    const indexedDiagnostics = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === indexedConsumerUri, "indexed workspace diagnostics");
+    assert.equal(indexedDiagnostics.params.diagnostics.some(d => /Unknown type|Unknown member/.test(d.message)), false, "unopened workspace files were not included in semantic indexing");
+    console.log("PASS native LSP: cross-file indexing, UTF-16 diagnostics, definitions, references, rename, symbols, tokens, signatures, hovers, and partial completions");
 } finally { child.kill(); }

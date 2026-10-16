@@ -1,4 +1,5 @@
 #include "Compiler.h"
+#include "Builtins.h"
 #include "Semantic.h"
 
 #include <algorithm>
@@ -11,7 +12,7 @@ namespace luasharp {
 namespace {
 
 const std::unordered_set<std::string> Keywords{
-    "class", "public", "private", "auto", "new", "if", "else", "return",
+    "class", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return",
     "null", "true", "false"
 };
 
@@ -88,7 +89,7 @@ private:
     }
     void LexSymbol(SyntaxTree& tree, size_t start) {
         static constexpr std::string_view symbols = "{}()[];:,.+-*/%=!<>";
-        static constexpr std::string_view pairs[] = {"!=", "==", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/="};
+        static constexpr std::string_view pairs[] = {"!=", "==", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=", "..", "=>"};
         for (const auto pair : pairs) {
             if (source_.substr(position_, 2) == pair) { position_ += 2; tree.tokens.push_back({SyntaxTokenKind::Symbol, std::string(pair), {start, 2}}); return; }
         }
@@ -115,6 +116,7 @@ public:
         while (!AtEnd()) {
             const size_t before = index_;
             if (Is("class")) program.classes.push_back(ParseClass());
+            else if (Is("enum")) program.enums.push_back(ParseEnum());
             else program.topLevel.push_back(ParseStatement());
             if (index_ == before) Advance();
         }
@@ -176,6 +178,36 @@ private:
             if (Is("else")) { Advance(); result.elseBody = Is("if") ? std::vector<SyntaxStatement>{ParseStatement()} : ParseBlock(); }
             result.span = Cover(start, PreviousSpan()); return result;
         }
+        if (Is("while")) {
+            Advance(); Match("("); auto condition = ParseExpression(); Match(")");
+            SyntaxStatement result; result.kind = SyntaxStatement::Kind::While; result.expression = std::move(condition); result.body = ParseBlock();
+            result.span = Cover(start, PreviousSpan()); return result;
+        }
+        if (Is("for")) {
+            Advance(); Match("("); SyntaxStatement result;
+            const bool forEach = Current().kind == SyntaxTokenKind::Identifier && (Is("in", 1) || (Is(",", 1) && Current(2).kind == SyntaxTokenKind::Identifier && Is("in", 3)));
+            if (forEach) {
+                result.kind = SyntaxStatement::Kind::ForEach;
+                const auto firstName = Advance(); result.name = firstName.text; result.nameSpan = firstName.span;
+                if (Is(",")) { Advance(); const auto secondName = Identifier("iteration variable"); result.secondName = secondName.text; result.secondNameSpan = secondName.span; }
+                Match("in"); auto iterable = ParseExpression();
+                if (Is("..")) { Advance(); auto end = ParseExpression(); iterable = {SyntaxExpression::Kind::Range, "..", Cover(iterable.span, end.span), {std::move(iterable), std::move(end)}}; }
+                result.expression = std::move(iterable); Match(")"); result.body = ParseBlock(); result.span = Cover(start, PreviousSpan()); return result;
+            }
+            result.kind = SyntaxStatement::Kind::For;
+            if (!Is(";")) result.initializer.push_back(ParseStatement());
+            else Advance();
+            if (!Is(";")) result.expression = ParseExpression();
+            else result.expression = {SyntaxExpression::Kind::Boolean, "true", Current().span, {}};
+            Match(";");
+            if (!Is(")")) result.increment = ParseExpression();
+            Match(")"); result.body = ParseBlock(); result.span = Cover(start, PreviousSpan()); return result;
+        }
+        if (Is("break") || Is("continue")) {
+            const auto keyword = Advance(); SyntaxStatement result;
+            result.kind = keyword.text == "break" ? SyntaxStatement::Kind::Break : SyntaxStatement::Kind::Continue;
+            Match(";"); result.span = Cover(start, PreviousSpan()); return result;
+        }
         if (Is("return")) {
             Advance(); SyntaxStatement result; result.kind = SyntaxStatement::Kind::Return;
             if (!Is(";")) result.expression = ParseExpression(); Match(";"); result.span = Cover(start, PreviousSpan()); return result;
@@ -201,6 +233,18 @@ private:
             if (!Is(",")) break; Advance();
         }
         Match(")"); result.body = ParseBlock(); return result;
+    }
+    SyntaxEnum ParseEnum() {
+        const auto start = Match("enum").span; const auto name = Identifier("enum name");
+        SyntaxEnum result; result.name = name.text; result.nameSpan = name.span;
+        Match("{");
+        while (!AtEnd() && !Is("}")) {
+            const auto memberName = Identifier("enum member"); SyntaxEnumMember member; member.name = memberName.text; member.nameSpan = memberName.span; member.span = memberName.span;
+            if (Is("=")) { Advance(); member.initializer = ParseExpression(); member.span = Cover(memberName.span, member.initializer.span); }
+            result.members.push_back(std::move(member));
+            if (!Is(",") && !Is(";")) break; Advance();
+        }
+        const auto close = Match("}"); result.span = Cover(start, close.span); return result;
     }
     SyntaxClass ParseClass() {
         Match("class"); const auto name = Identifier("class name"); SyntaxClass result; result.name = name.text; result.span = name.span;
@@ -235,6 +279,36 @@ private:
         if (op == "+" || op == "-") return 6; if (op == "*" || op == "/" || op == "%") return 7;
         return -1;
     }
+    bool LooksLikeLambda() const {
+        if (Current().kind == SyntaxTokenKind::Identifier && Is("=>", 1)) return true;
+        if (!Is("(")) return false;
+        size_t at = 1;
+        if (Is(")", at)) return Is("=>", at + 1);
+        for (;;) {
+            if (Current(at).kind != SyntaxTokenKind::Identifier) return false;
+            ++at;
+            if (Is(")", at)) return Is("=>", at + 1);
+            if (!Is(",", at)) return false;
+            ++at;
+        }
+    }
+    SyntaxExpression ParseLambda() {
+        const auto start = Current().span; std::vector<SyntaxParameter> parameters;
+        if (Current().kind == SyntaxTokenKind::Identifier) {
+            const auto name = Advance(); parameters.push_back({"any", name.text, name.span});
+        } else {
+            Match("(");
+            while (!AtEnd() && !Is(")")) {
+                const auto name = Identifier("lambda parameter"); parameters.push_back({"any", name.text, name.span});
+                if (!Is(",")) break; Advance();
+            }
+            Match(")");
+        }
+        Match("=>"); SyntaxExpression result; result.kind = SyntaxExpression::Kind::Lambda; result.span = start;
+        if (Is("{")) { result.lambdaIsBlock = true; result.lambdaBody = ParseBlock(); result.span = Cover(start, PreviousSpan()); }
+        else { auto body = ParseExpression(); result.span = Cover(start, body.span); result.children.push_back(std::move(body)); }
+        result.parameters = std::move(parameters); return result;
+    }
     SyntaxExpression ParseExpression(int minimum = 0) {
         auto left = ParseUnary();
         while (!AtEnd()) {
@@ -247,6 +321,7 @@ private:
         return left;
     }
     SyntaxExpression ParseUnary() {
+        if (LooksLikeLambda()) return ParsePostfix(ParseLambda());
         if (Is("!") || Is("-") || Is("+")) { const auto op = Advance(); auto operand = ParseUnary(); return {SyntaxExpression::Kind::Unary, op.text, Cover(op.span, operand.span), {std::move(operand)}}; }
         return ParsePostfix(ParsePrimary());
     }
@@ -263,7 +338,20 @@ private:
             return result;
         }
         if (token.text == "(") { auto value = ParseExpression(); const auto close = Match(")"); return {SyntaxExpression::Kind::Parenthesized, {}, Cover(token.span, close.span), {std::move(value)}}; }
-        if (token.text == "{") { const auto close = Match("}"); return {SyntaxExpression::Kind::Table, "{}", Cover(token.span, close.span), {}}; }
+        if (token.text == "{") {
+            std::vector<SyntaxExpression> values;
+            while (!AtEnd() && !Is("}")) {
+                if (Current().kind == SyntaxTokenKind::Identifier && Is("=", 1)) {
+                    const auto key = Advance(); Advance(); auto value = ParseExpression();
+                    values.push_back({SyntaxExpression::Kind::TableEntry, key.text, Cover(key.span, value.span), {std::move(value)}});
+                } else if (Is("[")) {
+                    const auto open = Advance(); auto key = ParseExpression(); Match("]"); Match("="); auto value = ParseExpression();
+                    values.push_back({SyntaxExpression::Kind::TableEntry, {}, Cover(open.span, value.span), {std::move(key), std::move(value)}});
+                } else values.push_back(ParseExpression());
+                if (!Is(",") && !Is(";")) break; Advance();
+            }
+            const auto close = Match("}"); return {SyntaxExpression::Kind::Table, "{}", Cover(token.span, close.span), std::move(values)};
+        }
         if (token.text == "null") return {SyntaxExpression::Kind::Null, token.text, token.span, {}};
         if (token.text == "true" || token.text == "false") return {SyntaxExpression::Kind::Boolean, token.text, token.span, {}};
         if (token.kind == SyntaxTokenKind::Number) return {SyntaxExpression::Kind::Number, token.text, token.span, {}};
@@ -307,28 +395,47 @@ std::string LuaType(const std::string& type) {
     if (type == "int") return "integer"; if (type == "float") return "number"; if (type == "bool") return "boolean"; return type;
 }
 
-const ExpressionInfo* ExpressionInfoFor(const Analysis* analysis, TextSpan span) {
-    if (!analysis) return nullptr;
-    const auto found = std::find_if(analysis->expressions.rbegin(), analysis->expressions.rend(), [&](const ExpressionInfo& value) { return value.span.offset == span.offset && value.span.length == span.length; });
-    return found == analysis->expressions.rend() ? nullptr : &*found;
+std::string DefaultValue(const std::string& type, const std::unordered_set<std::string>* enumTypes = nullptr) {
+    if (enumTypes && enumTypes->contains(type)) return "0";
+    if (const auto builtin = BuiltinDefaultValue(type)) return *builtin;
+    return "nil";
 }
 
-std::string EmitExpression(const SyntaxExpression& value, const Analysis* analysis) {
-    const auto child = [&](size_t index) { return EmitExpression(value.children.at(index), analysis); };
-    const auto* info = ExpressionInfoFor(analysis, value.span); const std::string lowering = info ? info->lowering : std::string{};
+struct Emitter {
+    std::string output;
+    std::vector<SourceMapEntry> sourceMap;
+    std::unordered_set<std::string> enumTypes;
+    size_t nextLabel{};
+    void Raw(std::string text) { output += std::move(text); }
+    void Line(std::string text, size_t sourceOffset) {
+        sourceMap.push_back({1 + static_cast<size_t>(std::count(output.begin(), output.end(), '\n')), sourceOffset}); output += text + "\n";
+    }
+};
+
+void EmitStatements(Emitter& emitter, const std::vector<BoundStatement>& statements, const std::string& indent, const std::string& continueLabel = {});
+
+std::string EmitExpression(const BoundExpression& value) {
+    const auto child = [&](size_t index) { return EmitExpression(value.children.at(index)); };
+    const auto& lowering = value.lowering;
     switch (value.kind) {
     case SyntaxExpression::Kind::Missing: return {};
-    case SyntaxExpression::Kind::Identifier: return value.text == "this" ? "self" : value.text;
+    case SyntaxExpression::Kind::Identifier:
+        if (value.text == "this") return "self";
+        return lowering == "implicit_field" || lowering == "implicit_method" ? "self." + value.text : value.text;
     case SyntaxExpression::Kind::Number: case SyntaxExpression::Kind::String:
-    case SyntaxExpression::Kind::Boolean: case SyntaxExpression::Kind::Table: return value.text;
+    case SyntaxExpression::Kind::Boolean: return value.text;
+    case SyntaxExpression::Kind::Table: { std::string out = "{"; for (size_t i{}; i < value.children.size(); ++i) { if (i) out += ", "; out += child(i); } return out + "}"; }
+    case SyntaxExpression::Kind::TableEntry:
+        return value.text.empty() ? "[" + child(0) + "] = " + child(1) : value.text + " = " + child(0);
     case SyntaxExpression::Kind::Null: return "nil";
     case SyntaxExpression::Kind::Parenthesized: return "(" + child(0) + ")";
     case SyntaxExpression::Kind::New: { std::string out = value.text + ".new("; for (size_t i{}; i < value.children.size(); ++i) { if (i) out += ", "; out += child(i); } return out + ")"; }
     case SyntaxExpression::Kind::Member: return child(0) + "." + value.text;
     case SyntaxExpression::Kind::Call: {
         const auto& callee = value.children.at(0); std::string out;
-        const auto receiver = [&]() { return callee.kind == SyntaxExpression::Kind::Member ? EmitExpression(callee.children.at(0), analysis) : std::string{}; };
+        const auto receiver = [&]() { return callee.kind == SyntaxExpression::Kind::Member ? EmitExpression(callee.children.at(0)) : std::string{}; };
         const auto argument = [&](size_t index) { return child(index + 1); };
+        if (lowering == "printf") { std::string result = "io.write(string.format("; for (size_t i = 1; i < value.children.size(); ++i) { if (i != 1) result += ", "; result += child(i); } return result + "))"; }
         if (lowering == "list_push_back") return "table.insert(" + receiver() + ", " + argument(0) + ")";
         if (lowering == "list_pop_back") return "table.remove(" + receiver() + ")";
         if (lowering == "list_size" || lowering == "string_length") return "#(" + receiver() + ")";
@@ -349,22 +456,30 @@ std::string EmitExpression(const SyntaxExpression& value, const Analysis* analys
         if (lowering == "cast_int_float") return "(function(v) return v < 0 and math.ceil(v) or math.floor(v) end)(" + argument(0) + ")";
         if (lowering == "cast_number_bool") return "(" + argument(0) + " and 1 or 0)";
         if (lowering == "cast_number_string") return "tonumber(" + argument(0) + ")";
-        if (callee.kind == SyntaxExpression::Kind::Member) out = EmitExpression(callee.children.at(0), analysis) + (lowering == "static_call" ? "." : ":") + callee.text;
-        else out = EmitExpression(callee, analysis);
+        if (callee.lowering == "implicit_method") out = "self:" + callee.text;
+        else if (callee.kind == SyntaxExpression::Kind::Member) out = EmitExpression(callee.children.at(0)) + (lowering == "static_call" ? "." : ":") + callee.text;
+        else out = EmitExpression(callee);
         out += "("; for (size_t i = 1; i < value.children.size(); ++i) { if (i != 1) out += ", "; out += child(i); } return out + ")";
     }
     case SyntaxExpression::Kind::Index:
         if (lowering == "list_index") return "(function(a, i) if i < 0 then i = #a + i end return a[i + 1] end)(" + child(0) + ", " + child(1) + ")";
         return child(0) + "[" + child(1) + "]";
     case SyntaxExpression::Kind::Slice: return "(function(a, s, e) local r = {} if s < 0 then s = #a + s end if e < 0 then e = #a + e end for i = s + 1, e do r[#r + 1] = a[i] end return r end)(" + child(0) + ", " + child(1) + ", " + child(2) + ")";
+    case SyntaxExpression::Kind::Range: return child(0) + ", " + child(1);
+    case SyntaxExpression::Kind::Lambda: {
+        std::string out = "function(";
+        for (size_t i{}; i < value.parameters.size(); ++i) { if (i) out += ", "; out += value.parameters[i].name; }
+        if (!value.lambdaIsBlock) return out + ") return " + child(0) + " end";
+        Emitter nested; EmitStatements(nested, value.lambdaBody, "    "); return out + ")\n" + nested.output + "end";
+    }
     case SyntaxExpression::Kind::Unary: return (value.text == "!" ? "not " : value.text) + child(0);
     case SyntaxExpression::Kind::Assignment: {
         if (lowering == "list_set") {
             const auto& index = value.children.at(0); const std::string slot = "a[i + 1]";
             const std::string assignment = value.text == "=" ? slot + " = v" : slot + " = " + slot + " " + value.text.substr(0, 1) + " v";
-            return "(function(a, i, v) if i < 0 then i = #a + i end " + assignment + " end)(" + EmitExpression(index.children.at(0), analysis) + ", " + EmitExpression(index.children.at(1), analysis) + ", " + child(1) + ")";
+            return "(function(a, i, v) if i < 0 then i = #a + i end " + assignment + " end)(" + EmitExpression(index.children.at(0)) + ", " + EmitExpression(index.children.at(1)) + ", " + child(1) + ")";
         }
-        std::string op = value.text; if (op.size() == 2 && op[1] == '=') return child(0) + " = " + child(0) + " " + op.substr(0, 1) + " " + child(1);
+        std::string op = value.text; if (op.size() == 2 && op[1] == '=') return child(0) + " = " + child(0) + " " + (lowering == "compound_concat" ? ".." : op.substr(0, 1)) + " " + child(1);
         return child(0) + " = " + child(1);
     }
     case SyntaxExpression::Kind::Binary: { const auto op = lowering == "concat" ? ".." : value.text == "!=" ? "~=" : value.text == "&&" ? "and" : value.text == "||" ? "or" : value.text; return child(0) + " " + op + " " + child(1); }
@@ -372,35 +487,77 @@ std::string EmitExpression(const SyntaxExpression& value, const Analysis* analys
     return {};
 }
 
-struct Emitter {
-    std::string output;
-    std::vector<SourceMapEntry> sourceMap;
-    void Raw(std::string text) { output += std::move(text); }
-    void Line(std::string text, size_t sourceOffset) {
-        sourceMap.push_back({1 + static_cast<size_t>(std::count(output.begin(), output.end(), '\n')), sourceOffset}); output += text + "\n";
+void EmitIf(Emitter& emitter, const BoundStatement& first, const std::string& indent, const std::string& continueLabel) {
+    const BoundStatement* current = &first; std::string keyword = "if";
+    for (;;) {
+        emitter.Line(indent + keyword + " " + EmitExpression(current->expression) + " then", current->span.offset);
+        EmitStatements(emitter, current->body, indent + "    ", continueLabel);
+        if (current->elseBody.size() == 1 && current->elseBody.front().kind == SyntaxStatement::Kind::If) { current = &current->elseBody.front(); keyword = "elseif"; continue; }
+        if (!current->elseBody.empty()) { emitter.Line(indent + "else", current->span.offset); EmitStatements(emitter, current->elseBody, indent + "    ", continueLabel); }
+        emitter.Line(indent + "end", first.span.offset); return;
     }
-};
+}
 
-void EmitStatements(Emitter& emitter, const std::vector<SyntaxStatement>& statements, const std::string& indent, const Analysis* analysis) {
+void EmitStatements(Emitter& emitter, const std::vector<BoundStatement>& statements, const std::string& indent, const std::string& continueLabel) {
     for (const auto& statement : statements) {
         switch (statement.kind) {
-        case SyntaxStatement::Kind::If:
-            emitter.Line(indent + "if " + EmitExpression(statement.expression, analysis) + " then", statement.span.offset);
-            EmitStatements(emitter, statement.body, indent + "    ", analysis);
-            if (!statement.elseBody.empty()) { emitter.Line(indent + "else", statement.span.offset); EmitStatements(emitter, statement.elseBody, indent + "    ", analysis); }
+        case SyntaxStatement::Kind::If: EmitIf(emitter, statement, indent, continueLabel); break;
+        case SyntaxStatement::Kind::While: {
+            const auto label = "__luasharp_continue_" + std::to_string(emitter.nextLabel++);
+            emitter.Line(indent + "while " + EmitExpression(statement.expression) + " do", statement.span.offset);
+            emitter.Line(indent + "    do", statement.span.offset);
+            EmitStatements(emitter, statement.body, indent + "        ", label);
+            emitter.Line(indent + "    end", statement.span.offset);
+            emitter.Line(indent + "    ::" + label + "::", statement.span.offset);
             emitter.Line(indent + "end", statement.span.offset); break;
-        case SyntaxStatement::Kind::Return: emitter.Line(indent + "return" + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " " + EmitExpression(statement.expression, analysis)), statement.span.offset); break;
-        case SyntaxStatement::Kind::Local: emitter.Line(indent + "local " + statement.name + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " = " + EmitExpression(statement.expression, analysis)), statement.span.offset); break;
-        case SyntaxStatement::Kind::Expression: emitter.Line(indent + EmitExpression(statement.expression, analysis), statement.span.offset); break;
+        }
+        case SyntaxStatement::Kind::For: {
+            const auto label = "__luasharp_continue_" + std::to_string(emitter.nextLabel++);
+            emitter.Line(indent + "do", statement.span.offset);
+            EmitStatements(emitter, statement.initializer, indent + "    ");
+            emitter.Line(indent + "    while " + EmitExpression(statement.expression) + " do", statement.span.offset);
+            emitter.Line(indent + "        do", statement.span.offset);
+            EmitStatements(emitter, statement.body, indent + "            ", label);
+            emitter.Line(indent + "        end", statement.span.offset);
+            emitter.Line(indent + "        ::" + label + "::", statement.span.offset);
+            if (statement.increment.kind != SyntaxExpression::Kind::Missing) emitter.Line(indent + "        " + EmitExpression(statement.increment), statement.increment.span.offset);
+            emitter.Line(indent + "    end", statement.span.offset);
+            emitter.Line(indent + "end", statement.span.offset); break;
+        }
+        case SyntaxStatement::Kind::ForEach: {
+            const auto loopId = emitter.nextLabel++; const auto label = "__luasharp_continue_" + std::to_string(loopId); std::string header; std::string listIndex;
+            if (statement.expression.kind == SyntaxExpression::Kind::Range) {
+                header = "for " + statement.name + " = " + EmitExpression(statement.expression) + " do";
+            } else if (!statement.secondName.empty() && statement.expression.type.ends_with("[]")) {
+                listIndex = "__luasharp_index_" + std::to_string(loopId);
+                header = "for " + listIndex + ", " + statement.secondName + " in ipairs(" + EmitExpression(statement.expression) + ") do";
+            } else if (!statement.secondName.empty()) {
+                header = "for " + statement.name + ", " + statement.secondName + " in pairs(" + EmitExpression(statement.expression) + ") do";
+            } else {
+                header = "for _, " + statement.name + " in ipairs(" + EmitExpression(statement.expression) + ") do";
+            }
+            emitter.Line(indent + header, statement.span.offset);
+            if (!listIndex.empty()) emitter.Line(indent + "    local " + statement.name + " = " + listIndex + " - 1", statement.span.offset);
+            emitter.Line(indent + "    do", statement.span.offset);
+            EmitStatements(emitter, statement.body, indent + "        ", label);
+            emitter.Line(indent + "    end", statement.span.offset);
+            emitter.Line(indent + "    ::" + label + "::", statement.span.offset);
+            emitter.Line(indent + "end", statement.span.offset); break;
+        }
+        case SyntaxStatement::Kind::Break: emitter.Line(indent + "break", statement.span.offset); break;
+        case SyntaxStatement::Kind::Continue: emitter.Line(indent + "goto " + continueLabel, statement.span.offset); break;
+        case SyntaxStatement::Kind::Return: emitter.Line(indent + "return" + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " " + EmitExpression(statement.expression)), statement.span.offset); break;
+        case SyntaxStatement::Kind::Local: emitter.Line(indent + "local " + statement.name + " = " + (statement.expression.kind == SyntaxExpression::Kind::Missing ? DefaultValue(statement.type, &emitter.enumTypes) : EmitExpression(statement.expression)), statement.span.offset); break;
+        case SyntaxStatement::Kind::Expression: emitter.Line(indent + EmitExpression(statement.expression), statement.span.offset); break;
         }
     }
 }
 
-void EmitClass(Emitter& emitter, const SyntaxClass& value, const Analysis* analysis) {
+void EmitClass(Emitter& emitter, const BoundClass& value) {
     emitter.Raw("---@class " + value.name + (value.baseName.empty() ? "" : " : " + value.baseName) + "\n");
     for (const auto& field : value.fields) {
         emitter.Raw("---@field " + field.access + " " + field.name + " " + LuaType(field.type));
-        if (field.initializer.kind == SyntaxExpression::Kind::Null) emitter.Raw("?"); emitter.Raw("\n");
+        if (field.initializer.kind == SyntaxExpression::Kind::Null || (field.initializer.kind == SyntaxExpression::Kind::Missing && DefaultValue(field.type, &emitter.enumTypes) == "nil")) emitter.Raw("?"); emitter.Raw("\n");
     }
     emitter.Raw("local " + value.name + " = {}\n" + value.name + ".__index = " + value.name + "\n");
     if (!value.baseName.empty()) emitter.Raw("setmetatable(" + value.name + ", { __index = " + value.baseName + " })\n");
@@ -408,9 +565,9 @@ void EmitClass(Emitter& emitter, const SyntaxClass& value, const Analysis* analy
     const auto constructor = std::find_if(value.functions.begin(), value.functions.end(), [](const auto& f) { return f.isConstructor; });
     emitter.Raw("function " + value.name + ".new(");
     if (constructor != value.functions.end()) for (size_t i{}; i < constructor->parameters.size(); ++i) { if (i) emitter.Raw(", "); emitter.Raw(constructor->parameters[i].name); }
-    emitter.Raw(")\n    local self = setmetatable({}, " + value.name + ")\n");
-    for (const auto& field : value.fields) if (field.initializer.kind != SyntaxExpression::Kind::Missing) emitter.Line("    self." + field.name + " = " + EmitExpression(field.initializer, analysis), field.span.offset);
-    if (constructor != value.functions.end()) EmitStatements(emitter, constructor->body, "    ", analysis);
+    emitter.Raw(")\n    local self = setmetatable(" + (value.baseName.empty() ? std::string("{}") : value.baseName + ".new()") + ", " + value.name + ")\n");
+    for (const auto& field : value.fields) emitter.Line("    self." + field.name + " = " + (field.initializer.kind == SyntaxExpression::Kind::Missing ? DefaultValue(field.type, &emitter.enumTypes) : EmitExpression(field.initializer)), field.span.offset);
+    if (constructor != value.functions.end()) EmitStatements(emitter, constructor->body, "    ");
     emitter.Raw("    return self\nend\n\n");
     for (const auto& function : value.functions) {
         if (function.isConstructor) continue;
@@ -418,8 +575,14 @@ void EmitClass(Emitter& emitter, const SyntaxClass& value, const Analysis* analy
         if (!function.returnType.empty() && function.returnType != "void") emitter.Raw("---@return " + LuaType(function.returnType) + "\n");
         emitter.Raw("function " + value.name + ":" + function.name + "(");
         for (size_t i{}; i < function.parameters.size(); ++i) { if (i) emitter.Raw(", "); emitter.Raw(function.parameters[i].name); }
-        emitter.Raw(")\n"); EmitStatements(emitter, function.body, "    ", analysis); emitter.Raw("end\n\n");
+        emitter.Raw(")\n"); EmitStatements(emitter, function.body, "    "); emitter.Raw("end\n\n");
     }
+}
+
+void EmitEnum(Emitter& emitter, const BoundEnum& value) {
+    emitter.Raw("---@enum " + value.name + "\nlocal " + value.name + " = {\n");
+    for (const auto& member : value.members) emitter.Line("    " + member.name + " = " + std::to_string(member.value) + ",", member.span.offset);
+    emitter.Raw("}\n\n");
 }
 
 std::runtime_error SyntaxError(const SyntaxDiagnostic& diagnostic) {
@@ -450,7 +613,9 @@ std::string Compile(std::string_view source) { return CompileWithSourceMap(sourc
 
 CompilationResult CompileWithSourceMap(std::string_view source) {
     auto analysis = Analyze(source); auto& tree = analysis.syntax; if (!tree.diagnostics.empty()) throw SyntaxError(tree.diagnostics.front());
-    Emitter emitter; for (const auto& value : tree.root.classes) EmitClass(emitter, value, &analysis); EmitStatements(emitter, tree.root.topLevel, {}, &analysis);
+    const auto error = std::find_if(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.severity == DiagnosticSeverity::Error; });
+    if (error != analysis.diagnostics.end()) throw std::runtime_error(error->message + " at " + std::to_string(error->span.offset));
+    Emitter emitter; for (const auto& value : analysis.bound.enums) emitter.enumTypes.insert(value.name); for (const auto& value : analysis.bound.enums) EmitEnum(emitter, value); for (const auto& value : analysis.bound.classes) EmitClass(emitter, value); EmitStatements(emitter, analysis.bound.topLevel, {});
     return {std::move(emitter.output), std::move(emitter.sourceMap)};
 }
 
