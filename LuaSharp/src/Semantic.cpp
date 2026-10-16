@@ -105,6 +105,7 @@ std::string_view LoweringName(Lowering lowering) {
     case Lowering::CastIntFloat: return "cast_int_float";
     case Lowering::CastNumberBool: return "cast_number_bool";
     case Lowering::CastNumberString: return "cast_number_string";
+    case Lowering::CastDynamic: return "cast_dynamic";
     }
     assert(false);
     return {};
@@ -479,9 +480,15 @@ private:
             if (targetKind == Kind::Index && types_.IsList(ChildType(first, 0))) lowering = Lowering::ListSet;
             if (expression.text == "=") {
                 if (!Accepts(left, first + 1)) AddDiagnostic("Cannot assign " + DisplayType(right) + " to " + DisplayType(left), syntaxChild(1).span);
+            } else if (left == TypeTable::Any || right == TypeTable::Any) {
+                // Checked at run time; a string operand makes "+=" a concatenation.
+                const auto other = left == TypeTable::Any ? right : left;
+                if (other == TypeTable::String && expression.text == "+=") { if (lowering != Lowering::ListSet) lowering = Lowering::CompoundConcat; }
+                else if (left == TypeTable::Int && expression.text == "/=") AddDiagnostic("Result of '/=' is 'float', which cannot be assigned to 'int'", expression.span);
+                else if (other != TypeTable::Any && other != TypeTable::Unknown && !IsNumeric(other)) AddDiagnostic("Operator '" + expression.text + "' is not defined for '" + Name(left) + "' and '" + Name(right) + "'", expression.span);
             } else if (const auto* builtin = FindBuiltinOperator(Name(left), std::string_view(expression.text).substr(0, 1), Name(right))) {
                 if (!Assignable(left, types_.Intern(builtin->result))) AddDiagnostic("Result of '" + expression.text + "' is '" + builtin->result + "', which cannot be assigned to '" + Name(left) + "'", expression.span);
-                if (builtin->lowering == Lowering::Concat) lowering = Lowering::CompoundConcat;
+                if (builtin->lowering == Lowering::Concat && lowering != Lowering::ListSet) lowering = Lowering::CompoundConcat;
             } else if (left != TypeTable::Unknown && right != TypeTable::Unknown) AddDiagnostic("Operator '" + expression.text + "' is not defined for '" + Name(left) + "' and '" + Name(right) + "'", expression.span);
             break;
         }

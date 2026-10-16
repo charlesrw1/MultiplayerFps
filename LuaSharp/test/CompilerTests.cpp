@@ -622,7 +622,7 @@ class Calculator {
     Require(std::any_of(generated.exports.begin(), generated.exports.end(), [](const auto& value) { return value.symbolName == "ls_Calculator_add" && value.returnType == "int"; }), "native method export metadata is missing");
 
     const auto lists = luasharp::CompileToC("int[] values = {1, 2}; int[][] grid = {{1}, {}};");
-    Require(lists.c.find("ls_list_create(sizeof(ls_int), 0, 2)") != std::string::npos && lists.c.find("ls_list_create(sizeof(LS_List*), 1, 2)") != std::string::npos, "list literals were not typed from their declarations");
+    Require(lists.c.find("ls_list_create(sizeof(ls_int), LS_KIND_INT, 2)") != std::string::npos && lists.c.find("ls_list_create(sizeof(LS_List*), LS_KIND_LIST, 2)") != std::string::npos, "list literals were not typed from their declarations");
 
     const auto rejects = [](std::string_view source, std::string_view message) {
         try { static_cast<void>(luasharp::CompileToC(source)); }
@@ -924,7 +924,7 @@ float[] floats = {1, 2.5};
 float floatSum = floats[0] + floats[1];
 )", options);
         const auto* values = NativeGlobal<const luasharp::NativeList*>(module, "values");
-        Require(values && values->count == 3 && values->elementSize == 8 && values->elementKind == luasharp::NativeElementKind::Plain, "native int list has the wrong layout");
+        Require(values && values->count == 3 && values->elementSize == 8 && values->elementKind == luasharp::NativeElementKind::Int, "native int list has the wrong layout");
         const auto* numbers = reinterpret_cast<const long long*>(values->data);
         Require(numbers[0] == 5 && numbers[1] == 20 && numbers[2] == 30, "native list writes or push/pop were wrong");
         Require(NativeGlobal<long long>(module, "popped") == 42, "compound list assignment or pop_back was wrong");
@@ -937,7 +937,7 @@ float floatSum = floats[0] + floats[1];
 
         runtime->Collect();
         const auto* words = NativeGlobal<const luasharp::NativeList*>(module, "words");
-        Require(words && words->count == 100 && words->elementKind == luasharp::NativeElementKind::Managed, "string list grew incorrectly");
+        Require(words && words->count == 100 && words->elementKind == luasharp::NativeElementKind::String, "string list grew incorrectly");
         const auto* word = reinterpret_cast<NativeString* const*>(words->data)[99];
         Require(std::string_view(word->data, static_cast<size_t>(word->length)) == "w99", "collection freed strings that a rooted list holds");
     }
@@ -1004,6 +1004,133 @@ for (key, score in scores) { keyCount += 1; if (score == 2) { foundTwo = true; }
     Require(NativeGlobal<long long>(module, "keyCount") == 2 && NativeGlobal<unsigned char>(module, "foundTwo") == 1, "table loop was wrong");
 }
 
+void TestNativeDynamicTables() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        auto module = luasharp::NativeModule::Compile(R"(
+class Enemy {
+    int hp = 10;
+    string name = "orc";
+    int hit(int amount) { hp -= amount; return hp; }
+}
+table t = {a = 1, b = "x", nested = {deep = 5}};
+class Probe { int read(table source) { return int(source.nested.deep); } }
+t["a"] += 2;
+t.b += "y";
+int a = t["a"];
+string b = t.b;
+t.nested.deep = 7;
+int deep = t["nested"]["deep"];
+t[1.0] = "one";
+string one = t[1];
+table fresh;
+fresh.k = 3;
+int k = int(fresh.k);
+t.a = null;
+bool removed = t.a == null;
+bool missingFalsy = false;
+if (!t.missing) { missingFalsy = true; }
+t.add = (self, x) => x + 1;
+int added = t.add(41);
+table holder = {enemy = new Enemy()};
+int hp = holder.enemy.hit(3);
+holder.enemy.hp = 100;
+Enemy direct = holder.enemy;
+int directHp = direct.hp;
+int[] xs = {1, 2, 3};
+table lists = {xs = xs};
+int listSum = 0;
+for (v in lists.xs) { listSum += int(v); }
+table outer = {seq = {10, 20, 30, null, 50}};
+int seqSum = 0;
+for (v in outer.seq) { seqSum += int(v); }
+int keyCount = 0;
+for (key, value in t) { keyCount += 1; }
+table big = {};
+for (int i = 0; i < 1000; i += 1) { big[i] = i * 2; }
+int bigValue = big[999];
+)", options);
+        runtime->Collect();
+        using Create = void* (*)();
+        using Read = long long (*)(void*, void*);
+        const auto create = reinterpret_cast<Create>(module.FindSymbol("ls_Probe_new"));
+        const auto read = reinterpret_cast<Read>(module.FindSymbol("ls_Probe_read"));
+        Require(create && read && read(create(), NativeGlobal<void*>(module, "t")) == 7 && module.LastError().empty(), "member names or table contents did not survive collection");
+        Require(NativeGlobal<long long>(module, "a") == 3 && NativeText(module, "b") == "xy", "compound table assignment was wrong");
+        Require(NativeGlobal<long long>(module, "deep") == 7, "nested member assignment or index was wrong");
+        Require(NativeText(module, "one") == "one", "float key 1.0 and int key 1 were not the same key");
+        Require(NativeGlobal<long long>(module, "k") == 3, "default table was not an empty table");
+        Require(NativeGlobal<unsigned char>(module, "removed") == 1 && NativeGlobal<unsigned char>(module, "missingFalsy") == 1, "nil entries or truthiness were wrong");
+        Require(NativeGlobal<long long>(module, "added") == 42, "table member call did not pass the table first");
+        Require(NativeGlobal<long long>(module, "hp") == 7 && NativeGlobal<long long>(module, "directHp") == 100, "dynamic object method or field access was wrong");
+        Require(NativeGlobal<long long>(module, "listSum") == 6 && NativeGlobal<long long>(module, "seqSum") == 60, "foreach over any was wrong");
+        Require(NativeGlobal<long long>(module, "keyCount") == 4, "table iteration did not skip removed entries");
+        Require(NativeGlobal<long long>(module, "bigValue") == 1998, "large table lookup was wrong");
+    }
+    Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "dynamic table graph was not reclaimed after module unload");
+    RequireNativeError("table t = {b = \"x\"}; int bad = t.b;", "expected int, got string");
+    RequireNativeError("class A {} class B {} table t = {a = new A()}; B bad = t.a;", "expected B, got A");
+    RequireNativeError("class A {} table t = {a = new A()}; auto bad = t.a.missing;", "no field 'missing' on A");
+    RequireNativeError("table t = {}; t[null] = 1;", "table index is nil");
+    RequireNativeError("table t = {}; auto bad = t.f(1);", "attempt to call a nil value");
+}
+
+void TestNativeClosureCaptures() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        auto module = luasharp::NativeModule::Compile(R"(
+class Counter {
+    int total = 0;
+    int run(int start) {
+        auto bump = () => { start += 1; total += start; };
+        bump(); bump();
+        return start;
+    }
+}
+auto makeCounter = () => {
+    int local = 0;
+    return () => { local += 1; return local; };
+};
+auto next = makeCounter();
+next(); next();
+int third = next();
+auto other = makeCounter();
+int otherFirst = other();
+auto makeAdder = (k) => (x) => x + k;
+int added = makeAdder(5)(10);
+auto pick = (v) => { if (v > 3) { return "big"; } return "small"; };
+string big = pick(5);
+string small = pick(1);
+int[] seen = {};
+for (i in 1..3) { auto f = () => i * 10; seen.push_back(f()); }
+Counter counter = new Counter();
+int start = counter.run(1);
+int total = counter.total;
+)", options);
+        Require(NativeGlobal<long long>(module, "third") == 3 && NativeGlobal<long long>(module, "otherFirst") == 1, "closures did not share or isolate their captured cells");
+        Require(NativeGlobal<long long>(module, "added") == 15, "nested closure did not capture through its parent");
+        Require(NativeText(module, "big") == "big" && NativeText(module, "small") == "small", "block closure returned the wrong value");
+        const auto* seen = NativeGlobal<const luasharp::NativeList*>(module, "seen");
+        Require(seen && seen->count == 3 && reinterpret_cast<const long long*>(seen->data)[2] == 30, "loop closures captured the wrong values");
+        Require(NativeGlobal<long long>(module, "start") == 3 && NativeGlobal<long long>(module, "total") == 5, "assigned parameter capture was not shared");
+    }
+    Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "closure cells were not reclaimed after module unload");
+}
+
+void TestDynamicLuaEmission() {
+    const auto lua = luasharp::Compile("table t = {}; t.n += 1; t.s += \"x\"; string[] words = {\"a\"}; words[0] += \"b\"; int n = int(t.n); bool b = bool(t.s);");
+    for (const auto expected : {"t.n = t.n + 1", "t.s = t.s .. \"x\"", "a[i + 1] = a[i + 1] .. v", "local b = (not not t.s)"})
+        Require(lua.find(expected) != std::string::npos, std::string("missing dynamic Lua lowering: ") + expected + "\n" + lua);
+    const auto invalid = luasharp::Analyze("table t = {}; int n = 1; n /= t.x;");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& value) { return value.message.find("'/=' is 'float'") != std::string::npos; }), "int /= any was accepted");
+}
+
 void TestPrintfBuiltin() {
     constexpr std::string_view source = R"(printf("i=%d f=%f s=%s b=%b %%\n", -7, 2.5, "ok", true);)";
     const auto analysis = luasharp::Analyze(source);
@@ -1060,12 +1187,15 @@ int main() {
         {"foreach and range loops", TestForEachAndRangeLoops},
         {"enums", TestEnums},
         {"lambdas", TestLambdas},
+        {"dynamic Lua emission", TestDynamicLuaEmission},
         {"C backend emission", TestCBackendEmission},
         {"libtcc integration", TestLibTccIntegrationWhenAvailable},
         {"libtcc errors do not crash host", TestLibTccErrorsDoNotCrashHost},
         {"native lists", TestNativeLists},
         {"native strings", TestNativeStrings},
         {"native loops", TestNativeLoops},
+        {"native dynamic tables", TestNativeDynamicTables},
+        {"native closure captures", TestNativeClosureCaptures},
         {"native state, arithmetic, and host symbols", TestNativeStateArithmeticAndHostSymbols},
         {"native reload slots", TestNativeReloadSlots},
         {"native garbage collection", TestNativeGarbageCollection},

@@ -18,8 +18,8 @@ struct NativeValue {
     union { std::int64_t integer; double number; std::uint64_t boolean; void* pointer; } as{};
 };
 
-// How a list traces its elements.
-enum class NativeElementKind : std::uint64_t { Plain, Managed, Value };
+// The NativeValueKind of a list's elements; Value means the elements are tagged NativeValues.
+enum class NativeElementKind : std::uint64_t { Value, Int, Float, Bool, String, Object, Table, Closure, List };
 // GC-managed dynamic array. Generated code reads data directly; only the runtime resizes it.
 struct NativeList {
     std::int64_t count{};

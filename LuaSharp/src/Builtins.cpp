@@ -130,6 +130,7 @@ const BuiltinFunction* FindBuiltinFunction(std::string_view name) {
 std::optional<Lowering> BuiltinCastLowering(std::string_view target, std::string_view source) {
     if (target == source) return Lowering::CastIdentity;
     if (target == "string") return Lowering::CastString;
+    if (source == "any" && (target == "int" || target == "float" || target == "bool")) return Lowering::CastDynamic;
     if (target == "bool") {
         if (source == "int" || source == "float") return Lowering::CastBoolNumber;
         if (source == "string") return Lowering::CastBoolString;

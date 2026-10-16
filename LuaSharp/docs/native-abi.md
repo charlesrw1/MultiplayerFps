@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `5`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `6`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -12,8 +12,8 @@ This document defines the native backend contract. The ABI version is currently 
 | `string` | `LS_String*` | Interned immutable UTF-8 object containing a signed 64-bit byte length and zero-terminated data |
 | `table` | opaque `LS_Table*` | GC-managed dynamic table with tagged keys and values |
 | `T[]` | `LS_List*` | GC-managed dynamic array of unboxed `T` elements, zero-based |
-| `any` | 16-byte `LS_Value` | 64-bit kind tag plus a 64-bit scalar or managed pointer payload |
-| class reference | `LS_Type*` | Nullable, stable for the lifetime of its owning runtime heap |
+| `any` | 16-byte `LS_Value` | 64-bit kind tag (`LS_KIND_*`) plus a 64-bit scalar or managed pointer payload |
+| class reference | `LS_Type*` | Nullable, stable for the lifetime of its owning runtime heap. The first field is `const LS_TypeInfo*` |
 | enum | signed 64-bit `ls_int` | Values use the declaration's resolved integer value |
 
 `int / int` returns `float`. Integer remainder follows Lua floor-modulo semantics, so `-5 % 3` is `1`. Integer division by zero consequently follows floating-point division behavior. Integer remainder by zero reports a structured runtime error and returns zero so native control can unwind through an ABI-safe caller.
@@ -31,14 +31,43 @@ The table contains these groups:
 - list creation, growth (`list_reserve`) and slices
 - `print`
 
+Boxing, checked unboxing, dynamic access and calls on `any`, and closure cells are header helpers. They do not use the table.
+
+## Tables
+
+A table is a hash map from tagged keys to tagged values. Entries keep their insertion order, and a table foreach loop visits them in that order.
+- A float key with an integer value is the same key as that integer, as in Lua. For example, `t[1.0]` and `t[1]` are the same entry.
+- A missing key reads as nil. Writing nil removes the entry.
+- A nil or NaN key on a write reports a runtime error.
+- An uninitialized `table` variable or field is an empty table, the same as `{}` in the Lua backend.
+
+`t.name` is the same as `t["name"]`. Generated code interns each member name once and keeps it in a module static, `ls_name_<name>`, which the module traces as a root.
+
+## Dynamic values
+
+A table read gives `any`. A lambda parameter is also `any`. The native backend converts between `any` and typed values wherever a value flows into a typed slot: locals, assignments, returns, arguments, fields and list elements.
+- Boxing a typed value into `LS_Value` cannot fail. A null reference boxes as nil.
+- Unboxing checks the kind at run time. A wrong kind reports an error, for example `expected int, got string`, and gives zero or null. Nil unboxes to null for reference types.
+- A float with an integer value unboxes to `int`, as in Lua `math.tointeger`.
+- A class object unboxes only to its own class. Each object starts with a `const LS_TypeInfo*`, and the check compares that pointer.
+- A list unboxes when its element kind matches. The class of object elements is not checked.
+- An `any` condition uses Lua truthiness: only nil and false are false. `bool(x)` on `any` does the same.
+
+`LS_TypeInfo` holds the class name, a table of fields (name, offset and kind) and a table of method thunks. With it, `any` code can do these operations on class objects:
+- `x.field` reads a field, and `x.field = v` writes it with a checked unbox.
+- `x.method(args)` calls a method. Missing arguments are nil.
+
+A method that has a parameter or result of an external type cannot be called through `any`.
+
+`x.name(args)` on a `table` or a table in `any` follows the Lua backend, which emits `x:name(args)`. The table is the first argument.
+
+A dynamic call has a limit of 16 arguments.
+
 ## Lists
 
 A list is one GC allocation with this layout: `count`, `capacity`, `element_size`, `element_kind` and `data`. The runtime owns the element buffer and frees it when it collects the list. Generated code reads and writes elements in `data` directly, but only the runtime resizes the buffer. Push doubles the capacity when the list is full.
 
-`element_kind` tells the collector how to trace elements:
-- `0`: plain scalars
-- `1`: managed pointers
-- `2`: `LS_Value`
+`element_kind` is the `LS_KIND` of the element type, or `LS_ELEMENT_VALUE` (`0`) when the elements are `LS_Value`. The collector traces elements of kind `LS_KIND_STRING` and higher, and `any` code uses the kind to box elements.
 
 A negative index counts from the end. An index that is out of range, a `pop_back` on an empty list, or the use of a null list reports a runtime error, and the operation continues on a zeroed scratch value. Lua returns `nil` in these cases. A list boxes into `LS_Value` as kind `8`.
 
@@ -56,8 +85,9 @@ Strings are immutable and interned, so `==` compares pointers. Every operation t
 - A list foreach loop reads `count` again before each pass, the same as `ipairs`.
 - A range loop evaluates its inclusive bounds once. A change to the loop variable does not change the iteration.
 - A table foreach loop visits non-null entries in insertion order.
+- A foreach loop over `any` follows the Lua backend. With two variables it is `pairs`, and with one variable it is `ipairs`, which stops at the first nil. A list in `any` gives 1-based keys, the same as Lua.
 
-`NativeRuntime` owns zeroed, non-moving allocations and performs precise stop-the-world mark-and-sweep collection. Generated trace functions cover class reference fields and closure environments; the runtime traces tagged table keys and values and list elements. Module globals are registered as roots while their module is loaded, and host code can keep returned objects alive with `Pin`/`Unpin`. Collection currently occurs only when the host calls `Collect`, so it must not run concurrently with generated code. There is consequently no write barrier or generated stack-map requirement yet.
+`NativeRuntime` owns zeroed, non-moving allocations and performs precise stop-the-world mark-and-sweep collection. Generated trace functions cover class reference fields, closure environments and cells; the runtime traces tagged table keys and values and list elements. Module globals are registered as roots while their module is loaded, and host code can keep returned objects alive with `Pin`/`Unpin`. Collection currently occurs only when the host calls `Collect`, so it must not run concurrently with generated code. There is consequently no write barrier or generated stack-map requirement yet.
 
 Interning is weak: identical live strings share one object, but the intern table does not itself keep strings alive. Sweeping a string removes its intern-table entry. ABI changes increment `abi_version`; generated code must never guess the layout of a different version.
 
@@ -75,7 +105,15 @@ External object types are opaque. Generated code may pass their pointers to decl
 
 ## Closures and current limits
 
-The implemented native closure object contains an invoke pointer and an optional GC-managed environment. Parameters cross the closure boundary as tagged `LS_Value` values; numeric dynamic arithmetic and comparisons are implemented. Referenced locals or `this` are copied into a precisely traced environment. Module globals are accessed through module state instead of being copied. Captures are currently by value; shared mutable capture cells, value-returning block closures, and dynamic member dispatch on untyped parameters are still required for full lambda parity.
+A native closure object contains an invoke pointer, an optional GC-managed environment and its arity. Parameters and results cross the closure boundary as `LS_Value`. A call through a typed closure variable has its arity checked at compile time. A call through `any` pads missing arguments with nil.
+
+Captures follow Lua upvalues:
+- Module globals are not captured. Closures use module state directly.
+- A captured local that no code assigns is copied into the environment.
+- A captured local that some code assigns, in the closure or outside it, lives in a GC cell. The enclosing scope and every closure share that cell. Each pass of a foreach loop declares new loop variables, so each pass has its own cell.
+- A nested closure captures through its parent closure.
+
+Block closures can return values. `return` boxes the value into the result.
 
 Closure invoke pointers currently point into their TinyCC module. `ReloadableNativeProgram` retains old generations, so those pointers remain valid there. A later ABI will replace raw invoke pointers with stable function-slot IDs before retired code can be unloaded.
 

@@ -66,7 +66,7 @@ enum class Lowering : uint8_t {
     None, ImplicitField, ImplicitMethod, StaticCall, Printf, Concat, CompoundConcat, ListIndex, ListSet,
     ListPushBack, ListPopBack, ListSize, ListEmpty, ListClear,
     StringLength, StringContains, StringStartsWith, StringEndsWith, StringSubstring, StringLower, StringUpper,
-    CastIdentity, CastString, CastBoolNumber, CastBoolString, CastIntFloat, CastNumberBool, CastNumberString
+    CastIdentity, CastString, CastBoolNumber, CastBoolString, CastIntFloat, CastNumberBool, CastNumberString, CastDynamic
 };
 std::string_view LoweringName(Lowering lowering);
 

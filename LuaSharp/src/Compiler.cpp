@@ -518,6 +518,7 @@ std::string EmitExpression(const Emitter& emitter, const BoundExpression& value)
         case Lowering::CastIntFloat: return "(function(v) return v < 0 and math.ceil(v) or math.floor(v) end)(" + argument(0) + ")";
         case Lowering::CastNumberBool: return "(" + argument(0) + " and 1 or 0)";
         case Lowering::CastNumberString: return "tonumber(" + argument(0) + ")";
+        case Lowering::CastDynamic: return value.type == TypeTable::Bool ? "(not not " + argument(0) + ")" : "(" + argument(0) + ")";
         default: break;
         }
         if (callee.lowering == Lowering::ImplicitMethod) out = "self:" + callee.Text();
@@ -541,7 +542,8 @@ std::string EmitExpression(const Emitter& emitter, const BoundExpression& value)
     case SyntaxExpression::Kind::Assignment: {
         if (lowering == Lowering::ListSet) {
             const auto& index = emitter.Child(value, 0); const std::string slot = "a[i + 1]";
-            const std::string assignment = text == "=" ? slot + " = v" : slot + " = " + slot + " " + text.substr(0, 1) + " v";
+            const std::string operation = text == "+=" && value.type == TypeTable::String ? ".." : text.substr(0, 1);
+            const std::string assignment = text == "=" ? slot + " = v" : slot + " = " + slot + " " + operation + " v";
             return "(function(a, i, v) if i < 0 then i = #a + i end " + assignment + " end)(" + EmitExpression(emitter, emitter.Child(index, 0)) + ", " + EmitExpression(emitter, emitter.Child(index, 1)) + ", " + child(1) + ")";
         }
         if (text.size() == 2 && text[1] == '=') return child(0) + " = " + child(0) + " " + (lowering == Lowering::CompoundConcat ? ".." : text.substr(0, 1)) + " " + child(1);

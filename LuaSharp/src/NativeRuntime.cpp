@@ -31,7 +31,7 @@ struct RuntimeString {
     char data[1]{};
 };
 
-constexpr unsigned long long AbiVersion = 5;
+constexpr unsigned long long AbiVersion = 6;
 
 // Field order must match LS_RuntimeApi in the generated C preamble.
 struct RuntimeAbi {
@@ -56,13 +56,6 @@ struct RuntimeAbi {
     void (*toNumber)(void*, void*, NativeValue*){};
 };
 
-struct RuntimeTable { std::vector<std::pair<NativeValue, NativeValue>> entries; };
-// header must stay first: generated code reads it as LS_List.
-struct RuntimeList {
-    NativeList header;
-    std::vector<std::byte> storage;
-};
-
 bool ValueEqual(const NativeValue& left, const NativeValue& right) {
     if (left.kind != right.kind) return false;
     switch (left.kind) {
@@ -72,6 +65,36 @@ bool ValueEqual(const NativeValue& left, const NativeValue& right) {
     case NativeValueKind::Bool: return left.as.boolean == right.as.boolean;
     default: return left.as.pointer == right.as.pointer;
     }
+}
+
+struct KeyHash {
+    size_t operator()(const NativeValue& key) const {
+        std::uint64_t bits; std::memcpy(&bits, &key.as, sizeof(bits));
+        return std::hash<std::uint64_t>{}(bits ^ (static_cast<std::uint64_t>(key.kind) << 59));
+    }
+};
+struct KeyEqual { bool operator()(const NativeValue& left, const NativeValue& right) const { return ValueEqual(left, right); } };
+
+// Entries keep insertion order for iteration. Writing nil leaves a tombstone, so cursors stay valid.
+struct RuntimeTable {
+    std::vector<std::pair<NativeValue, NativeValue>> entries;
+    std::unordered_map<NativeValue, size_t, KeyHash, KeyEqual> slots; // key -> entries index
+};
+// header must stay first: generated code reads it as LS_List.
+struct RuntimeList {
+    NativeList header;
+    std::vector<std::byte> storage;
+};
+
+// Lua keys: a float with an integer value is the same key as that integer.
+NativeValue NormalizeKey(NativeValue key) {
+    constexpr double limit = 9223372036854775808.0; // 2^63
+    if (key.kind == NativeValueKind::Float && key.as.number >= -limit && key.as.number < limit) {
+        const auto integer = static_cast<std::int64_t>(key.as.number);
+        if (static_cast<double>(integer) == key.as.number) { key.kind = NativeValueKind::Int; key.as.integer = integer; }
+    }
+    if (key.kind == NativeValueKind::Bool) key.as.boolean = key.as.boolean != 0;
+    return key;
 }
 
 bool IsManaged(const NativeValue& value) {
@@ -160,25 +183,33 @@ void TraceTable(void* context, void* object) {
     }
 }
 void FinalizeTable(void* object) { static_cast<RuntimeTable*>(object)->~RuntimeTable(); }
+void AbiTableGet(void* context, void* object, const NativeValue* key, NativeValue* out) {
+    assert(key && out);
+    *out = {};
+    if (!object) { static_cast<NativeRuntime*>(context)->ReportError("attempt to index a null table"); return; }
+    const auto& table = *static_cast<RuntimeTable*>(object);
+    if (const auto found = table.slots.find(NormalizeKey(*key)); found != table.slots.end()) *out = table.entries[found->second].second;
+}
+void AbiTableSet(void* context, void* object, const NativeValue* key, const NativeValue* value) {
+    assert(key && value);
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    if (!object) { runtime.ReportError("attempt to index a null table"); return; }
+    if (key->kind == NativeValueKind::Null) { runtime.ReportError("table index is nil"); return; }
+    if (key->kind == NativeValueKind::Float && key->as.number != key->as.number) { runtime.ReportError("table index is NaN"); return; }
+    auto& table = *static_cast<RuntimeTable*>(object);
+    const auto normalized = NormalizeKey(*key);
+    if (const auto found = table.slots.find(normalized); found != table.slots.end()) { table.entries[found->second].second = *value; return; }
+    if (value->kind == NativeValueKind::Null) return;
+    table.slots.emplace(normalized, table.entries.size());
+    table.entries.emplace_back(normalized, *value);
+}
 void* AbiTableCreate(void* context, unsigned long long count, const NativeValue* pairs) {
     auto& runtime = *static_cast<NativeRuntime*>(context);
     auto* table = static_cast<RuntimeTable*>(runtime.Allocate(sizeof(RuntimeTable), TraceTable, FinalizeTable));
     if (!table) return nullptr;
     new (table) RuntimeTable();
-    for (unsigned long long i{}; i < count; ++i) table->entries.emplace_back(pairs[i * 2], pairs[i * 2 + 1]);
+    for (unsigned long long i{}; i < count; ++i) AbiTableSet(context, table, &pairs[i * 2], &pairs[i * 2 + 1]);
     return table;
-}
-void AbiTableGet(void*, void* object, const NativeValue* key, NativeValue* out) {
-    *out = {};
-    if (!object || !key) return;
-    const auto& entries = static_cast<RuntimeTable*>(object)->entries;
-    for (auto item = entries.rbegin(); item != entries.rend(); ++item) if (ValueEqual(item->first, *key)) { *out = item->second; return; }
-}
-void AbiTableSet(void*, void* object, const NativeValue* key, const NativeValue* value) {
-    if (!object || !key || !value) return;
-    auto& entries = static_cast<RuntimeTable*>(object)->entries;
-    for (auto& item : entries) if (ValueEqual(item.first, *key)) { item.second = *value; return; }
-    entries.emplace_back(*key, *value);
 }
 void AbiPrint(void* context, void* formatObject, unsigned long long count, const NativeValue* arguments) {
     auto& runtime = *static_cast<NativeRuntime*>(context);
@@ -236,11 +267,12 @@ int AbiTableNext(void* context, void* object, unsigned long long* cursor, Native
 void TraceList(void* context, void* object) {
     auto& runtime = *static_cast<NativeRuntime*>(context);
     const auto& list = static_cast<RuntimeList*>(object)->header;
-    if (list.elementKind == NativeElementKind::Plain) return;
+    const bool tagged = list.elementKind == NativeElementKind::Value;
+    if (!tagged && list.elementKind < NativeElementKind::String) return;
     for (std::int64_t i{}; i < list.count; ++i) {
         const std::byte* slot = list.data + i * list.elementSize;
-        if (list.elementKind == NativeElementKind::Managed) { void* pointer; std::memcpy(&pointer, slot, sizeof(pointer)); runtime.Mark(pointer); }
-        else { NativeValue item; std::memcpy(&item, slot, sizeof(item)); if (IsManaged(item)) runtime.Mark(item.as.pointer); }
+        if (tagged) { NativeValue item; std::memcpy(&item, slot, sizeof(item)); if (IsManaged(item)) runtime.Mark(item.as.pointer); }
+        else { void* pointer; std::memcpy(&pointer, slot, sizeof(pointer)); runtime.Mark(pointer); }
     }
 }
 void FinalizeList(void* object) { static_cast<RuntimeList*>(object)->~RuntimeList(); }
@@ -251,7 +283,7 @@ void ReserveList(RuntimeList& list, std::int64_t capacity) {
     list.header.capacity = capacity;
 }
 void* AbiListCreate(void* context, unsigned long long elementSize, unsigned long long elementKind, unsigned long long capacity) {
-    assert(elementSize > 0 && elementSize <= sizeof(NativeValue) && elementKind <= static_cast<unsigned long long>(NativeElementKind::Value));
+    assert(elementSize > 0 && elementSize <= sizeof(NativeValue) && elementKind <= static_cast<unsigned long long>(NativeElementKind::List));
     auto& runtime = *static_cast<NativeRuntime*>(context);
     auto* list = static_cast<RuntimeList*>(runtime.Allocate(sizeof(RuntimeList), TraceList, FinalizeList));
     if (!list) return nullptr;

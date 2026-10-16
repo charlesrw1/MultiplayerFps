@@ -195,7 +195,7 @@ NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompil
         throw std::runtime_error("TinyCC relocation failed" + (errors.empty() ? std::string{} : ":\n" + errors));
 
     const auto abiVersion = reinterpret_cast<long long (*)()>(impl->getSymbol(impl->state, "ls_module_abi_version"));
-    if (!abiVersion || abiVersion() != 5) throw std::runtime_error("LuaSharp native module ABI version mismatch");
+    if (!abiVersion || abiVersion() != 6) throw std::runtime_error("LuaSharp native module ABI version mismatch");
     const auto bind = reinterpret_cast<int (*)(void*)>(impl->getSymbol(impl->state, "ls_module_bind"));
     if (!bind || bind(impl->runtime->Abi()) != 0) throw std::runtime_error("LuaSharp native module rejected the runtime ABI");
     const auto traceRoots = reinterpret_cast<NativeRootTraceFunction>(impl->getSymbol(impl->state, "ls_module_trace_roots"));

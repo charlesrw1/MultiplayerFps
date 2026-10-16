@@ -43,15 +43,13 @@ The native slice supports these features:
 - arithmetic
 - interned strings, including concatenation, `substring`, `lower`, `upper`, and `string()`/`int()`/`float()` conversions
 - typed dynamic lists (`T[]`) with literals, indexing, slices and all list methods
-- mixed-key/mixed-value tables
-- closures with tagged parameters and by-value local captures
+- hashed mixed-key/mixed-value tables: reads and writes through `t[k]` and `t.name`, compound assignment, nesting, and `t.f(args)` calls
+- `any` values: checked conversion to typed values, Lua truthiness, and field access and method calls on class objects through generated type info
+- closures with Lua upvalue semantics (assigned captures are shared), nested closures, and block closures that return values
 
-The shared runtime uses a precise, non-moving mark-and-sweep heap. It traces module globals, class fields, list elements, table contents, closure environments, and explicit host pins.
+The shared runtime uses a precise, non-moving mark-and-sweep heap. It traces module globals, class fields, list elements, table contents, closure environments and cells, and explicit host pins.
 
 These features fail with an explicit backend error:
-- dynamic member calls on untyped closure parameters
-- block closures that return values
-- foreach over `any`
 - inheritance
 - conversions between `table` and list values other than literals
 - native `Vec3`/`Quat`/`Transform` ABIs
