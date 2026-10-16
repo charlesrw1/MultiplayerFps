@@ -16,9 +16,14 @@
 namespace luasharp {
 namespace {
 
+constexpr bool IsIdentifierCharacter(char value) {
+    return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') || (value >= '0' && value <= '9') || value == '_';
+}
+
 void AppendIdentifier(std::string& out, std::string_view value) {
-    if (value.empty() || std::isdigit(static_cast<unsigned char>(value.front()))) out += '_';
-    for (const unsigned char character : value) out += std::isalnum(character) || character == '_' ? static_cast<char>(character) : '_';
+    if (value.empty() || (value.front() >= '0' && value.front() <= '9')) out += '_';
+    if (std::all_of(value.begin(), value.end(), IsIdentifierCharacter)) { out += value; return; }
+    for (const char character : value) out += IsIdentifierCharacter(character) ? character : '_';
 }
 
 std::string Identifier(std::string_view value) {
@@ -84,11 +89,7 @@ struct CEmitter {
         for (const auto& item : program.classes) classes[item.name] = &item;
         for (const auto& item : externalTypes) { externalNames.insert(item.name); if (item.isEnum) enums.insert(item.name); }
         std::vector<const VariableBinding*> moduleBindings;
-        std::unordered_map<size_t, const VariableBinding*> bindingsBySymbol;
-        for (const auto& binding : analysis.bindings) {
-            if (binding.depth == 0) moduleBindings.push_back(&binding);
-            bindingsBySymbol.try_emplace(binding.symbolIndex, &binding);
-        }
+        for (const auto& binding : analysis.bindings) if (binding.depth == 0) moduleBindings.push_back(&binding);
         for (const auto& statement : program.Statements(program.topLevel)) {
             if (statement.kind != SyntaxStatement::Kind::Local) continue;
             for (const auto* binding : moduleBindings) {
@@ -119,6 +120,14 @@ struct CEmitter {
             for (const auto& field : type.fields) expression(expression, program.Expression(field.initializer));
             for (const auto& function : type.functions) statements(statements, function.body);
         }
+        std::vector<const VariableBinding*> bindingsBySymbol; // first binding of each symbol index
+        if (!lambdas.empty()) {
+            bindingsBySymbol.resize(analysis.symbols.size());
+            for (const auto& binding : analysis.bindings) {
+                assert(binding.symbolIndex < bindingsBySymbol.size());
+                if (!bindingsBySymbol[binding.symbolIndex]) bindingsBySymbol[binding.symbolIndex] = &binding;
+            }
+        }
         for (const auto* lambda : lambdas) {
             std::vector<const VariableBinding*> captured;
             const auto add = [&](const VariableBinding* binding) {
@@ -128,8 +137,9 @@ struct CEmitter {
             const auto scanExpression = [&](auto&& self, const BoundExpression& value) -> void {
                 if (&value != lambda && value.kind == SyntaxExpression::Kind::Lambda) return;
                 if (value.symbolIndex) {
-                    const auto binding = bindingsBySymbol.find(*value.symbolIndex);
-                    if (binding != bindingsBySymbol.end() && (binding->second->declaration.offset < lambda->span.offset || binding->second->declaration.offset >= lambda->span.End())) add(binding->second);
+                    assert(*value.symbolIndex < bindingsBySymbol.size());
+                    const auto* binding = bindingsBySymbol[*value.symbolIndex];
+                    if (binding && (binding->declaration.offset < lambda->span.offset || binding->declaration.offset >= lambda->span.End())) add(binding);
                 }
                 if (value.lowering == Lowering::ImplicitField || value.lowering == Lowering::ImplicitMethod) {
                     const auto binding = std::find_if(analysis.bindings.begin(), analysis.bindings.end(), [&](const auto& item) { return item.name == "this" && item.visibility.offset <= lambda->span.offset && item.visibility.End() >= lambda->span.End(); });
@@ -604,8 +614,9 @@ struct CEmitter {
                 if (self != lambdaCaptures[i].end()) Line(1, Type((*self)->type), " self=ls_env->", Id{(*self)->name}, ';');
             }
             Line(1, "(void)arguments;");
-            for (size_t parameter{}; parameter < lambda.Parameters().size(); ++parameter)
-                Line(1, "LS_Value ", Id{lambda.Parameters()[parameter].name}, "=arguments[", parameter, "];");
+            const auto parameters = analysis.syntax.Parameters(*lambda.syntax);
+            for (size_t parameter{}; parameter < parameters.size(); ++parameter)
+                Line(1, "LS_Value ", Id{parameters[parameter].name}, "=arguments[", parameter, "];");
             const auto returnType = types.Element(lambda.type);
             activeLambda = i;
             if (lambda.LambdaIsBlock()) {

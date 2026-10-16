@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cassert>
 #include <cstddef>
+#include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -26,8 +29,35 @@ struct SyntaxDiagnostic {
     TextSpan span;
 };
 
+// Syntax and bound trees store nodes in flat pools and link them by index.
+using NodeId = uint32_t;
+struct NodeRange { NodeId first{}; NodeId count{}; };
+
+// Nodes of a pool, listed by id. Iterates as references.
+template <typename T> class NodeList {
+public:
+    NodeList(const std::vector<T>& pool, std::span<const NodeId> ids) : pool_(&pool), ids_(ids) {}
+    struct Iterator {
+        const std::vector<T>* pool;
+        const NodeId* at;
+        const T& operator*() const { return (*pool)[*at]; }
+        Iterator& operator++() { ++at; return *this; }
+        bool operator==(const Iterator&) const = default;
+    };
+    [[nodiscard]] Iterator begin() const { return {pool_, ids_.data()}; }
+    [[nodiscard]] Iterator end() const { return {pool_, ids_.data() + ids_.size()}; }
+    [[nodiscard]] size_t size() const { return ids_.size(); }
+    [[nodiscard]] bool empty() const { return ids_.empty(); }
+    [[nodiscard]] const T& operator[](size_t index) const { assert(index < ids_.size()); return (*pool_)[ids_[index]]; }
+    [[nodiscard]] const T& front() const { return (*this)[0]; }
+
+private:
+    const std::vector<T>* pool_;
+    std::span<const NodeId> ids_;
+};
+
 struct SyntaxParameter { std::string type; std::string name; TextSpan span; };
-struct SyntaxStatement;
+// Ranges index SyntaxTree::links (child ids) or SyntaxTree::parameters.
 struct SyntaxExpression {
     enum class Kind {
         Missing, Identifier, Number, String, Null, Boolean, Table, TableEntry, New,
@@ -35,9 +65,9 @@ struct SyntaxExpression {
     } kind{Kind::Missing};
     std::string text;
     TextSpan span;
-    std::vector<SyntaxExpression> children;
-    std::vector<SyntaxParameter> parameters;
-    std::vector<SyntaxStatement> lambdaBody;
+    NodeRange children;   // expression ids
+    NodeRange parameters; // lambda parameters
+    NodeRange lambdaBody; // statement ids
     bool lambdaIsBlock{};
 };
 
@@ -45,7 +75,7 @@ struct SyntaxField {
     std::string access;
     std::string type;
     std::string name;
-    SyntaxExpression initializer;
+    NodeId initializer{}; // 0 is the shared missing expression
     TextSpan span;
 };
 struct SyntaxStatement {
@@ -56,11 +86,11 @@ struct SyntaxStatement {
     TextSpan nameSpan;
     TextSpan secondNameSpan;
     bool inferredType{};
-    SyntaxExpression expression;
-    SyntaxExpression increment;
-    std::vector<SyntaxStatement> initializer;
-    std::vector<SyntaxStatement> body;
-    std::vector<SyntaxStatement> elseBody;
+    NodeId expression{}; // 0 is the shared missing expression
+    NodeId increment{};
+    NodeRange initializer; // statement ids
+    NodeRange body;
+    NodeRange elseBody;
     TextSpan span;
 };
 struct SyntaxFunction {
@@ -69,7 +99,7 @@ struct SyntaxFunction {
     std::string returnType;
     bool isConstructor{};
     std::vector<SyntaxParameter> parameters;
-    std::vector<SyntaxStatement> body;
+    NodeRange body;
     TextSpan span;
 };
 struct SyntaxClass {
@@ -82,7 +112,7 @@ struct SyntaxClass {
 struct SyntaxEnumMember {
     std::string name;
     TextSpan nameSpan;
-    SyntaxExpression initializer;
+    NodeId initializer{};
     TextSpan span;
 };
 struct SyntaxEnum {
@@ -94,13 +124,38 @@ struct SyntaxEnum {
 struct SyntaxProgram {
     std::vector<SyntaxEnum> enums;
     std::vector<SyntaxClass> classes;
-    std::vector<SyntaxStatement> topLevel;
+    NodeRange topLevel;
     TextSpan span;
 };
+// Nodes never move after parsing, so pointers into the pools stay valid while the tree lives.
 struct SyntaxTree {
     SyntaxProgram root;
     std::vector<SyntaxToken> tokens;
     std::vector<SyntaxDiagnostic> diagnostics;
+    std::vector<SyntaxExpression> expressions; // [0] is the shared missing expression
+    std::vector<SyntaxStatement> statements;
+    std::vector<SyntaxParameter> parameters;
+    std::vector<NodeId> links;
+
+    [[nodiscard]] const SyntaxExpression& Expression(NodeId id) const { assert(id < expressions.size()); return expressions[id]; }
+    [[nodiscard]] NodeList<SyntaxExpression> Children(const SyntaxExpression& value) const { return {expressions, Links(value.children)}; }
+    [[nodiscard]] const SyntaxExpression& Child(const SyntaxExpression& value, size_t index) const { assert(index < value.children.count); return Expression(links[value.children.first + index]); }
+    [[nodiscard]] NodeList<SyntaxStatement> Statements(NodeRange range) const { return {statements, Links(range)}; }
+    [[nodiscard]] std::span<const SyntaxParameter> Parameters(const SyntaxExpression& value) const {
+        assert(value.parameters.first + value.parameters.count <= parameters.size());
+        return std::span(parameters).subspan(value.parameters.first, value.parameters.count);
+    }
+
+private:
+    [[nodiscard]] std::span<const NodeId> Links(NodeRange range) const {
+        assert(range.first + range.count <= links.size());
+        return std::span(links).subspan(range.first, range.count);
+    }
+};
+struct ExpressionTree {
+    SyntaxTree tree;
+    NodeId root{};
+    [[nodiscard]] const SyntaxExpression& Root() const { return tree.Expression(root); }
 };
 
 struct SourceMapEntry {
@@ -114,9 +169,9 @@ struct CompilationResult {
 
 // ParseTree is error-tolerant and is the entry point for editor tooling.
 SyntaxTree ParseTree(std::string_view source);
-// Compatibility helpers for callers that require valid syntax.
-SyntaxProgram ParseSyntax(std::string_view source);
-SyntaxExpression ParseExpression(const std::vector<SyntaxToken>& tokens);
+// Helpers for callers that require valid syntax; they throw on the first syntax error.
+SyntaxTree ParseSyntax(std::string_view source);
+ExpressionTree ParseExpression(const std::vector<SyntaxToken>& tokens);
 
 std::string Compile(std::string_view source);
 CompilationResult CompileWithSourceMap(std::string_view source);

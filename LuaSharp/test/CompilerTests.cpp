@@ -107,17 +107,20 @@ player.missing();
 }
 
 void TestSharedSyntaxTree() {
-    const auto syntax = luasharp::ParseSyntax(R"(class Child : Component {
+    const auto tree = luasharp::ParseSyntax(R"(class Child : Component {
 int health = 10;
 void move(int speed) { int distance = speed; }
 }
 
 auto child = new Child();
 )");
+    const auto& syntax = tree.root;
     Require(syntax.classes.size() == 1 && syntax.classes[0].baseName == "Component", "class inheritance was not parsed into syntax tree");
     Require(syntax.classes[0].fields.size() == 1 && syntax.classes[0].functions.size() == 1, "class members were not parsed into syntax tree");
     Require(syntax.classes[0].functions[0].parameters[0].name == "speed", "function parameter was not parsed into syntax tree");
-    Require(syntax.classes[0].functions[0].body[0].type == "int", "typed local was not parsed into syntax tree");
+    Require(tree.Statements(syntax.classes[0].functions[0].body)[0].type == "int", "typed local was not parsed into syntax tree");
+    const auto topLevel = tree.Statements(syntax.topLevel);
+    Require(topLevel.size() == 1 && tree.Expression(topLevel[0].expression).kind == luasharp::SyntaxExpression::Kind::New, "top-level statement was not linked into the syntax tree");
 }
 
 void TestExpressionTree() {
@@ -128,11 +131,15 @@ void TestExpressionTree() {
         {luasharp::SyntaxTokenKind::Number, "2", {16, 1}}, {luasharp::SyntaxTokenKind::Symbol, ")", {17, 1}},
         {luasharp::SyntaxTokenKind::Symbol, "[", {18, 1}}, {luasharp::SyntaxTokenKind::Number, "0", {19, 1}},
         {luasharp::SyntaxTokenKind::Symbol, "]", {20, 1}}};
-    const auto expression = luasharp::ParseExpression(tokens);
+    const auto parsed = luasharp::ParseExpression(tokens);
+    const auto& tree = parsed.tree;
+    const auto& expression = parsed.Root();
     Require(expression.kind == luasharp::SyntaxExpression::Kind::Index, "index expression was not parsed");
-    Require(expression.children[0].kind == luasharp::SyntaxExpression::Kind::Call, "call expression was not parsed");
-    Require(expression.children[0].children[0].kind == luasharp::SyntaxExpression::Kind::Member, "member expression was not parsed");
-    Require(expression.children[0].children[1].kind == luasharp::SyntaxExpression::Kind::Binary, "binary precedence expression was not parsed");
+    const auto& call = tree.Child(expression, 0);
+    Require(call.kind == luasharp::SyntaxExpression::Kind::Call, "call expression was not parsed");
+    Require(tree.Child(call, 0).kind == luasharp::SyntaxExpression::Kind::Member, "member expression was not parsed");
+    Require(tree.Child(call, 1).kind == luasharp::SyntaxExpression::Kind::Binary, "binary precedence expression was not parsed");
+    Require(tree.Children(tree.Child(call, 1)).size() == 2 && tree.Child(tree.Child(call, 1), 1).text == "2", "binary operands were not linked in order");
 }
 
 void TestRecoveringSyntaxTree() {
@@ -147,7 +154,7 @@ void TestLexerTriviaAndSpans() {
     const auto tree = luasharp::ParseTree("/* header */\nclass Thing { // field\n int value = 12; }");
     Require(tree.diagnostics.empty(), "comments caused lexer diagnostics");
     Require(tree.root.classes[0].span.offset == 19, "class name span is incorrect");
-    Require(tree.root.classes[0].fields[0].initializer.kind == luasharp::SyntaxExpression::Kind::Number, "field initializer was not parsed");
+    Require(tree.Expression(tree.root.classes[0].fields[0].initializer).kind == luasharp::SyntaxExpression::Kind::Number, "field initializer was not parsed");
     const auto broken = luasharp::ParseTree("/* never closed");
     Require(!broken.diagnostics.empty() && broken.diagnostics[0].message.find("Unterminated block comment") != std::string::npos, "unterminated comment was not diagnosed");
 }

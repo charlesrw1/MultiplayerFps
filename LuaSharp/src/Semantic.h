@@ -109,8 +109,6 @@ struct VariableBinding {
 
 // Bound nodes live in the BoundProgram pools and link by index. They point at
 // their syntax node for text, so they stay trivially destructible.
-using NodeId = uint32_t;
-struct NodeRange { NodeId first{}; NodeId count{}; };
 struct BoundExpression {
     SyntaxExpression::Kind kind{SyntaxExpression::Kind::Missing};
     Lowering lowering{};
@@ -122,7 +120,6 @@ struct BoundExpression {
     const SyntaxExpression* syntax{}; // null only for the shared missing node
 
     [[nodiscard]] const std::string& Text() const { static const std::string none; return syntax ? syntax->text : none; }
-    [[nodiscard]] std::span<const SyntaxParameter> Parameters() const { return syntax ? std::span(syntax->parameters) : std::span<const SyntaxParameter>{}; }
     [[nodiscard]] bool LambdaIsBlock() const { return syntax && syntax->lambdaIsBlock; }
 };
 struct BoundStatement {

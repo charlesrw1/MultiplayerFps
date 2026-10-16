@@ -157,6 +157,7 @@ private:
     bool IsNumeric(TypeId type) const { return type == TypeTable::Int || type == TypeTable::Float; }
     bool IsOpen(TypeId type) const { return type == TypeTable::Table || type == TypeTable::Any; }
     const std::string& Name(TypeId type) const { return types_.Name(type); }
+    const SyntaxTree& Syntax() const { return result_.syntax; }
     std::pair<size_t, size_t> Position(size_t offset) const {
         offset = (std::min)(offset, source_.size());
         const auto next = std::upper_bound(lineStarts_.begin(), lineStarts_.end(), offset);
@@ -303,7 +304,7 @@ private:
         for (size_t i{}; i < count; ++i) {
             const std::string_view label = callable.parameters[i];
             const auto expected = types_.Intern(label.substr(0, label.find(' '))), actual = Node(arguments + static_cast<NodeId>(i)).type;
-            if (!Assignable(expected, actual)) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + callable.name + "' expects '" + Name(expected) + "', got " + DisplayType(actual), call.children[i + 1].span);
+            if (!Assignable(expected, actual)) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + callable.name + "' expects '" + Name(expected) + "', got " + DisplayType(actual), Syntax().Child(call, i + 1).span);
         }
     }
     void CheckBuiltinArguments(std::string_view name, std::span<const BuiltinParameter> parameters, bool variadic, const SyntaxExpression& call, NodeId arguments, size_t count) {
@@ -316,7 +317,7 @@ private:
         const auto checked = (std::min)(count, parameters.size());
         for (size_t i{}; i < checked; ++i) {
             const auto actual = Node(arguments + static_cast<NodeId>(i)).type;
-            if (!Assignable(types_.Intern(parameters[i].type), actual)) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + std::string(name) + "' expects '" + parameters[i].type + "', got " + DisplayType(actual), call.children[i + 1].span);
+            if (!Assignable(types_.Intern(parameters[i].type), actual)) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + std::string(name) + "' expects '" + parameters[i].type + "', got " + DisplayType(actual), Syntax().Child(call, i + 1).span);
         }
     }
     const Local* FindLocal(const std::vector<Local>& locals, std::string_view name) const {
@@ -327,13 +328,14 @@ private:
     // a recursive call, since recursion grows the pool.
     TypeId Infer(const SyntaxExpression& expression, std::vector<Local>& locals, const SyntaxClass* owner, NodeId slot) {
         using Kind = SyntaxExpression::Kind;
-        const auto childCount = expression.children.size();
+        const size_t childCount = expression.children.count;
         const NodeId first = AllocateExpressions(childCount);
         NodeId visited{};
+        const auto syntaxChild = [&](size_t index) -> const SyntaxExpression& { return Syntax().Child(expression, index); };
         const auto child = [&](size_t index) {
             assert(index == visited && index < childCount);
             ++visited;
-            return Infer(expression.children[index], locals, owner, first + static_cast<NodeId>(index));
+            return Infer(syntaxChild(index), locals, owner, first + static_cast<NodeId>(index));
         };
         TypeId type{}; std::optional<size_t> symbol; Lowering lowering{}; NodeRange lambdaBody;
         switch (expression.kind) {
@@ -357,7 +359,7 @@ private:
                 if (childCount != expected) AddDiagnostic("Expected " + std::to_string(expected) + " constructor argument(s) for '" + expression.text + "', got " + std::to_string(childCount), expression.span);
                 else for (size_t i{}; i < expected; ++i) {
                     const auto actual = Node(first + static_cast<NodeId>(i)).type;
-                    if (!Assignable(types_.Intern(constructor->parameters[i].type), actual)) AddDiagnostic("Constructor argument " + std::to_string(i + 1) + " for '" + expression.text + "' expects '" + constructor->parameters[i].type + "', got " + DisplayType(actual), expression.children[i].span);
+                    if (!Assignable(types_.Intern(constructor->parameters[i].type), actual)) AddDiagnostic("Constructor argument " + std::to_string(i + 1) + " for '" + expression.text + "' expects '" + constructor->parameters[i].type + "', got " + DisplayType(actual), syntaxChild(i).span);
                 }
             }
             break;
@@ -389,13 +391,13 @@ private:
             break;
         }
         case Kind::Call: {
-            const auto& callee = expression.children[0];
+            const auto& callee = syntaxChild(0);
             const NodeId arguments = first + 1; const size_t argumentCount = childCount - 1;
             if (callee.kind == Kind::Identifier && (callee.text == "int" || callee.text == "float" || callee.text == "bool" || callee.text == "string")) {
                 for (size_t i{}; i < childCount; ++i) child(i);
                 if (argumentCount != 1) AddDiagnostic("Cast to '" + callee.text + "' expects exactly one argument", expression.span);
                 else if (const auto cast = BuiltinCastLowering(callee.text, Name(Node(arguments).type))) { type = types_.Intern(callee.text); lowering = *cast; }
-                else AddDiagnostic("Cannot convert " + DisplayType(Node(arguments).type) + " to '" + callee.text + "'", expression.children[1].span);
+                else AddDiagnostic("Cannot convert " + DisplayType(Node(arguments).type) + " to '" + callee.text + "'", syntaxChild(1).span);
                 break;
             }
             type = child(0);
@@ -423,7 +425,7 @@ private:
         }
         case Kind::Index: {
             const auto target = child(0), index = child(1);
-            if (types_.IsList(target)) { type = types_.Element(target); lowering = Lowering::ListIndex; if (index != TypeTable::Int && index != TypeTable::Any && index != TypeTable::Unknown) AddDiagnostic("List index must be 'int', got " + DisplayType(index), expression.children[1].span); }
+            if (types_.IsList(target)) { type = types_.Element(target); lowering = Lowering::ListIndex; if (index != TypeTable::Int && index != TypeTable::Any && index != TypeTable::Unknown) AddDiagnostic("List index must be 'int', got " + DisplayType(index), syntaxChild(1).span); }
             else if (IsOpen(target)) type = TypeTable::Any;
             else if (target != TypeTable::Unknown) AddDiagnostic("Type '" + Name(target) + "' is not indexable", expression.span);
             break;
@@ -440,16 +442,17 @@ private:
         }
         case Kind::Lambda: {
             auto lambdaLocals = locals; const size_t lambdaDepth = lambdaLocals.empty() ? 1 : lambdaLocals.back().depth + 1;
-            for (const auto& parameter : expression.parameters) AddLocal(lambdaLocals, parameter.name, TypeTable::Any, SymbolKind::Parameter, parameter.span, expression.span, lambdaDepth);
+            const auto parameters = Syntax().Parameters(expression);
+            for (const auto& parameter : parameters) AddLocal(lambdaLocals, parameter.name, TypeTable::Any, SymbolKind::Parameter, parameter.span, expression.span, lambdaDepth);
             TypeId resultType{};
             if (expression.lambdaIsBlock) {
                 lambdaBody = AnalyzeStatements(expression.lambdaBody, lambdaLocals, owner, InferReturn, expression.span.End(), lambdaDepth + 1);
                 resultType = LambdaResult(expression, lambdaBody);
             } else {
                 assert(childCount == 1);
-                ++visited; resultType = Infer(expression.children[0], lambdaLocals, owner, first);
+                ++visited; resultType = Infer(syntaxChild(0), lambdaLocals, owner, first);
             }
-            type = types_.Function(expression.parameters.size(), resultType == TypeTable::Unknown ? TypeTable::Any : resultType); break;
+            type = types_.Function(parameters.size(), resultType == TypeTable::Unknown ? TypeTable::Any : resultType); break;
         }
         case Kind::Unary: {
             const auto operand = child(0);
@@ -471,11 +474,11 @@ private:
         }
         case Kind::Assignment: {
             const auto left = child(0), right = child(1); type = left;
-            const auto targetKind = expression.children[0].kind;
-            if (targetKind != Kind::Identifier && targetKind != Kind::Member && targetKind != Kind::Index) AddDiagnostic("Invalid assignment target", expression.children[0].span);
+            const auto targetKind = syntaxChild(0).kind;
+            if (targetKind != Kind::Identifier && targetKind != Kind::Member && targetKind != Kind::Index) AddDiagnostic("Invalid assignment target", syntaxChild(0).span);
             if (targetKind == Kind::Index && types_.IsList(ChildType(first, 0))) lowering = Lowering::ListSet;
             if (expression.text == "=") {
-                if (!Assignable(left, right)) AddDiagnostic("Cannot assign " + DisplayType(right) + " to " + DisplayType(left), expression.children[1].span);
+                if (!Assignable(left, right)) AddDiagnostic("Cannot assign " + DisplayType(right) + " to " + DisplayType(left), syntaxChild(1).span);
             } else if (const auto* builtin = FindBuiltinOperator(Name(left), std::string_view(expression.text).substr(0, 1), Name(right))) {
                 if (!Assignable(left, types_.Intern(builtin->result))) AddDiagnostic("Result of '" + expression.text + "' is '" + builtin->result + "', which cannot be assigned to '" + Name(left) + "'", expression.span);
                 if (builtin->lowering == Lowering::Concat) lowering = Lowering::CompoundConcat;
@@ -552,53 +555,55 @@ private:
         if (const auto found = result_.variableTypes.find(name); found != result_.variableTypes.end()) found->second = type;
         else result_.variableTypes.emplace(std::string(name), type);
     }
-    NodeRange AnalyzeStatements(const std::vector<SyntaxStatement>& statements, std::vector<Local>& locals, const SyntaxClass* owner, TypeId returnType, size_t scopeEnd, size_t depth, size_t loopDepth = 0, bool preserveLocals = false) {
+    NodeRange AnalyzeStatements(NodeRange range, std::vector<Local>& locals, const SyntaxClass* owner, TypeId returnType, size_t scopeEnd, size_t depth, size_t loopDepth = 0, bool preserveLocals = false) {
         using StatementKind = SyntaxStatement::Kind;
+        const auto statements = Syntax().Statements(range);
         const auto first = static_cast<NodeId>(result_.bound.statements.size());
         result_.bound.statements.resize(first + statements.size());
         const size_t startingLocals = locals.size();
         bool unreachable = false;
         for (size_t at{}; at < statements.size(); ++at) {
             const auto& statement = statements[at];
+            const auto& expression = Syntax().Expression(statement.expression);
             if (unreachable) AddDiagnostic("Unreachable code", statement.span, DiagnosticSeverity::Warning);
             BoundStatement bound; bound.kind = statement.kind; bound.inferredType = statement.inferredType; bound.span = statement.span; bound.syntax = &statement;
-            const auto infer = [&](const SyntaxExpression& expression, NodeId& slot) { slot = AllocateExpressions(1); return Infer(expression, locals, owner, slot); };
+            const auto infer = [&](const SyntaxExpression& value, NodeId& slot) { slot = AllocateExpressions(1); return Infer(value, locals, owner, slot); };
             if (statement.kind == StatementKind::Local) {
-                const auto actual = infer(statement.expression, bound.expression); const auto type = statement.inferredType ? actual : types_.Intern(statement.type); bound.type = type;
+                const auto actual = infer(expression, bound.expression); const auto type = statement.inferredType ? actual : types_.Intern(statement.type); bound.type = type;
                 const TextSpan nameSpan = statement.nameSpan;
                 if (!statement.inferredType) {
-                    CheckType(type, nameSpan); if (statement.expression.kind != SyntaxExpression::Kind::Missing && !Assignable(type, actual)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + Name(type) + "'", statement.expression.span);
-                    if (types_.IsList(type) && statement.expression.kind == SyntaxExpression::Kind::Table) {
+                    CheckType(type, nameSpan); if (expression.kind != SyntaxExpression::Kind::Missing && !Assignable(type, actual)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + Name(type) + "'", expression.span);
+                    if (types_.IsList(type) && expression.kind == SyntaxExpression::Kind::Table) {
                         const auto element = types_.Element(type); const auto entries = Node(bound.expression).children;
                         for (NodeId i{}; i < entries.count; ++i) {
                             const auto& entry = Node(entries.first + i);
-                            if (entry.kind == SyntaxExpression::Kind::TableEntry) AddDiagnostic("Typed list literals cannot contain keyed entries", statement.expression.children[i].span);
-                            else if (!Assignable(element, entry.type)) AddDiagnostic("List element " + std::to_string(i + 1) + " expects '" + Name(element) + "', got " + DisplayType(entry.type), statement.expression.children[i].span);
+                            if (entry.kind == SyntaxExpression::Kind::TableEntry) AddDiagnostic("Typed list literals cannot contain keyed entries", Syntax().Child(expression, i).span);
+                            else if (!Assignable(element, entry.type)) AddDiagnostic("List element " + std::to_string(i + 1) + " expects '" + Name(element) + "', got " + DisplayType(entry.type), Syntax().Child(expression, i).span);
                         }
                     }
                 }
                 if (statement.inferredType && type == TypeTable::Unknown) AddDiagnostic("Cannot infer type of '" + statement.name + "'", nameSpan);
-                if (statement.inferredType && type == TypeTable::Void) AddDiagnostic("Cannot initialize '" + statement.name + "' with a void expression", statement.expression.span);
+                if (statement.inferredType && type == TypeTable::Void) AddDiagnostic("Cannot initialize '" + statement.name + "' with a void expression", expression.span);
                 AddLocal(locals, statement.name, type, SymbolKind::Variable, nameSpan, {statement.span.offset, scopeEnd - statement.span.offset}, depth);
             } else if (statement.kind == StatementKind::Return) {
-                const auto actual = infer(statement.expression, bound.expression);
-                const bool hasValue = statement.expression.kind != SyntaxExpression::Kind::Missing;
+                const auto actual = infer(expression, bound.expression);
+                const bool hasValue = expression.kind != SyntaxExpression::Kind::Missing;
                 if (returnType == InferReturn) { }
-                else if (returnType == TypeTable::Void && hasValue) AddDiagnostic("Void function cannot return a value", statement.expression.span);
+                else if (returnType == TypeTable::Void && hasValue) AddDiagnostic("Void function cannot return a value", expression.span);
                 else if (returnType != TypeTable::Void && !hasValue) AddDiagnostic("Function returning '" + Name(returnType) + "' must return a value", statement.span);
-                else if (returnType != TypeTable::Void && !Assignable(returnType, actual)) AddDiagnostic("Cannot return " + DisplayType(actual) + " from function returning '" + Name(returnType) + "'", statement.expression.span);
+                else if (returnType != TypeTable::Void && !Assignable(returnType, actual)) AddDiagnostic("Cannot return " + DisplayType(actual) + " from function returning '" + Name(returnType) + "'", expression.span);
             } else if (statement.kind == StatementKind::Break || statement.kind == StatementKind::Continue) {
                 if (loopDepth == 0) AddDiagnostic(std::string(statement.kind == StatementKind::Break ? "'break'" : "'continue'") + " can only be used inside a loop", statement.span);
             } else if (statement.kind == StatementKind::For) {
                 const size_t loopLocals = locals.size();
                 bound.initializer = AnalyzeStatements(statement.initializer, locals, owner, returnType, statement.span.End(), depth + 1, loopDepth, true);
-                const auto condition = infer(statement.expression, bound.expression);
-                if (condition != TypeTable::Bool && condition != TypeTable::Any && condition != TypeTable::Unknown) AddDiagnostic("For condition must be 'bool', got " + DisplayType(condition), statement.expression.span);
-                infer(statement.increment, bound.increment);
+                const auto condition = infer(expression, bound.expression);
+                if (condition != TypeTable::Bool && condition != TypeTable::Any && condition != TypeTable::Unknown) AddDiagnostic("For condition must be 'bool', got " + DisplayType(condition), expression.span);
+                infer(Syntax().Expression(statement.increment), bound.increment);
                 bound.body = AnalyzeStatements(statement.body, locals, owner, returnType, statement.span.End(), depth + 2, loopDepth + 1);
                 locals.resize(loopLocals);
             } else if (statement.kind == StatementKind::ForEach) {
-                const size_t loopLocals = locals.size(); const auto iterable = infer(statement.expression, bound.expression);
+                const size_t loopLocals = locals.size(); const auto iterable = infer(expression, bound.expression);
                 TypeId firstType{};
                 if (iterable == TypeTable::Range) {
                     firstType = TypeTable::Int;
@@ -610,7 +615,7 @@ private:
                     if (statement.secondName.empty()) AddDiagnostic("Table loops require key and value iteration variables", statement.nameSpan);
                 } else if (iterable == TypeTable::Any) {
                     firstType = TypeTable::Any;
-                } else if (iterable != TypeTable::Unknown) AddDiagnostic("Type '" + Name(iterable) + "' is not iterable", statement.expression.span);
+                } else if (iterable != TypeTable::Unknown) AddDiagnostic("Type '" + Name(iterable) + "' is not iterable", expression.span);
                 AddLocal(locals, statement.name, firstType, SymbolKind::Variable, statement.nameSpan, {statement.nameSpan.offset, statement.span.End() - statement.nameSpan.offset}, depth + 1);
                 if (!statement.secondName.empty()) {
                     const auto secondType = types_.IsList(iterable) ? types_.Element(iterable) : TypeTable::Any;
@@ -619,15 +624,15 @@ private:
                 bound.body = AnalyzeStatements(statement.body, locals, owner, returnType, statement.span.End(), depth + 2, loopDepth + 1);
                 locals.resize(loopLocals);
             } else {
-                const auto condition = infer(statement.expression, bound.expression);
+                const auto condition = infer(expression, bound.expression);
                 if (statement.kind == StatementKind::If || statement.kind == StatementKind::While) {
-                    if (condition != TypeTable::Bool && condition != TypeTable::Any && condition != TypeTable::Unknown) AddDiagnostic(std::string(statement.kind == StatementKind::If ? "If" : "While") + " condition must be 'bool', got " + DisplayType(condition), statement.expression.span);
+                    if (condition != TypeTable::Bool && condition != TypeTable::Any && condition != TypeTable::Unknown) AddDiagnostic(std::string(statement.kind == StatementKind::If ? "If" : "While") + " condition must be 'bool', got " + DisplayType(condition), expression.span);
                     bound.body = AnalyzeStatements(statement.body, locals, owner, returnType, statement.span.End(), depth + 1, loopDepth + (statement.kind == StatementKind::While ? 1 : 0));
                     if (statement.kind == StatementKind::If) bound.elseBody = AnalyzeStatements(statement.elseBody, locals, owner, returnType, statement.span.End(), depth + 1, loopDepth);
                 }
             }
             result_.bound.statements[first + at] = bound;
-            if (statement.kind == StatementKind::Return || statement.kind == StatementKind::Break || statement.kind == StatementKind::Continue || (statement.kind == StatementKind::If && !statement.elseBody.empty() && AlwaysReturns(statement.body) && AlwaysReturns(statement.elseBody))) unreachable = true;
+            if (statement.kind == StatementKind::Return || statement.kind == StatementKind::Break || statement.kind == StatementKind::Continue || (statement.kind == StatementKind::If && statement.elseBody.count && AlwaysReturns(statement.body) && AlwaysReturns(statement.elseBody))) unreachable = true;
         }
         if (!preserveLocals) locals.resize(startingLocals);
         return {first, static_cast<NodeId>(statements.size())};
@@ -638,11 +643,12 @@ private:
             BoundEnum boundEnum; boundEnum.name = value.name; boundEnum.span = value.span; long long nextValue{};
             for (const auto& member : value.members) {
                 long long resolved = nextValue;
-                if (member.initializer.kind != SyntaxExpression::Kind::Missing) {
-                    const SyntaxExpression* number = &member.initializer; int sign = 1;
-                    if (number->kind == SyntaxExpression::Kind::Unary && (number->text == "-" || number->text == "+") && number->children.size() == 1) { sign = number->text == "-" ? -1 : 1; number = &number->children[0]; }
-                    if (number->kind != SyntaxExpression::Kind::Number || number->text.find('.') != std::string::npos) AddDiagnostic("Enum values must be integer constants", member.initializer.span);
-                    else try { resolved = std::stoll(number->text) * sign; } catch (...) { AddDiagnostic("Enum value is outside the supported integer range", member.initializer.span); }
+                const auto& initializer = Syntax().Expression(member.initializer);
+                if (initializer.kind != SyntaxExpression::Kind::Missing) {
+                    const SyntaxExpression* number = &initializer; int sign = 1;
+                    if (number->kind == SyntaxExpression::Kind::Unary && (number->text == "-" || number->text == "+") && number->children.count == 1) { sign = number->text == "-" ? -1 : 1; number = &Syntax().Child(*number, 0); }
+                    if (number->kind != SyntaxExpression::Kind::Number || number->text.find('.') != std::string::npos) AddDiagnostic("Enum values must be integer constants", initializer.span);
+                    else try { resolved = std::stoll(number->text) * sign; } catch (...) { AddDiagnostic("Enum value is outside the supported integer range", initializer.span); }
                 }
                 boundEnum.members.push_back({member.name, resolved, member.nameSpan}); nextValue = resolved + 1;
             }
@@ -656,10 +662,11 @@ private:
             BoundClass boundClass; boundClass.name = value.name; boundClass.baseName = value.baseName; boundClass.span = value.span;
             for (const auto& field : value.fields) {
                 BoundField boundField; boundField.access = field.access; boundField.type = field.type; boundField.name = field.name; boundField.span = field.span;
-                if (field.initializer.kind != SyntaxExpression::Kind::Missing) {
+                const auto& initializer = Syntax().Expression(field.initializer);
+                if (initializer.kind != SyntaxExpression::Kind::Missing) {
                     std::vector<Local> none; boundField.initializer = AllocateExpressions(1);
-                    const auto actual = Infer(field.initializer, none, &value, boundField.initializer);
-                    if (!Assignable(types_.Intern(field.type), actual)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + field.type + "'", field.initializer.span);
+                    const auto actual = Infer(initializer, none, &value, boundField.initializer);
+                    if (!Assignable(types_.Intern(field.type), actual)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + field.type + "'", initializer.span);
                 }
                 boundClass.fields.push_back(std::move(boundField));
             }
@@ -683,13 +690,13 @@ private:
     }
     size_t FunctionEnd(const SyntaxFunction& function) const {
         size_t end = function.span.End();
-        const auto visit = [&](auto&& self, const std::vector<SyntaxStatement>& statements) -> void { for (const auto& statement : statements) { end = (std::max)(end, statement.span.End()); self(self, statement.body); self(self, statement.elseBody); } };
+        const auto visit = [&](auto&& self, NodeRange statements) -> void { for (const auto& statement : Syntax().Statements(statements)) { end = (std::max)(end, statement.span.End()); self(self, statement.body); self(self, statement.elseBody); } };
         visit(visit, function.body); return end;
     }
-    bool AlwaysReturns(const std::vector<SyntaxStatement>& statements) const {
-        for (const auto& statement : statements) {
+    bool AlwaysReturns(NodeRange statements) const {
+        for (const auto& statement : Syntax().Statements(statements)) {
             if (statement.kind == SyntaxStatement::Kind::Return) return true;
-            if (statement.kind == SyntaxStatement::Kind::If && !statement.elseBody.empty() && AlwaysReturns(statement.body) && AlwaysReturns(statement.elseBody)) return true;
+            if (statement.kind == SyntaxStatement::Kind::If && statement.elseBody.count && AlwaysReturns(statement.body) && AlwaysReturns(statement.elseBody)) return true;
         }
         return false;
     }
