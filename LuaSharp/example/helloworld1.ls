@@ -215,3 +215,130 @@ for (int i = 0; i < 500; i += 1) {
     checksum = (checksum * 31 + i) % 1000003;
 }
 printf("loop: evens=%d odds=%d checksum=%d\n", evens, odds, checksum);
+
+int[] integers;
+for(i in 0..9) {
+    integers.push_back(i);
+}
+printf("%d\n",integers.size());
+for(i in integers) {
+    printf("%d\n", i * 2);
+}
+
+string somestr = "Hello...";
+somestr += "WORLD!\n";
+printf(somestr);
+int[] subintegers = {69,70,71};
+for(i in subintegers) {
+    printf("%d\n", i * 2);
+}
+printf("%d\n",integers[0]);
+
+class Player {
+    string player_func() {
+        return "Player name:"+name;
+    }
+    void set_name(string s) {
+        name = s;
+    }
+
+    Player[] otherplayers;
+    string name = "none";
+
+
+}
+auto p = new Player();
+p.set_name("charlie");
+printf(p.player_func());
+p.otherplayers.push_back(p);
+printf("%d\n",p.otherplayers.size());
+p.otherplayers.clear();
+
+class Application {
+    table print_table(table t) {
+        for(key,value in t) {
+            printf("%s %s\n",key,value);
+        }
+        return t;
+    }
+}
+auto app = new Application();
+auto anothertable = app.print_table({key1="value1",key2="value2"});
+printf("=================\n");
+app.print_table(anothertable);
+
+
+/*
+Wants:
+debugger
+ensuring program never segfaults/sandboxing
+metrics about garbage collection, heap, etc.
+
+dict, set type? function type? any type?
+
+casting between types dynamically.
+
+constructors of objects. super objects. virtual functions.
+
+iterating properties of objects.
+
+binding to C++ application...how?
+    c++ will pass structs and pointers and lists and dicts and strings
+    at script compilation time, have extern list of classes and structs
+        these have field offsets and a table for getters/setters
+    
+    ClassBase system
+    Struct system
+    C++ objects not garbage collected? crap
+
+    but want things like DynamicMaterial, DynamicModel to be GC'd
+        or be careful. c++ made objects not GCd. LS objects GCd, so be very careful passing objects back and forth.
+        never pass a LS object to C++
+    
+
+    .ls wrapper object that has ptr to c++ object
+        calling .ls wrapper functions then calls c++ object. this is like what you have now,  kind of.
+        {
+        _ptr=0xffe34983
+        get_position,
+        set_position,
+        get_parent,
+        }
+        ownership. 
+
+    
+    dont allow new to make c++ objects? must be done in c++.
+    any `new` in .ls is GC managed. use handles or whatever.
+
+    structs: have to copy...
+
+
+table and list literals
+
+
+
+include an optimized path for arrays
+
+i.e. you can send ptrs to/from c++, somehow.
+like for filling buffers for meshes or for transform data
+
+can do raw memcpys of a struct defined in c++, or even not defined there.
+copy data into the ptr with some range checks.
+then C++ side can upload to a glbuffer
+
+byte type.
+
+then can do
+
+raw_span<T> type:
+    a view into a raw array of type T. 
+
+T[] my_managed_array.
+my_managed_array.to_raw_span(). creates a raw_span that c++ can read the ptr. 
+
+can only make raw_span of a struct or literal type.
+
+raw_spans are very dangerous. you shouldnt play around with them.
+
+
+*/
