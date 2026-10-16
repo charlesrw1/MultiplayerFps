@@ -104,8 +104,13 @@ try {
     send({ jsonrpc: "2.0", id: 9, method: "textDocument/hover", params: { textDocument: { uri }, position: { line: listHoverSource.split("\n").length - 1, character: 10 } } });
     const listHover = await waitFor(m => m.id === 9, "list method hover");
     assert.match(listHover.result.contents.value, /void push_back\(int value\)/, "list method hover must include its return type and parameters");
+    const printfSource = `${source}\nprintf("hi\\n");`;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 12 }, contentChanges: [{ text: printfSource }] } });
+    send({ jsonrpc: "2.0", id: 91, method: "textDocument/hover", params: { textDocument: { uri }, position: { line: printfSource.split("\n").length - 1, character: 2 } } });
+    const printfHover = await waitFor(m => m.id === 91, "builtin function hover");
+    assert.match(printfHover.result.contents.value, /void printf\(string format/, "builtin function hover must show its signature");
     const partialSource = `${source}\nint[] partialValues = {};\npartialValues.pu`;
-    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 12 }, contentChanges: [{ text: partialSource }] } });
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 13 }, contentChanges: [{ text: partialSource }] } });
     send({ jsonrpc: "2.0", id: 10, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: partialSource.split("\n").length - 1, character: "partialValues.pu".length } } });
     const partialCompletion = await waitFor(m => m.id === 10, "partial member completion");
     assert.ok(partialCompletion.result.some(item => item.label.startsWith("push_back(")), "member completion failed after a typed prefix");

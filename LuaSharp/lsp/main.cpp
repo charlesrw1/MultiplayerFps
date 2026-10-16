@@ -88,7 +88,7 @@ std::string WordAt(const std::string& text, const json& position) {
     return text.substr(begin, end - begin);
 }
 int TokenKind(luasharp::SymbolKind kind) {
-    switch (kind) { case luasharp::SymbolKind::Class: return 0; case luasharp::SymbolKind::Enum: case luasharp::SymbolKind::Type: return 1; case luasharp::SymbolKind::Method: return 3; case luasharp::SymbolKind::Field: return 4; case luasharp::SymbolKind::Parameter: return 6; default: return 5; }
+    switch (kind) { case luasharp::SymbolKind::Class: return 0; case luasharp::SymbolKind::Enum: case luasharp::SymbolKind::Type: return 1; case luasharp::SymbolKind::Function: return 2; case luasharp::SymbolKind::Method: return 3; case luasharp::SymbolKind::Field: return 4; case luasharp::SymbolKind::Parameter: return 6; default: return 5; }
 }
 const luasharp::Symbol* MemberAt(const luasharp::Analysis& analysis, size_t offset) {
     const auto& tokens = analysis.syntax.tokens;
@@ -120,7 +120,7 @@ std::string DisplayType(const std::string& type) {
 std::string HoverLabel(const luasharp::Symbol& symbol) {
     if (symbol.kind == luasharp::SymbolKind::Class) return "class " + symbol.name;
     if (symbol.kind == luasharp::SymbolKind::Enum) return "enum " + symbol.name;
-    if (symbol.kind != luasharp::SymbolKind::Method) return DisplayType(symbol.type) + " " + symbol.name;
+    if (symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Function) return DisplayType(symbol.type) + " " + symbol.name;
     std::string result = symbol.type + " " + symbol.name + "(";
     for (size_t i{}; i < symbol.parameters.size(); ++i) { if (i) result += ", "; result += symbol.parameters[i]; }
     return result + ")";
@@ -265,6 +265,7 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
         if (!symbol) if (const auto* expression = luasharp::FindExpression(analysis, token.span.offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) symbol = &analysis.symbols[*expression->symbolIndex];
         if (symbol) tokenKind = TokenKind(symbol->kind);
         else if (std::any_of(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) { return (candidate.kind == luasharp::SymbolKind::Class || candidate.kind == luasharp::SymbolKind::Enum) && candidate.name == token.text; })) tokenKind = 1;
+        else if (&token + 1 != analysis.syntax.tokens.data() + analysis.syntax.tokens.size() && (&token)[1].text == "(" && luasharp::FindBuiltinFunction(token.text)) tokenKind = 2;
         if (tokenKind < 0) continue;
         const auto location = PositionAt(text, token.span.offset); const size_t line = location["line"], character = location["character"];
         data.push_back(emitted ? line - previousLine : line); data.push_back(emitted && line == previousLine ? character - previousCharacter : character); data.push_back(token.span.length); data.push_back(tokenKind); data.push_back(0);

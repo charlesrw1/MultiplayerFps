@@ -10,7 +10,7 @@
 
 namespace luasharp {
 
-enum class SymbolKind { Class, Enum, Type, Field, Method, Variable, Parameter };
+enum class SymbolKind { Class, Enum, Type, Field, Method, Function, Variable, Parameter };
 struct Symbol {
     std::string name;
     std::string type;

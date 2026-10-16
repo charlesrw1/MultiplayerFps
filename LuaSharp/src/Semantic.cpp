@@ -221,7 +221,7 @@ private:
                 }
             }
             if (type.empty() && (IsBuiltinType(expression.text) || enumTypes_.contains(expression.text))) type = "$type:" + expression.text;
-            if (type.empty()) if (const auto builtin = FindBuiltinFunction(expression.text)) type = "$builtin:" + builtin->name;
+            if (type.empty()) if (const auto builtin = FindBuiltinFunction(expression.text)) { type = "$builtin:" + builtin->name; symbol = BuiltinSymbolIndex(*builtin); }
             if (type.empty()) AddDiagnostic("Unknown identifier '" + expression.text + "'", expression.span);
             break;
         }
@@ -374,6 +374,13 @@ private:
         std::string current = actual;
         for (size_t depth{}; depth < result_.baseTypes.size() + 1;) { const auto base = result_.baseTypes.find(current); if (base == result_.baseTypes.end()) break; if (base->second == expected) return true; current = base->second; ++depth; }
         return false;
+    }
+    size_t BuiltinSymbolIndex(const BuiltinFunction& builtin) {
+        const auto existing = std::find_if(result_.symbols.begin(), result_.symbols.end(), [&](const Symbol& symbol) { return symbol.kind == SymbolKind::Function && symbol.name == builtin.name; });
+        if (existing != result_.symbols.end()) return static_cast<size_t>(existing - result_.symbols.begin());
+        std::vector<std::string> parameters; for (const auto& parameter : builtin.parameters) parameters.push_back(parameter.type + " " + parameter.name);
+        if (builtin.variadic) parameters.push_back("any values...");
+        return AddSymbol(builtin.name, builtin.returnType, SymbolKind::Function, {source_.size(), 0}, std::move(parameters));
     }
     std::optional<size_t> SymbolIndex(const Symbol& symbol) const {
         for (size_t i{}; i < result_.symbols.size(); ++i) if (&result_.symbols[i] == &symbol || (result_.symbols[i].span.offset == symbol.span.offset && result_.symbols[i].name == symbol.name)) return i;
