@@ -195,6 +195,7 @@ private:
         using Kind = SyntaxExpression::Kind;
         BoundExpression scratch; auto& bound = output ? *output : scratch;
         bound.kind = expression.kind; bound.text = expression.text; bound.span = expression.span; bound.children.clear(); bound.parameters = expression.parameters; bound.lambdaBody.clear(); bound.lambdaIsBlock = expression.lambdaIsBlock;
+        bound.children.reserve(expression.children.size());
         const auto child = [&](size_t index) {
             bound.children.emplace_back();
             return Infer(expression.children[index], locals, owner, &bound.children.back());

@@ -26,6 +26,7 @@ public:
 
     SyntaxTree Run() {
         SyntaxTree tree;
+        tree.tokens.reserve(source_.size() / 3); // regrowing a large token vector costs more than lexing itself
         while (position_ < source_.size()) {
             SkipTrivia();
             if (position_ >= source_.size()) break;
@@ -134,7 +135,7 @@ private:
     const SyntaxToken& Current(size_t lookahead = 0) const { return tokens_[(std::min)(index_ + lookahead, tokens_.size() - 1)]; }
     bool AtEnd() const { return Current().kind == SyntaxTokenKind::EndOfFile; }
     bool Is(std::string_view text, size_t lookahead = 0) const { return Current(lookahead).text == text; }
-    SyntaxToken Advance() { const auto token = Current(); if (!AtEnd()) ++index_; return token; }
+    const SyntaxToken& Advance() { const auto& token = Current(); if (!AtEnd()) ++index_; return token; }
     SyntaxToken Match(std::string_view text) {
         if (Is(text)) return Advance();
         diagnostics_.push_back({"Expected '" + std::string(text) + "'", Current().span});
