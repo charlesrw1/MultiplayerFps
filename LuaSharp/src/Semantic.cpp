@@ -1,4 +1,5 @@
 #include "Semantic.h"
+#include "Builtins.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -15,7 +16,11 @@ struct Local {
 
 class Analyzer {
 public:
-    Analyzer(std::string_view source, SyntaxTree syntax) : source_(source) { result_.syntax = std::move(syntax); }
+    Analyzer(std::string_view source, SyntaxTree syntax) : source_(source) {
+        result_.syntax = std::move(syntax);
+        for (const auto& type : BuiltinTypes()) knownTypes_.insert(type);
+        RegisterBuiltinType("string"); RegisterBuiltinType("Vec3"); RegisterBuiltinType("Quat"); RegisterBuiltinType("Transform");
+    }
 
     Analysis Run() {
         for (const auto& diagnostic : result_.syntax.diagnostics) AddDiagnostic(diagnostic.message, diagnostic.span);
@@ -28,7 +33,7 @@ public:
 
 private:
     static std::string BaseType(std::string type) { while (type.ends_with("[]")) type.resize(type.size() - 2); return type; }
-    static bool IsOpenType(const std::string& type) { return type == "table" || type.ends_with("[]"); }
+    static bool IsOpenType(const std::string& type) { return type == "table" || type == "any"; }
     static bool IsNumeric(const std::string& type) { return type == "int" || type == "float"; }
     std::pair<size_t, size_t> Position(size_t offset) const {
         offset = (std::min)(offset, source_.size()); size_t line{}, lineStart{};
@@ -46,6 +51,18 @@ private:
     void CheckType(const std::string& type, TextSpan span) {
         const auto base = BaseType(type);
         if (!base.empty() && base != "void" && !knownTypes_.contains(base)) AddDiagnostic("Unknown type '" + base + "'", span);
+        if (type.ends_with("[]")) RegisterBuiltinType(type);
+    }
+    static std::vector<std::string> ParameterLabels(const BuiltinMember& member) {
+        std::vector<std::string> result; for (const auto& parameter : member.parameters) result.push_back(parameter.type + " " + parameter.name + (parameter.optional ? "?" : "")); return result;
+    }
+    void RegisterBuiltinType(const std::string& type) {
+        if (!registeredBuiltins_.insert(type).second) return;
+        const auto add = [&](const BuiltinMember& member, const std::string& key) {
+            result_.members[key].push_back({member.name, member.returnType, member.kind, 0, 0, {source_.size(), 0}, ParameterLabels(member)});
+        };
+        for (const auto& member : BuiltinMembers(type, false)) add(member, type);
+        for (const auto& member : BuiltinMembers(type, true)) add(member, "$type:" + type);
     }
     TextSpan ParameterNameSpan(const SyntaxParameter& parameter) const {
         return {parameter.span.End() - parameter.name.size(), parameter.name.size()};
@@ -101,7 +118,9 @@ private:
         return found == result_.syntax.root.classes.end() ? TextSpan{} : found->span;
     }
     const Symbol* FindMember(const std::string& type, std::string_view name) const {
-        const auto found = result_.members.find(BaseType(type)); if (found == result_.members.end()) return nullptr;
+        auto found = result_.members.find(type);
+        if (found == result_.members.end()) found = result_.members.find(BaseType(type));
+        if (found == result_.members.end()) return nullptr;
         const auto member = std::find_if(found->second.begin(), found->second.end(), [&](const Symbol& value) { return value.name == name; });
         return member == found->second.end() ? nullptr : &*member;
     }
@@ -119,13 +138,20 @@ private:
             if (!Assignable(expected, actual[i])) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + callable.name + "' expects '" + expected + "', got " + DisplayType(actual[i]), call.children[i + 1].span);
         }
     }
+    void CheckBuiltinArguments(const BuiltinMember& callable, const SyntaxExpression& call, const std::vector<std::string>& actual) {
+        const size_t required = static_cast<size_t>(std::count_if(callable.parameters.begin(), callable.parameters.end(), [](const auto& value) { return !value.optional; }));
+        if (actual.size() < required || actual.size() > callable.parameters.size()) {
+            AddDiagnostic("Expected " + std::to_string(required) + (required == callable.parameters.size() ? "" : " to " + std::to_string(callable.parameters.size())) + " argument(s) for '" + callable.name + "', got " + std::to_string(actual.size()), call.span); return;
+        }
+        for (size_t i{}; i < actual.size(); ++i) if (!Assignable(callable.parameters[i].type, actual[i])) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + callable.name + "' expects '" + callable.parameters[i].type + "', got " + DisplayType(actual[i]), call.children[i + 1].span);
+    }
     const Local* FindLocal(const std::vector<Local>& locals, std::string_view name) const {
         const auto found = std::find_if(locals.rbegin(), locals.rend(), [&](const Local& value) { return value.name == name; });
         return found == locals.rend() ? nullptr : &*found;
     }
     std::string Infer(const SyntaxExpression& expression, const std::vector<Local>& locals, const SyntaxClass* owner) {
         using Kind = SyntaxExpression::Kind;
-        std::string type; std::optional<size_t> symbol;
+        std::string type; std::optional<size_t> symbol; std::string lowering;
         switch (expression.kind) {
         case Kind::Missing: break;
         case Kind::Number: type = expression.text.find('.') == std::string::npos ? "int" : "float"; break;
@@ -149,6 +175,7 @@ private:
             else if (owner) {
                 if (const auto* member = FindMember(owner->name, expression.text)) { type = member->type; symbol = SymbolIndex(*member); }
             }
+            if (type.empty() && IsBuiltinType(expression.text)) type = "$type:" + expression.text;
             if (type.empty()) AddDiagnostic("Unknown identifier '" + expression.text + "'", expression.span);
             break;
         }
@@ -156,43 +183,77 @@ private:
         case Kind::Member: {
             const auto target = Infer(expression.children[0], locals, owner); const auto* member = FindMember(target, expression.text);
             if (member) { type = member->type; symbol = SymbolIndex(*member); }
+            else if (target == "table" || target == "any") type = "any";
             else if (expression.text != "<missing>" && !target.empty() && !IsOpenType(target)) AddDiagnostic("Unknown member '" + expression.text + "' on " + BaseType(target), MemberNameSpan(expression), DiagnosticSeverity::Warning);
             break;
         }
         case Kind::Call: {
-            const auto& callee = expression.children[0]; type = Infer(callee, locals, owner); std::vector<std::string> arguments;
+            const auto& callee = expression.children[0]; std::vector<std::string> arguments;
+            if (callee.kind == Kind::Identifier && (callee.text == "int" || callee.text == "float" || callee.text == "bool" || callee.text == "string")) {
+                for (size_t i = 1; i < expression.children.size(); ++i) arguments.push_back(Infer(expression.children[i], locals, owner));
+                if (arguments.size() != 1) AddDiagnostic("Cast to '" + callee.text + "' expects exactly one argument", expression.span);
+                else if (const auto cast = BuiltinCastLowering(callee.text, arguments[0])) { type = callee.text; lowering = *cast; }
+                else AddDiagnostic("Cannot convert " + DisplayType(arguments[0]) + " to '" + callee.text + "'", expression.children[1].span);
+                break;
+            }
+            type = Infer(callee, locals, owner);
             for (size_t i = 1; i < expression.children.size(); ++i) arguments.push_back(Infer(expression.children[i], locals, owner));
             const Symbol* callable = nullptr;
-            if (callee.kind == Kind::Member) callable = FindMember(ExpressionType(callee.children[0].span), callee.text);
+            std::optional<BuiltinMember> builtin;
+            if (callee.kind == Kind::Member) {
+                auto receiver = ExpressionType(callee.children[0].span); bool isStatic = receiver.starts_with("$type:"); if (isStatic) receiver = receiver.substr(6);
+                builtin = FindBuiltinMember(receiver, callee.text, isStatic); callable = FindMember(ExpressionType(callee.children[0].span), callee.text);
+            }
             else if (callee.kind == Kind::Identifier && owner) callable = FindMember(owner->name, callee.text);
-            if (callable && callable->kind == SymbolKind::Method) CheckArguments(*callable, expression, arguments);
+            if (builtin) { CheckBuiltinArguments(*builtin, expression, arguments); lowering = builtin->lowering.empty() && builtin->isStatic ? "static_call" : builtin->lowering; }
+            else if (callable && callable->kind == SymbolKind::Method) CheckArguments(*callable, expression, arguments);
             break;
         }
         case Kind::Index: {
             const auto target = Infer(expression.children[0], locals, owner); Infer(expression.children[1], locals, owner);
-            if (target.ends_with("[]")) type = target.substr(0, target.size() - 2); break;
+            const auto index = ExpressionType(expression.children[1].span);
+            if (target.ends_with("[]")) { type = target.substr(0, target.size() - 2); lowering = "list_index"; if (index != "int" && index != "any" && !index.empty()) AddDiagnostic("List index must be 'int', got " + DisplayType(index), expression.children[1].span); }
+            else if (target == "table" || target == "any") type = "any";
+            else if (!target.empty()) AddDiagnostic("Type '" + target + "' is not indexable", expression.span);
+            break;
         }
         case Kind::Slice: {
-            type = Infer(expression.children[0], locals, owner); Infer(expression.children[1], locals, owner); Infer(expression.children[2], locals, owner); break;
+            type = Infer(expression.children[0], locals, owner); const auto first = Infer(expression.children[1], locals, owner), last = Infer(expression.children[2], locals, owner);
+            if (!type.ends_with("[]")) AddDiagnostic("Only lists can be sliced", expression.span);
+            if (first != "int" || last != "int") AddDiagnostic("Slice bounds must be 'int'", expression.span); break;
         }
-        case Kind::Unary: type = expression.text == "!" ? "bool" : Infer(expression.children[0], locals, owner); break;
+        case Kind::Unary: {
+            const auto operand = Infer(expression.children[0], locals, owner);
+            if (expression.text == "!") { type = "bool"; if (operand != "bool" && operand != "any") AddDiagnostic("Operator '!' requires 'bool', got " + DisplayType(operand), expression.span); }
+            else { type = operand; if (!IsNumeric(operand) && operand != "Vec3" && operand != "any") AddDiagnostic("Unary '" + expression.text + "' is not defined for " + DisplayType(operand), expression.span); }
+            break;
+        }
         case Kind::Binary: {
             const auto left = Infer(expression.children[0], locals, owner), right = Infer(expression.children[1], locals, owner);
-            if (expression.text == "==" || expression.text == "!=" || expression.text == "<" || expression.text == ">" || expression.text == "<=" || expression.text == ">=" || expression.text == "&&" || expression.text == "||") type = "bool";
-            else if (IsNumeric(left) && IsNumeric(right)) type = left == "float" || right == "float" ? "float" : "int";
+            if (expression.text == "&&" || expression.text == "||") { type = "bool"; if ((left != "bool" && left != "any") || (right != "bool" && right != "any")) AddDiagnostic("Logical operator requires 'bool' operands", expression.span); }
+            else if ((expression.text == "==" || expression.text == "!=") && (left == "null" || right == "null")) {
+                const auto& other = left == "null" ? right : left; type = "bool";
+                if (other == "int" || other == "float" || other == "bool") AddDiagnostic("Cannot compare 'null' with '" + other + "'", expression.span);
+            }
+            else if (left == "any" || right == "any") type = "any";
+            else if (const auto operation = FindBuiltinOperator(left, expression.text, right)) { type = operation->result; lowering = operation->lowering; }
+            else if (!left.empty() && !right.empty()) AddDiagnostic("Operator '" + expression.text + "' is not defined for '" + left + "' and '" + right + "'", expression.span);
             break;
         }
         case Kind::Assignment: {
             const auto left = Infer(expression.children[0], locals, owner), right = Infer(expression.children[1], locals, owner); type = left;
+            if (expression.children[0].kind == Kind::Index && ExpressionType(expression.children[0].children[0].span).ends_with("[]")) lowering = "list_set";
             if (!Assignable(left, right)) AddDiagnostic("Cannot assign " + DisplayType(right) + " to " + DisplayType(left), expression.children[1].span);
             break;
         }
         }
-        result_.expressions.push_back({expression.span, type, symbol}); return type;
+        result_.expressions.push_back({expression.span, type, symbol, lowering}); return type;
     }
     static std::string DisplayType(const std::string& type) { return type.empty() ? "unknown value" : "'" + type + "'"; }
     bool Assignable(const std::string& expected, const std::string& actual) const {
-        if (expected.empty() || actual.empty() || actual == "null" || expected == actual) return true;
+        if (expected.empty() || actual.empty() || expected == "any" || actual == "any" || expected == actual) return true;
+        if (actual == "null") return expected == "table" || expected.ends_with("[]") || (!IsBuiltinType(expected) && expected != "void");
+        if (expected.ends_with("[]") && actual == "table") return true;
         if (expected == "float" && actual == "int") return true;
         if (expected == "table" && actual.ends_with("[]")) return true;
         std::string current = actual;
@@ -270,8 +331,9 @@ private:
 
     std::string_view source_;
     Analysis result_;
-    std::unordered_set<std::string> knownTypes_{"int", "float", "bool", "string", "table"};
+    std::unordered_set<std::string> knownTypes_;
     std::unordered_set<std::string> declaredTypes_;
+    std::unordered_set<std::string> registeredBuiltins_;
 };
 
 } // namespace

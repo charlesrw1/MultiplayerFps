@@ -1,4 +1,5 @@
 #include "Compiler.h"
+#include "Builtins.h"
 #include "Semantic.h"
 
 #include <windows.h>
@@ -93,16 +94,17 @@ json Completions(const std::string& text, const json& position) {
         if (type) {
             const auto members = analysis.members.find(*type);
             if (members != analysis.members.end()) for (const auto& member : members->second) {
-                const auto signature = member.parameters.empty() ? "" : "(" + [&] { std::string value; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) value += ", "; value += member.parameters[i]; } return value; }() + ")";
+                const auto signature = member.kind == luasharp::SymbolKind::Method ? "(" + [&] { std::string value; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) value += ", "; value += member.parameters[i]; } return value; }() + ")" : "";
                 json item{{"label", member.name + signature}, {"kind", member.kind == luasharp::SymbolKind::Method ? 2 : 5}, {"detail", member.type + signature}};
-                if (member.kind == luasharp::SymbolKind::Method) { item["insertTextFormat"] = 2; item["insertText"] = member.name + "(${1})"; }
+                if (member.kind == luasharp::SymbolKind::Method) { item["insertTextFormat"] = 2; item["insertText"] = member.parameters.empty() ? member.name + "()" : member.name + "(${1})"; }
                 result.push_back(std::move(item));
             }
         }
         return result;
     }
-    const char* words[] = {"class", "public", "private", "auto", "new", "if", "else", "return", "int", "float", "bool", "string", "table", "void", "null"};
+    const char* words[] = {"class", "public", "private", "auto", "new", "if", "else", "return", "void", "null"};
     for (const auto* word : words) result.push_back({{"label", word}, {"kind", 14}});
+    for (const auto& type : luasharp::BuiltinTypes()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in type"}});
     for (const auto& symbol : analysis.symbols) result.push_back({{"label", symbol.name}, {"kind", symbol.kind == luasharp::SymbolKind::Class ? 7 : symbol.kind == luasharp::SymbolKind::Method ? 2 : 6}, {"detail", symbol.type}});
     return result;
 }

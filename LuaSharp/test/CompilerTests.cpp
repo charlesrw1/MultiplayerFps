@@ -229,6 +229,84 @@ void TestNoEngineTypesAreHardcoded() {
     const auto declared = luasharp::Analyze("class Anything {}\nAnything value;");
     Require(declared.diagnostics.empty(), "user-declared type was not registered dynamically");
 }
+
+void TestListSemanticsAndLowering() {
+    constexpr std::string_view source = R"(class Item {}
+Item[] items = {};
+items.push_back(new Item());
+int count = items.size();
+Item first = items[0];
+items[-1] = first;
+Item[] tail = items[1:3];
+)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid list operations produced diagnostics");
+    Require(analysis.variableTypes.at("first") == "Item", "list indexing did not return the element type");
+    Require(analysis.variableTypes.at("tail") == "Item[]", "list slicing did not preserve the list type");
+    const auto lua = luasharp::Compile(source);
+    Require(lua.find("table.insert(items, Item.new())") != std::string::npos, "push_back was not lowered to table.insert");
+    Require(lua.find("#(items)") != std::string::npos, "list size was not lowered");
+    Require(lua.find("i + 1") != std::string::npos, "zero-based list indexing was not lowered");
+    const auto invalid = luasharp::Analyze("int[] values = {};\nvalues.no_such_method();");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Unknown member 'no_such_method'") != std::string::npos; }), "unknown list method was not diagnosed");
+}
+
+void TestStringMethodsAndCasts() {
+    constexpr std::string_view source = R"(string text = "Hello";
+int length = text.length();
+bool contains = text.contains("ell");
+string part = text.substring(1, 3);
+int whole = int(2.8);
+float decimal = float(whole);
+bool enabled = bool(whole);
+string printed = string(enabled);
+)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid string methods or casts produced diagnostics");
+    const auto lua = luasharp::Compile(source);
+    Require(lua.find("string.find(text, \"ell\", 1, true) ~= nil") != std::string::npos, "string contains was not lowered");
+    Require(lua.find("math.floor") != std::string::npos, "float-to-int cast was not lowered");
+    Require(lua.find("whole ~= 0") != std::string::npos, "number-to-bool cast was not lowered");
+    Require(lua.find("tostring(enabled)") != std::string::npos, "string cast was not lowered");
+}
+
+void TestDynamicTableSemantics() {
+    const auto analysis = luasharp::Analyze(R"(table values = {};
+values["name"] = "thing";
+values[4] = true;
+auto first = values["name"];
+auto arbitrary = values.any_key;
+)");
+    Require(analysis.diagnostics.empty(), "table rejected heterogeneous keys or values");
+    Require(analysis.variableTypes.at("first") == "any" && analysis.variableTypes.at("arbitrary") == "any", "table reads did not produce dynamic values");
+}
+
+void TestNativeMathTypesAndOperators() {
+    constexpr std::string_view source = R"(Vec3 a = Vec3.new(1, 2, 3);
+Vec3 b = Vec3.splat(2);
+Vec3 sum = a + b;
+float dot = a.dot(b);
+Quat rotation = Quat.from_euler(a);
+Vec3 rotated = rotation * sum;
+Transform transform = Transform.from_pos_rot(a, rotation);
+Vec3 point = transform * rotated;
+)";
+    const auto analysis = luasharp::Analyze(source);
+    Require(analysis.diagnostics.empty(), "valid native math operations produced diagnostics");
+    Require(analysis.variableTypes.at("rotated") == "Vec3" && analysis.variableTypes.at("point") == "Vec3", "native operator result types were wrong");
+    const auto lua = luasharp::Compile(source);
+    Require(lua.find("Vec3.new(1, 2, 3)") != std::string::npos && lua.find("Vec3:new") == std::string::npos, "native static call used method-call syntax");
+    Require(lua.find("rotation * sum") != std::string::npos && lua.find("transform * rotated") != std::string::npos, "native operators were not preserved for Lua metatables");
+    const auto invalid = luasharp::Analyze("Quat q = Quat.identity();\nfloat bad = q + q;");
+    Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Operator '+' is not defined") != std::string::npos; }), "invalid native operator was not diagnosed");
+}
+
+void TestNullAndOperatorDiagnostics() {
+    const auto valid = luasharp::Analyze("class Item {}\nItem item = null;\nbool missing = item == null;");
+    Require(valid.diagnostics.empty(), "class value could not be compared or assigned to null");
+    const auto invalid = luasharp::Analyze("int value = null;\nbool missing = value != null;");
+    Require(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.severity == luasharp::DiagnosticSeverity::Error; }) >= 2, "null was accepted for a primitive value");
+}
 }
 
 int main() {
@@ -252,6 +330,11 @@ int main() {
         {"reassignment and this", TestReassignmentAndThis},
         {"unknown name and missing return", TestUnknownNameAndMissingReturn},
         {"no hardcoded engine types", TestNoEngineTypesAreHardcoded},
+        {"list semantics and lowering", TestListSemanticsAndLowering},
+        {"string methods and casts", TestStringMethodsAndCasts},
+        {"dynamic table semantics", TestDynamicTableSemantics},
+        {"native math types and operators", TestNativeMathTypesAndOperators},
+        {"null and operator diagnostics", TestNullAndOperatorDiagnostics},
     };
 
     for (const auto& [name, test] : tests) {

@@ -46,7 +46,8 @@
     },
     "types": {
       "patterns": [
-        { "match": "\\b(?:int|float|bool|string|table)\\b", "name": "storage.type.primitive.luasharp" }
+        { "match": "\\b(?:int|float|bool|string|table)\\b", "name": "storage.type.primitive.luasharp" },
+        { "match": "\\b(?:Vec3|Quat|Transform)\\b", "name": "support.type.native.luasharp" }
       ]
     },
     "constants": {

@@ -8,6 +8,6 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup><OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir><IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir><TargetName>LuaSharpLspNative</TargetName></PropertyGroup>
   <ItemDefinitionGroup><ClCompile><WarningLevel>Level4</WarningLevel><SDLCheck>true</SDLCheck><ConformanceMode>true</ConformanceMode><LanguageStandard>stdcpp20</LanguageStandard><PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions><AdditionalIncludeDirectories>$(ProjectDir)src</AdditionalIncludeDirectories></ClCompile><Link><SubSystem>Console</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation></Link></ItemDefinitionGroup>
-  <ItemGroup><ClCompile Include="src\Compiler.cpp" /><ClCompile Include="src\LspBridge.cpp" /><ClCompile Include="src\Semantic.cpp" /><ClCompile Include="lsp\main.cpp" /><ClInclude Include="src\Compiler.h" /><ClInclude Include="src\LspBridge.h" /><ClInclude Include="src\Semantic.h" /></ItemGroup>
+  <ItemGroup><ClCompile Include="src\Builtins.cpp" /><ClCompile Include="src\Compiler.cpp" /><ClCompile Include="src\LspBridge.cpp" /><ClCompile Include="src\Semantic.cpp" /><ClCompile Include="lsp\main.cpp" /><ClInclude Include="src\Builtins.h" /><ClInclude Include="src\Compiler.h" /><ClInclude Include="src\LspBridge.h" /><ClInclude Include="src\Semantic.h" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

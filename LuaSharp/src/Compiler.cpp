@@ -1,4 +1,5 @@
 #include "Compiler.h"
+#include "Semantic.h"
 
 #include <algorithm>
 #include <cctype>
@@ -143,6 +144,11 @@ private:
         if (!AtEnd() && Current().kind != SyntaxTokenKind::Symbol) return Advance();
         return {SyntaxTokenKind::Bad, "<missing>", {Current().span.offset, 0}};
     }
+    SyntaxToken MemberName() {
+        if (Current().kind == SyntaxTokenKind::Identifier || Current().kind == SyntaxTokenKind::Keyword) return Advance();
+        diagnostics_.push_back({"Expected member name", Current().span});
+        return {SyntaxTokenKind::Bad, "<missing>", {Current().span.offset, 0}};
+    }
     std::pair<std::string, TextSpan> ParseType() {
         const auto first = Identifier("type name"); std::string type = first.text; TextSpan span = first.span;
         while (Is("[")) { const auto open = Advance(); const auto close = Match("]"); type += "[]"; span = Cover(span, close.span.length ? close.span : open.span); }
@@ -276,7 +282,7 @@ private:
     SyntaxExpression ParsePostfix(SyntaxExpression value) {
         while (!AtEnd()) {
             if (Is(".")) {
-                Advance(); const auto name = Identifier("member name"); value = {SyntaxExpression::Kind::Member, name.text, Cover(value.span, name.span), {std::move(value)}};
+                Advance(); const auto name = MemberName(); value = {SyntaxExpression::Kind::Member, name.text, Cover(value.span, name.span), {std::move(value)}};
             } else if (Is("(")) {
                 const auto start = value.span; auto arguments = ParseArguments(); std::vector<SyntaxExpression> children; children.push_back(std::move(value));
                 for (auto& argument : arguments) children.push_back(std::move(argument));
@@ -301,8 +307,15 @@ std::string LuaType(const std::string& type) {
     if (type == "int") return "integer"; if (type == "float") return "number"; if (type == "bool") return "boolean"; return type;
 }
 
-std::string EmitExpression(const SyntaxExpression& value) {
-    const auto child = [&](size_t index) { return EmitExpression(value.children.at(index)); };
+const ExpressionInfo* ExpressionInfoFor(const Analysis* analysis, TextSpan span) {
+    if (!analysis) return nullptr;
+    const auto found = std::find_if(analysis->expressions.rbegin(), analysis->expressions.rend(), [&](const ExpressionInfo& value) { return value.span.offset == span.offset && value.span.length == span.length; });
+    return found == analysis->expressions.rend() ? nullptr : &*found;
+}
+
+std::string EmitExpression(const SyntaxExpression& value, const Analysis* analysis) {
+    const auto child = [&](size_t index) { return EmitExpression(value.children.at(index), analysis); };
+    const auto* info = ExpressionInfoFor(analysis, value.span); const std::string lowering = info ? info->lowering : std::string{};
     switch (value.kind) {
     case SyntaxExpression::Kind::Missing: return {};
     case SyntaxExpression::Kind::Identifier: return value.text == "this" ? "self" : value.text;
@@ -314,18 +327,47 @@ std::string EmitExpression(const SyntaxExpression& value) {
     case SyntaxExpression::Kind::Member: return child(0) + "." + value.text;
     case SyntaxExpression::Kind::Call: {
         const auto& callee = value.children.at(0); std::string out;
-        if (callee.kind == SyntaxExpression::Kind::Member) out = EmitExpression(callee.children.at(0)) + ":" + callee.text;
-        else out = EmitExpression(callee);
+        const auto receiver = [&]() { return callee.kind == SyntaxExpression::Kind::Member ? EmitExpression(callee.children.at(0), analysis) : std::string{}; };
+        const auto argument = [&](size_t index) { return child(index + 1); };
+        if (lowering == "list_push_back") return "table.insert(" + receiver() + ", " + argument(0) + ")";
+        if (lowering == "list_pop_back") return "table.remove(" + receiver() + ")";
+        if (lowering == "list_size" || lowering == "string_length") return "#(" + receiver() + ")";
+        if (lowering == "list_empty") return "#(" + receiver() + ") == 0";
+        if (lowering == "list_clear") return "(function(t) for k in pairs(t) do t[k] = nil end end)(" + receiver() + ")";
+        if (lowering == "string_contains") return "string.find(" + receiver() + ", " + argument(0) + ", 1, true) ~= nil";
+        if (lowering == "string_starts_with") return "(function(s, p) return string.sub(s, 1, #p) == p end)(" + receiver() + ", " + argument(0) + ")";
+        if (lowering == "string_ends_with") return "(function(s, p) return p == '' or string.sub(s, -#p) == p end)(" + receiver() + ", " + argument(0) + ")";
+        if (lowering == "string_substring") return value.children.size() == 3
+            ? "(function(s, i, n) return string.sub(s, i + 1, i + n) end)(" + receiver() + ", " + argument(0) + ", " + argument(1) + ")"
+            : "string.sub(" + receiver() + ", " + argument(0) + " + 1)";
+        if (lowering == "string_lower") return "string.lower(" + receiver() + ")";
+        if (lowering == "string_upper") return "string.upper(" + receiver() + ")";
+        if (lowering == "cast_identity") return "(" + argument(0) + ")";
+        if (lowering == "cast_string") return "tostring(" + argument(0) + ")";
+        if (lowering == "cast_bool_number") return "(" + argument(0) + " ~= 0)";
+        if (lowering == "cast_bool_string") return "(" + argument(0) + " ~= '')";
+        if (lowering == "cast_int_float") return "(function(v) return v < 0 and math.ceil(v) or math.floor(v) end)(" + argument(0) + ")";
+        if (lowering == "cast_number_bool") return "(" + argument(0) + " and 1 or 0)";
+        if (lowering == "cast_number_string") return "tonumber(" + argument(0) + ")";
+        if (callee.kind == SyntaxExpression::Kind::Member) out = EmitExpression(callee.children.at(0), analysis) + (lowering == "static_call" ? "." : ":") + callee.text;
+        else out = EmitExpression(callee, analysis);
         out += "("; for (size_t i = 1; i < value.children.size(); ++i) { if (i != 1) out += ", "; out += child(i); } return out + ")";
     }
-    case SyntaxExpression::Kind::Index: return child(0) + "[" + child(1) + "]";
-    case SyntaxExpression::Kind::Slice: return "LuaSharp.slice(" + child(0) + ", " + child(1) + ", " + child(2) + ")";
+    case SyntaxExpression::Kind::Index:
+        if (lowering == "list_index") return "(function(a, i) if i < 0 then i = #a + i end return a[i + 1] end)(" + child(0) + ", " + child(1) + ")";
+        return child(0) + "[" + child(1) + "]";
+    case SyntaxExpression::Kind::Slice: return "(function(a, s, e) local r = {} if s < 0 then s = #a + s end if e < 0 then e = #a + e end for i = s + 1, e do r[#r + 1] = a[i] end return r end)(" + child(0) + ", " + child(1) + ", " + child(2) + ")";
     case SyntaxExpression::Kind::Unary: return (value.text == "!" ? "not " : value.text) + child(0);
     case SyntaxExpression::Kind::Assignment: {
+        if (lowering == "list_set") {
+            const auto& index = value.children.at(0); const std::string slot = "a[i + 1]";
+            const std::string assignment = value.text == "=" ? slot + " = v" : slot + " = " + slot + " " + value.text.substr(0, 1) + " v";
+            return "(function(a, i, v) if i < 0 then i = #a + i end " + assignment + " end)(" + EmitExpression(index.children.at(0), analysis) + ", " + EmitExpression(index.children.at(1), analysis) + ", " + child(1) + ")";
+        }
         std::string op = value.text; if (op.size() == 2 && op[1] == '=') return child(0) + " = " + child(0) + " " + op.substr(0, 1) + " " + child(1);
         return child(0) + " = " + child(1);
     }
-    case SyntaxExpression::Kind::Binary: { const auto op = value.text == "!=" ? "~=" : value.text == "&&" ? "and" : value.text == "||" ? "or" : value.text; return child(0) + " " + op + " " + child(1); }
+    case SyntaxExpression::Kind::Binary: { const auto op = lowering == "concat" ? ".." : value.text == "!=" ? "~=" : value.text == "&&" ? "and" : value.text == "||" ? "or" : value.text; return child(0) + " " + op + " " + child(1); }
     }
     return {};
 }
@@ -339,22 +381,22 @@ struct Emitter {
     }
 };
 
-void EmitStatements(Emitter& emitter, const std::vector<SyntaxStatement>& statements, const std::string& indent) {
+void EmitStatements(Emitter& emitter, const std::vector<SyntaxStatement>& statements, const std::string& indent, const Analysis* analysis) {
     for (const auto& statement : statements) {
         switch (statement.kind) {
         case SyntaxStatement::Kind::If:
-            emitter.Line(indent + "if " + EmitExpression(statement.expression) + " then", statement.span.offset);
-            EmitStatements(emitter, statement.body, indent + "    ");
-            if (!statement.elseBody.empty()) { emitter.Line(indent + "else", statement.span.offset); EmitStatements(emitter, statement.elseBody, indent + "    "); }
+            emitter.Line(indent + "if " + EmitExpression(statement.expression, analysis) + " then", statement.span.offset);
+            EmitStatements(emitter, statement.body, indent + "    ", analysis);
+            if (!statement.elseBody.empty()) { emitter.Line(indent + "else", statement.span.offset); EmitStatements(emitter, statement.elseBody, indent + "    ", analysis); }
             emitter.Line(indent + "end", statement.span.offset); break;
-        case SyntaxStatement::Kind::Return: emitter.Line(indent + "return" + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " " + EmitExpression(statement.expression)), statement.span.offset); break;
-        case SyntaxStatement::Kind::Local: emitter.Line(indent + "local " + statement.name + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " = " + EmitExpression(statement.expression)), statement.span.offset); break;
-        case SyntaxStatement::Kind::Expression: emitter.Line(indent + EmitExpression(statement.expression), statement.span.offset); break;
+        case SyntaxStatement::Kind::Return: emitter.Line(indent + "return" + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " " + EmitExpression(statement.expression, analysis)), statement.span.offset); break;
+        case SyntaxStatement::Kind::Local: emitter.Line(indent + "local " + statement.name + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " = " + EmitExpression(statement.expression, analysis)), statement.span.offset); break;
+        case SyntaxStatement::Kind::Expression: emitter.Line(indent + EmitExpression(statement.expression, analysis), statement.span.offset); break;
         }
     }
 }
 
-void EmitClass(Emitter& emitter, const SyntaxClass& value) {
+void EmitClass(Emitter& emitter, const SyntaxClass& value, const Analysis* analysis) {
     emitter.Raw("---@class " + value.name + (value.baseName.empty() ? "" : " : " + value.baseName) + "\n");
     for (const auto& field : value.fields) {
         emitter.Raw("---@field " + field.access + " " + field.name + " " + LuaType(field.type));
@@ -367,8 +409,8 @@ void EmitClass(Emitter& emitter, const SyntaxClass& value) {
     emitter.Raw("function " + value.name + ".new(");
     if (constructor != value.functions.end()) for (size_t i{}; i < constructor->parameters.size(); ++i) { if (i) emitter.Raw(", "); emitter.Raw(constructor->parameters[i].name); }
     emitter.Raw(")\n    local self = setmetatable({}, " + value.name + ")\n");
-    for (const auto& field : value.fields) if (field.initializer.kind != SyntaxExpression::Kind::Missing) emitter.Line("    self." + field.name + " = " + EmitExpression(field.initializer), field.span.offset);
-    if (constructor != value.functions.end()) EmitStatements(emitter, constructor->body, "    ");
+    for (const auto& field : value.fields) if (field.initializer.kind != SyntaxExpression::Kind::Missing) emitter.Line("    self." + field.name + " = " + EmitExpression(field.initializer, analysis), field.span.offset);
+    if (constructor != value.functions.end()) EmitStatements(emitter, constructor->body, "    ", analysis);
     emitter.Raw("    return self\nend\n\n");
     for (const auto& function : value.functions) {
         if (function.isConstructor) continue;
@@ -376,7 +418,7 @@ void EmitClass(Emitter& emitter, const SyntaxClass& value) {
         if (!function.returnType.empty() && function.returnType != "void") emitter.Raw("---@return " + LuaType(function.returnType) + "\n");
         emitter.Raw("function " + value.name + ":" + function.name + "(");
         for (size_t i{}; i < function.parameters.size(); ++i) { if (i) emitter.Raw(", "); emitter.Raw(function.parameters[i].name); }
-        emitter.Raw(")\n"); EmitStatements(emitter, function.body, "    "); emitter.Raw("end\n\n");
+        emitter.Raw(")\n"); EmitStatements(emitter, function.body, "    ", analysis); emitter.Raw("end\n\n");
     }
 }
 
@@ -407,8 +449,8 @@ SyntaxExpression ParseExpression(const std::vector<SyntaxToken>& tokens) {
 std::string Compile(std::string_view source) { return CompileWithSourceMap(source).lua; }
 
 CompilationResult CompileWithSourceMap(std::string_view source) {
-    auto tree = ParseTree(source); if (!tree.diagnostics.empty()) throw SyntaxError(tree.diagnostics.front());
-    Emitter emitter; for (const auto& value : tree.root.classes) EmitClass(emitter, value); EmitStatements(emitter, tree.root.topLevel, {});
+    auto analysis = Analyze(source); auto& tree = analysis.syntax; if (!tree.diagnostics.empty()) throw SyntaxError(tree.diagnostics.front());
+    Emitter emitter; for (const auto& value : tree.root.classes) EmitClass(emitter, value, &analysis); EmitStatements(emitter, tree.root.topLevel, {}, &analysis);
     return {std::move(emitter.output), std::move(emitter.sourceMap)};
 }
 

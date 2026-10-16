@@ -32,6 +32,7 @@ struct ExpressionInfo {
     TextSpan span;
     std::string type;
     std::optional<size_t> symbolIndex;
+    std::string lowering;
 };
 struct VariableBinding {
     std::string name;

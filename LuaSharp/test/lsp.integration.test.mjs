@@ -66,5 +66,20 @@ try {
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 7 }, contentChanges: [{ text: `${source}\nclass Broken` }] } });
     const syntax = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.diagnostics.some(d => /Expected '\{'/.test(d.message)), "syntax diagnostic");
     assert.equal(syntax.params.diagnostics.find(d => /Expected '\{'/.test(d.message)).range.start.line, brokenLine, "syntax error was not mapped to its source line");
-    console.log("PASS native LSP: fixture diagnostics, members, definitions, semantic tokens, signatures, type/member/syntax errors");
+    const stringCompletionSource = `${source}\nstring text = "";\ntext.`;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 8 }, contentChanges: [{ text: stringCompletionSource }] } });
+    send({ jsonrpc: "2.0", id: 6, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: stringCompletionSource.split("\n").length - 1, character: 5 } } });
+    const stringCompletion = await waitFor(m => m.id === 6, "string member completion");
+    assert.ok(stringCompletion.result.some(item => item.label.startsWith("contains(")), "string methods missing from completion");
+    const listCompletionSource = `${source}\nEntity[] values = {};\nvalues.`;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 9 }, contentChanges: [{ text: listCompletionSource }] } });
+    send({ jsonrpc: "2.0", id: 7, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: listCompletionSource.split("\n").length - 1, character: 7 } } });
+    const listCompletion = await waitFor(m => m.id === 7, "list member completion");
+    assert.ok(listCompletion.result.some(item => item.label.startsWith("push_back(")) && listCompletion.result.some(item => item.label === "size()"), "list methods missing from completion");
+    const nativeCompletionSource = `${source}\nVec3.`;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 10 }, contentChanges: [{ text: nativeCompletionSource }] } });
+    send({ jsonrpc: "2.0", id: 8, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: nativeCompletionSource.split("\n").length - 1, character: 5 } } });
+    const nativeCompletion = await waitFor(m => m.id === 8, "native static completion");
+    assert.ok(nativeCompletion.result.some(item => item.label.startsWith("new(")) && nativeCompletion.result.some(item => item.label.startsWith("splat(")), "native static methods missing from completion");
+    console.log("PASS native LSP: diagnostics, definitions, tokens, signatures, and class/string/list/native completions");
 } finally { child.kill(); }
