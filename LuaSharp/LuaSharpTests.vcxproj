@@ -22,9 +22,11 @@
   <ItemGroup>
     <ClCompile Include="src\Compiler.cpp" />
     <ClCompile Include="src\LspBridge.cpp" />
+    <ClCompile Include="src\Semantic.cpp" />
     <ClCompile Include="test\CompilerTests.cpp" />
     <ClInclude Include="src\Compiler.h" />
     <ClInclude Include="src\LspBridge.h" />
+    <ClInclude Include="src\Semantic.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

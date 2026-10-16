@@ -1,12 +1,16 @@
 {
   "name": "luasharp",
+  "publisher": "charl",
   "displayName": "LuaSharp",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "private": true,
   "engines": { "vscode": "^1.95.0" },
   "categories": ["Programming Languages"],
   "activationEvents": ["onLanguage:luasharp"],
   "main": "./extension.js",
+  "scripts": {
+    "test:integration": "node ../test/lsp.integration.test.mjs"
+  },
   "contributes": {
     "languages": [{
       "id": "luasharp",
@@ -14,21 +18,22 @@
       "extensions": [".ls"],
       "configuration": "./language-configuration.json"
     }],
+    "grammars": [{
+      "language": "luasharp",
+      "scopeName": "source.luasharp",
+      "path": "./syntaxes/luasharp.tmLanguage.json"
+    }],
     "configuration": {
       "title": "LuaSharp",
       "properties": {
         "luasharp.languageServerPath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to LuaSharpLsp.exe."
-        },
-        "luasharp.luaLsPath": {
-          "type": "string",
-          "default": "",
-          "description": "Absolute path to lua-language-server.exe."
+          "description": "Absolute path to LuaSharpLspNative.exe."
         }
       }
-    }
+    },
+    "configurationDefaults": { "[luasharp]": { "editor.semanticHighlighting.enabled": true } }
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"

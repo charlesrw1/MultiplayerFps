@@ -23,7 +23,7 @@ struct Statement {
     size_t sourceOffset{};
 };
 struct Function { std::string name; std::string returnType; bool isConstructor{}; std::vector<Parameter> parameters; std::vector<Statement> body; };
-struct Class { std::string name; std::vector<Field> fields; std::vector<Function> functions; };
+struct Class { std::string name; std::string baseName; std::vector<Field> fields; std::vector<Function> functions; };
 struct Program { std::vector<Class> classes; std::vector<Statement> topLevel; };
 
 std::vector<Token> Lex(std::string_view source) {
@@ -122,6 +122,17 @@ private:
             if (Is("=")) { Take("="); statement.expression = Until(";"); }
             Take(";"); statement.sourceOffset = sourceOffset; return statement;
         }
+        // A typed local has the form `Type name = value;`, including array types.
+        // Do this look-ahead before treating the line as an ordinary Lua expression.
+        if (Current().kind == TokenKind::Identifier) {
+            size_t lookahead = index_ + 1;
+            while (tokens_[lookahead].text == "[" && tokens_[lookahead + 1].text == "]") lookahead += 2;
+            if (tokens_[lookahead].kind == TokenKind::Identifier && (tokens_[lookahead + 1].text == "=" || tokens_[lookahead + 1].text == ";")) {
+                static_cast<void>(Type()); Statement statement{Statement::Kind::Local}; statement.name = Identifier();
+                if (Is("=")) { Take("="); statement.expression = Until(";"); }
+                Take(";"); statement.sourceOffset = sourceOffset; return statement;
+            }
+        }
         Statement statement{Statement::Kind::Expression}; statement.expression = Until(";"); Take(";"); statement.sourceOffset = sourceOffset; return statement;
     }
     Function ParseFunction(std::string name, std::string returnType, bool isConstructor) {
@@ -131,7 +142,9 @@ private:
         return function;
     }
     Class ParseClass() {
-        Take("class"); Class result; result.name = Identifier(); Take("{"); std::string access = "public";
+        Take("class"); Class result; result.name = Identifier();
+        if (Is(":")) { Take(":"); result.baseName = Identifier(); }
+        Take("{"); std::string access = "public";
         while (!Is("}")) {
             if ((Is("public") || Is("private")) && tokens_[index_ + 1].text == ":") { access = Take().text; Take(":"); continue; }
             const auto first = Identifier();
@@ -203,7 +216,7 @@ void EmitStatements(Emitter& emitter, const std::vector<Statement>& statements, 
 
 void EmitClass(Emitter& emitter, const Class& value) {
     auto& output = emitter.output;
-    output += "---@class " + value.name + "\n";
+    output += "---@class " + value.name + (value.baseName.empty() ? "" : " : " + value.baseName) + "\n";
     for (const auto& field : value.fields) {
         output += "---@field " + field.access + " " + field.name + " " + LuaType(field.type);
         if (!field.initializer.empty() && field.initializer.front().text == "null") output += "?";

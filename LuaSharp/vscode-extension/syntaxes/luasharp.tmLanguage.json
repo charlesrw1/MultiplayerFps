@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "LuaSharp",
+  "scopeName": "source.luasharp",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "match": "\\b(?:true|false|null)\\b", "name": "constant.language.luasharp" },
+    { "match": "\\b\\d+(?:\\.\\d+)?\\b", "name": "constant.numeric.luasharp" }
+  ],
+  "repository": {
+    "comments": { "patterns": [{ "match": "//.*$", "name": "comment.line.double-slash.luasharp" }] },
+    "strings": { "patterns": [{ "begin": "\"", "end": "\"", "name": "string.quoted.double.luasharp" }, { "begin": "'", "end": "'", "name": "string.quoted.single.luasharp" }] },
+    "keywords": { "patterns": [{ "match": "\\b(?:class|public|private|if|else|return|new|auto)\\b", "name": "keyword.control.luasharp" }] },
+    "types": { "patterns": [{ "match": "\\b(?:int|float|bool|string|table|void|Entity)\\b", "name": "storage.type.luasharp" }] }
+  }
+}

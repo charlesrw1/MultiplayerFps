@@ -6,9 +6,8 @@ Set these workspace settings to the built executables:
 
 ```json
 {
-  "luasharp.languageServerPath": "C:\\Users\\charl\\source\\repos\\CsRemake\\x64\\Debug\\LuaSharpLsp.exe",
-  "luasharp.luaLsPath": "C:\\Users\\charl\\.vscode\\extensions\\sumneko.lua-3.19.2-win32-x64\\server\\bin\\lua-language-server.exe"
+  "luasharp.languageServerPath": "C:\\Users\\charl\\source\\repos\\CsRemake\\x64\\Debug\\LuaSharpLspNative.exe"
 }
 ```
 
-The extension associates `.ls` with LuaSharp and launches the native proxy. The proxy transpiles open documents into virtual Lua and delegates language features to LuaLS.
+The extension associates `.ls` with LuaSharp and launches the native LuaSharp language server. It does not launch or depend on LuaLS.

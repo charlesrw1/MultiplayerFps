@@ -1,4 +1,5 @@
 #include "Compiler.h"
+#include "Semantic.h"
 
 #include <cassert>
 #include <filesystem>
@@ -22,7 +23,22 @@ void RunTests() {
 int main(int argc, char** argv) {
     try {
         if (argc == 2 && std::string_view(argv[1]) == "--test") { RunTests(); return 0; }
-        if (argc != 2) { std::cerr << "Usage: luasharp <file.ls>\n"; return 2; }
+        if (argc < 2) { std::cerr << "Usage: luasharp [check] <file.ls> [more files]\n"; return 2; }
+        if (std::string_view(argv[1]) == "check") {
+            if (argc < 3) { std::cerr << "Usage: luasharp check <file.ls> [more files]\n"; return 2; }
+            bool failed = false;
+            for (int index = 2; index < argc; ++index) {
+                const std::filesystem::path input = argv[index]; std::ifstream sourceFile(input, std::ios::binary);
+                if (!sourceFile) { std::cerr << "luasharp: Cannot open " << input.string() << '\n'; failed = true; continue; }
+                std::ostringstream source; source << sourceFile.rdbuf();
+                const auto analysis = luasharp::Analyze(source.str());
+                for (const auto& diagnostic : analysis.diagnostics) { std::cerr << input.string() << '(' << diagnostic.line + 1 << ',' << diagnostic.character + 1 << "): error: " << diagnostic.message << '\n'; failed = true; }
+                try { static_cast<void>(luasharp::Compile(source.str())); }
+                catch (const std::exception& error) { std::cerr << input.string() << ": error: " << error.what() << '\n'; failed = true; }
+            }
+            return failed ? 1 : 0;
+        }
+        if (argc != 2) { std::cerr << "Usage: luasharp [check] <file.ls> [more files]\n"; return 2; }
         const std::filesystem::path input = argv[1];
         std::ifstream sourceFile(input, std::ios::binary);
         if (!sourceFile) throw std::runtime_error("Cannot open " + input.string());

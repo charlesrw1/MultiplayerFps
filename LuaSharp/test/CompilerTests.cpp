@@ -1,5 +1,6 @@
 #include "Compiler.h"
 #include "LspBridge.h"
+#include "Semantic.h"
 
 #include <functional>
 #include <iostream>
@@ -58,6 +59,24 @@ void TestLspPositionTranslation() {
     Require(luasharp::ToGeneratedPosition(document, {1, 4}).line == 1, "source position did not map to generated line");
     Require(luasharp::ToSourcePosition(document, {1, 0}).line == 1, "generated position did not map back to source line");
 }
+
+void TestSemanticAnalysis() {
+    const auto analysis = luasharp::Analyze(R"(class Component {
+int id = 1;
+}
+class Player : Component {
+int health = 1;
+public:
+int score(Entity target) { return 0; }
+}
+auto player = new Player();
+int invalid = "text";
+)");
+    const auto members = analysis.members.find("Player");
+    Require(members != analysis.members.end() && members->second.size() == 3, "class and inherited members were not collected");
+    Require(analysis.variableTypes.at("player") == "Player", "auto new type was not inferred");
+    Require(!analysis.diagnostics.empty(), "type mismatch was not diagnosed");
+}
 }
 
 int main() {
@@ -67,6 +86,7 @@ int main() {
         {"statement source map", TestStatementSourceMap},
         {"invalid syntax", TestInvalidSyntax},
         {"LSP position translation", TestLspPositionTranslation},
+        {"semantic analysis", TestSemanticAnalysis},
     };
 
     for (const auto& [name, test] : tests) {
