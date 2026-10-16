@@ -628,6 +628,19 @@ void TestLibTccIntegrationWhenAvailable() {
     Require(add(create(7), 5) == 12, "libtcc-compiled LuaSharp method returned the wrong result");
 }
 
+void TestLibTccErrorsDoNotCrashHost() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        luasharp::CCompilationResult invalid; invalid.c = "long long f(void) { return undefined_name; }";
+        try { static_cast<void>(luasharp::NativeModule::Load(invalid, {})); Require(false, "invalid C compiled"); }
+        catch (const std::runtime_error& error) {
+            Require(std::string_view(error.what()).find("'undefined_name' undeclared") != std::string_view::npos, std::string("TinyCC error lost its message: ") + error.what());
+        }
+    }
+    auto valid = luasharp::NativeModule::Compile("int answer = 42;");
+    Require(*static_cast<long long*>(valid.FindGlobal("answer")) == 42, "libtcc was unusable after a compile error");
+}
+
 void TestNativeStateArithmeticAndHostSymbols() {
     if (!luasharp::NativeModule::IsLibTccAvailable()) return;
 
@@ -887,6 +900,7 @@ int main() {
         {"lambdas", TestLambdas},
         {"C backend emission", TestCBackendEmission},
         {"libtcc integration", TestLibTccIntegrationWhenAvailable},
+        {"libtcc errors do not crash host", TestLibTccErrorsDoNotCrashHost},
         {"native state, arithmetic, and host symbols", TestNativeStateArithmeticAndHostSymbols},
         {"native reload slots", TestNativeReloadSlots},
         {"native garbage collection", TestNativeGarbageCollection},

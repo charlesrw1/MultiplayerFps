@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstring>
 #include <filesystem>
 #include <mutex>
 #include <stdexcept>
@@ -62,6 +63,48 @@ void RequireTccRuntime(HMODULE library) {
         throw std::runtime_error("TinyCC runtime not found at '" + runtime.string() + "'. libtcc.dll must sit in a full TinyCC install (run LuaSharp/scripts/install-libtcc.ps1 and rebuild)");
 }
 
+// The official libtcc.dll passes its stack pointer to msvcrt's _setjmp as jmp_buf.Frame, so tcc_error's
+// longjmp SEH-unwinds libtcc frames that have no unwind data and the host crashes (STATUS_BAD_STACK).
+// With Frame == 0, longjmp restores registers without unwinding; libtcc is plain C, so nothing is skipped.
+void* NonUnwindingSetjmpThunk(void* realSetjmp) {
+    static void* thunk = [&] {
+        // xor edx, edx; mov rax, realSetjmp; jmp rax -- a tail jump, so _setjmp still sees libtcc's frame.
+        unsigned char code[] = {0x31, 0xD2, 0x48, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xE0};
+        std::memcpy(code + 4, &realSetjmp, sizeof(realSetjmp));
+        void* memory = VirtualAlloc(nullptr, sizeof(code), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (!memory) throw std::runtime_error("Could not allocate the libtcc setjmp thunk");
+        std::memcpy(memory, code, sizeof(code));
+        DWORD previous{};
+        if (!VirtualProtect(memory, sizeof(code), PAGE_EXECUTE_READ, &previous)) throw std::runtime_error("Could not protect the libtcc setjmp thunk");
+        FlushInstructionCache(GetCurrentProcess(), memory, sizeof(code));
+        return memory;
+    }();
+    return thunk;
+}
+
+void DisableLongjmpUnwinding(HMODULE library) {
+    static std::mutex mutex;
+    const std::lock_guard lock(mutex);
+    const auto msvcrt = GetModuleHandleW(L"msvcrt.dll");
+    void* const realSetjmp = msvcrt ? reinterpret_cast<void*>(GetProcAddress(msvcrt, "_setjmp")) : nullptr;
+    if (!realSetjmp) return;
+    void* const thunk = NonUnwindingSetjmpThunk(realSetjmp);
+
+    auto* const base = reinterpret_cast<unsigned char*>(library);
+    const auto* const nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + reinterpret_cast<const IMAGE_DOS_HEADER*>(base)->e_lfanew);
+    const auto& imports = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    if (!imports.VirtualAddress) return;
+    for (auto* descriptor = reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR*>(base + imports.VirtualAddress); descriptor->Name; ++descriptor) {
+        for (auto* slot = reinterpret_cast<void**>(base + descriptor->FirstThunk); *slot; ++slot) {
+            if (*slot != realSetjmp) continue;
+            DWORD previous{};
+            if (!VirtualProtect(slot, sizeof(*slot), PAGE_READWRITE, &previous)) throw std::runtime_error("Could not patch libtcc's _setjmp import");
+            *slot = thunk;
+            VirtualProtect(slot, sizeof(*slot), previous, &previous);
+        }
+    }
+}
+
 template <class T> T Import(HMODULE library, const char* name) {
     const auto address = GetProcAddress(library, name);
     if (!address) throw std::runtime_error(std::string("libtcc.dll does not export '") + name + "'");
@@ -116,6 +159,7 @@ NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompil
         throw std::runtime_error("Could not load libtcc.dll. Expected it in the 'tcc' folder beside the executable, or set LUASHARP_LIBTCC to its full path");
     }
     RequireTccRuntime(impl->library);
+    DisableLongjmpUnwinding(impl->library);
 
     const auto create = Import<TccNew>(impl->library, "tcc_new");
     impl->destroy = Import<TccDelete>(impl->library, "tcc_delete");
