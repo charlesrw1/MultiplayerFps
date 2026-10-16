@@ -19,6 +19,12 @@ void Require(bool condition, std::string_view message) {
 
 long long NativeScale(void*, long long value) { return value * 3; }
 
+const std::string& VariableType(const luasharp::Analysis& analysis, std::string_view name) {
+    const auto found = analysis.variableTypes.find(name);
+    Require(found != analysis.variableTypes.end(), "variable was not bound");
+    return analysis.types.Name(found->second);
+}
+
 void TestTopLevelConstructorCall() {
     const auto lua = luasharp::Compile("class MyClass {}\nauto m = new MyClass();");
     Require(lua.find("local m = MyClass.new()\n") != std::string::npos, "new expression was not lowered to .new()");
@@ -81,7 +87,7 @@ int invalid = "text";
 )");
     const auto members = analysis.members.find("Player");
     Require(members != analysis.members.end() && members->second.size() == 3, "class and inherited members were not collected");
-    Require(analysis.variableTypes.at("player") == "Player", "auto new type was not inferred");
+    Require(VariableType(analysis, "player") == "Player", "auto new type was not inferred");
     Require(!analysis.diagnostics.empty(), "type mismatch was not diagnosed");
 }
 
@@ -94,8 +100,8 @@ UnknownType value;
 auto player = new Player();
 player.missing();
 )");
-    const auto move = std::find_if(analysis.members.at("Player").begin(), analysis.members.at("Player").end(), [](const auto& symbol) { return symbol.name == "move"; });
-    Require(move != analysis.members.at("Player").end() && move->parameters.size() == 2, "method parameter information was not retained");
+    const auto* move = luasharp::FindMember(analysis, "Player", "move");
+    Require(move && move->parameters.size() == 2, "method parameter information was not retained");
     Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& d) { return d.message.find("Unknown type") != std::string::npos; }), "unknown type was not diagnosed");
     Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& d) { return d.message.find("Unknown member") != std::string::npos && d.severity == luasharp::DiagnosticSeverity::Warning; }), "unknown member was not warned");
 }
@@ -167,7 +173,7 @@ class Player { Weapon weapon = new Weapon(); }
 auto player = new Player();
 auto damage = player.weapon.damage;
 )" );
-    Require(analysis.variableTypes.at("damage") == "int", "member chain type was not inferred");
+    Require(VariableType(analysis, "damage") == "int", "member chain type was not inferred");
     Require(analysis.diagnostics.empty(), "valid member chain produced diagnostics");
 }
 
@@ -247,8 +253,8 @@ Item[] tail = items[1:3];
 )";
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid list operations produced diagnostics");
-    Require(analysis.variableTypes.at("first") == "Item", "list indexing did not return the element type");
-    Require(analysis.variableTypes.at("tail") == "Item[]", "list slicing did not preserve the list type");
+    Require(VariableType(analysis, "first") == "Item", "list indexing did not return the element type");
+    Require(VariableType(analysis, "tail") == "Item[]", "list slicing did not preserve the list type");
     const auto lua = luasharp::Compile(source);
     Require(lua.find("table.insert(items, Item.new())") != std::string::npos, "push_back was not lowered to table.insert");
     Require(lua.find("#(items)") != std::string::npos, "list size was not lowered");
@@ -284,7 +290,7 @@ auto first = values["name"];
 auto arbitrary = values.any_key;
 )");
     Require(analysis.diagnostics.empty(), "table rejected heterogeneous keys or values");
-    Require(analysis.variableTypes.at("first") == "any" && analysis.variableTypes.at("arbitrary") == "any", "table reads did not produce dynamic values");
+    Require(VariableType(analysis, "first") == "any" && VariableType(analysis, "arbitrary") == "any", "table reads did not produce dynamic values");
 }
 
 void TestNativeMathTypesAndOperators() {
@@ -299,7 +305,7 @@ Vec3 point = transform * rotated;
 )";
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid native math operations produced diagnostics");
-    Require(analysis.variableTypes.at("rotated") == "Vec3" && analysis.variableTypes.at("point") == "Vec3", "native operator result types were wrong");
+    Require(VariableType(analysis, "rotated") == "Vec3" && VariableType(analysis, "point") == "Vec3", "native operator result types were wrong");
     const auto lua = luasharp::Compile(source);
     Require(lua.find("Vec3.new(1, 2, 3)") != std::string::npos && lua.find("Vec3:new") == std::string::npos, "native static call used method-call syntax");
     Require(lua.find("rotation * sum") != std::string::npos && lua.find("transform * rotated") != std::string::npos, "native operators were not preserved for Lua metatables");
@@ -328,7 +334,8 @@ void update() { value = value + 1; helper(); }
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid else-if or implicit members produced diagnostics");
     Require(analysis.bound.classes.size() == 1 && analysis.bound.classes[0].functions.size() == 3, "bound semantic class tree was not built");
-    Require(analysis.bound.classes[0].functions[1].body[0].elseBody[0].kind == luasharp::SyntaxStatement::Kind::If, "else-if chain was not retained in the bound tree");
+    const auto& program = analysis.bound;
+    Require(program.Statements(program.Statements(program.classes[0].functions[1].body)[0].elseBody)[0].kind == luasharp::SyntaxStatement::Kind::If, "else-if chain was not retained in the bound tree");
     const auto lua = luasharp::Compile(source);
     Require(lua.find("elseif input == 2 then") != std::string::npos, "else-if was not lowered to Lua elseif");
     Require(lua.find("self.value = self.value + 1") != std::string::npos, "implicit field access was not lowered through self");

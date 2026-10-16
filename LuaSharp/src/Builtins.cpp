@@ -1,6 +1,8 @@
 #include "Builtins.h"
 
 #include <algorithm>
+#include <map>
+#include <mutex>
 
 namespace luasharp {
 namespace {
@@ -11,14 +13,14 @@ using M = BuiltinMember;
 const std::vector<std::string> Types{"int", "float", "bool", "string", "table", "Vec3", "Quat", "Transform"};
 
 const std::vector<M> Members{
-    {"string", "length", "int", {}, SymbolKind::Method, false, "string_length"},
-    {"string", "size", "int", {}, SymbolKind::Method, false, "string_length"},
-    {"string", "contains", "bool", {{"string", "value"}}, SymbolKind::Method, false, "string_contains"},
-    {"string", "starts_with", "bool", {{"string", "prefix"}}, SymbolKind::Method, false, "string_starts_with"},
-    {"string", "ends_with", "bool", {{"string", "suffix"}}, SymbolKind::Method, false, "string_ends_with"},
-    {"string", "substring", "string", {{"int", "start"}, {"int", "length", true}}, SymbolKind::Method, false, "string_substring"},
-    {"string", "lower", "string", {}, SymbolKind::Method, false, "string_lower"},
-    {"string", "upper", "string", {}, SymbolKind::Method, false, "string_upper"},
+    {"string", "length", "int", {}, SymbolKind::Method, false, Lowering::StringLength},
+    {"string", "size", "int", {}, SymbolKind::Method, false, Lowering::StringLength},
+    {"string", "contains", "bool", {{"string", "value"}}, SymbolKind::Method, false, Lowering::StringContains},
+    {"string", "starts_with", "bool", {{"string", "prefix"}}, SymbolKind::Method, false, Lowering::StringStartsWith},
+    {"string", "ends_with", "bool", {{"string", "suffix"}}, SymbolKind::Method, false, Lowering::StringEndsWith},
+    {"string", "substring", "string", {{"int", "start"}, {"int", "length", true}}, SymbolKind::Method, false, Lowering::StringSubstring},
+    {"string", "lower", "string", {}, SymbolKind::Method, false, Lowering::StringLower},
+    {"string", "upper", "string", {}, SymbolKind::Method, false, Lowering::StringUpper},
 
     {"Vec3", "x", "float", {}, SymbolKind::Field}, {"Vec3", "y", "float", {}, SymbolKind::Field}, {"Vec3", "z", "float", {}, SymbolKind::Field},
     {"Vec3", "length", "float", {}, SymbolKind::Method},
@@ -63,14 +65,14 @@ const std::vector<BuiltinOperator> Operators{
     {"float", "+", "float", "float", {}}, {"float", "-", "float", "float", {}}, {"float", "*", "float", "float", {}}, {"float", "/", "float", "float", {}},
     {"float", "+", "int", "float", {}}, {"float", "-", "int", "float", {}}, {"float", "*", "int", "float", {}}, {"float", "/", "int", "float", {}},
     {"int", "+", "float", "float", {}}, {"int", "-", "float", "float", {}}, {"int", "*", "float", "float", {}}, {"int", "/", "float", "float", {}},
-    {"string", "+", "string", "string", "concat"},
+    {"string", "+", "string", "string", Lowering::Concat},
     {"Vec3", "+", "Vec3", "Vec3", {}}, {"Vec3", "-", "Vec3", "Vec3", {}}, {"Vec3", "*", "Vec3", "Vec3", {}}, {"Vec3", "*", "float", "Vec3", {}}, {"Vec3", "*", "int", "Vec3", {}},
     {"Quat", "*", "Quat", "Quat", {}}, {"Quat", "*", "Vec3", "Vec3", {}},
     {"Transform", "*", "Transform", "Transform", {}}, {"Transform", "*", "Vec3", "Vec3", {}},
 };
 
 const std::vector<BuiltinFunction> Functions{
-    {"printf", "void", {{"string", "format"}}, true, "printf"},
+    {"printf", "void", {{"string", "format"}}, true, Lowering::Printf},
 };
 
 std::string ElementType(std::string_view array) { return std::string(array.substr(0, array.size() - 2)); }
@@ -84,11 +86,11 @@ std::vector<BuiltinMember> BuiltinMembers(std::string_view type, bool staticMemb
     if (type.ends_with("[]") && !staticMembers) {
         const auto element = ElementType(type);
         return {
-            {std::string(type), "push_back", "void", {{element, "value"}}, SymbolKind::Method, false, "list_push_back"},
-            {std::string(type), "pop_back", element, {}, SymbolKind::Method, false, "list_pop_back"},
-            {std::string(type), "size", "int", {}, SymbolKind::Method, false, "list_size"},
-            {std::string(type), "empty", "bool", {}, SymbolKind::Method, false, "list_empty"},
-            {std::string(type), "clear", "void", {}, SymbolKind::Method, false, "list_clear"},
+            {std::string(type), "push_back", "void", {{element, "value"}}, SymbolKind::Method, false, Lowering::ListPushBack},
+            {std::string(type), "pop_back", element, {}, SymbolKind::Method, false, Lowering::ListPopBack},
+            {std::string(type), "size", "int", {}, SymbolKind::Method, false, Lowering::ListSize},
+            {std::string(type), "empty", "bool", {}, SymbolKind::Method, false, Lowering::ListEmpty},
+            {std::string(type), "clear", "void", {}, SymbolKind::Method, false, Lowering::ListClear},
         };
     }
     std::vector<BuiltinMember> result;
@@ -96,42 +98,52 @@ std::vector<BuiltinMember> BuiltinMembers(std::string_view type, bool staticMemb
     return result;
 }
 
-std::optional<BuiltinMember> FindBuiltinMember(std::string_view type, std::string_view name, bool staticMember) {
-    auto members = BuiltinMembers(type, staticMember);
-    const auto found = std::find_if(members.begin(), members.end(), [&](const auto& value) { return value.name == name; });
-    return found == members.end() ? std::nullopt : std::optional<BuiltinMember>(*found);
+const BuiltinMember* FindBuiltinMember(std::string_view type, std::string_view name, bool staticMember) {
+    const std::vector<BuiltinMember>* members = &Members;
+    if (type.ends_with("[]")) {
+        if (staticMember) return nullptr;
+        static std::mutex mutex;
+        static std::map<std::string, std::vector<BuiltinMember>, std::less<>> lists; // never erased, so returned pointers stay valid
+        std::lock_guard lock(mutex);
+        auto found = lists.find(type);
+        if (found == lists.end()) found = lists.emplace(std::string(type), BuiltinMembers(type, false)).first;
+        members = &found->second;
+    }
+    const auto found = std::find_if(members->begin(), members->end(), [&](const auto& value) { return value.owner == type && value.isStatic == staticMember && value.name == name; });
+    return found == members->end() ? nullptr : &*found;
 }
 
-std::optional<BuiltinOperator> FindBuiltinOperator(std::string_view left, std::string_view operation, std::string_view right) {
-    if ((operation == "==" || operation == "!=") && left == right) return BuiltinOperator{std::string(left), std::string(operation), std::string(right), "bool", {}};
-    if ((operation == "<" || operation == ">" || operation == "<=" || operation == ">=") && ((left == "int" || left == "float") && (right == "int" || right == "float"))) return BuiltinOperator{std::string(left), std::string(operation), std::string(right), "bool", {}};
+const BuiltinOperator* FindBuiltinOperator(std::string_view left, std::string_view operation, std::string_view right) {
+    static const BuiltinOperator comparison{{}, {}, {}, "bool", {}};
+    if ((operation == "==" || operation == "!=") && left == right) return &comparison;
+    if ((operation == "<" || operation == ">" || operation == "<=" || operation == ">=") && ((left == "int" || left == "float") && (right == "int" || right == "float"))) return &comparison;
     const auto found = std::find_if(Operators.begin(), Operators.end(), [&](const auto& value) { return value.left == left && value.operation == operation && value.right == right; });
-    return found == Operators.end() ? std::nullopt : std::optional<BuiltinOperator>(*found);
+    return found == Operators.end() ? nullptr : &*found;
 }
 
 const std::vector<BuiltinFunction>& BuiltinFunctions() { return Functions; }
-std::optional<BuiltinFunction> FindBuiltinFunction(std::string_view name) {
+const BuiltinFunction* FindBuiltinFunction(std::string_view name) {
     const auto found = std::find_if(Functions.begin(), Functions.end(), [&](const auto& value) { return value.name == name; });
-    return found == Functions.end() ? std::nullopt : std::optional<BuiltinFunction>(*found);
+    return found == Functions.end() ? nullptr : &*found;
 }
 
-std::optional<std::string> BuiltinCastLowering(std::string_view target, std::string_view source) {
-    if (target == source) return "cast_identity";
-    if (target == "string") return "cast_string";
+std::optional<Lowering> BuiltinCastLowering(std::string_view target, std::string_view source) {
+    if (target == source) return Lowering::CastIdentity;
+    if (target == "string") return Lowering::CastString;
     if (target == "bool") {
-        if (source == "int" || source == "float") return "cast_bool_number";
-        if (source == "string") return "cast_bool_string";
-        if (source == "bool") return "cast_identity";
+        if (source == "int" || source == "float") return Lowering::CastBoolNumber;
+        if (source == "string") return Lowering::CastBoolString;
+        if (source == "bool") return Lowering::CastIdentity;
     }
     if (target == "int") {
-        if (source == "float") return "cast_int_float";
-        if (source == "bool") return "cast_number_bool";
-        if (source == "string") return "cast_number_string";
+        if (source == "float") return Lowering::CastIntFloat;
+        if (source == "bool") return Lowering::CastNumberBool;
+        if (source == "string") return Lowering::CastNumberString;
     }
     if (target == "float") {
-        if (source == "int") return "cast_identity";
-        if (source == "bool") return "cast_number_bool";
-        if (source == "string") return "cast_number_string";
+        if (source == "int") return Lowering::CastIdentity;
+        if (source == "bool") return Lowering::CastNumberBool;
+        if (source == "string") return Lowering::CastNumberString;
     }
     return std::nullopt;
 }

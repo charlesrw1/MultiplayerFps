@@ -403,87 +403,98 @@ std::string DefaultValue(const std::string& type, const std::unordered_set<std::
 }
 
 struct Emitter {
+    const Analysis& analysis;
     std::string output;
     std::vector<SourceMapEntry> sourceMap;
     std::unordered_set<std::string> enumTypes;
     size_t nextLabel{};
-    void Raw(std::string text) { output += std::move(text); }
-    void Line(std::string text, size_t sourceOffset) {
-        sourceMap.push_back({1 + static_cast<size_t>(std::count(output.begin(), output.end(), '\n')), sourceOffset}); output += text + "\n";
+    size_t lines{};
+    void Raw(std::string_view text) { output.append(text); lines += static_cast<size_t>(std::count(text.begin(), text.end(), '\n')); }
+    void Line(std::string_view text, size_t sourceOffset) {
+        sourceMap.push_back({1 + lines, sourceOffset}); Raw(text); Raw("\n");
     }
+    const BoundProgram& Program() const { return analysis.bound; }
+    const BoundExpression& Expression(NodeId id) const { return Program().Expression(id); }
+    const BoundExpression& Child(const BoundExpression& value, size_t index) const { return Program().Child(value, index); }
 };
 
-void EmitStatements(Emitter& emitter, const std::vector<BoundStatement>& statements, const std::string& indent, const std::string& continueLabel = {});
+void EmitStatements(Emitter& emitter, NodeRange statements, const std::string& indent, const std::string& continueLabel = {});
 
-std::string EmitExpression(const BoundExpression& value) {
-    const auto child = [&](size_t index) { return EmitExpression(value.children.at(index)); };
-    const auto& lowering = value.lowering;
+std::string EmitExpression(const Emitter& emitter, const BoundExpression& value) {
+    const auto child = [&](size_t index) { return EmitExpression(emitter, emitter.Child(value, index)); };
+    const auto lowering = value.lowering;
+    const auto& text = value.Text();
+    const size_t childCount = value.children.count;
     switch (value.kind) {
     case SyntaxExpression::Kind::Missing: return {};
     case SyntaxExpression::Kind::Identifier:
-        if (value.text == "this") return "self";
-        return lowering == "implicit_field" || lowering == "implicit_method" ? "self." + value.text : value.text;
+        if (text == "this") return "self";
+        return lowering == Lowering::ImplicitField || lowering == Lowering::ImplicitMethod ? "self." + text : text;
     case SyntaxExpression::Kind::Number: case SyntaxExpression::Kind::String:
-    case SyntaxExpression::Kind::Boolean: return value.text;
-    case SyntaxExpression::Kind::Table: { std::string out = "{"; for (size_t i{}; i < value.children.size(); ++i) { if (i) out += ", "; out += child(i); } return out + "}"; }
+    case SyntaxExpression::Kind::Boolean: return text;
+    case SyntaxExpression::Kind::Table: { std::string out = "{"; for (size_t i{}; i < childCount; ++i) { if (i) out += ", "; out += child(i); } return out + "}"; }
     case SyntaxExpression::Kind::TableEntry:
-        return value.text.empty() ? "[" + child(0) + "] = " + child(1) : value.text + " = " + child(0);
+        return text.empty() ? "[" + child(0) + "] = " + child(1) : text + " = " + child(0);
     case SyntaxExpression::Kind::Null: return "nil";
     case SyntaxExpression::Kind::Parenthesized: return "(" + child(0) + ")";
-    case SyntaxExpression::Kind::New: { std::string out = value.text + ".new("; for (size_t i{}; i < value.children.size(); ++i) { if (i) out += ", "; out += child(i); } return out + ")"; }
-    case SyntaxExpression::Kind::Member: return child(0) + "." + value.text;
+    case SyntaxExpression::Kind::New: { std::string out = text + ".new("; for (size_t i{}; i < childCount; ++i) { if (i) out += ", "; out += child(i); } return out + ")"; }
+    case SyntaxExpression::Kind::Member: return child(0) + "." + text;
     case SyntaxExpression::Kind::Call: {
-        const auto& callee = value.children.at(0); std::string out;
-        const auto receiver = [&]() { return callee.kind == SyntaxExpression::Kind::Member ? EmitExpression(callee.children.at(0)) : std::string{}; };
+        const auto& callee = emitter.Child(value, 0); std::string out;
+        const auto receiver = [&]() { return callee.kind == SyntaxExpression::Kind::Member ? EmitExpression(emitter, emitter.Child(callee, 0)) : std::string{}; };
         const auto argument = [&](size_t index) { return child(index + 1); };
-        if (lowering == "printf") { std::string result = "io.write(string.format("; for (size_t i = 1; i < value.children.size(); ++i) { if (i != 1) result += ", "; result += child(i); } return result + "))"; }
-        if (lowering == "list_push_back") return "table.insert(" + receiver() + ", " + argument(0) + ")";
-        if (lowering == "list_pop_back") return "table.remove(" + receiver() + ")";
-        if (lowering == "list_size" || lowering == "string_length") return "#(" + receiver() + ")";
-        if (lowering == "list_empty") return "#(" + receiver() + ") == 0";
-        if (lowering == "list_clear") return "(function(t) for k in pairs(t) do t[k] = nil end end)(" + receiver() + ")";
-        if (lowering == "string_contains") return "string.find(" + receiver() + ", " + argument(0) + ", 1, true) ~= nil";
-        if (lowering == "string_starts_with") return "(function(s, p) return string.sub(s, 1, #p) == p end)(" + receiver() + ", " + argument(0) + ")";
-        if (lowering == "string_ends_with") return "(function(s, p) return p == '' or string.sub(s, -#p) == p end)(" + receiver() + ", " + argument(0) + ")";
-        if (lowering == "string_substring") return value.children.size() == 3
+        switch (lowering) {
+        case Lowering::Printf: { std::string result = "io.write(string.format("; for (size_t i = 1; i < childCount; ++i) { if (i != 1) result += ", "; result += child(i); } return result + "))"; }
+        case Lowering::ListPushBack: return "table.insert(" + receiver() + ", " + argument(0) + ")";
+        case Lowering::ListPopBack: return "table.remove(" + receiver() + ")";
+        case Lowering::ListSize: case Lowering::StringLength: return "#(" + receiver() + ")";
+        case Lowering::ListEmpty: return "#(" + receiver() + ") == 0";
+        case Lowering::ListClear: return "(function(t) for k in pairs(t) do t[k] = nil end end)(" + receiver() + ")";
+        case Lowering::StringContains: return "string.find(" + receiver() + ", " + argument(0) + ", 1, true) ~= nil";
+        case Lowering::StringStartsWith: return "(function(s, p) return string.sub(s, 1, #p) == p end)(" + receiver() + ", " + argument(0) + ")";
+        case Lowering::StringEndsWith: return "(function(s, p) return p == '' or string.sub(s, -#p) == p end)(" + receiver() + ", " + argument(0) + ")";
+        case Lowering::StringSubstring: return childCount == 3
             ? "(function(s, i, n) return string.sub(s, i + 1, i + n) end)(" + receiver() + ", " + argument(0) + ", " + argument(1) + ")"
             : "string.sub(" + receiver() + ", " + argument(0) + " + 1)";
-        if (lowering == "string_lower") return "string.lower(" + receiver() + ")";
-        if (lowering == "string_upper") return "string.upper(" + receiver() + ")";
-        if (lowering == "cast_identity") return "(" + argument(0) + ")";
-        if (lowering == "cast_string") return "tostring(" + argument(0) + ")";
-        if (lowering == "cast_bool_number") return "(" + argument(0) + " ~= 0)";
-        if (lowering == "cast_bool_string") return "(" + argument(0) + " ~= '')";
-        if (lowering == "cast_int_float") return "(function(v) return v < 0 and math.ceil(v) or math.floor(v) end)(" + argument(0) + ")";
-        if (lowering == "cast_number_bool") return "(" + argument(0) + " and 1 or 0)";
-        if (lowering == "cast_number_string") return "tonumber(" + argument(0) + ")";
-        if (callee.lowering == "implicit_method") out = "self:" + callee.text;
-        else if (callee.kind == SyntaxExpression::Kind::Member) out = EmitExpression(callee.children.at(0)) + (lowering == "static_call" ? "." : ":") + callee.text;
-        else out = EmitExpression(callee);
-        out += "("; for (size_t i = 1; i < value.children.size(); ++i) { if (i != 1) out += ", "; out += child(i); } return out + ")";
+        case Lowering::StringLower: return "string.lower(" + receiver() + ")";
+        case Lowering::StringUpper: return "string.upper(" + receiver() + ")";
+        case Lowering::CastIdentity: return "(" + argument(0) + ")";
+        case Lowering::CastString: return "tostring(" + argument(0) + ")";
+        case Lowering::CastBoolNumber: return "(" + argument(0) + " ~= 0)";
+        case Lowering::CastBoolString: return "(" + argument(0) + " ~= '')";
+        case Lowering::CastIntFloat: return "(function(v) return v < 0 and math.ceil(v) or math.floor(v) end)(" + argument(0) + ")";
+        case Lowering::CastNumberBool: return "(" + argument(0) + " and 1 or 0)";
+        case Lowering::CastNumberString: return "tonumber(" + argument(0) + ")";
+        default: break;
+        }
+        if (callee.lowering == Lowering::ImplicitMethod) out = "self:" + callee.Text();
+        else if (callee.kind == SyntaxExpression::Kind::Member) out = EmitExpression(emitter, emitter.Child(callee, 0)) + (lowering == Lowering::StaticCall ? "." : ":") + callee.Text();
+        else out = EmitExpression(emitter, callee);
+        out += "("; for (size_t i = 1; i < childCount; ++i) { if (i != 1) out += ", "; out += child(i); } return out + ")";
     }
     case SyntaxExpression::Kind::Index:
-        if (lowering == "list_index") return "(function(a, i) if i < 0 then i = #a + i end return a[i + 1] end)(" + child(0) + ", " + child(1) + ")";
+        if (lowering == Lowering::ListIndex) return "(function(a, i) if i < 0 then i = #a + i end return a[i + 1] end)(" + child(0) + ", " + child(1) + ")";
         return child(0) + "[" + child(1) + "]";
     case SyntaxExpression::Kind::Slice: return "(function(a, s, e) local r = {} if s < 0 then s = #a + s end if e < 0 then e = #a + e end for i = s + 1, e do r[#r + 1] = a[i] end return r end)(" + child(0) + ", " + child(1) + ", " + child(2) + ")";
     case SyntaxExpression::Kind::Range: return child(0) + ", " + child(1);
     case SyntaxExpression::Kind::Lambda: {
         std::string out = "function(";
-        for (size_t i{}; i < value.parameters.size(); ++i) { if (i) out += ", "; out += value.parameters[i].name; }
-        if (!value.lambdaIsBlock) return out + ") return " + child(0) + " end";
-        Emitter nested; EmitStatements(nested, value.lambdaBody, "    "); return out + ")\n" + nested.output + "end";
+        const auto parameters = value.Parameters();
+        for (size_t i{}; i < parameters.size(); ++i) { if (i) out += ", "; out += parameters[i].name; }
+        if (!value.LambdaIsBlock()) return out + ") return " + child(0) + " end";
+        Emitter nested{emitter.analysis}; EmitStatements(nested, value.lambdaBody, "    "); return out + ")\n" + nested.output + "end";
     }
-    case SyntaxExpression::Kind::Unary: return (value.text == "!" ? "not " : value.text) + child(0);
+    case SyntaxExpression::Kind::Unary: return (text == "!" ? "not " : text) + child(0);
     case SyntaxExpression::Kind::Assignment: {
-        if (lowering == "list_set") {
-            const auto& index = value.children.at(0); const std::string slot = "a[i + 1]";
-            const std::string assignment = value.text == "=" ? slot + " = v" : slot + " = " + slot + " " + value.text.substr(0, 1) + " v";
-            return "(function(a, i, v) if i < 0 then i = #a + i end " + assignment + " end)(" + EmitExpression(index.children.at(0)) + ", " + EmitExpression(index.children.at(1)) + ", " + child(1) + ")";
+        if (lowering == Lowering::ListSet) {
+            const auto& index = emitter.Child(value, 0); const std::string slot = "a[i + 1]";
+            const std::string assignment = text == "=" ? slot + " = v" : slot + " = " + slot + " " + text.substr(0, 1) + " v";
+            return "(function(a, i, v) if i < 0 then i = #a + i end " + assignment + " end)(" + EmitExpression(emitter, emitter.Child(index, 0)) + ", " + EmitExpression(emitter, emitter.Child(index, 1)) + ", " + child(1) + ")";
         }
-        std::string op = value.text; if (op.size() == 2 && op[1] == '=') return child(0) + " = " + child(0) + " " + (lowering == "compound_concat" ? ".." : op.substr(0, 1)) + " " + child(1);
+        if (text.size() == 2 && text[1] == '=') return child(0) + " = " + child(0) + " " + (lowering == Lowering::CompoundConcat ? ".." : text.substr(0, 1)) + " " + child(1);
         return child(0) + " = " + child(1);
     }
-    case SyntaxExpression::Kind::Binary: { const auto op = lowering == "concat" ? ".." : value.text == "!=" ? "~=" : value.text == "&&" ? "and" : value.text == "||" ? "or" : value.text; return child(0) + " " + op + " " + child(1); }
+    case SyntaxExpression::Kind::Binary: { const auto& op = lowering == Lowering::Concat ? ".." : text == "!=" ? "~=" : text == "&&" ? "and" : text == "||" ? "or" : text; return child(0) + " " + op + " " + child(1); }
     }
     return {};
 }
@@ -491,21 +502,23 @@ std::string EmitExpression(const BoundExpression& value) {
 void EmitIf(Emitter& emitter, const BoundStatement& first, const std::string& indent, const std::string& continueLabel) {
     const BoundStatement* current = &first; std::string keyword = "if";
     for (;;) {
-        emitter.Line(indent + keyword + " " + EmitExpression(current->expression) + " then", current->span.offset);
+        emitter.Line(indent + keyword + " " + EmitExpression(emitter, emitter.Expression(current->expression)) + " then", current->span.offset);
         EmitStatements(emitter, current->body, indent + "    ", continueLabel);
-        if (current->elseBody.size() == 1 && current->elseBody.front().kind == SyntaxStatement::Kind::If) { current = &current->elseBody.front(); keyword = "elseif"; continue; }
-        if (!current->elseBody.empty()) { emitter.Line(indent + "else", current->span.offset); EmitStatements(emitter, current->elseBody, indent + "    ", continueLabel); }
+        const auto elseBody = emitter.Program().Statements(current->elseBody);
+        if (elseBody.size() == 1 && elseBody.front().kind == SyntaxStatement::Kind::If) { current = &elseBody.front(); keyword = "elseif"; continue; }
+        if (!elseBody.empty()) { emitter.Line(indent + "else", current->span.offset); EmitStatements(emitter, current->elseBody, indent + "    ", continueLabel); }
         emitter.Line(indent + "end", first.span.offset); return;
     }
 }
 
-void EmitStatements(Emitter& emitter, const std::vector<BoundStatement>& statements, const std::string& indent, const std::string& continueLabel) {
-    for (const auto& statement : statements) {
+void EmitStatements(Emitter& emitter, NodeRange statements, const std::string& indent, const std::string& continueLabel) {
+    for (const auto& statement : emitter.Program().Statements(statements)) {
+        const auto& expression = emitter.Expression(statement.expression);
         switch (statement.kind) {
         case SyntaxStatement::Kind::If: EmitIf(emitter, statement, indent, continueLabel); break;
         case SyntaxStatement::Kind::While: {
             const auto label = "__luasharp_continue_" + std::to_string(emitter.nextLabel++);
-            emitter.Line(indent + "while " + EmitExpression(statement.expression) + " do", statement.span.offset);
+            emitter.Line(indent + "while " + EmitExpression(emitter, expression) + " do", statement.span.offset);
             emitter.Line(indent + "    do", statement.span.offset);
             EmitStatements(emitter, statement.body, indent + "        ", label);
             emitter.Line(indent + "    end", statement.span.offset);
@@ -514,31 +527,33 @@ void EmitStatements(Emitter& emitter, const std::vector<BoundStatement>& stateme
         }
         case SyntaxStatement::Kind::For: {
             const auto label = "__luasharp_continue_" + std::to_string(emitter.nextLabel++);
+            const auto& increment = emitter.Expression(statement.increment);
             emitter.Line(indent + "do", statement.span.offset);
             EmitStatements(emitter, statement.initializer, indent + "    ");
-            emitter.Line(indent + "    while " + EmitExpression(statement.expression) + " do", statement.span.offset);
+            emitter.Line(indent + "    while " + EmitExpression(emitter, expression) + " do", statement.span.offset);
             emitter.Line(indent + "        do", statement.span.offset);
             EmitStatements(emitter, statement.body, indent + "            ", label);
             emitter.Line(indent + "        end", statement.span.offset);
             emitter.Line(indent + "        ::" + label + "::", statement.span.offset);
-            if (statement.increment.kind != SyntaxExpression::Kind::Missing) emitter.Line(indent + "        " + EmitExpression(statement.increment), statement.increment.span.offset);
+            if (increment.kind != SyntaxExpression::Kind::Missing) emitter.Line(indent + "        " + EmitExpression(emitter, increment), increment.span.offset);
             emitter.Line(indent + "    end", statement.span.offset);
             emitter.Line(indent + "end", statement.span.offset); break;
         }
         case SyntaxStatement::Kind::ForEach: {
             const auto loopId = emitter.nextLabel++; const auto label = "__luasharp_continue_" + std::to_string(loopId); std::string header; std::string listIndex;
-            if (statement.expression.kind == SyntaxExpression::Kind::Range) {
-                header = "for " + statement.name + " = " + EmitExpression(statement.expression) + " do";
-            } else if (!statement.secondName.empty() && statement.expression.type.ends_with("[]")) {
+            const auto& name = statement.Name(); const auto& secondName = statement.SecondName();
+            if (expression.kind == SyntaxExpression::Kind::Range) {
+                header = "for " + name + " = " + EmitExpression(emitter, expression) + " do";
+            } else if (!secondName.empty() && emitter.analysis.types.IsList(expression.type)) {
                 listIndex = "__luasharp_index_" + std::to_string(loopId);
-                header = "for " + listIndex + ", " + statement.secondName + " in ipairs(" + EmitExpression(statement.expression) + ") do";
-            } else if (!statement.secondName.empty()) {
-                header = "for " + statement.name + ", " + statement.secondName + " in pairs(" + EmitExpression(statement.expression) + ") do";
+                header = "for " + listIndex + ", " + secondName + " in ipairs(" + EmitExpression(emitter, expression) + ") do";
+            } else if (!secondName.empty()) {
+                header = "for " + name + ", " + secondName + " in pairs(" + EmitExpression(emitter, expression) + ") do";
             } else {
-                header = "for _, " + statement.name + " in ipairs(" + EmitExpression(statement.expression) + ") do";
+                header = "for _, " + name + " in ipairs(" + EmitExpression(emitter, expression) + ") do";
             }
             emitter.Line(indent + header, statement.span.offset);
-            if (!listIndex.empty()) emitter.Line(indent + "    local " + statement.name + " = " + listIndex + " - 1", statement.span.offset);
+            if (!listIndex.empty()) emitter.Line(indent + "    local " + name + " = " + listIndex + " - 1", statement.span.offset);
             emitter.Line(indent + "    do", statement.span.offset);
             EmitStatements(emitter, statement.body, indent + "        ", label);
             emitter.Line(indent + "    end", statement.span.offset);
@@ -547,9 +562,9 @@ void EmitStatements(Emitter& emitter, const std::vector<BoundStatement>& stateme
         }
         case SyntaxStatement::Kind::Break: emitter.Line(indent + "break", statement.span.offset); break;
         case SyntaxStatement::Kind::Continue: emitter.Line(indent + "goto " + continueLabel, statement.span.offset); break;
-        case SyntaxStatement::Kind::Return: emitter.Line(indent + "return" + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " " + EmitExpression(statement.expression)), statement.span.offset); break;
-        case SyntaxStatement::Kind::Local: emitter.Line(indent + "local " + statement.name + " = " + (statement.expression.kind == SyntaxExpression::Kind::Missing ? DefaultValue(statement.type, &emitter.enumTypes) : EmitExpression(statement.expression)), statement.span.offset); break;
-        case SyntaxStatement::Kind::Expression: emitter.Line(indent + EmitExpression(statement.expression), statement.span.offset); break;
+        case SyntaxStatement::Kind::Return: emitter.Line(indent + "return" + (expression.kind == SyntaxExpression::Kind::Missing ? "" : " " + EmitExpression(emitter, expression)), statement.span.offset); break;
+        case SyntaxStatement::Kind::Local: emitter.Line(indent + "local " + statement.Name() + " = " + (expression.kind == SyntaxExpression::Kind::Missing ? DefaultValue(emitter.analysis.types.Name(statement.type), &emitter.enumTypes) : EmitExpression(emitter, expression)), statement.span.offset); break;
+        case SyntaxStatement::Kind::Expression: emitter.Line(indent + EmitExpression(emitter, expression), statement.span.offset); break;
         }
     }
 }
@@ -557,8 +572,9 @@ void EmitStatements(Emitter& emitter, const std::vector<BoundStatement>& stateme
 void EmitClass(Emitter& emitter, const BoundClass& value) {
     emitter.Raw("---@class " + value.name + (value.baseName.empty() ? "" : " : " + value.baseName) + "\n");
     for (const auto& field : value.fields) {
+        const auto initializer = emitter.Expression(field.initializer).kind;
         emitter.Raw("---@field " + field.access + " " + field.name + " " + LuaType(field.type));
-        if (field.initializer.kind == SyntaxExpression::Kind::Null || (field.initializer.kind == SyntaxExpression::Kind::Missing && DefaultValue(field.type, &emitter.enumTypes) == "nil")) emitter.Raw("?"); emitter.Raw("\n");
+        if (initializer == SyntaxExpression::Kind::Null || (initializer == SyntaxExpression::Kind::Missing && DefaultValue(field.type, &emitter.enumTypes) == "nil")) emitter.Raw("?"); emitter.Raw("\n");
     }
     emitter.Raw("local " + value.name + " = {}\n" + value.name + ".__index = " + value.name + "\n");
     if (!value.baseName.empty()) emitter.Raw("setmetatable(" + value.name + ", { __index = " + value.baseName + " })\n");
@@ -567,7 +583,10 @@ void EmitClass(Emitter& emitter, const BoundClass& value) {
     emitter.Raw("function " + value.name + ".new(");
     if (constructor != value.functions.end()) for (size_t i{}; i < constructor->parameters.size(); ++i) { if (i) emitter.Raw(", "); emitter.Raw(constructor->parameters[i].name); }
     emitter.Raw(")\n    local self = setmetatable(" + (value.baseName.empty() ? std::string("{}") : value.baseName + ".new()") + ", " + value.name + ")\n");
-    for (const auto& field : value.fields) emitter.Line("    self." + field.name + " = " + (field.initializer.kind == SyntaxExpression::Kind::Missing ? DefaultValue(field.type, &emitter.enumTypes) : EmitExpression(field.initializer)), field.span.offset);
+    for (const auto& field : value.fields) {
+        const auto& initializer = emitter.Expression(field.initializer);
+        emitter.Line("    self." + field.name + " = " + (initializer.kind == SyntaxExpression::Kind::Missing ? DefaultValue(field.type, &emitter.enumTypes) : EmitExpression(emitter, initializer)), field.span.offset);
+    }
     if (constructor != value.functions.end()) EmitStatements(emitter, constructor->body, "    ");
     emitter.Raw("    return self\nend\n\n");
     for (const auto& function : value.functions) {
@@ -616,7 +635,7 @@ CompilationResult CompileWithSourceMap(std::string_view source) {
     auto analysis = Analyze(source); auto& tree = analysis.syntax; if (!tree.diagnostics.empty()) throw SyntaxError(tree.diagnostics.front());
     const auto error = std::find_if(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.severity == DiagnosticSeverity::Error; });
     if (error != analysis.diagnostics.end()) throw std::runtime_error(error->message + " at " + std::to_string(error->span.offset));
-    Emitter emitter; for (const auto& value : analysis.bound.enums) emitter.enumTypes.insert(value.name); for (const auto& value : analysis.bound.enums) EmitEnum(emitter, value); for (const auto& value : analysis.bound.classes) EmitClass(emitter, value); EmitStatements(emitter, analysis.bound.topLevel, {});
+    Emitter emitter{analysis}; for (const auto& value : analysis.bound.enums) emitter.enumTypes.insert(value.name); for (const auto& value : analysis.bound.enums) EmitEnum(emitter, value); for (const auto& value : analysis.bound.classes) EmitClass(emitter, value); EmitStatements(emitter, analysis.bound.topLevel, {});
     return {std::move(emitter.output), std::move(emitter.sourceMap)};
 }
 

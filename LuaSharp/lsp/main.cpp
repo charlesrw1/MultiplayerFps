@@ -28,7 +28,7 @@ std::vector<luasharp::ExternalType> ExternalTypesFor(const std::string& uri) {
         for (const auto& symbol : analysis.symbols) {
             if ((symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum) || !symbol.span.length) continue;
             luasharp::ExternalType type{symbol.name}; type.isEnum = symbol.kind == luasharp::SymbolKind::Enum; if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
-            if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) type.members = members->second;
+            if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) for (const auto index : members->second) type.members.push_back(analysis.symbols[index]);
             result.push_back(std::move(type));
         }
     }
@@ -97,11 +97,8 @@ const luasharp::Symbol* MemberAt(const luasharp::Analysis& analysis, size_t offs
         if (token.kind != luasharp::SyntaxTokenKind::Identifier || offset < token.span.offset || offset > token.span.End() || tokens[i - 1].text != ".") continue;
         const auto receiverOffset = tokens[i - 2].span.End() ? tokens[i - 2].span.End() - 1 : tokens[i - 2].span.offset;
         const auto* receiver = luasharp::FindExpression(analysis, receiverOffset);
-        if (!receiver || receiver->type.empty()) return nullptr;
-        const auto members = analysis.members.find(receiver->type);
-        if (members == analysis.members.end()) return nullptr;
-        const auto member = std::find_if(members->second.begin(), members->second.end(), [&](const auto& candidate) { return candidate.name == token.text; });
-        return member == members->second.end() ? nullptr : &*member;
+        if (!receiver || receiver->type == luasharp::TypeTable::Unknown) return nullptr;
+        return luasharp::FindMember(analysis, analysis.types.Name(receiver->type), token.text);
     }
     return nullptr;
 }
@@ -126,7 +123,7 @@ std::string HoverLabel(const luasharp::Symbol& symbol) {
     return result + ")";
 }
 const luasharp::Symbol* SymbolAt(const luasharp::Analysis& analysis, size_t offset) {
-    const auto declaration = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& symbol) { return symbol.span.Contains(offset); });
+    const auto declaration = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& symbol) { return !symbol.implicit && symbol.span.Contains(offset); });
     if (declaration != analysis.symbols.end()) return &*declaration;
     if (const auto* member = MemberAt(analysis, offset)) return member;
     if (const auto* expression = luasharp::FindExpression(analysis, offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) return &analysis.symbols[*expression->symbolIndex];
@@ -182,14 +179,15 @@ json Completions(const std::string& uri, const std::string& text, const json& po
     if (memberStart > 0 && line[memberStart - 1] == '.') {
         const size_t dotOffset = lineStart + memberStart - 1;
         std::optional<std::string> type;
-        if (dotOffset > 0) if (const auto* expression = luasharp::FindExpression(analysis, dotOffset - 1); expression && !expression->type.empty()) type = expression->type;
+        if (dotOffset > 0) if (const auto* expression = luasharp::FindExpression(analysis, dotOffset - 1); expression && expression->type != luasharp::TypeTable::Unknown) type = analysis.types.Name(expression->type);
         if (!type) {
             size_t end = memberStart - 1, begin = end; while (begin > 0 && (std::isalnum(static_cast<unsigned char>(line[begin - 1])) || line[begin - 1] == '_')) --begin;
             type = luasharp::ResolveVariableType(analysis, line.substr(begin, end - begin), dotOffset);
         }
         if (type) {
             const auto members = analysis.members.find(*type);
-            if (members != analysis.members.end()) for (const auto& member : members->second) {
+            if (members != analysis.members.end()) for (const auto index : members->second) {
+                const auto& member = analysis.symbols[index];
                 const auto signature = member.kind == luasharp::SymbolKind::Method ? "(" + [&] { std::string value; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) value += ", "; value += member.parameters[i]; } return value; }() + ")" : "";
                 json item{{"label", member.name + signature}, {"kind", member.kind == luasharp::SymbolKind::Method ? 2 : 5}, {"detail", member.type + signature}};
                 if (member.kind == luasharp::SymbolKind::Method) {
@@ -211,7 +209,7 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         signature += ")";
         result.push_back({{"label", function.name + signature}, {"kind", 3}, {"detail", function.returnType + signature}});
     }
-    for (const auto& symbol : analysis.symbols) result.push_back({{"label", symbol.name}, {"kind", symbol.kind == luasharp::SymbolKind::Class || symbol.kind == luasharp::SymbolKind::Enum ? 7 : symbol.kind == luasharp::SymbolKind::Method ? 2 : 6}, {"detail", DisplayType(symbol.type)}});
+    for (const auto& symbol : analysis.symbols) if (!symbol.implicit) result.push_back({{"label", symbol.name}, {"kind", symbol.kind == luasharp::SymbolKind::Class || symbol.kind == luasharp::SymbolKind::Enum ? 7 : symbol.kind == luasharp::SymbolKind::Method ? 2 : 6}, {"detail", DisplayType(symbol.type)}});
     return result;
 }
 json SignatureHelp(const std::string& uri, const std::string& text, const json& position) {
@@ -222,10 +220,9 @@ json SignatureHelp(const std::string& uri, const std::string& text, const json& 
     if (open < 1 || tokens[open - 1].kind != luasharp::SyntaxTokenKind::Identifier) return nullptr;
     const auto name = tokens[open - 1].text; std::string returnType; std::vector<std::string> parameterLabels;
     if (open >= 3 && tokens[open - 2].text == ".") {
-        const auto* receiver = luasharp::FindExpression(analysis, tokens[open - 3].span.End() ? tokens[open - 3].span.End() - 1 : tokens[open - 3].span.offset); if (!receiver || receiver->type.empty()) return nullptr;
-        const auto members = analysis.members.find(receiver->type); if (members == analysis.members.end()) return nullptr;
-        const auto member = std::find_if(members->second.begin(), members->second.end(), [&](const auto& symbol) { return symbol.name == name && symbol.kind == luasharp::SymbolKind::Method; });
-        if (member == members->second.end()) return nullptr; returnType = member->type; parameterLabels = member->parameters;
+        const auto* receiver = luasharp::FindExpression(analysis, tokens[open - 3].span.End() ? tokens[open - 3].span.End() - 1 : tokens[open - 3].span.offset); if (!receiver || receiver->type == luasharp::TypeTable::Unknown) return nullptr;
+        const auto* member = luasharp::FindMember(analysis, analysis.types.Name(receiver->type), name);
+        if (!member || member->kind != luasharp::SymbolKind::Method) return nullptr; returnType = member->type; parameterLabels = member->parameters;
     } else if (open >= 2 && tokens[open - 2].text == "new") {
         const auto type = std::find_if(analysis.syntax.root.classes.begin(), analysis.syntax.root.classes.end(), [&](const auto& value) { return value.name == name; }); if (type == analysis.syntax.root.classes.end()) return nullptr;
         const auto constructor = std::find_if(type->functions.begin(), type->functions.end(), [](const auto& value) { return value.isConstructor; }); returnType = type->name;
@@ -299,19 +296,19 @@ int main() {
         }
         else if (method == "textDocument/documentSymbol") {
             const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto& text = documents[uri]; const auto analysis = AnalyzeForEditor(uri, text); json symbols = json::array();
-            for (const auto& symbol : analysis.symbols) { if (symbol.kind == luasharp::SymbolKind::Variable || symbol.kind == luasharp::SymbolKind::Parameter) continue; const int kind = symbol.kind == luasharp::SymbolKind::Class ? 5 : symbol.kind == luasharp::SymbolKind::Enum ? 10 : symbol.kind == luasharp::SymbolKind::Method ? 6 : 8; symbols.push_back({{"name", symbol.name}, {"kind", kind}, {"range", SpanRange(text, symbol.span)}, {"selectionRange", SpanRange(text, symbol.span)}}); }
+            for (const auto& symbol : analysis.symbols) { if (symbol.implicit || symbol.kind == luasharp::SymbolKind::Variable || symbol.kind == luasharp::SymbolKind::Parameter) continue; const int kind = symbol.kind == luasharp::SymbolKind::Class ? 5 : symbol.kind == luasharp::SymbolKind::Enum ? 10 : symbol.kind == luasharp::SymbolKind::Method ? 6 : 8; symbols.push_back({{"name", symbol.name}, {"kind", kind}, {"range", SpanRange(text, symbol.span)}, {"selectionRange", SpanRange(text, symbol.span)}}); }
             Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", symbols}});
         }
         else if (method == "workspace/symbol") {
             const auto query = (*message)["params"].value("query", ""); json symbols = json::array();
-            for (const auto& [uri, text] : AllDocuments()) { const auto analysis = luasharp::Analyze(text); for (const auto& symbol : analysis.symbols) { if (symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum && symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Field) continue; if (!query.empty() && symbol.name.find(query) == std::string::npos) continue; const int kind = symbol.kind == luasharp::SymbolKind::Class ? 5 : symbol.kind == luasharp::SymbolKind::Enum ? 10 : symbol.kind == luasharp::SymbolKind::Method ? 6 : 8; symbols.push_back({{"name", symbol.name}, {"kind", kind}, {"location", Location(uri, text, symbol)}}); } }
+            for (const auto& [uri, text] : AllDocuments()) { const auto analysis = luasharp::Analyze(text); for (const auto& symbol : analysis.symbols) { if (symbol.implicit) continue; if (symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum && symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Field) continue; if (!query.empty() && symbol.name.find(query) == std::string::npos) continue; const int kind = symbol.kind == luasharp::SymbolKind::Class ? 5 : symbol.kind == luasharp::SymbolKind::Enum ? 10 : symbol.kind == luasharp::SymbolKind::Method ? 6 : 8; symbols.push_back({{"name", symbol.name}, {"kind", kind}, {"location", Location(uri, text, symbol)}}); } }
             Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", symbols}});
         }
         else if (method == "textDocument/hover" || method == "textDocument/definition") {
             const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto analysis = AnalyzeForEditor(uri, documents[uri]); const auto offset = OffsetAt(documents[uri], p["position"]);
             const luasharp::Symbol* symbol = MemberAt(analysis, offset);
             if (const auto* expression = luasharp::FindExpression(analysis, offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) symbol = &analysis.symbols[*expression->symbolIndex];
-            if (!symbol) { const auto word = WordAt(documents[uri], p["position"]); const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) { return candidate.name == word; }); if (found != analysis.symbols.end()) symbol = &*found; }
+            if (!symbol) { const auto word = WordAt(documents[uri], p["position"]); const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) { return !candidate.implicit && candidate.name == word; }); if (found != analysis.symbols.end()) symbol = &*found; }
             if (method == "textDocument/definition") { json locations = json::array(); if (symbol && symbol->span.length) locations.push_back(Location(uri, documents[uri], *symbol)); else if (symbol) if (const auto external = ExternalLocation(uri, *symbol)) locations.push_back(*external); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", locations}}); }
             else Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", symbol ? json{{"contents", {{"kind", "markdown"}, {"value", "```luasharp\n" + HoverLabel(*symbol) + "\n```"}}}} : json(nullptr)}});
         } else if (method == "shutdown") Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", nullptr}});

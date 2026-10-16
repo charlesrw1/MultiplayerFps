@@ -22,7 +22,7 @@ struct BuiltinMember {
     std::vector<BuiltinParameter> parameters;
     SymbolKind kind{SymbolKind::Method};
     bool isStatic{};
-    std::string lowering;
+    Lowering lowering{};
 };
 
 struct BuiltinOperator {
@@ -30,7 +30,7 @@ struct BuiltinOperator {
     std::string operation;
     std::string right;
     std::string result;
-    std::string lowering;
+    Lowering lowering{};
 };
 
 struct BuiltinFunction {
@@ -38,17 +38,18 @@ struct BuiltinFunction {
     std::string returnType;
     std::vector<BuiltinParameter> parameters;
     bool variadic{};
-    std::string lowering;
+    Lowering lowering{};
 };
 
 const std::vector<std::string>& BuiltinTypes();
 bool IsBuiltinType(std::string_view type);
 std::vector<BuiltinMember> BuiltinMembers(std::string_view type, bool staticMembers = false);
-std::optional<BuiltinMember> FindBuiltinMember(std::string_view type, std::string_view name, bool staticMember = false);
-std::optional<BuiltinOperator> FindBuiltinOperator(std::string_view left, std::string_view operation, std::string_view right);
+// Lookups return pointers into static tables that live for the whole program.
+const BuiltinMember* FindBuiltinMember(std::string_view type, std::string_view name, bool staticMember = false);
+const BuiltinOperator* FindBuiltinOperator(std::string_view left, std::string_view operation, std::string_view right);
 const std::vector<BuiltinFunction>& BuiltinFunctions();
-std::optional<BuiltinFunction> FindBuiltinFunction(std::string_view name);
-std::optional<std::string> BuiltinCastLowering(std::string_view target, std::string_view source);
+const BuiltinFunction* FindBuiltinFunction(std::string_view name);
+std::optional<Lowering> BuiltinCastLowering(std::string_view target, std::string_view source);
 std::optional<std::string> BuiltinDefaultValue(std::string_view type);
 
 } // namespace luasharp
