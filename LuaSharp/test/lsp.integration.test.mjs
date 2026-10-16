@@ -164,6 +164,16 @@ try {
     send({ jsonrpc: "2.0", id: 18, method: "textDocument/references", params: { textDocument: { uri: consumerUri }, position: { line: 0, character: 2 }, context: { includeDeclaration: true } } });
     const crossReferences = await waitFor(m => m.id === 18, "cross-file references");
     assert.ok(crossReferences.result.some(location => location.uri === sharedUri) && crossReferences.result.some(location => location.uri === consumerUri), "cross-file references did not cover declaration and use sites");
+    // The consumer's cached analysis must pick up member changes in the shared file.
+    const consumerCompletionSource = `${consumerSource}\nitem.`;
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri: consumerUri, version: 2 }, contentChanges: [{ text: consumerCompletionSource }] } });
+    send({ jsonrpc: "2.0", id: 19, method: "textDocument/completion", params: { textDocument: { uri: consumerUri }, position: { line: 1, character: 5 } } });
+    const beforeChange = await waitFor(m => m.id === 19, "cross-file completion before change");
+    assert.equal(beforeChange.result.some(item => item.label === "added"), false, "member appeared before it was declared");
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri: sharedUri, version: 2 }, contentChanges: [{ text: sharedSource.replace("int value;", "int value; int added;") }] } });
+    send({ jsonrpc: "2.0", id: 20, method: "textDocument/completion", params: { textDocument: { uri: consumerUri }, position: { line: 1, character: 5 } } });
+    const afterChange = await waitFor(m => m.id === 20, "cross-file completion after change");
+    assert.ok(afterChange.result.some(item => item.label === "added"), "cached analysis missed a member added in another file");
     const indexedUri = pathToFileURL(path.join(root, "LuaSharp", "indexed-test.ls")).toString();
     const indexedConsumerUri = pathToFileURL(path.join(root, "LuaSharp", "indexed-consumer-test.ls")).toString();
     send({ jsonrpc: "2.0", method: "luasharp/indexWorkspace", params: { documents: [{ uri: indexedUri, text: "class IndexedType { string label; }" }] } });

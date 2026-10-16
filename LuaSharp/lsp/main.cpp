@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -15,26 +16,61 @@
 using json = nlohmann::json;
 
 namespace {
-std::unordered_map<std::string, std::string> documents;
-std::unordered_map<std::string, std::string> indexedDocuments;
+// Analyses are cached per document. A text change drops only that document's
+// analyses; other documents re-analyze only when its exported types change.
+struct Document {
+    std::string text;
+    std::unique_ptr<luasharp::Analysis> standalone; // without other files' types; source of exports
+    std::vector<luasharp::ExternalType> exports;    // types this file offers the others
+    std::unique_ptr<luasharp::Analysis> editor;     // with the other files' exports
+    uint64_t editorRevision{};                      // exportsRevision the editor analysis was built against
 
-std::unordered_map<std::string, std::string> AllDocuments() { auto result = indexedDocuments; for (const auto& [uri, text] : documents) result[uri] = text; return result; }
+    void SetText(std::string value) { text = std::move(value); standalone.reset(); editor.reset(); }
+};
+std::unordered_map<std::string, Document> documents;        // open in the editor
+std::unordered_map<std::string, Document> indexedDocuments; // workspace files; open documents win
+uint64_t exportsRevision = 1;                               // advances when the set of exported types changes
 
-std::vector<luasharp::ExternalType> ExternalTypesFor(const std::string& uri) {
+template <typename Visit> void ForEachDocument(Visit&& visit) {
+    for (auto& [uri, document] : documents) visit(uri, document);
+    for (auto& [uri, document] : indexedDocuments) if (!documents.contains(uri)) visit(uri, document);
+}
+
+std::vector<luasharp::ExternalType> ExportsOf(const luasharp::Analysis& analysis) {
     std::vector<luasharp::ExternalType> result;
-    for (const auto& [otherUri, source] : AllDocuments()) {
-        if (otherUri == uri) continue;
-        const auto analysis = luasharp::Analyze(source);
-        for (const auto& symbol : analysis.symbols) {
-            if ((symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum) || !symbol.span.length) continue;
-            luasharp::ExternalType type{symbol.name}; type.isEnum = symbol.kind == luasharp::SymbolKind::Enum; if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
-            if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) for (const auto index : members->second) type.members.push_back(analysis.symbols[index]);
-            result.push_back(std::move(type));
-        }
+    for (const auto& symbol : analysis.symbols) {
+        if ((symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum) || !symbol.span.length) continue;
+        luasharp::ExternalType type{symbol.name}; type.isEnum = symbol.kind == luasharp::SymbolKind::Enum; if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
+        if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) for (const auto index : members->second) type.members.push_back(analysis.symbols[index]);
+        result.push_back(std::move(type));
     }
     return result;
 }
-luasharp::Analysis AnalyzeForEditor(const std::string& uri, const std::string& text) { return luasharp::Analyze(text, ExternalTypesFor(uri)); }
+// Positions are ignored: moving a declaration does not change what other files see.
+bool SameExports(const std::vector<luasharp::ExternalType>& left, const std::vector<luasharp::ExternalType>& right) {
+    const auto sameMember = [](const luasharp::Symbol& a, const luasharp::Symbol& b) { return a.name == b.name && a.type == b.type && a.kind == b.kind && a.parameters == b.parameters && a.owner == b.owner && a.access == b.access; };
+    const auto sameType = [&](const luasharp::ExternalType& a, const luasharp::ExternalType& b) { return a.name == b.name && a.baseType == b.baseType && a.isEnum == b.isEnum && std::equal(a.members.begin(), a.members.end(), b.members.begin(), b.members.end(), sameMember); };
+    return std::equal(left.begin(), left.end(), right.begin(), right.end(), sameType);
+}
+const luasharp::Analysis& Standalone(Document& document) {
+    if (document.standalone) return *document.standalone;
+    document.standalone = std::make_unique<luasharp::Analysis>(luasharp::Analyze(document.text));
+    auto exports = ExportsOf(*document.standalone);
+    if (!SameExports(exports, document.exports)) { document.exports = std::move(exports); ++exportsRevision; }
+    return *document.standalone;
+}
+// Refreshes every document's exports first, so exportsRevision is stable for the
+// rest of the request and earlier references from Editor() stay valid.
+const luasharp::Analysis& Editor(const std::string& uri, Document& document) {
+    ForEachDocument([](const std::string&, Document& value) { Standalone(value); });
+    if (document.editor && document.editorRevision == exportsRevision) return *document.editor;
+    std::vector<luasharp::ExternalType> external;
+    ForEachDocument([&](const std::string& other, Document& value) { if (other != uri) external.insert(external.end(), value.exports.begin(), value.exports.end()); });
+    document.editor = std::make_unique<luasharp::Analysis>(luasharp::Analyze(document.text, external));
+    document.editorRevision = exportsRevision;
+    return *document.editor;
+}
+const luasharp::Analysis& Editor(const std::string& uri) { return Editor(uri, documents[uri]); }
 
 bool ReadExact(char* buffer, DWORD count) {
     while (count != 0) { DWORD read{}; if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), buffer, count, &read, nullptr) || read == 0) return false; buffer += read; count -= read; }
@@ -69,13 +105,15 @@ json PositionAt(const std::string& text, size_t offset) {
 }
 void UpdateDocument(const json& params, bool opened) {
     const auto& document = params["textDocument"]; const auto uri = document.value("uri", "");
-    if (opened) { documents[uri] = document.value("text", ""); return; }
-    auto& text = documents[uri];
+    // Opening shadows any indexed copy, so the exported types may change.
+    if (opened) { documents[uri].SetText(document.value("text", "")); ++exportsRevision; return; }
+    auto text = std::move(documents[uri].text);
     for (const auto& change : params.value("contentChanges", json::array())) {
         if (!change.contains("range")) { text = change.value("text", ""); continue; }
         const auto start = OffsetAt(text, change["range"]["start"]), end = OffsetAt(text, change["range"]["end"]);
         text.replace(start, end - start, change.value("text", ""));
     }
+    documents[uri].SetText(std::move(text));
 }
 std::string LineAt(const std::string& text, size_t wanted) {
     size_t offset{}; for (size_t line{}; line < wanted; ++line) { offset = text.find('\n', offset); if (offset == std::string::npos) return {}; ++offset; }
@@ -142,38 +180,48 @@ json Location(const std::string& uri, const std::string& text, const luasharp::S
     return {{"uri", uri}, {"range", SpanRange(text, symbol.span)}};
 }
 std::optional<json> ExternalLocation(const std::string& currentUri, const luasharp::Symbol& wanted) {
-    for (const auto& [uri, text] : AllDocuments()) {
-        if (uri == currentUri) continue; const auto analysis = luasharp::Analyze(text);
+    std::optional<json> result;
+    ForEachDocument([&](const std::string& uri, Document& document) {
+        if (result || uri == currentUri) return; const auto& analysis = Standalone(document);
         const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) {
             if (!candidate.span.length || candidate.kind != wanted.kind || candidate.name != wanted.name) return false;
             return wanted.kind == luasharp::SymbolKind::Class || wanted.kind == luasharp::SymbolKind::Enum || candidate.owner == wanted.owner;
         });
-        if (found != analysis.symbols.end()) return Location(uri, text, *found);
-    }
-    return std::nullopt;
+        if (found != analysis.symbols.end()) result = Location(uri, document.text, *found);
+    });
+    return result;
 }
 std::vector<luasharp::TextSpan> ReferenceSpans(const luasharp::Analysis& analysis, const luasharp::Symbol& wanted) {
     std::vector<luasharp::TextSpan> result;
     for (const auto& token : analysis.syntax.tokens) {
-        if (token.kind != luasharp::SyntaxTokenKind::Identifier) continue;
+        // Symbol spans cover only the name, so a reference token always spells it; skip the costly lookup otherwise.
+        if (token.kind != luasharp::SyntaxTokenKind::Identifier || token.text != wanted.name) continue;
         const auto* symbol = SymbolAt(analysis, token.span.offset);
-        if (symbol && SameSymbol(*symbol, wanted)) result.push_back(token.span);
-        else if ((wanted.kind == luasharp::SymbolKind::Class || wanted.kind == luasharp::SymbolKind::Enum) && token.text == wanted.name && !symbol) result.push_back(token.span);
+        if (symbol ? SameSymbol(*symbol, wanted) : wanted.kind == luasharp::SymbolKind::Class || wanted.kind == luasharp::SymbolKind::Enum) result.push_back(token.span);
     }
     return result;
 }
+// Calls visit(uri, text, spans) for each document with references to wanted.
+template <typename Visit> void ForEachReference(const std::string& uri, const luasharp::Symbol& wanted, bool workspaceWide, Visit&& visit) {
+    ForEachDocument([&](const std::string& documentUri, Document& document) {
+        if (!workspaceWide && documentUri != uri) return;
+        if (document.text.find(wanted.name) == std::string::npos) return; // a reference token spells the name
+        const auto spans = ReferenceSpans(Editor(documentUri, document), wanted);
+        if (!spans.empty()) visit(documentUri, document.text, spans);
+    });
+}
 void PublishDiagnostics(const std::string& uri) {
     json diagnostics = json::array();
-    const auto analysis = AnalyzeForEditor(uri, documents[uri]);
+    const auto& analysis = Editor(uri); const auto& text = documents[uri].text;
     for (const auto& diagnostic : analysis.diagnostics) {
-        const auto start = PositionAt(documents[uri], diagnostic.span.offset);
-        const auto end = PositionAt(documents[uri], diagnostic.span.End() > diagnostic.span.offset ? diagnostic.span.End() : diagnostic.span.offset + 1);
+        const auto start = PositionAt(text, diagnostic.span.offset);
+        const auto end = PositionAt(text, diagnostic.span.End() > diagnostic.span.offset ? diagnostic.span.End() : diagnostic.span.offset + 1);
         diagnostics.push_back({{"severity", diagnostic.severity == luasharp::DiagnosticSeverity::Error ? 1 : 2}, {"message", diagnostic.message}, {"source", "LuaSharp"}, {"range", {{"start", start}, {"end", end}}}});
     }
     Send({{"jsonrpc", "2.0"}, {"method", "textDocument/publishDiagnostics"}, {"params", {{"uri", uri}, {"diagnostics", diagnostics}}}});
 }
 json Completions(const std::string& uri, const std::string& text, const json& position) {
-    const auto analysis = AnalyzeForEditor(uri, text); const auto offset = OffsetAt(text, position); const auto lineStart = offset == 0 ? 0 : text.rfind('\n', offset - 1) == std::string::npos ? 0 : text.rfind('\n', offset - 1) + 1; const auto lineEnd = text.find('\n', offset); const auto line = text.substr(lineStart, lineEnd == std::string::npos ? std::string::npos : lineEnd - lineStart); const auto character = offset - lineStart;
+    const auto& analysis = Editor(uri); const auto offset = OffsetAt(text, position); const auto lineStart = offset == 0 ? 0 : text.rfind('\n', offset - 1) == std::string::npos ? 0 : text.rfind('\n', offset - 1) + 1; const auto lineEnd = text.find('\n', offset); const auto line = text.substr(lineStart, lineEnd == std::string::npos ? std::string::npos : lineEnd - lineStart); const auto character = offset - lineStart;
     json result = json::array();
     size_t memberStart = character; while (memberStart > 0 && (std::isalnum(static_cast<unsigned char>(line[memberStart - 1])) || line[memberStart - 1] == '_')) --memberStart;
     if (memberStart > 0 && line[memberStart - 1] == '.') {
@@ -213,7 +261,7 @@ json Completions(const std::string& uri, const std::string& text, const json& po
     return result;
 }
 json SignatureHelp(const std::string& uri, const std::string& text, const json& position) {
-    const auto analysis = AnalyzeForEditor(uri, text); const auto cursor = OffsetAt(text, position); const auto& tokens = analysis.syntax.tokens;
+    const auto& analysis = Editor(uri); const auto cursor = OffsetAt(text, position); const auto& tokens = analysis.syntax.tokens;
     size_t limit{}; while (limit < tokens.size() && tokens[limit].span.offset < cursor) ++limit;
     size_t open = tokens.size(), depth{};
     for (size_t i = limit; i-- > 0;) { if (tokens[i].text == ")") ++depth; else if (tokens[i].text == "(") { if (depth == 0) { open = i; break; } --depth; } }
@@ -250,7 +298,7 @@ json SignatureHelp(const std::string& uri, const std::string& text, const json& 
     return {{"signatures", json::array({{{"label", label}, {"parameters", parameters}}})}, {"activeSignature", 0}, {"activeParameter", activeParameter}};
 }
 json SemanticTokens(const std::string& uri, const std::string& text) {
-    const auto analysis = AnalyzeForEditor(uri, text);
+    const auto& analysis = Editor(uri);
     json data = json::array(); size_t previousLine{}, previousCharacter{}; bool emitted = false;
     for (const auto& token : analysis.syntax.tokens) {
         if (token.kind != luasharp::SyntaxTokenKind::Identifier) continue;
@@ -276,40 +324,41 @@ int main() {
     while (auto message = ReadMessage()) {
         const auto method = message->value("method", "");
         if (method == "initialize") Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", {{"capabilities", {{"textDocumentSync", 2}, {"completionProvider", {{"triggerCharacters", json::array({"."})}}}, {"signatureHelpProvider", {{"triggerCharacters", json::array({"(", ","})}}}, {"hoverProvider", true}, {"definitionProvider", true}, {"referencesProvider", true}, {"renameProvider", true}, {"documentSymbolProvider", true}, {"workspaceSymbolProvider", true}, {"semanticTokensProvider", {{"legend", {{"tokenTypes", json::array({"class", "type", "function", "method", "property", "variable", "parameter"})}, {"tokenModifiers", json::array()}}}, {"full", true}}}}}}}});
-        else if (method == "luasharp/indexWorkspace") { indexedDocuments.clear(); for (const auto& document : (*message)["params"].value("documents", json::array())) indexedDocuments[document.value("uri", "")] = document.value("text", ""); for (const auto& [uri, text] : documents) PublishDiagnostics(uri); }
+        else if (method == "luasharp/indexWorkspace") { indexedDocuments.clear(); for (const auto& document : (*message)["params"].value("documents", json::array())) indexedDocuments[document.value("uri", "")].SetText(document.value("text", "")); ++exportsRevision; for (const auto& [uri, document] : documents) PublishDiagnostics(uri); }
         else if (method == "textDocument/didOpen") { UpdateDocument((*message)["params"], true); PublishDiagnostics((*message)["params"]["textDocument"].value("uri", "")); }
         else if (method == "textDocument/didChange") { UpdateDocument((*message)["params"], false); PublishDiagnostics((*message)["params"]["textDocument"].value("uri", "")); }
-        else if (method == "textDocument/didClose") { const auto uri = (*message)["params"]["textDocument"].value("uri", ""); documents.erase(uri); Send({{"jsonrpc", "2.0"}, {"method", "textDocument/publishDiagnostics"}, {"params", {{"uri", uri}, {"diagnostics", json::array()}}}}); }
-        else if (method == "textDocument/completion") { const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", Completions(uri, documents[uri], p["position"])}}); }
-        else if (method == "textDocument/signatureHelp") { const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", SignatureHelp(uri, documents[uri], p["position"])}}); }
-        else if (method == "textDocument/semanticTokens/full") { const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", SemanticTokens(uri, documents[uri])}}); }
+        else if (method == "textDocument/didClose") { const auto uri = (*message)["params"]["textDocument"].value("uri", ""); documents.erase(uri); ++exportsRevision; Send({{"jsonrpc", "2.0"}, {"method", "textDocument/publishDiagnostics"}, {"params", {{"uri", uri}, {"diagnostics", json::array()}}}}); }
+        else if (method == "textDocument/completion") { const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", Completions(uri, documents[uri].text, p["position"])}}); }
+        else if (method == "textDocument/signatureHelp") { const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", SignatureHelp(uri, documents[uri].text, p["position"])}}); }
+        else if (method == "textDocument/semanticTokens/full") { const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", SemanticTokens(uri, documents[uri].text)}}); }
         else if (method == "textDocument/references" || method == "textDocument/rename") {
-            const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto& text = documents[uri]; const auto analysis = AnalyzeForEditor(uri, text); const auto* symbol = SymbolAt(analysis, OffsetAt(text, p["position"]));
+            const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto& text = documents[uri].text; const auto* found = SymbolAt(Editor(uri), OffsetAt(text, p["position"]));
+            const std::optional<luasharp::Symbol> symbol = found ? std::optional(*found) : std::nullopt;
             const bool workspaceWide = symbol && (symbol->kind == luasharp::SymbolKind::Class || symbol->kind == luasharp::SymbolKind::Enum || symbol->kind == luasharp::SymbolKind::Method || symbol->kind == luasharp::SymbolKind::Field);
             if (method == "textDocument/references") {
-                json locations = json::array(); if (symbol) for (const auto& [documentUri, documentText] : AllDocuments()) { if (!workspaceWide && documentUri != uri) continue; const auto documentAnalysis = AnalyzeForEditor(documentUri, documentText); for (const auto span : ReferenceSpans(documentAnalysis, *symbol)) locations.push_back({{"uri", documentUri}, {"range", SpanRange(documentText, span)}}); }
+                json locations = json::array(); if (symbol) ForEachReference(uri, *symbol, workspaceWide, [&](const std::string& documentUri, const std::string& documentText, const std::vector<luasharp::TextSpan>& spans) { for (const auto span : spans) locations.push_back({{"uri", documentUri}, {"range", SpanRange(documentText, span)}}); });
                 Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", locations}});
             } else {
-                json changes = json::object(); if (symbol && (symbol->span.length || workspaceWide)) for (const auto& [documentUri, documentText] : AllDocuments()) { if (!workspaceWide && documentUri != uri) continue; const auto documentAnalysis = AnalyzeForEditor(documentUri, documentText); const auto spans = ReferenceSpans(documentAnalysis, *symbol); if (spans.empty()) continue; changes[documentUri] = json::array(); for (const auto span : spans) changes[documentUri].push_back({{"range", SpanRange(documentText, span)}, {"newText", p.value("newName", symbol->name)}}); }
+                json changes = json::object(); if (symbol && (symbol->span.length || workspaceWide)) ForEachReference(uri, *symbol, workspaceWide, [&](const std::string& documentUri, const std::string& documentText, const std::vector<luasharp::TextSpan>& spans) { changes[documentUri] = json::array(); for (const auto span : spans) changes[documentUri].push_back({{"range", SpanRange(documentText, span)}, {"newText", p.value("newName", symbol->name)}}); });
                 Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", {{"changes", changes}}}});
             }
         }
         else if (method == "textDocument/documentSymbol") {
-            const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto& text = documents[uri]; const auto analysis = AnalyzeForEditor(uri, text); json symbols = json::array();
+            const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto& text = documents[uri].text; const auto& analysis = Editor(uri); json symbols = json::array();
             for (const auto& symbol : analysis.symbols) { if (symbol.implicit || symbol.kind == luasharp::SymbolKind::Variable || symbol.kind == luasharp::SymbolKind::Parameter) continue; const int kind = symbol.kind == luasharp::SymbolKind::Class ? 5 : symbol.kind == luasharp::SymbolKind::Enum ? 10 : symbol.kind == luasharp::SymbolKind::Method ? 6 : 8; symbols.push_back({{"name", symbol.name}, {"kind", kind}, {"range", SpanRange(text, symbol.span)}, {"selectionRange", SpanRange(text, symbol.span)}}); }
             Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", symbols}});
         }
         else if (method == "workspace/symbol") {
             const auto query = (*message)["params"].value("query", ""); json symbols = json::array();
-            for (const auto& [uri, text] : AllDocuments()) { const auto analysis = luasharp::Analyze(text); for (const auto& symbol : analysis.symbols) { if (symbol.implicit) continue; if (symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum && symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Field) continue; if (!query.empty() && symbol.name.find(query) == std::string::npos) continue; const int kind = symbol.kind == luasharp::SymbolKind::Class ? 5 : symbol.kind == luasharp::SymbolKind::Enum ? 10 : symbol.kind == luasharp::SymbolKind::Method ? 6 : 8; symbols.push_back({{"name", symbol.name}, {"kind", kind}, {"location", Location(uri, text, symbol)}}); } }
+            ForEachDocument([&](const std::string& uri, Document& document) { for (const auto& symbol : Standalone(document).symbols) { if (symbol.implicit) continue; if (symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum && symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Field) continue; if (!query.empty() && symbol.name.find(query) == std::string::npos) continue; const int kind = symbol.kind == luasharp::SymbolKind::Class ? 5 : symbol.kind == luasharp::SymbolKind::Enum ? 10 : symbol.kind == luasharp::SymbolKind::Method ? 6 : 8; symbols.push_back({{"name", symbol.name}, {"kind", kind}, {"location", Location(uri, document.text, symbol)}}); } });
             Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", symbols}});
         }
         else if (method == "textDocument/hover" || method == "textDocument/definition") {
-            const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto analysis = AnalyzeForEditor(uri, documents[uri]); const auto offset = OffsetAt(documents[uri], p["position"]);
+            const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto& text = documents[uri].text; const auto& analysis = Editor(uri); const auto offset = OffsetAt(text, p["position"]);
             const luasharp::Symbol* symbol = MemberAt(analysis, offset);
             if (const auto* expression = luasharp::FindExpression(analysis, offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) symbol = &analysis.symbols[*expression->symbolIndex];
-            if (!symbol) { const auto word = WordAt(documents[uri], p["position"]); const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) { return !candidate.implicit && candidate.name == word; }); if (found != analysis.symbols.end()) symbol = &*found; }
-            if (method == "textDocument/definition") { json locations = json::array(); if (symbol && symbol->span.length) locations.push_back(Location(uri, documents[uri], *symbol)); else if (symbol) if (const auto external = ExternalLocation(uri, *symbol)) locations.push_back(*external); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", locations}}); }
+            if (!symbol) { const auto word = WordAt(text, p["position"]); const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) { return !candidate.implicit && candidate.name == word; }); if (found != analysis.symbols.end()) symbol = &*found; }
+            if (method == "textDocument/definition") { json locations = json::array(); if (symbol && symbol->span.length) locations.push_back(Location(uri, text, *symbol)); else if (symbol) if (const auto external = ExternalLocation(uri, *symbol)) locations.push_back(*external); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", locations}}); }
             else Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", symbol ? json{{"contents", {{"kind", "markdown"}, {"value", "```luasharp\n" + HoverLabel(*symbol) + "\n```"}}}} : json(nullptr)}});
         } else if (method == "shutdown") Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", nullptr}});
         else if (method == "exit") break;
