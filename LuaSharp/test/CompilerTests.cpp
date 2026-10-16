@@ -109,12 +109,125 @@ auto child = new Child();
 }
 
 void TestExpressionTree() {
-    const std::vector<luasharp::SyntaxToken> tokens{{"player", 0}, {".", 6}, {"move", 7}, {"(", 11}, {"1", 12}, {"+", 14}, {"2", 16}, {")", 17}, {"[", 18}, {"0", 19}, {"]", 20}};
+    const std::vector<luasharp::SyntaxToken> tokens{
+        {luasharp::SyntaxTokenKind::Identifier, "player", {0, 6}}, {luasharp::SyntaxTokenKind::Symbol, ".", {6, 1}},
+        {luasharp::SyntaxTokenKind::Identifier, "move", {7, 4}}, {luasharp::SyntaxTokenKind::Symbol, "(", {11, 1}},
+        {luasharp::SyntaxTokenKind::Number, "1", {12, 1}}, {luasharp::SyntaxTokenKind::Symbol, "+", {14, 1}},
+        {luasharp::SyntaxTokenKind::Number, "2", {16, 1}}, {luasharp::SyntaxTokenKind::Symbol, ")", {17, 1}},
+        {luasharp::SyntaxTokenKind::Symbol, "[", {18, 1}}, {luasharp::SyntaxTokenKind::Number, "0", {19, 1}},
+        {luasharp::SyntaxTokenKind::Symbol, "]", {20, 1}}};
     const auto expression = luasharp::ParseExpression(tokens);
     Require(expression.kind == luasharp::SyntaxExpression::Kind::Index, "index expression was not parsed");
     Require(expression.children[0].kind == luasharp::SyntaxExpression::Kind::Call, "call expression was not parsed");
     Require(expression.children[0].children[0].kind == luasharp::SyntaxExpression::Kind::Member, "member expression was not parsed");
     Require(expression.children[0].children[1].kind == luasharp::SyntaxExpression::Kind::Binary, "binary precedence expression was not parsed");
+}
+
+void TestRecoveringSyntaxTree() {
+    const auto tree = luasharp::ParseTree("class Broken { int value = ; auto x = 1;");
+    Require(!tree.diagnostics.empty(), "malformed input did not retain syntax diagnostics");
+    Require(tree.root.classes.size() == 1, "recovering parser discarded the class");
+    Require(tree.tokens.back().kind == luasharp::SyntaxTokenKind::EndOfFile, "token stream has no EOF token");
+    Require(std::any_of(tree.diagnostics.begin(), tree.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.span.offset > 0; }), "syntax diagnostics lost source spans");
+}
+
+void TestLexerTriviaAndSpans() {
+    const auto tree = luasharp::ParseTree("/* header */\nclass Thing { // field\n int value = 12; }");
+    Require(tree.diagnostics.empty(), "comments caused lexer diagnostics");
+    Require(tree.root.classes[0].span.offset == 19, "class name span is incorrect");
+    Require(tree.root.classes[0].fields[0].initializer.kind == luasharp::SyntaxExpression::Kind::Number, "field initializer was not parsed");
+    const auto broken = luasharp::ParseTree("/* never closed");
+    Require(!broken.diagnostics.empty() && broken.diagnostics[0].message.find("Unterminated block comment") != std::string::npos, "unterminated comment was not diagnosed");
+}
+
+void TestScopeAwareBinding() {
+    constexpr std::string_view source = R"(auto value = new Outer();
+if (true) {
+    auto value = new Inner();
+    value.run();
+}
+value.run();
+)";
+    const auto analysis = luasharp::Analyze(source);
+    const auto innerUse = source.find("value.run");
+    const auto outerUse = source.rfind("value.run");
+    Require(luasharp::ResolveVariableType(analysis, "value", innerUse) == "Inner", "inner shadow did not bind to inner variable");
+    Require(luasharp::ResolveVariableType(analysis, "value", outerUse) == "Outer", "outer reference leaked inner scope");
+}
+
+void TestBoundMemberChain() {
+    const auto analysis = luasharp::Analyze(R"(class Weapon { int damage = 1; }
+class Player { Weapon weapon = new Weapon(); }
+auto player = new Player();
+auto damage = player.weapon.damage;
+)" );
+    Require(analysis.variableTypes.at("damage") == "int", "member chain type was not inferred");
+    Require(analysis.diagnostics.empty(), "valid member chain produced diagnostics");
+}
+
+void TestSemanticErrors() {
+    const auto analysis = luasharp::Analyze(R"(class Bad : Bad {
+int duplicate;
+int duplicate;
+int get() { return "wrong"; }
+})");
+    const auto has = [&](std::string_view text) { return std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [&](const auto& diagnostic) { return diagnostic.message.find(text) != std::string::npos; }); };
+    Require(has("already declared"), "duplicate member was not diagnosed");
+    Require(has("Inheritance cycle"), "inheritance cycle was not diagnosed");
+    Require(has("Cannot return"), "return type mismatch was not diagnosed");
+}
+
+void TestConstructorAndGroupingEmission() {
+    const auto lua = luasharp::Compile(R"(class Point {
+int x;
+Point(int initial) { x = initial; }
+}
+auto point = new Point(2);
+auto result = (1 + 2) * 3;
+)");
+    Require(lua.find("function Point.new(initial)") != std::string::npos, "constructor parameters were not emitted");
+    Require(lua.find("Point.new(2)") != std::string::npos, "constructor arguments were not emitted");
+    Require(lua.find("(1 + 2) * 3") != std::string::npos, "parenthesized expression semantics were lost");
+}
+
+void TestCallDiagnostics() {
+    const auto analysis = luasharp::Analyze(R"(class Receiver {
+void send(string message, int count) {}
+}
+auto receiver = new Receiver();
+receiver.send(12);
+)");
+    Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Expected 2 argument") != std::string::npos && diagnostic.severity == luasharp::DiagnosticSeverity::Error; }), "call arity error was not produced");
+}
+
+void TestReassignmentAndThis() {
+    const auto analysis = luasharp::Analyze(R"(class Example {
+string name;
+void update() {
+    int value = 1;
+    value = "wrong";
+    this.name = "right";
+}
+})");
+    Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Cannot assign 'string' to 'int'") != std::string::npos; }), "reassignment to a different type was not diagnosed");
+    Require(std::none_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Unknown identifier 'this'") != std::string::npos; }), "this was not bound in a method");
+    const auto lua = luasharp::Compile(R"(class Example { string name; void update() { this.name = "right"; } })");
+    Require(lua.find("self.name = \"right\"") != std::string::npos, "this was not lowered to Lua self");
+}
+
+void TestUnknownNameAndMissingReturn() {
+    const auto analysis = luasharp::Analyze(R"(class Example {
+int calculate() { typo(); }
+})");
+    Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Unknown identifier 'typo'") != std::string::npos; }), "unknown identifier was not diagnosed");
+    Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Not all code paths return") != std::string::npos; }), "missing return was not diagnosed");
+}
+
+void TestNoEngineTypesAreHardcoded() {
+    const auto unknown = luasharp::Analyze("Entity value;");
+    Require(std::any_of(unknown.diagnostics.begin(), unknown.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Unknown type 'Entity'") != std::string::npos; }), "engine type was incorrectly hardcoded as a language type");
+    const auto declared = luasharp::Analyze("class Anything {}\nAnything value;");
+    Require(declared.diagnostics.empty(), "user-declared type was not registered dynamically");
 }
 }
 
@@ -129,6 +242,16 @@ int main() {
         {"semantic diagnostics and parameters", TestSemanticDiagnosticsAndParameters},
         {"shared syntax tree", TestSharedSyntaxTree},
         {"expression tree", TestExpressionTree},
+        {"recovering syntax tree", TestRecoveringSyntaxTree},
+        {"lexer trivia and spans", TestLexerTriviaAndSpans},
+        {"scope-aware binding", TestScopeAwareBinding},
+        {"bound member chain", TestBoundMemberChain},
+        {"semantic errors", TestSemanticErrors},
+        {"constructor and grouping emission", TestConstructorAndGroupingEmission},
+        {"call diagnostics", TestCallDiagnostics},
+        {"reassignment and this", TestReassignmentAndThis},
+        {"unknown name and missing return", TestUnknownNameAndMissingReturn},
+        {"no hardcoded engine types", TestNoEngineTypesAreHardcoded},
     };
 
     for (const auto& [name, test] : tests) {

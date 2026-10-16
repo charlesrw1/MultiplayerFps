@@ -3,353 +3,412 @@
 #include <algorithm>
 #include <cctype>
 #include <stdexcept>
-#include <string>
+#include <unordered_set>
 #include <utility>
-#include <vector>
 
 namespace luasharp {
 namespace {
 
-enum class TokenKind { Identifier, Number, String, Symbol, End };
-struct Token { TokenKind kind; std::string text; size_t offset; };
-struct Parameter { std::string type; std::string name; size_t offset{}; };
-struct Field { std::string access; std::string type; std::string name; std::vector<Token> initializer; size_t offset{}; };
-struct Statement {
-    enum class Kind { If, Return, Local, Expression } kind;
-    std::string name;
-    std::string type;
-    std::vector<Token> expression;
-    std::vector<Statement> body;
-    std::vector<Statement> elseBody;
-    size_t sourceOffset{};
+const std::unordered_set<std::string> Keywords{
+    "class", "public", "private", "auto", "new", "if", "else", "return",
+    "null", "true", "false"
 };
-struct Function { std::string name; std::string returnType; bool isConstructor{}; std::vector<Parameter> parameters; std::vector<Statement> body; size_t offset{}; };
-struct Class { std::string name; std::string baseName; std::vector<Field> fields; std::vector<Function> functions; size_t offset{}; };
-struct Program { std::vector<Class> classes; std::vector<Statement> topLevel; };
 
-std::vector<Token> Lex(std::string_view source) {
-    std::vector<Token> result;
-    for (size_t i = 0; i < source.size();) {
-        const auto start = i;
-        const char ch = source[i];
-        if (std::isspace(static_cast<unsigned char>(ch))) { ++i; continue; }
-        if (source.substr(i, 2) == "//") { while (i < source.size() && source[i] != '\n') ++i; continue; }
-        if (std::isalpha(static_cast<unsigned char>(ch)) || ch == '_') {
-            while (i < source.size() && (std::isalnum(static_cast<unsigned char>(source[i])) || source[i] == '_')) ++i;
-            result.push_back({TokenKind::Identifier, std::string(source.substr(start, i - start)), start}); continue;
-        }
-        if (std::isdigit(static_cast<unsigned char>(ch))) {
-            while (i < source.size() && (std::isdigit(static_cast<unsigned char>(source[i])) || source[i] == '.')) ++i;
-            result.push_back({TokenKind::Number, std::string(source.substr(start, i - start)), start}); continue;
-        }
-        if (ch == '\'' || ch == '"') {
-            const char quote = source[i++];
-            while (i < source.size() && source[i] != quote) { if (source[i] == '\\') ++i; ++i; }
-            if (i == source.size()) throw std::runtime_error("Unterminated string at " + std::to_string(start));
-            result.push_back({TokenKind::String, std::string(source.substr(start, ++i - start)), start}); continue;
-        }
-        for (const std::string_view pair : {"!=", "==", "<=", ">=", "&&", "||", "+=", "-="}) {
-            if (source.substr(i, pair.size()) == pair) { result.push_back({TokenKind::Symbol, std::string(pair), i}); i += pair.size(); goto next; }
-        }
-        if (std::string_view("{}()[];:,.+-*/=!<>").find(ch) != std::string_view::npos) { result.push_back({TokenKind::Symbol, std::string(1, ch), i++}); continue; }
-        throw std::runtime_error(std::string("Unexpected character '") + ch + "' at " + std::to_string(i));
-next:;
-    }
-    result.push_back({TokenKind::End, {}, source.size()});
-    return result;
+TextSpan Cover(TextSpan first, TextSpan last) {
+    return {first.offset, last.End() >= first.offset ? last.End() - first.offset : 0};
 }
 
-class Parser {
+class Lexer {
 public:
-    explicit Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
+    explicit Lexer(std::string_view source) : source_(source) {}
 
-    Program Parse() {
-        Program program;
-        while (Current().kind != TokenKind::End) {
-            if (Is("class")) program.classes.push_back(ParseClass());
-            else program.topLevel.push_back(ParseStatement());
+    SyntaxTree Run() {
+        SyntaxTree tree;
+        while (position_ < source_.size()) {
+            SkipTrivia();
+            if (position_ >= source_.size()) break;
+            const size_t start = position_;
+            const unsigned char ch = static_cast<unsigned char>(source_[position_]);
+            if (std::isalpha(ch) || ch == '_') LexIdentifier(tree);
+            else if (std::isdigit(ch)) LexNumber(tree);
+            else if (ch == '\'' || ch == '\"') LexString(tree);
+            else LexSymbol(tree, start);
         }
-        return program;
+        tree.tokens.push_back({SyntaxTokenKind::EndOfFile, {}, {source_.size(), 0}});
+        tree.diagnostics.insert(tree.diagnostics.end(), pending_.begin(), pending_.end());
+        return tree;
     }
 
 private:
-    const Token& Current() const { return tokens_[index_]; }
-    bool Is(std::string_view value) const { return Current().text == value; }
-    Token Take(std::string_view expected = {}) {
-        const Token token = Current();
-        if (!expected.empty() && token.text != expected) throw std::runtime_error("Expected '" + std::string(expected) + "' at " + std::to_string(token.offset));
-        ++index_;
-        return token;
-    }
-    std::string Identifier() {
-        const auto token = Take();
-        if (token.kind != TokenKind::Identifier) throw std::runtime_error("Expected identifier at " + std::to_string(token.offset));
-        return token.text;
-    }
-    std::string Type(std::string type = {}) {
-        if (type.empty()) type = Identifier();
-        while (Is("[")) { Take("["); Take("]"); type += "[]"; }
-        return type;
-    }
-    std::vector<Token> Until(std::string_view end) {
-        std::vector<Token> tokens;
-        int depth = 0;
-        while (!(Is(end) && depth == 0)) {
-            if (Current().kind == TokenKind::End) throw std::runtime_error("Expected '" + std::string(end) + "'");
-            auto token = Take();
-            if (token.text == "(" || token.text == "[" || token.text == "{") ++depth;
-            if (token.text == ")" || token.text == "]" || token.text == "}") --depth;
-            tokens.push_back(std::move(token));
+    void SkipTrivia() {
+        for (;;) {
+            while (position_ < source_.size() && std::isspace(static_cast<unsigned char>(source_[position_]))) ++position_;
+            if (source_.substr(position_, 2) == "//") {
+                position_ += 2;
+                while (position_ < source_.size() && source_[position_] != '\n') ++position_;
+            } else if (source_.substr(position_, 2) == "/*") {
+                const size_t start = position_;
+                position_ += 2;
+                const auto close = source_.find("*/", position_);
+                if (close == std::string_view::npos) { pending_.push_back({"Unterminated block comment", {start, source_.size() - start}}); position_ = source_.size(); }
+                else position_ = close + 2;
+            } else break;
         }
-        return tokens;
     }
-    std::vector<Statement> Block() {
-        Take("{"); std::vector<Statement> body;
-        while (!Is("}")) body.push_back(ParseStatement());
-        Take("}");
-        return body;
+    void LexIdentifier(SyntaxTree& tree) {
+        const size_t start = position_++;
+        while (position_ < source_.size()) {
+            const unsigned char ch = static_cast<unsigned char>(source_[position_]);
+            if (!std::isalnum(ch) && ch != '_') break;
+            ++position_;
+        }
+        std::string text(source_.substr(start, position_ - start));
+        tree.tokens.push_back({Keywords.contains(text) ? SyntaxTokenKind::Keyword : SyntaxTokenKind::Identifier, std::move(text), {start, position_ - start}});
     }
-    Statement ParseStatement() {
-        const size_t sourceOffset = Current().offset;
+    void LexNumber(SyntaxTree& tree) {
+        const size_t start = position_++;
+        bool dot = false;
+        while (position_ < source_.size()) {
+            const char ch = source_[position_];
+            if (std::isdigit(static_cast<unsigned char>(ch))) { ++position_; continue; }
+            if (ch == '.' && !dot && position_ + 1 < source_.size() && std::isdigit(static_cast<unsigned char>(source_[position_ + 1]))) { dot = true; ++position_; continue; }
+            break;
+        }
+        tree.tokens.push_back({SyntaxTokenKind::Number, std::string(source_.substr(start, position_ - start)), {start, position_ - start}});
+    }
+    void LexString(SyntaxTree& tree) {
+        const size_t start = position_; const char quote = source_[position_++]; bool closed = false;
+        while (position_ < source_.size()) {
+            if (source_[position_] == '\\' && position_ + 1 < source_.size()) { position_ += 2; continue; }
+            if (source_[position_++] == quote) { closed = true; break; }
+        }
+        tree.tokens.push_back({SyntaxTokenKind::String, std::string(source_.substr(start, position_ - start)), {start, position_ - start}});
+        if (!closed) tree.diagnostics.push_back({"Unterminated string literal", {start, position_ - start}});
+    }
+    void LexSymbol(SyntaxTree& tree, size_t start) {
+        static constexpr std::string_view symbols = "{}()[];:,.+-*/%=!<>";
+        static constexpr std::string_view pairs[] = {"!=", "==", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/="};
+        for (const auto pair : pairs) {
+            if (source_.substr(position_, 2) == pair) { position_ += 2; tree.tokens.push_back({SyntaxTokenKind::Symbol, std::string(pair), {start, 2}}); return; }
+        }
+        const char ch = source_[position_++];
+        if (symbols.find(ch) != std::string_view::npos) tree.tokens.push_back({SyntaxTokenKind::Symbol, std::string(1, ch), {start, 1}});
+        else {
+            tree.tokens.push_back({SyntaxTokenKind::Bad, std::string(1, ch), {start, 1}});
+            tree.diagnostics.push_back({std::string("Unexpected character '") + ch + "'", {start, 1}});
+        }
+    }
+
+    std::string_view source_;
+    size_t position_{};
+    std::vector<SyntaxDiagnostic> pending_;
+};
+
+class Parser {
+public:
+    Parser(std::vector<SyntaxToken> tokens, std::vector<SyntaxDiagnostic> diagnostics, size_t sourceLength)
+        : tokens_(std::move(tokens)), diagnostics_(std::move(diagnostics)), sourceLength_(sourceLength) {}
+
+    SyntaxTree Run() {
+        SyntaxProgram program; program.span = {0, sourceLength_};
+        while (!AtEnd()) {
+            const size_t before = index_;
+            if (Is("class")) program.classes.push_back(ParseClass());
+            else program.topLevel.push_back(ParseStatement());
+            if (index_ == before) Advance();
+        }
+        return {std::move(program), std::move(tokens_), std::move(diagnostics_)};
+    }
+
+    SyntaxExpression RunExpression() {
+        auto expression = ParseExpression();
+        if (!AtEnd()) diagnostics_.push_back({"Unexpected token '" + Current().text + "' in expression", Current().span});
+        return expression;
+    }
+    const std::vector<SyntaxDiagnostic>& Diagnostics() const { return diagnostics_; }
+
+private:
+    const SyntaxToken& Current(size_t lookahead = 0) const { return tokens_[(std::min)(index_ + lookahead, tokens_.size() - 1)]; }
+    bool AtEnd() const { return Current().kind == SyntaxTokenKind::EndOfFile; }
+    bool Is(std::string_view text, size_t lookahead = 0) const { return Current(lookahead).text == text; }
+    SyntaxToken Advance() { const auto token = Current(); if (!AtEnd()) ++index_; return token; }
+    SyntaxToken Match(std::string_view text) {
+        if (Is(text)) return Advance();
+        diagnostics_.push_back({"Expected '" + std::string(text) + "'", Current().span});
+        return {SyntaxTokenKind::Bad, std::string(text), {Current().span.offset, 0}};
+    }
+    SyntaxToken Identifier(std::string_view purpose = "identifier") {
+        if (Current().kind == SyntaxTokenKind::Identifier) return Advance();
+        diagnostics_.push_back({"Expected " + std::string(purpose), Current().span});
+        if (!AtEnd() && Current().kind != SyntaxTokenKind::Symbol) return Advance();
+        return {SyntaxTokenKind::Bad, "<missing>", {Current().span.offset, 0}};
+    }
+    std::pair<std::string, TextSpan> ParseType() {
+        const auto first = Identifier("type name"); std::string type = first.text; TextSpan span = first.span;
+        while (Is("[")) { const auto open = Advance(); const auto close = Match("]"); type += "[]"; span = Cover(span, close.span.length ? close.span : open.span); }
+        return {std::move(type), span};
+    }
+    bool LooksLikeLocal() const {
+        if (Current().kind != SyntaxTokenKind::Identifier) return false;
+        size_t at = 1;
+        while (Is("[", at) && Is("]", at + 1)) at += 2;
+        return Current(at).kind == SyntaxTokenKind::Identifier && (Is("=", at + 1) || Is(";", at + 1));
+    }
+    std::vector<SyntaxStatement> ParseBlock() {
+        Match("{"); std::vector<SyntaxStatement> body;
+        while (!AtEnd() && !Is("}")) {
+            const size_t before = index_; body.push_back(ParseStatement());
+            if (before == index_) Advance();
+        }
+        Match("}"); return body;
+    }
+    SyntaxStatement ParseStatement() {
+        const auto start = Current().span;
         if (Is("if")) {
-            Take("if"); Take("("); Statement statement{Statement::Kind::If}; statement.expression = Until(")"); Take(")"); statement.body = Block();
-            if (Is("else")) { Take("else"); statement.elseBody = Is("if") ? std::vector<Statement>{ParseStatement()} : Block(); }
-            statement.sourceOffset = sourceOffset;
-            return statement;
+            Advance(); Match("("); auto condition = ParseExpression(); Match(")");
+            SyntaxStatement result; result.kind = SyntaxStatement::Kind::If; result.expression = std::move(condition); result.body = ParseBlock();
+            if (Is("else")) { Advance(); result.elseBody = Is("if") ? std::vector<SyntaxStatement>{ParseStatement()} : ParseBlock(); }
+            result.span = Cover(start, PreviousSpan()); return result;
         }
-        if (Is("return")) { Take("return"); Statement statement{Statement::Kind::Return}; statement.expression = Until(";"); Take(";"); statement.sourceOffset = sourceOffset; return statement; }
-        if (Is("auto")) {
-            Take("auto"); Statement statement{Statement::Kind::Local}; statement.name = Identifier();
-            if (Is("=")) { Take("="); statement.expression = Until(";"); }
-            Take(";"); statement.sourceOffset = sourceOffset; return statement;
+        if (Is("return")) {
+            Advance(); SyntaxStatement result; result.kind = SyntaxStatement::Kind::Return;
+            if (!Is(";")) result.expression = ParseExpression(); Match(";"); result.span = Cover(start, PreviousSpan()); return result;
         }
-        // A typed local has the form `Type name = value;`, including array types.
-        // Do this look-ahead before treating the line as an ordinary Lua expression.
-        if (Current().kind == TokenKind::Identifier) {
-            size_t lookahead = index_ + 1;
-            while (tokens_[lookahead].text == "[" && tokens_[lookahead + 1].text == "]") lookahead += 2;
-            if (tokens_[lookahead].kind == TokenKind::Identifier && (tokens_[lookahead + 1].text == "=" || tokens_[lookahead + 1].text == ";")) {
-                const auto type = Type(); Statement statement{Statement::Kind::Local}; statement.type = type; statement.name = Identifier();
-                if (Is("=")) { Take("="); statement.expression = Until(";"); }
-                Take(";"); statement.sourceOffset = sourceOffset; return statement;
-            }
+        if (Is("auto") || LooksLikeLocal()) {
+            SyntaxStatement result; result.kind = SyntaxStatement::Kind::Local;
+            if (Is("auto")) { Advance(); result.inferredType = true; }
+            else result.type = ParseType().first;
+            const auto name = Identifier("variable name"); result.name = name.text; result.nameSpan = name.span;
+            if (Is("=")) { Advance(); result.expression = ParseExpression(); }
+            else if (result.inferredType) diagnostics_.push_back({"An auto variable requires an initializer", name.span});
+            Match(";"); result.span = Cover(start, PreviousSpan()); return result;
         }
-        Statement statement{Statement::Kind::Expression}; statement.expression = Until(";"); Take(";"); statement.sourceOffset = sourceOffset; return statement;
+        SyntaxStatement result; result.kind = SyntaxStatement::Kind::Expression; result.expression = ParseExpression();
+        Match(";"); result.span = Cover(start, PreviousSpan()); return result;
     }
-    Function ParseFunction(std::string name, std::string returnType, bool isConstructor) {
-        Function function{std::move(name), std::move(returnType), isConstructor}; function.offset = Current().offset; Take("(");
-        while (!Is(")")) { const auto type = Type(); const auto offset = Current().offset; function.parameters.push_back({type, Identifier(), offset}); if (!Is(",")) break; Take(","); }
-        Take(")"); function.body = Block();
-        return function;
+    SyntaxFunction ParseFunction(std::string access, SyntaxToken name, std::string returnType, bool constructor) {
+        SyntaxFunction result; result.access = std::move(access); result.name = name.text; result.returnType = std::move(returnType); result.isConstructor = constructor; result.span = name.span;
+        Match("(");
+        while (!AtEnd() && !Is(")")) {
+            auto [type, typeSpan] = ParseType(); const auto parameterName = Identifier("parameter name");
+            result.parameters.push_back({std::move(type), parameterName.text, Cover(typeSpan, parameterName.span)});
+            if (!Is(",")) break; Advance();
+        }
+        Match(")"); result.body = ParseBlock(); return result;
     }
-    Class ParseClass() {
-        const auto classToken = Take("class"); Class result; result.offset = classToken.offset; result.name = Identifier();
-        if (Is(":")) { Take(":"); result.baseName = Identifier(); }
-        Take("{"); std::string access = "public";
-        while (!Is("}")) {
-            if ((Is("public") || Is("private")) && tokens_[index_ + 1].text == ":") { access = Take().text; Take(":"); continue; }
+    SyntaxClass ParseClass() {
+        Match("class"); const auto name = Identifier("class name"); SyntaxClass result; result.name = name.text; result.span = name.span;
+        if (Is(":")) { Advance(); result.baseName = Identifier("base type").text; }
+        Match("{"); std::string access = "public";
+        while (!AtEnd() && !Is("}")) {
+            if ((Is("public") || Is("private")) && Is(":", 1)) { access = Advance().text; Advance(); continue; }
+            const size_t before = index_;
             const auto first = Identifier();
-            if (Is("(")) { result.functions.push_back(ParseFunction(first, {}, true)); continue; }
-            const auto type = Type(first); const auto fieldOffset = Current().offset; const auto name = Identifier();
-            if (Is("(")) result.functions.push_back(ParseFunction(name, type, false));
+            if (Is("(")) result.functions.push_back(ParseFunction(access, first, {}, true));
             else {
-                Field field{access, type, name, {}, fieldOffset};
-                if (Is("=")) { Take("="); field.initializer = Until(";"); }
-                Take(";"); result.fields.push_back(std::move(field));
+                std::string type = first.text;
+                while (Is("[")) { Advance(); Match("]"); type += "[]"; }
+                const auto memberName = Identifier("member name");
+                if (Is("(")) result.functions.push_back(ParseFunction(access, memberName, std::move(type), false));
+                else {
+                    SyntaxField field; field.access = access; field.type = std::move(type); field.name = memberName.text; field.span = memberName.span;
+                    if (Is("=")) { Advance(); field.initializer = ParseExpression(); }
+                    Match(";"); result.fields.push_back(std::move(field));
+                }
             }
+            if (before == index_) Advance();
         }
-        Take("}"); return result;
+        Match("}"); return result;
     }
-    std::vector<Token> tokens_;
+
+    static int Precedence(std::string_view op) {
+        if (op == "=" || op == "+=" || op == "-=" || op == "*=" || op == "/=") return 1;
+        if (op == "||") return 2; if (op == "&&") return 3;
+        if (op == "==" || op == "!=") return 4;
+        if (op == "<" || op == ">" || op == "<=" || op == ">=") return 5;
+        if (op == "+" || op == "-") return 6; if (op == "*" || op == "/" || op == "%") return 7;
+        return -1;
+    }
+    SyntaxExpression ParseExpression(int minimum = 0) {
+        auto left = ParseUnary();
+        while (!AtEnd()) {
+            const auto operation = Current(); const int precedence = Precedence(operation.text);
+            if (precedence < minimum) break;
+            Advance(); const bool assignment = precedence == 1;
+            auto right = ParseExpression(precedence + (assignment ? 0 : 1));
+            left = {assignment ? SyntaxExpression::Kind::Assignment : SyntaxExpression::Kind::Binary, operation.text, Cover(left.span, right.span), {std::move(left), std::move(right)}};
+        }
+        return left;
+    }
+    SyntaxExpression ParseUnary() {
+        if (Is("!") || Is("-") || Is("+")) { const auto op = Advance(); auto operand = ParseUnary(); return {SyntaxExpression::Kind::Unary, op.text, Cover(op.span, operand.span), {std::move(operand)}}; }
+        return ParsePostfix(ParsePrimary());
+    }
+    SyntaxExpression ParsePrimary() {
+        const auto token = Current();
+        if (AtEnd() || Is(";") || Is(")") || Is("]") || Is("}" ) || Is(",")) {
+            diagnostics_.push_back({"Expected expression", token.span}); return {SyntaxExpression::Kind::Missing, {}, {token.span.offset, 0}, {}};
+        }
+        Advance();
+        if (token.text == "new") {
+            const auto type = Identifier("type name after 'new'"); SyntaxExpression result{SyntaxExpression::Kind::New, type.text, Cover(token.span, type.span), {}};
+            if (Is("(")) { auto arguments = ParseArguments(); if (!arguments.empty()) result.span = Cover(token.span, arguments.back().span); result.children = std::move(arguments); }
+            else diagnostics_.push_back({"Expected '(' after constructed type", Current().span});
+            return result;
+        }
+        if (token.text == "(") { auto value = ParseExpression(); const auto close = Match(")"); return {SyntaxExpression::Kind::Parenthesized, {}, Cover(token.span, close.span), {std::move(value)}}; }
+        if (token.text == "{") { const auto close = Match("}"); return {SyntaxExpression::Kind::Table, "{}", Cover(token.span, close.span), {}}; }
+        if (token.text == "null") return {SyntaxExpression::Kind::Null, token.text, token.span, {}};
+        if (token.text == "true" || token.text == "false") return {SyntaxExpression::Kind::Boolean, token.text, token.span, {}};
+        if (token.kind == SyntaxTokenKind::Number) return {SyntaxExpression::Kind::Number, token.text, token.span, {}};
+        if (token.kind == SyntaxTokenKind::String) return {SyntaxExpression::Kind::String, token.text, token.span, {}};
+        if (token.kind != SyntaxTokenKind::Identifier) diagnostics_.push_back({"Expected expression", token.span});
+        return {token.kind == SyntaxTokenKind::Identifier ? SyntaxExpression::Kind::Identifier : SyntaxExpression::Kind::Missing, token.text, token.span, {}};
+    }
+    std::vector<SyntaxExpression> ParseArguments() {
+        Match("("); std::vector<SyntaxExpression> arguments;
+        while (!AtEnd() && !Is(")")) {
+            arguments.push_back(ParseExpression());
+            if (!Is(",")) break; Advance();
+        }
+        Match(")"); return arguments;
+    }
+    SyntaxExpression ParsePostfix(SyntaxExpression value) {
+        while (!AtEnd()) {
+            if (Is(".")) {
+                Advance(); const auto name = Identifier("member name"); value = {SyntaxExpression::Kind::Member, name.text, Cover(value.span, name.span), {std::move(value)}};
+            } else if (Is("(")) {
+                const auto start = value.span; auto arguments = ParseArguments(); std::vector<SyntaxExpression> children; children.push_back(std::move(value));
+                for (auto& argument : arguments) children.push_back(std::move(argument));
+                value = {SyntaxExpression::Kind::Call, {}, arguments.empty() ? start : Cover(start, arguments.back().span), std::move(children)};
+            } else if (Is("[")) {
+                Advance(); const auto start = value.span; auto first = ParseExpression();
+                if (Is(":")) { Advance(); auto last = ParseExpression(); const auto close = Match("]"); value = {SyntaxExpression::Kind::Slice, {}, Cover(start, close.span), {std::move(value), std::move(first), std::move(last)}}; }
+                else { const auto close = Match("]"); value = {SyntaxExpression::Kind::Index, {}, Cover(start, close.span), {std::move(value), std::move(first)}}; }
+            } else break;
+        }
+        return value;
+    }
+    TextSpan PreviousSpan() const { return index_ == 0 ? TextSpan{} : tokens_[index_ - 1].span; }
+
+    std::vector<SyntaxToken> tokens_;
+    std::vector<SyntaxDiagnostic> diagnostics_;
+    size_t sourceLength_{};
     size_t index_{};
 };
 
 std::string LuaType(const std::string& type) {
-    if (type == "int") return "integer";
-    if (type == "float") return "number";
-    if (type == "bool") return "boolean";
-    return type;
+    if (type == "int") return "integer"; if (type == "float") return "number"; if (type == "bool") return "boolean"; return type;
 }
 
-std::string Expression(const SyntaxExpression& value) {
-    const auto child = [&](size_t index) -> std::string { return Expression(value.children.at(index)); };
+std::string EmitExpression(const SyntaxExpression& value) {
+    const auto child = [&](size_t index) { return EmitExpression(value.children.at(index)); };
     switch (value.kind) {
-    case SyntaxExpression::Kind::Identifier: case SyntaxExpression::Kind::Number: case SyntaxExpression::Kind::String: case SyntaxExpression::Kind::Boolean: case SyntaxExpression::Kind::Table: return value.text;
+    case SyntaxExpression::Kind::Missing: return {};
+    case SyntaxExpression::Kind::Identifier: return value.text == "this" ? "self" : value.text;
+    case SyntaxExpression::Kind::Number: case SyntaxExpression::Kind::String:
+    case SyntaxExpression::Kind::Boolean: case SyntaxExpression::Kind::Table: return value.text;
     case SyntaxExpression::Kind::Null: return "nil";
-    case SyntaxExpression::Kind::New: { std::string out = value.text + ".new("; for (size_t i{}; i < value.children.size(); ++i) { if (i) out += ", "; out += Expression(value.children[i]); } return out + ")"; }
+    case SyntaxExpression::Kind::Parenthesized: return "(" + child(0) + ")";
+    case SyntaxExpression::Kind::New: { std::string out = value.text + ".new("; for (size_t i{}; i < value.children.size(); ++i) { if (i) out += ", "; out += child(i); } return out + ")"; }
     case SyntaxExpression::Kind::Member: return child(0) + "." + value.text;
     case SyntaxExpression::Kind::Call: {
-        std::string out; const auto& callee = value.children.at(0);
-        if (callee.kind == SyntaxExpression::Kind::Member) out = Expression(callee.children.at(0)) + ":" + callee.text;
-        else out = Expression(callee);
-        out += "("; for (size_t i = 1; i < value.children.size(); ++i) { if (i != 1) out += ", "; out += Expression(value.children[i]); } return out + ")";
+        const auto& callee = value.children.at(0); std::string out;
+        if (callee.kind == SyntaxExpression::Kind::Member) out = EmitExpression(callee.children.at(0)) + ":" + callee.text;
+        else out = EmitExpression(callee);
+        out += "("; for (size_t i = 1; i < value.children.size(); ++i) { if (i != 1) out += ", "; out += child(i); } return out + ")";
     }
     case SyntaxExpression::Kind::Index: return child(0) + "[" + child(1) + "]";
     case SyntaxExpression::Kind::Slice: return "LuaSharp.slice(" + child(0) + ", " + child(1) + ", " + child(2) + ")";
     case SyntaxExpression::Kind::Unary: return (value.text == "!" ? "not " : value.text) + child(0);
-    case SyntaxExpression::Kind::Assignment: return child(0) + " = " + child(1);
+    case SyntaxExpression::Kind::Assignment: {
+        std::string op = value.text; if (op.size() == 2 && op[1] == '=') return child(0) + " = " + child(0) + " " + op.substr(0, 1) + " " + child(1);
+        return child(0) + " = " + child(1);
+    }
     case SyntaxExpression::Kind::Binary: { const auto op = value.text == "!=" ? "~=" : value.text == "&&" ? "and" : value.text == "||" ? "or" : value.text; return child(0) + " " + op + " " + child(1); }
     }
-    throw std::runtime_error("Unknown expression node");
-}
-std::string Expression(const std::vector<Token>& tokens) {
-    std::vector<SyntaxToken> syntax; for (const auto& token : tokens) syntax.push_back({token.text, token.offset});
-    return Expression(ParseExpression(syntax));
+    return {};
 }
 
 struct Emitter {
     std::string output;
     std::vector<SourceMapEntry> sourceMap;
-
-    void Line(std::string text, size_t sourceOffset = 0) {
-        sourceMap.push_back({1 + static_cast<size_t>(std::count(output.begin(), output.end(), '\n')), sourceOffset});
-        output += text + "\n";
+    void Raw(std::string text) { output += std::move(text); }
+    void Line(std::string text, size_t sourceOffset) {
+        sourceMap.push_back({1 + static_cast<size_t>(std::count(output.begin(), output.end(), '\n')), sourceOffset}); output += text + "\n";
     }
 };
 
-void EmitStatements(Emitter& emitter, const std::vector<Statement>& statements, std::string indent) {
+void EmitStatements(Emitter& emitter, const std::vector<SyntaxStatement>& statements, const std::string& indent) {
     for (const auto& statement : statements) {
-        if (statement.kind == Statement::Kind::If) {
-            emitter.Line(indent + "if " + Expression(statement.expression) + " then", statement.sourceOffset);
+        switch (statement.kind) {
+        case SyntaxStatement::Kind::If:
+            emitter.Line(indent + "if " + EmitExpression(statement.expression) + " then", statement.span.offset);
             EmitStatements(emitter, statement.body, indent + "    ");
-            if (!statement.elseBody.empty()) { emitter.Line(indent + "else", statement.sourceOffset); EmitStatements(emitter, statement.elseBody, indent + "    "); }
-            emitter.Line(indent + "end", statement.sourceOffset);
-        } else if (statement.kind == Statement::Kind::Return) emitter.Line(indent + "return " + Expression(statement.expression), statement.sourceOffset);
-        else if (statement.kind == Statement::Kind::Local) emitter.Line(indent + "local " + statement.name + (statement.expression.empty() ? "" : " = " + Expression(statement.expression)), statement.sourceOffset);
-        else emitter.Line(indent + Expression(statement.expression), statement.sourceOffset);
+            if (!statement.elseBody.empty()) { emitter.Line(indent + "else", statement.span.offset); EmitStatements(emitter, statement.elseBody, indent + "    "); }
+            emitter.Line(indent + "end", statement.span.offset); break;
+        case SyntaxStatement::Kind::Return: emitter.Line(indent + "return" + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " " + EmitExpression(statement.expression)), statement.span.offset); break;
+        case SyntaxStatement::Kind::Local: emitter.Line(indent + "local " + statement.name + (statement.expression.kind == SyntaxExpression::Kind::Missing ? "" : " = " + EmitExpression(statement.expression)), statement.span.offset); break;
+        case SyntaxStatement::Kind::Expression: emitter.Line(indent + EmitExpression(statement.expression), statement.span.offset); break;
+        }
     }
 }
 
-void EmitClass(Emitter& emitter, const Class& value) {
-    auto& output = emitter.output;
-    output += "---@class " + value.name + (value.baseName.empty() ? "" : " : " + value.baseName) + "\n";
+void EmitClass(Emitter& emitter, const SyntaxClass& value) {
+    emitter.Raw("---@class " + value.name + (value.baseName.empty() ? "" : " : " + value.baseName) + "\n");
     for (const auto& field : value.fields) {
-        output += "---@field " + field.access + " " + field.name + " " + LuaType(field.type);
-        if (!field.initializer.empty() && field.initializer.front().text == "null") output += "?";
-        output += "\n";
+        emitter.Raw("---@field " + field.access + " " + field.name + " " + LuaType(field.type));
+        if (field.initializer.kind == SyntaxExpression::Kind::Null) emitter.Raw("?"); emitter.Raw("\n");
     }
-    output += "local " + value.name + " = {}\n" + value.name + ".__index = " + value.name + "\n\n";
-    output += "function " + value.name + ".new()\n    local self = setmetatable({}, " + value.name + ")\n";
-    for (const auto& field : value.fields) if (!field.initializer.empty()) output += "    self." + field.name + " = " + Expression(field.initializer) + "\n";
-    if (const auto constructor = std::find_if(value.functions.begin(), value.functions.end(), [](const Function& f) { return f.isConstructor; }); constructor != value.functions.end()) EmitStatements(emitter, constructor->body, "    ");
-    output += "    return self\nend\n\n";
+    emitter.Raw("local " + value.name + " = {}\n" + value.name + ".__index = " + value.name + "\n");
+    if (!value.baseName.empty()) emitter.Raw("setmetatable(" + value.name + ", { __index = " + value.baseName + " })\n");
+    emitter.Raw("\n");
+    const auto constructor = std::find_if(value.functions.begin(), value.functions.end(), [](const auto& f) { return f.isConstructor; });
+    emitter.Raw("function " + value.name + ".new(");
+    if (constructor != value.functions.end()) for (size_t i{}; i < constructor->parameters.size(); ++i) { if (i) emitter.Raw(", "); emitter.Raw(constructor->parameters[i].name); }
+    emitter.Raw(")\n    local self = setmetatable({}, " + value.name + ")\n");
+    for (const auto& field : value.fields) if (field.initializer.kind != SyntaxExpression::Kind::Missing) emitter.Line("    self." + field.name + " = " + EmitExpression(field.initializer), field.span.offset);
+    if (constructor != value.functions.end()) EmitStatements(emitter, constructor->body, "    ");
+    emitter.Raw("    return self\nend\n\n");
     for (const auto& function : value.functions) {
         if (function.isConstructor) continue;
-        for (const auto& parameter : function.parameters) output += "---@param " + parameter.name + " " + LuaType(parameter.type) + "\n";
-        if (!function.returnType.empty() && function.returnType != "void") output += "---@return " + LuaType(function.returnType) + "\n";
-        output += "function " + value.name + ":" + function.name + "(";
-        for (size_t i = 0; i < function.parameters.size(); ++i) { if (i != 0) output += ", "; output += function.parameters[i].name; }
-        output += ")\n"; EmitStatements(emitter, function.body, "    "); output += "end\n\n";
+        for (const auto& parameter : function.parameters) emitter.Raw("---@param " + parameter.name + " " + LuaType(parameter.type) + "\n");
+        if (!function.returnType.empty() && function.returnType != "void") emitter.Raw("---@return " + LuaType(function.returnType) + "\n");
+        emitter.Raw("function " + value.name + ":" + function.name + "(");
+        for (size_t i{}; i < function.parameters.size(); ++i) { if (i) emitter.Raw(", "); emitter.Raw(function.parameters[i].name); }
+        emitter.Raw(")\n"); EmitStatements(emitter, function.body, "    "); emitter.Raw("end\n\n");
     }
+}
+
+std::runtime_error SyntaxError(const SyntaxDiagnostic& diagnostic) {
+    return std::runtime_error(diagnostic.message + " at " + std::to_string(diagnostic.span.offset));
 }
 
 } // namespace
 
-namespace {
-class ExpressionParser {
-public:
-    explicit ExpressionParser(const std::vector<SyntaxToken>& tokens) : tokens_(tokens) {}
-    SyntaxExpression Parse() {
-        if (tokens_.empty()) return {SyntaxExpression::Kind::Table, "", 0, {}};
-        auto result = ParseBinary(0);
-        if (index != tokens_.size()) throw std::runtime_error("Unexpected token in expression at " + std::to_string(tokens_[index].offset));
-        return result;
-    }
-private:
-    const SyntaxToken& Current() const { if (index >= tokens_.size()) throw std::runtime_error("Unexpected end of expression"); return tokens_[index]; }
-    bool Is(std::string_view text) const { return index < tokens_.size() && tokens_[index].text == text; }
-    SyntaxToken Take() { const auto token = Current(); ++index; return token; }
-    static int Precedence(std::string_view value) {
-        if (value == "=") return 1; if (value == "||") return 2; if (value == "&&") return 3; if (value == "==" || value == "!=") return 4;
-        if (value == "<" || value == ">" || value == "<=" || value == ">=") return 5; if (value == "+" || value == "-") return 6; if (value == "*" || value == "/") return 7; return -1;
-    }
-    SyntaxExpression ParseBinary(int minimum) {
-        auto left = ParseUnary();
-        while (index < tokens_.size()) {
-            const auto operation = Current(); const int precedence = Precedence(operation.text); if (precedence < minimum) break; ++index;
-            auto right = ParseBinary(precedence + (operation.text == "=" ? 0 : 1));
-            left = {operation.text == "=" ? SyntaxExpression::Kind::Assignment : SyntaxExpression::Kind::Binary, operation.text, operation.offset, {std::move(left), std::move(right)}};
-        }
-        return left;
-    }
-    SyntaxExpression ParseUnary() {
-        if (Is("!") || Is("-")) { const auto operation = Take(); return {SyntaxExpression::Kind::Unary, operation.text, operation.offset, {ParseUnary()}}; }
-        return ParsePostfix(ParsePrimary());
-    }
-    SyntaxExpression ParsePrimary() {
-        const auto token = Take();
-        if (token.text == "new") { const auto type = Take(); if (!std::isalpha(static_cast<unsigned char>(type.text[0])) && type.text[0] != '_') throw std::runtime_error("Expected type after new at " + std::to_string(type.offset)); SyntaxExpression result{SyntaxExpression::Kind::New, type.text, token.offset, {}}; if (Is("(")) result.children = ParseArguments(); return result; }
-        if (token.text == "(") { auto result = ParseBinary(0); if (!Is(")")) throw std::runtime_error("Expected ')' at " + std::to_string(token.offset)); ++index; return result; }
-        if (token.text == "{") { if (!Is("}")) throw std::runtime_error("Only empty table literals are currently supported at " + std::to_string(token.offset)); ++index; return {SyntaxExpression::Kind::Table, "{}", token.offset, {}}; }
-        if (token.text == "null") return {SyntaxExpression::Kind::Null, token.text, token.offset, {}};
-        if (token.text == "true" || token.text == "false") return {SyntaxExpression::Kind::Boolean, token.text, token.offset, {}};
-        if (!token.text.empty() && (std::isdigit(static_cast<unsigned char>(token.text[0])))) return {SyntaxExpression::Kind::Number, token.text, token.offset, {}};
-        if (!token.text.empty() && (token.text[0] == '\"' || token.text[0] == '\'')) return {SyntaxExpression::Kind::String, token.text, token.offset, {}};
-        return {SyntaxExpression::Kind::Identifier, token.text, token.offset, {}};
-    }
-    std::vector<SyntaxExpression> ParseArguments() {
-        ++index; std::vector<SyntaxExpression> arguments;
-        while (!Is(")")) { arguments.push_back(ParseBinary(0)); if (Is(",")) ++index; else if (!Is(")")) throw std::runtime_error("Expected ',' or ')' in argument list"); }
-        ++index; return arguments;
-    }
-    SyntaxExpression ParsePostfix(SyntaxExpression value) {
-        while (index < tokens_.size()) {
-            if (Is(".")) { const auto dot = Take(); const auto name = Take(); value = {SyntaxExpression::Kind::Member, name.text, dot.offset, {std::move(value)}}; }
-            else if (Is("(")) { const auto offset = Current().offset; value = {SyntaxExpression::Kind::Call, "", offset, {std::move(value)}}; auto arguments = ParseArguments(); value.children.insert(value.children.end(), std::make_move_iterator(arguments.begin()), std::make_move_iterator(arguments.end())); }
-            else if (Is("[")) {
-                const auto offset = Take().offset; auto first = ParseBinary(0);
-                if (Is(":")) { ++index; auto last = ParseBinary(0); if (!Is("]")) throw std::runtime_error("Expected ']' at " + std::to_string(offset)); ++index; value = {SyntaxExpression::Kind::Slice, "", offset, {std::move(value), std::move(first), std::move(last)}}; }
-                else { if (!Is("]")) throw std::runtime_error("Expected ']' at " + std::to_string(offset)); ++index; value = {SyntaxExpression::Kind::Index, "", offset, {std::move(value), std::move(first)}}; }
-            }
-            else break;
-        }
-        return value;
-    }
-    const std::vector<SyntaxToken>& tokens_; size_t index{};
-};
-
-SyntaxToken ToSyntaxToken(const Token& value) { return {value.text, value.offset}; }
-SyntaxStatement ToSyntaxStatement(const Statement& value) {
-    SyntaxStatement result{static_cast<SyntaxStatement::Kind>(value.kind), value.name, value.type, {}, {}, {}, {}, value.sourceOffset};
-    for (const auto& token : value.expression) result.expressionTokens.push_back(ToSyntaxToken(token));
-    if (!result.expressionTokens.empty()) result.expression = ExpressionParser(result.expressionTokens).Parse();
-    for (const auto& statement : value.body) result.body.push_back(ToSyntaxStatement(statement));
-    for (const auto& statement : value.elseBody) result.elseBody.push_back(ToSyntaxStatement(statement));
-    return result;
+SyntaxTree ParseTree(std::string_view source) {
+    auto lexed = Lexer(source).Run();
+    return Parser(std::move(lexed.tokens), std::move(lexed.diagnostics), source.size()).Run();
 }
-SyntaxFunction ToSyntaxFunction(const Function& value) {
-    SyntaxFunction result{value.name, value.returnType, value.isConstructor, {}, {}, value.offset};
-    for (const auto& parameter : value.parameters) result.parameters.push_back({parameter.type, parameter.name, parameter.offset});
-    for (const auto& statement : value.body) result.body.push_back(ToSyntaxStatement(statement));
-    return result;
-}
-SyntaxClass ToSyntaxClass(const Class& value) {
-    SyntaxClass result{value.name, value.baseName, {}, {}, value.offset};
-    for (const auto& field : value.fields) { SyntaxField converted{field.access, field.type, field.name, {}, {}, field.offset}; for (const auto& token : field.initializer) converted.initializerTokens.push_back(ToSyntaxToken(token)); if (!converted.initializerTokens.empty()) converted.initializer = ExpressionParser(converted.initializerTokens).Parse(); result.fields.push_back(std::move(converted)); }
-    for (const auto& function : value.functions) result.functions.push_back(ToSyntaxFunction(function));
-    return result;
-}
-}
-
-SyntaxExpression ParseExpression(const std::vector<SyntaxToken>& tokens) { return ExpressionParser(tokens).Parse(); }
 
 SyntaxProgram ParseSyntax(std::string_view source) {
-    const auto parsed = Parser(Lex(source)).Parse();
-    SyntaxProgram result;
-    for (const auto& value : parsed.classes) result.classes.push_back(ToSyntaxClass(value));
-    for (const auto& statement : parsed.topLevel) result.topLevel.push_back(ToSyntaxStatement(statement));
-    return result;
+    auto tree = ParseTree(source); if (!tree.diagnostics.empty()) throw SyntaxError(tree.diagnostics.front()); return std::move(tree.root);
 }
 
-std::string Compile(std::string_view source) {
-    return CompileWithSourceMap(source).lua;
+SyntaxExpression ParseExpression(const std::vector<SyntaxToken>& tokens) {
+    std::vector<SyntaxToken> copy = tokens;
+    const size_t end = copy.empty() ? 0 : copy.back().span.End();
+    copy.push_back({SyntaxTokenKind::EndOfFile, {}, {end, 0}});
+    Parser parser(std::move(copy), {}, end); auto expression = parser.RunExpression();
+    if (!parser.Diagnostics().empty()) throw SyntaxError(parser.Diagnostics().front());
+    return expression;
 }
+
+std::string Compile(std::string_view source) { return CompileWithSourceMap(source).lua; }
 
 CompilationResult CompileWithSourceMap(std::string_view source) {
-    const auto program = Parser(Lex(source)).Parse();
-    Emitter emitter;
-    for (const auto& value : program.classes) EmitClass(emitter, value);
-    EmitStatements(emitter, program.topLevel, {});
+    auto tree = ParseTree(source); if (!tree.diagnostics.empty()) throw SyntaxError(tree.diagnostics.front());
+    Emitter emitter; for (const auto& value : tree.root.classes) EmitClass(emitter, value); EmitStatements(emitter, tree.root.topLevel, {});
     return {std::move(emitter.output), std::move(emitter.sourceMap)};
 }
 

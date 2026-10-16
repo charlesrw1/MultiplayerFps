@@ -11,6 +11,14 @@ Build the `LuaSharp` project in Visual Studio, or from the repository root:
 .\x64\Debug\LuaSharpTests.exe
 ```
 
-The final command writes `LuaSharp\example.lua`. The current compiler supports the syntax in `example.ls`: classes, public/private sections, typed fields and parameters, constructors, methods, `auto`, `if`, `return`, `new`, `null`, and Lua table literals. It also emits EmmyLua/LuaLS annotations for fields, parameters, and returns.
+The final command writes `LuaSharp\example.lua`. The compiler supports the syntax in `example.ls`: classes and inheritance, public/private sections, typed fields, parameters and locals, constructors, methods, `auto`, `if`/`else`, `return`, `new`, `null`, arrays, indexing/slices, and empty Lua table literals. It also emits EmmyLua/LuaLS annotations for fields, parameters, and returns.
 
-`LuaSharpTests` is a separate unit-test executable. LSP integration tests will be added with the LuaSharp LSP proxy, because they require a real LuaLS process.
+The lexer produces a source-located token stream and recoverable diagnostics. One recursive-descent syntax tree is shared by the semantic analyzer, transpiler, and native language server. Semantic analysis binds scoped locals and parameters, resolves inherited members and expression types, and records declaration references used by completion, hover, definition, signatures, and semantic tokens.
+
+Only `int`, `float`, `string`, `table`, and `bool` are built-in types. All project and engine types must come from source declarations; the analyzer contains no engine-specific type names.
+
+`LuaSharpTests` is the unit-test executable. The native LSP integration test is self-contained and can be run after building `LuaSharpLsp`:
+
+```powershell
+node LuaSharp/test/lsp.integration.test.mjs
+```

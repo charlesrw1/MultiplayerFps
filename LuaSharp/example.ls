@@ -1,3 +1,5 @@
+class Entity {}
+
 class MyClass {
 private:
 int integer;

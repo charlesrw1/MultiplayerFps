@@ -9,10 +9,10 @@
 
 namespace {
 void RunTests() {
-    const auto lua = luasharp::Compile(R"(class Thing { private: Entity value = null; public: Thing() {} int get(Entity e) { if (e != null) { return e.blah(); } return 0; } } auto t = new Thing();)");
-    assert(lua.find("---@field private value Entity?") != std::string::npos);
-    assert(lua.find("function Thing:get(e)") != std::string::npos);
-    assert(lua.find("return e:blah()") != std::string::npos);
+    const auto lua = luasharp::Compile(R"(class Value {} class Thing { private: Value value = null; public: Thing() {} int get(Value v) { if (v != null) { return v.read(); } return 0; } } auto t = new Thing();)");
+    assert(lua.find("---@field private value Value?") != std::string::npos);
+    assert(lua.find("function Thing:get(v)") != std::string::npos);
+    assert(lua.find("return v:read()") != std::string::npos);
     assert(lua.find("local t = Thing.new()") != std::string::npos);
     const auto mapped = luasharp::CompileWithSourceMap("auto value = 1;");
     assert(mapped.sourceMap.size() == 1 && mapped.sourceMap.front().generatedLine == 1);
@@ -32,9 +32,11 @@ int main(int argc, char** argv) {
                 if (!sourceFile) { std::cerr << "luasharp: Cannot open " << input.string() << '\n'; failed = true; continue; }
                 std::ostringstream source; source << sourceFile.rdbuf();
                 const auto analysis = luasharp::Analyze(source.str());
-                for (const auto& diagnostic : analysis.diagnostics) { std::cerr << input.string() << '(' << diagnostic.line + 1 << ',' << diagnostic.character + 1 << "): error: " << diagnostic.message << '\n'; failed = true; }
-                try { static_cast<void>(luasharp::Compile(source.str())); }
-                catch (const std::exception& error) { std::cerr << input.string() << ": error: " << error.what() << '\n'; failed = true; }
+                for (const auto& diagnostic : analysis.diagnostics) {
+                    const bool error = diagnostic.severity == luasharp::DiagnosticSeverity::Error;
+                    std::cerr << input.string() << '(' << diagnostic.line + 1 << ',' << diagnostic.character + 1 << "): " << (error ? "error: " : "warning: ") << diagnostic.message << '\n';
+                    failed = failed || error;
+                }
             }
             return failed ? 1 : 0;
         }

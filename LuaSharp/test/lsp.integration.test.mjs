@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
 const server = process.env.LUASHARP_LSP ?? path.join(root, "x64", "Debug", "LuaSharpLspNative.exe");
-const fixture = process.env.LUASHARP_TEST_FILE ?? "D:\\Data\\scripts\\fps\\luasharpfile.ls";
+const fixture = process.env.LUASHARP_TEST_FILE ?? path.join(root, "LuaSharp", "example.ls");
 assert.ok(existsSync(server), `Missing language server: ${server}`);
 assert.ok(existsSync(fixture), `Missing fixture: ${fixture}`);
 const source = readFileSync(fixture, "utf8");
@@ -33,7 +33,8 @@ try {
     const uri = pathToFileURL(fixture).toString();
     send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri, languageId: "luasharp", version: 1, text: source } } });
     const cleanDiagnostics = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === uri, "initial diagnostics");
-    assert.deepEqual(cleanDiagnostics.params.diagnostics, [], "real LuaSharp fixture must type-check cleanly");
+    assert.ok(cleanDiagnostics.params.diagnostics.every(d => d.severity !== 1), "real LuaSharp fixture must have no errors");
+    assert.ok(cleanDiagnostics.params.diagnostics.some(d => /Unknown member 'blah' on Entity/.test(d.message) && d.severity === 2), "undeclared Entity member must be warned");
     const completionLine = source.split("\n").length;
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 2 }, contentChanges: [{ text: `${source}\nm.` }] } });
     send({ jsonrpc: "2.0", id: 2, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: completionLine, character: 2 } } });
@@ -47,7 +48,8 @@ try {
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 3 }, contentChanges: [{ text: `${source}\nMyClass` }] } });
     send({ jsonrpc: "2.0", id: 4, method: "textDocument/definition", params: { textDocument: { uri }, position: { line: referenceLine, character: 2 } } });
     const definition = await waitFor(m => m.id === 4, "definition");
-    assert.equal(definition.result[0].range.start.line, 0, "class definition location was incorrect");
+    const classLine = source.split("\n").findIndex(line => line.startsWith("class MyClass"));
+    assert.equal(definition.result[0].range.start.line, classLine, "class definition location was incorrect");
     const signatureLine = source.split("\n").length;
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 4 }, contentChanges: [{ text: `${source}\nm.myfunc(` }] } });
     send({ jsonrpc: "2.0", id: 5, method: "textDocument/signatureHelp", params: { textDocument: { uri }, position: { line: signatureLine, character: 9 } } });
