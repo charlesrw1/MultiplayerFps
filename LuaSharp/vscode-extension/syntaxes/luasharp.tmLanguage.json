@@ -5,15 +5,64 @@
   "patterns": [
     { "include": "#comments" },
     { "include": "#strings" },
+    { "include": "#declarations" },
     { "include": "#keywords" },
     { "include": "#types" },
-    { "match": "\\b(?:true|false|null)\\b", "name": "constant.language.luasharp" },
-    { "match": "\\b\\d+(?:\\.\\d+)?\\b", "name": "constant.numeric.luasharp" }
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#operators" }
   ],
   "repository": {
-    "comments": { "patterns": [{ "match": "//.*$", "name": "comment.line.double-slash.luasharp" }] },
-    "strings": { "patterns": [{ "begin": "\"", "end": "\"", "name": "string.quoted.double.luasharp" }, { "begin": "'", "end": "'", "name": "string.quoted.single.luasharp" }] },
-    "keywords": { "patterns": [{ "match": "\\b(?:class|public|private|if|else|return|new|auto)\\b", "name": "keyword.control.luasharp" }] },
-    "types": { "patterns": [{ "match": "\\b(?:int|float|bool|string|table|void|Entity)\\b", "name": "storage.type.luasharp" }] }
+    "comments": {
+      "patterns": [
+        { "begin": "/\\*", "end": "\\*/", "name": "comment.block.luasharp" },
+        { "match": "//.*$", "name": "comment.line.double-slash.luasharp" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        { "begin": "\"", "end": "\"", "name": "string.quoted.double.luasharp", "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.luasharp" }] },
+        { "begin": "'", "end": "'", "name": "string.quoted.single.luasharp", "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.luasharp" }] }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(class)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.class.luasharp" },
+            "3": { "name": "entity.name.type.class.luasharp" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "match": "\\b(?:public|private)\\b", "name": "storage.modifier.luasharp" },
+        { "match": "\\b(?:if|else|return|new|auto)\\b", "name": "keyword.control.luasharp" },
+        { "match": "\\bvoid\\b", "name": "keyword.other.void.luasharp" },
+        { "match": "\\bthis\\b", "name": "variable.language.this.luasharp" }
+      ]
+    },
+    "types": {
+      "patterns": [
+        { "match": "\\b(?:int|float|bool|string|table)\\b", "name": "storage.type.primitive.luasharp" }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        { "match": "\\b(?:true|false|null)\\b", "name": "constant.language.luasharp" }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "match": "\\b\\d+(?:\\.\\d+)?\\b", "name": "constant.numeric.luasharp" }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        { "match": "!=|==|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|[+\\-*/%=!<>]", "name": "keyword.operator.luasharp" }
+      ]
+    }
   }
 }

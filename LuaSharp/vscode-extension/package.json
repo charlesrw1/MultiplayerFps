@@ -9,7 +9,8 @@
   "activationEvents": ["onLanguage:luasharp"],
   "main": "./extension.js",
   "scripts": {
-    "test:integration": "node ../test/lsp.integration.test.mjs"
+    "test:integration": "node ../test/lsp.integration.test.mjs",
+    "test:syntax": "node ../test/syntax-highlighting.test.mjs"
   },
   "contributes": {
     "languages": [{
