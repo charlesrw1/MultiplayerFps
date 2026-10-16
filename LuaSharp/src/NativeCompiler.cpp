@@ -36,14 +36,30 @@ void CaptureError(void* opaque, const char* message) {
     errors += message ? message : "unknown libtcc error";
 }
 
+std::filesystem::path ModulePath(HMODULE module) {
+    std::wstring path(MAX_PATH, L'\0');
+    for (;;) {
+        const auto length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
+        if (length == 0) return {};
+        if (length < path.size()) { path.resize(length); return path; }
+        path.resize(path.size() * 2);
+    }
+}
+
 HMODULE LoadLibTcc(std::string_view requested) {
     if (!requested.empty()) return LoadLibraryA(std::string(requested).c_str());
     char environment[32768]{};
     const auto length = GetEnvironmentVariableA("LUASHARP_LIBTCC", environment, static_cast<DWORD>(std::size(environment)));
-    if (length > 0 && length < std::size(environment)) if (auto module = LoadLibraryA(environment)) return module;
-    if (auto module = LoadLibraryA("LuaSharp\\tools\\tcc\\libtcc.dll")) return module;
-    if (auto module = LoadLibraryA("tools\\tcc\\libtcc.dll")) return module;
-    return LoadLibraryA("libtcc.dll");
+    if (length > 0 && length < std::size(environment)) return LoadLibraryA(environment);
+    const auto bundled = ModulePath(nullptr).parent_path() / "tcc" / "libtcc.dll";
+    return LoadLibraryExW(bundled.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+}
+
+// libtcc resolves lib/ and include/ relative to its own DLL.
+void RequireTccRuntime(HMODULE library) {
+    const auto runtime = ModulePath(library).parent_path() / "lib" / "libtcc1-64.a";
+    if (!std::filesystem::exists(runtime))
+        throw std::runtime_error("TinyCC runtime not found at '" + runtime.string() + "'. libtcc.dll must sit in a full TinyCC install (run LuaSharp/scripts/install-libtcc.ps1 and rebuild)");
 }
 
 template <class T> T Import(HMODULE library, const char* name) {
@@ -92,8 +108,9 @@ NativeModule NativeModule::Compile(std::string_view source, const NativeCompileO
     impl->runtime = options.runtime ? options.runtime : NativeRuntime::Create();
     impl->library = LoadLibTcc(options.libtccPath);
     if (!impl->library) {
-        throw std::runtime_error("Could not load libtcc.dll. Put it beside the executable or set LUASHARP_LIBTCC to its full path");
+        throw std::runtime_error("Could not load libtcc.dll. Expected it in the 'tcc' folder beside the executable, or set LUASHARP_LIBTCC to its full path");
     }
+    RequireTccRuntime(impl->library);
 
     const auto create = Import<TccNew>(impl->library, "tcc_new");
     impl->destroy = Import<TccDelete>(impl->library, "tcc_delete");

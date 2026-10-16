@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Deploys the TinyCC runtime (libtcc.dll + lib/ + include/) to $(OutDir)tcc\. libtcc resolves its runtime relative to its own DLL. -->
+  <PropertyGroup>
+    <TinyCCSourceDir>$(MSBuildThisFileDirectory)tools\tcc\</TinyCCSourceDir>
+  </PropertyGroup>
+  <Target Name="DeployTinyCC" AfterTargets="Build" Condition="Exists('$(TinyCCSourceDir)libtcc.dll')">
+    <ItemGroup>
+      <TinyCCFile Include="$(TinyCCSourceDir)libtcc.dll" Subdir="" />
+      <TinyCCFile Include="$(TinyCCSourceDir)lib\**\*" Subdir="lib\" />
+      <TinyCCFile Include="$(TinyCCSourceDir)include\**\*" Subdir="include\" />
+    </ItemGroup>
+    <Copy SourceFiles="@(TinyCCFile)" DestinationFiles="@(TinyCCFile->'$(OutDir)tcc\%(Subdir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

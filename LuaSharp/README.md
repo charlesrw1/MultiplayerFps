@@ -27,7 +27,7 @@ The compiler supports the syntax in `example.ls`: classes and inheritance, enums
 .\x64\Debug\LuaSharp.exe run-native .\LuaSharp\native-example.ls
 ```
 
-After an explicit API path, the loader checks `LUASHARP_LIBTCC` (a full DLL path), `LuaSharp\tools\tcc`, `tools\tcc`, and the normal Windows DLL search path.
+The build copies `tools\tcc` (`libtcc.dll`, `lib\`, `include\`) to `tcc\` beside the executable (`TinyCC.targets`). After an explicit API path, the loader checks `LUASHARP_LIBTCC` (a full DLL path), then `<exe dir>\tcc\libtcc.dll`. It does not use the working directory. libtcc finds its runtime relative to its own DLL, so a lone `libtcc.dll` without `lib\libtcc1-64.a` is rejected.
 
 Host code can use `NativeModule::FindSymbol` with the export metadata returned by `CompileToC`. Generated names are stable (`Class.method` becomes `ls_Class_method`, and constructors become `ls_Class_new`), which provides the function-slot boundary needed for hot reload. A module owns its TinyCC state, so its function pointers remain valid until that module is destroyed.
 

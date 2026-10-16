@@ -36,4 +36,5 @@
     <ClInclude Include="src\Semantic.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="TinyCC.targets" />
 </Project>
