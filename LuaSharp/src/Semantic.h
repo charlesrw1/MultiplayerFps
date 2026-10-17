@@ -15,6 +15,9 @@
 
 namespace luasharp {
 
+struct BuiltinMember;
+struct BuiltinOperator;
+
 struct StringHash {
     using is_transparent = void;
     size_t operator()(std::string_view value) const { return std::hash<std::string_view>{}(value); }
@@ -63,7 +66,7 @@ private:
 };
 
 enum class Lowering : uint8_t {
-    None, ImplicitField, ImplicitMethod, StaticCall, Printf, Concat, CompoundConcat, ListIndex, ListSet,
+    None, ImplicitField, ImplicitMethod, StaticCall, NativeMethod, NativeStatic, NativeConstant, Construct, Printf, Concat, CompoundConcat, ListIndex, ListSet,
     ListPushBack, ListPopBack, ListSize, ListEmpty, ListClear,
     StringLength, StringContains, StringStartsWith, StringEndsWith, StringSubstring, StringLower, StringUpper,
     CastIdentity, CastString, CastBoolNumber, CastBoolString, CastIntFloat, CastNumberBool, CastNumberString, CastDynamic
@@ -82,12 +85,15 @@ struct Symbol {
     std::string owner;
     std::string access{"public"};
     bool implicit{}; // member of a builtin or external type; has no declaration in this source
+    bool isStatic{};
+    bool isStruct{}; // Class symbols: a value type
 };
 struct ExternalType {
     std::string name;
     std::string baseType;
     std::vector<Symbol> members;
     bool isEnum{};
+    bool isStruct{};
 };
 enum class DiagnosticSeverity { Error, Warning };
 struct Diagnostic {
@@ -118,6 +124,8 @@ struct BoundExpression {
     NodeRange children;
     NodeRange lambdaBody;
     const SyntaxExpression* syntax{}; // null only for the shared missing node
+    const BuiltinMember* nativeMember{};     // call or static constant resolved to a native C function or expression
+    const BuiltinOperator* nativeOperator{}; // unary, binary or compound operator implemented by a native C function
 
     [[nodiscard]] const std::string& Text() const { static const std::string none; return syntax ? syntax->text : none; }
     [[nodiscard]] bool LambdaIsBlock() const { return syntax && syntax->lambdaIsBlock; }
@@ -142,6 +150,8 @@ struct BoundFunction {
     std::string name;
     std::string returnType;
     bool isConstructor{};
+    bool isStatic{};
+    size_t symbolIndex{};
     std::vector<SyntaxParameter> parameters;
     NodeRange body;
     TextSpan span;
@@ -156,6 +166,7 @@ struct BoundField {
 struct BoundClass {
     std::string name;
     std::string baseName;
+    bool isStruct{};
     std::vector<BoundField> fields;
     std::vector<BoundFunction> functions;
     TextSpan span;

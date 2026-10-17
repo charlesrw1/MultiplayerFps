@@ -29,7 +29,7 @@
     "declarations": {
       "patterns": [
         {
-          "match": "\\b(class)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "\\b(class|struct)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "keyword.declaration.class.luasharp" },
             "3": { "name": "entity.name.type.class.luasharp" }
@@ -52,7 +52,7 @@
     },
     "keywords": {
       "patterns": [
-        { "match": "\\b(?:public|private)\\b", "name": "storage.modifier.luasharp" },
+        { "match": "\\b(?:public|private|static)\\b", "name": "storage.modifier.luasharp" },
         { "match": "\\b(?:if|else|while|for|in|break|continue|return|new|auto)\\b", "name": "keyword.control.luasharp" },
         { "match": "\\bvoid\\b", "name": "keyword.other.void.luasharp" },
         { "match": "\\bthis\\b", "name": "variable.language.this.luasharp" }
@@ -61,7 +61,7 @@
     "types": {
       "patterns": [
         { "match": "\\b(?:int|float|bool|string|table)\\b", "name": "storage.type.primitive.luasharp" },
-        { "match": "\\b(?:Vec3|Quat|Transform)\\b", "name": "support.type.native.luasharp" }
+        { "match": "\\b(?:Vec2|Vec3|Vec2i|Vec3i|Quat|Mat4x4|math)\\b", "name": "support.type.native.luasharp" }
       ]
     },
     "constants": {

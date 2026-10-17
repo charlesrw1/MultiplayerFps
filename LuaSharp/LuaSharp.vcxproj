@@ -79,6 +79,10 @@
     <ClInclude Include="src\Compiler.h" />
     <ClInclude Include="src\Semantic.h" />
     <None Include="runtime\luasharp\runtime.h" />
+    <None Include="runtime\luasharp\vecmath.h" />
+    <None Include="src\BuiltinMathMembers.inc" />
+    <None Include="src\BuiltinMathOperators.inc" />
+    <None Include="scripts\gen_vecmath.py" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="TinyCC.targets" />

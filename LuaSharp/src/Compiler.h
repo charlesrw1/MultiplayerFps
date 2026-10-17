@@ -77,6 +77,7 @@ struct SyntaxField {
     std::string name;
     NodeId initializer{}; // 0 is the shared missing expression
     TextSpan span;
+    bool isStatic{};
 };
 struct SyntaxStatement {
     enum class Kind { If, While, For, ForEach, Break, Continue, Return, Local, Expression } kind{Kind::Expression};
@@ -98,13 +99,16 @@ struct SyntaxFunction {
     std::string name;
     std::string returnType;
     bool isConstructor{};
+    bool isStatic{};
     std::vector<SyntaxParameter> parameters;
     NodeRange body;
     TextSpan span;
 };
+// Classes and structs share one syntax node; a struct is a value type.
 struct SyntaxClass {
     std::string name;
     std::string baseName;
+    bool isStruct{};
     std::vector<SyntaxField> fields;
     std::vector<SyntaxFunction> functions;
     TextSpan span;

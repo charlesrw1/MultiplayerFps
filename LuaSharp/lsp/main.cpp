@@ -40,8 +40,12 @@ std::vector<luasharp::ExternalType> ExportsOf(const luasharp::Analysis& analysis
     std::vector<luasharp::ExternalType> result;
     for (const auto& symbol : analysis.symbols) {
         if ((symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum) || !symbol.span.length) continue;
-        luasharp::ExternalType type{symbol.name}; type.isEnum = symbol.kind == luasharp::SymbolKind::Enum; if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
+        luasharp::ExternalType type{symbol.name}; type.isEnum = symbol.kind == luasharp::SymbolKind::Enum; type.isStruct = symbol.isStruct; if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
         if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) for (const auto index : members->second) type.members.push_back(analysis.symbols[index]);
+        if (!type.isEnum) {
+            if (const auto statics = analysis.members.find("$type:" + symbol.name); statics != analysis.members.end()) for (const auto index : statics->second) type.members.push_back(analysis.symbols[index]);
+            for (const auto& candidate : analysis.symbols) if (candidate.kind == luasharp::SymbolKind::Method && candidate.name == symbol.name && candidate.owner == symbol.name && candidate.span.length) type.members.push_back(candidate); // constructors
+        }
         result.push_back(std::move(type));
     }
     return result;
@@ -247,7 +251,7 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         }
         return result;
     }
-    const char* words[] = {"class", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return", "void", "null"};
+    const char* words[] = {"class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return", "void", "null"};
     for (const auto* word : words) result.push_back({{"label", word}, {"kind", 14}});
     for (const auto& type : luasharp::BuiltinTypes()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in type"}});
     for (const auto& function : luasharp::BuiltinFunctions()) {
@@ -308,7 +312,7 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
         if (declaration != analysis.symbols.end()) symbol = &*declaration;
         else symbol = MemberAt(analysis, token.span.offset);
         if (!symbol) if (const auto* expression = luasharp::FindExpression(analysis, token.span.offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) symbol = &analysis.symbols[*expression->symbolIndex];
-        if (symbol) tokenKind = TokenKind(symbol->kind);
+        if (symbol) tokenKind = symbol->kind == luasharp::SymbolKind::Method && symbol->name == symbol->owner ? 1 : TokenKind(symbol->kind); // a constructor name is the type
         else if (std::any_of(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) { return (candidate.kind == luasharp::SymbolKind::Class || candidate.kind == luasharp::SymbolKind::Enum) && candidate.name == token.text; })) tokenKind = 1;
         else if (&token + 1 != analysis.syntax.tokens.data() + analysis.syntax.tokens.size() && (&token)[1].text == "(" && luasharp::FindBuiltinFunction(token.text)) tokenKind = 2;
         if (tokenKind < 0) continue;

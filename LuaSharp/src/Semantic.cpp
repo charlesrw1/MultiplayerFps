@@ -81,6 +81,10 @@ std::string_view LoweringName(Lowering lowering) {
     case Lowering::ImplicitField: return "implicit_field";
     case Lowering::ImplicitMethod: return "implicit_method";
     case Lowering::StaticCall: return "static_call";
+    case Lowering::NativeMethod: return "native_method";
+    case Lowering::NativeStatic: return "native_static";
+    case Lowering::NativeConstant: return "native_constant";
+    case Lowering::Construct: return "construct";
     case Lowering::Printf: return "printf";
     case Lowering::Concat: return "concat";
     case Lowering::CompoundConcat: return "compound_concat";
@@ -132,16 +136,26 @@ public:
         result_.bound.expressions.reserve(result_.syntax.tokens.size() + 1);
         result_.bound.statements.reserve(result_.syntax.tokens.size() / 2);
         result_.bound.expressions.emplace_back(); // shared missing expression
-        vec3_ = types_.Intern("Vec3");
         for (const auto& type : BuiltinTypes()) knownTypes_.insert(type);
-        RegisterBuiltinType("string"); RegisterBuiltinType("Vec3"); RegisterBuiltinType("Quat"); RegisterBuiltinType("Transform");
+        for (const auto& type : NativeStructTypes()) structTypes_.insert(type);
+        RegisterBuiltinType("string"); RegisterBuiltinType("math");
+        for (const auto& type : NativeStructTypes()) RegisterBuiltinType(type);
         for (const auto& external : externalTypes) {
             knownTypes_.insert(external.name); declaredTypes_.insert(external.name);
             if (external.isEnum) enumTypes_.insert(external.name);
-            PushSymbol({external.name, external.name, external.isEnum ? SymbolKind::Enum : SymbolKind::Class, 0, 0, {source_.size(), 0}, {}, external.name, "public"});
+            if (external.isStruct) structTypes_.insert(external.name);
+            Symbol typeSymbol{external.name, external.name, external.isEnum ? SymbolKind::Enum : SymbolKind::Class, 0, 0, {source_.size(), 0}, {}, external.name, "public"};
+            typeSymbol.isStruct = external.isStruct;
+            PushSymbol(std::move(typeSymbol));
             if (!external.baseType.empty()) result_.baseTypes[external.name] = external.baseType;
-            auto& members = result_.members[external.isEnum ? "$type:" + external.name : external.name];
-            for (auto member : external.members) { member.span = {source_.size(), 0}; member.implicit = true; members.push_back(PushSymbol(std::move(member))); }
+            for (auto member : external.members) {
+                member.span = {source_.size(), 0}; member.implicit = true;
+                const bool constructor = member.kind == SymbolKind::Method && member.name == external.name;
+                const auto staticMember = member.isStatic;
+                const auto index = PushSymbol(std::move(member));
+                if (constructor) constructors_[external.name].push_back(index);
+                else result_.members[external.isEnum || staticMember ? "$type:" + external.name : external.name].push_back(index);
+            }
         }
     }
 
@@ -191,12 +205,13 @@ private:
         if (!registeredBuiltins_.insert(type).second) return;
         const auto add = [&](const BuiltinMember& member, const std::string& key) {
             Symbol symbol{member.name, member.returnType, member.kind, 0, 0, {source_.size(), 0}, ParameterLabels(member), type};
-            symbol.implicit = true;
+            symbol.implicit = true; symbol.isStatic = member.isStatic;
             const auto index = PushSymbol(std::move(symbol));
             result_.members[key].push_back(index);
+            symbolBuiltins_.emplace(index, &member);
         };
-        for (const auto& member : BuiltinMembers(type, false)) add(member, type);
-        for (const auto& member : BuiltinMembers(type, true)) add(member, "$type:" + type);
+        for (const auto* member : BuiltinMembers(type, false)) add(*member, type);
+        for (const auto* member : BuiltinMembers(type, true)) add(*member, "$type:" + type);
     }
     TextSpan ParameterNameSpan(const SyntaxParameter& parameter) const {
         return {parameter.span.End() - parameter.name.size(), parameter.name.size()};
@@ -208,9 +223,11 @@ private:
             const auto index = AddSymbol(value.name, value.name, SymbolKind::Enum, value.nameSpan); result_.symbols[index].owner = value.name;
         }
         for (const auto& value : result_.syntax.root.classes) {
-            if (!declaredTypes_.insert(value.name).second) AddDiagnostic("Type '" + value.name + "' is already declared", value.span);
+            if (IsBuiltinType(value.name) || IsBuiltinStaticClass(value.name)) AddDiagnostic("'" + value.name + "' is a built-in type and cannot be redeclared", value.span);
+            else if (!declaredTypes_.insert(value.name).second) AddDiagnostic("Type '" + value.name + "' is already declared", value.span);
             knownTypes_.insert(value.name); classes_.try_emplace(value.name, &value);
-            const auto index = AddSymbol(value.name, value.name, SymbolKind::Class, value.span); result_.symbols[index].owner = value.name;
+            if (value.isStruct) structTypes_.insert(value.name);
+            const auto index = AddSymbol(value.name, value.name, SymbolKind::Class, value.span); result_.symbols[index].owner = value.name; result_.symbols[index].isStruct = value.isStruct;
             if (!value.baseName.empty()) result_.baseTypes[value.name] = value.baseName;
         }
         for (const auto& value : result_.syntax.root.classes) if (!value.baseName.empty()) CheckType(types_.Intern(value.baseName), value.span);
@@ -227,46 +244,89 @@ private:
             }
         }
         for (const auto& value : result_.syntax.root.classes) {
-            std::unordered_set<std::string_view> names; bool hasConstructor = false;
+            struct Declared { std::string_view name; bool method; std::vector<std::string> parameterTypes; };
+            std::vector<Declared> declared;
             auto& members = result_.members[value.name];
+            auto& statics = result_.members["$type:" + value.name];
+            auto& constructors = constructors_[value.name];
             for (const auto& field : value.fields) {
                 CheckType(types_.Intern(field.type), field.span);
-                if (!names.insert(field.name).second) AddDiagnostic("Member '" + field.name + "' is already declared on " + value.name, field.span);
+                if (field.isStatic) AddDiagnostic("Static fields are not supported", field.span);
+                if (value.isStruct) CheckStructField(value, field);
+                if (std::any_of(declared.begin(), declared.end(), [&](const Declared& item) { return item.name == field.name; })) AddDiagnostic("Member '" + field.name + "' is already declared on " + value.name, field.span);
+                declared.push_back({field.name, false, {}});
                 const auto index = AddSymbol(field.name, field.type, SymbolKind::Field, field.span);
                 result_.symbols[index].owner = value.name; result_.symbols[index].access = field.access;
                 members.push_back(index);
             }
             for (const auto& function : value.functions) {
-                if (function.isConstructor && function.name != value.name) AddDiagnostic("Constructor name must match class '" + value.name + "'", function.span);
-                if (function.isConstructor && std::exchange(hasConstructor, true)) AddDiagnostic("Class '" + value.name + "' has more than one constructor", function.span);
-                if (!function.isConstructor) {
-                    CheckType(types_.Intern(function.returnType), function.span);
-                    if (!names.insert(function.name).second) AddDiagnostic("Member '" + function.name + "' is already declared on " + value.name, function.span);
+                if (function.isConstructor && function.name != value.name) AddDiagnostic("Constructor name must match " + std::string(value.isStruct ? "struct" : "class") + " '" + value.name + "'", function.span);
+                if (!function.isConstructor) CheckType(types_.Intern(function.returnType), function.span);
+                std::vector<std::string> parameters, parameterTypes;
+                for (const auto& parameter : function.parameters) { CheckType(types_.Intern(parameter.type), ParameterNameSpan(parameter)); parameters.push_back(parameter.type + " " + parameter.name); parameterTypes.push_back(parameter.type); }
+                if (function.isConstructor) {
+                    const bool duplicate = std::any_of(constructors.begin(), constructors.end(), [&](size_t other) { return SameParameterTypes(result_.symbols[other].parameters, parameters); });
+                    if (duplicate) AddDiagnostic("Constructor with the same parameters is already declared on " + value.name, function.span);
+                } else {
+                    const bool duplicate = std::any_of(declared.begin(), declared.end(), [&](const Declared& item) { return item.name == function.name && (!item.method || item.parameterTypes == parameterTypes); });
+                    if (duplicate) AddDiagnostic("Member '" + function.name + "' is already declared on " + value.name, function.span);
+                    declared.push_back({function.name, true, parameterTypes});
                 }
-                std::vector<std::string> parameters;
-                for (const auto& parameter : function.parameters) { CheckType(types_.Intern(parameter.type), ParameterNameSpan(parameter)); parameters.push_back(parameter.type + " " + parameter.name); }
                 const auto index = AddSymbol(function.name, function.isConstructor ? value.name : function.returnType, SymbolKind::Method, function.span, std::move(parameters));
-                result_.symbols[index].owner = value.name; result_.symbols[index].access = function.access;
-                if (!function.isConstructor) members.push_back(index);
+                result_.symbols[index].owner = value.name; result_.symbols[index].access = function.access; result_.symbols[index].isStatic = function.isStatic;
+                functionSymbols_.emplace(&function, index);
+                if (function.isConstructor) constructors.push_back(index);
+                else (function.isStatic ? statics : members).push_back(index);
             }
         }
+        CheckStructCycles();
+    }
+    static bool SameParameterTypes(const std::vector<std::string>& left, const std::vector<std::string>& right) {
+        if (left.size() != right.size()) return false;
+        for (size_t i{}; i < left.size(); ++i) if (std::string_view(left[i]).substr(0, left[i].find(' ')) != std::string_view(right[i]).substr(0, right[i].find(' '))) return false;
+        return true;
+    }
+    bool IsStructType(TypeId type) const { return structTypes_.contains(Name(type)); }
+    bool IsValueType(TypeId type) const { return IsNumeric(type) || type == TypeTable::Bool || enumTypes_.contains(Name(type)) || IsStructType(type); }
+    void CheckStructField(const SyntaxClass& owner, const SyntaxField& field) {
+        const auto type = types_.Intern(field.type);
+        if (type == TypeTable::Unknown || (IsValueType(type) && !field.type.ends_with("[]")) || !knownTypes_.contains(types_.Name(types_.Base(type)))) return;
+        AddDiagnostic("Field '" + field.name + "' of struct '" + owner.name + "' must be a value type (int, float, bool, enum or struct), got '" + field.type + "'", field.span);
+    }
+    // A struct cannot contain itself, directly or through other structs.
+    void CheckStructCycles() {
+        StringSet done;
+        const auto visit = [&](auto&& self, const SyntaxClass& value, std::vector<std::string_view>& path) -> void {
+            if (std::find(path.begin(), path.end(), value.name) != path.end()) { AddDiagnostic("Struct '" + value.name + "' cannot contain itself", value.span); return; }
+            if (!done.insert(value.name).second) return;
+            path.push_back(value.name);
+            for (const auto& field : value.fields) if (const auto* inner = FindClass(field.type); inner && inner->isStruct) self(self, *inner, path);
+            path.pop_back();
+        };
+        for (const auto& value : result_.syntax.root.classes) if (value.isStruct) { std::vector<std::string_view> path; visit(visit, value, path); }
     }
     void FlattenInheritance() {
         for (const auto& [derived, firstBase] : result_.baseTypes) {
-            std::unordered_set<std::string_view> visited{derived}; std::string_view base = firstBase;
-            auto& derivedMembers = result_.members[derived];
-            while (!base.empty()) {
-                if (!visited.insert(base).second) { AddDiagnostic("Inheritance cycle involving '" + derived + "'", ClassSpan(derived)); break; }
-                if (const auto found = result_.members.find(base); found != result_.members.end()) {
-                    for (const auto memberIndex : found->second) {
-                        const auto& member = result_.symbols[memberIndex];
-                        const auto own = std::find_if(derivedMembers.begin(), derivedMembers.end(), [&](size_t index) { return result_.symbols[index].name == member.name; });
-                        if (own == derivedMembers.end()) { derivedMembers.push_back(memberIndex); continue; }
-                        const auto& mine = result_.symbols[*own];
-                        if (member.access != "private" && (mine.kind != member.kind || mine.type != member.type || mine.parameters != member.parameters)) AddDiagnostic("Override of '" + member.name + "' on '" + derived + "' does not match the inherited signature", mine.span);
+            for (const std::string prefix : {std::string(), std::string("$type:")}) {
+                std::unordered_set<std::string_view> visited{derived}; std::string_view base = firstBase;
+                auto& derivedMembers = result_.members[prefix + derived];
+                while (!base.empty()) {
+                    if (!visited.insert(base).second) { if (prefix.empty()) AddDiagnostic("Inheritance cycle involving '" + derived + "'", ClassSpan(derived)); break; }
+                    if (const auto found = result_.members.find(prefix + std::string(base)); found != result_.members.end()) {
+                        for (const auto memberIndex : std::vector<size_t>(found->second)) {
+                            const auto& member = result_.symbols[memberIndex];
+                            // Same name and, for methods, same parameters is an override; a different parameter list is an overload.
+                            const auto own = std::find_if(derivedMembers.begin(), derivedMembers.end(), [&](size_t index) {
+                                const auto& mine = result_.symbols[index];
+                                return mine.name == member.name && (mine.kind != SymbolKind::Method || member.kind != SymbolKind::Method || SameParameterTypes(mine.parameters, member.parameters));
+                            });
+                            if (own == derivedMembers.end()) { derivedMembers.push_back(memberIndex); continue; }
+                            const auto& mine = result_.symbols[*own];
+                            if (member.access != "private" && (mine.kind != member.kind || mine.type != member.type || mine.parameters != member.parameters)) AddDiagnostic("Override of '" + member.name + "' on '" + derived + "' does not match the inherited signature", mine.span);
+                        }
                     }
+                    const auto parent = result_.baseTypes.find(base); base = parent == result_.baseTypes.end() ? std::string_view{} : std::string_view(parent->second);
                 }
-                const auto parent = result_.baseTypes.find(base); base = parent == result_.baseTypes.end() ? std::string_view{} : std::string_view(parent->second);
             }
         }
     }
@@ -278,12 +338,18 @@ private:
         const auto* found = FindClass(name);
         return found ? found->span : TextSpan{};
     }
+    // Every member called name on type, overloads in declaration order.
+    std::vector<size_t> FindMembers(std::string_view type, std::string_view name) const {
+        std::vector<size_t> result;
+        auto found = result_.members.find(type);
+        if (found == result_.members.end()) found = result_.members.find(type.substr(0, type.find("[]")));
+        if (found == result_.members.end()) return result;
+        for (const auto index : found->second) if (result_.symbols[index].name == name) result.push_back(index);
+        return result;
+    }
     std::optional<size_t> FindMember(std::string_view type, std::string_view name) const {
         auto found = result_.members.find(type);
-        if (found == result_.members.end()) {
-            const auto base = type.substr(0, type.find("[]"));
-            found = result_.members.find(base);
-        }
+        if (found == result_.members.end()) found = result_.members.find(type.substr(0, type.find("[]")));
         if (found == result_.members.end()) return std::nullopt;
         const auto member = std::find_if(found->second.begin(), found->second.end(), [&](size_t index) { return result_.symbols[index].name == name; });
         return member == found->second.end() ? std::nullopt : std::optional<size_t>(*member);
@@ -296,16 +362,194 @@ private:
         pool.resize(pool.size() + count);
         return first;
     }
-    // Arguments of a call are its children after the callee.
-    void CheckArguments(const Symbol& callable, const SyntaxExpression& call, NodeId arguments, size_t count) {
-        if (count != callable.parameters.size()) {
-            AddDiagnostic("Expected " + std::to_string(callable.parameters.size()) + " argument(s) for '" + callable.name + "', got " + std::to_string(count), call.span);
+    // One overload of a method, constructor, static function or native member.
+    struct Callable {
+        std::vector<TypeId> parameters;
+        size_t required{};
+        TypeId result{};
+        std::optional<size_t> symbol;            // null for the implicit default constructor
+        const BuiltinMember* builtin{};
+        bool isStatic{};
+    };
+    Callable MakeCallable(size_t symbolIndex) {
+        const auto& symbol = result_.symbols[symbolIndex];
+        Callable callable; callable.symbol = symbolIndex; callable.result = symbolTypes_[symbolIndex]; callable.isStatic = symbol.isStatic;
+        for (const auto& label : symbol.parameters) {
+            auto type = std::string_view(label).substr(0, label.find(' '));
+            if (type.ends_with('?')) type.remove_suffix(1);
+            callable.parameters.push_back(types_.Intern(type));
+        }
+        callable.required = callable.parameters.size();
+        if (const auto builtin = symbolBuiltins_.find(symbolIndex); builtin != symbolBuiltins_.end()) {
+            callable.builtin = builtin->second;
+            callable.required = static_cast<size_t>(std::count_if(builtin->second->parameters.begin(), builtin->second->parameters.end(), [](const auto& parameter) { return !parameter.optional; }));
+        }
+        return callable;
+    }
+    std::string Signature(std::string_view name, const Callable& callable) const {
+        std::string text(name); text += '(';
+        for (size_t i{}; i < callable.parameters.size(); ++i) { if (i) text += ", "; text += Name(callable.parameters[i]); if (i >= callable.required) text += '?'; }
+        return text + ')';
+    }
+    // Cost of passing an argument of type actual for a parameter of type expected; negative when it cannot convert.
+    int ConversionCost(TypeId expected, TypeId actual) const {
+        if (expected == actual || expected == TypeTable::Unknown || actual == TypeTable::Unknown) return 0;
+        if (!Assignable(expected, actual)) return -1;
+        if (actual == TypeTable::Any) return expected == TypeTable::Int ? 21 : 20;
+        if (expected == TypeTable::Any) return 10;
+        if (actual == TypeTable::Null) return 5;
+        if (expected == TypeTable::Float && actual == TypeTable::Int) return 2;
+        if (types_.IsList(expected) || expected == TypeTable::Table) return 4;
+        return 1; // derived to base
+    }
+    // Total conversion cost of the arguments for one overload, or -1 when it does not apply.
+    int Score(const Callable& callable, NodeId arguments, size_t count) {
+        if (count < callable.required || count > callable.parameters.size()) return -1;
+        int total = static_cast<int>(callable.parameters.size() - count);
+        for (size_t i{}; i < count; ++i) {
+            const auto cost = ConversionCost(callable.parameters[i], Node(arguments + static_cast<NodeId>(i)).type);
+            if (cost < 0) return -1;
+            total += cost;
+        }
+        return total;
+    }
+    // Picks the cheapest applicable overload. Reports the failure and returns -1 when none applies.
+    // What names the callee in messages: "constructor" gets the constructor wording.
+    int ResolveOverload(std::string_view name, const std::vector<Callable>& candidates, NodeId arguments, size_t count, const SyntaxExpression& call, bool constructor) {
+        int best = -1, bestCost = 0; bool tie = false;
+        for (size_t i{}; i < candidates.size(); ++i) {
+            const auto cost = Score(candidates[i], arguments, count);
+            if (cost < 0) continue;
+            if (best < 0 || cost < bestCost) { best = static_cast<int>(i); bestCost = cost; tie = false; }
+            else if (cost == bestCost) tie = true;
+        }
+        if (best >= 0) {
+            if (tie) {
+                bool dynamic = false;
+                for (size_t i{}; i < count; ++i) { const auto type = Node(arguments + static_cast<NodeId>(i)).type; dynamic = dynamic || type == TypeTable::Any || type == TypeTable::Unknown; }
+                if (!dynamic) AddDiagnostic("Call to '" + std::string(name) + "' is ambiguous between overloads with equally good conversions", call.span);
+            }
+            return best;
+        }
+        if (candidates.size() == 1) {
+            const auto& only = candidates.front();
+            if (count < only.required || count > only.parameters.size()) {
+                const auto range = only.required == only.parameters.size() ? "" : " to " + std::to_string(only.parameters.size());
+                AddDiagnostic("Expected " + std::to_string(only.required) + range + (constructor ? " constructor" : "") + " argument(s) for '" + std::string(name) + "', got " + std::to_string(count), call.span);
+                return -1;
+            }
+            for (size_t i{}; i < count; ++i) {
+                const auto actual = Node(arguments + static_cast<NodeId>(i)).type;
+                if (ConversionCost(only.parameters[i], actual) < 0)
+                    AddDiagnostic(std::string(constructor ? "Constructor argument " : "Argument ") + std::to_string(i + 1) + (constructor ? " for '" : " of '") + std::string(name) + "' expects '" + Name(only.parameters[i]) + "', got " + DisplayType(actual), Syntax().Child(call, i + 1).span);
+            }
+            return -1;
+        }
+        std::string message = "No overload of '" + std::string(name) + "' accepts (";
+        for (size_t i{}; i < count; ++i) { if (i) message += ", "; message += Name(Node(arguments + static_cast<NodeId>(i)).type); }
+        message += "). Candidates: ";
+        for (size_t i{}; i < candidates.size(); ++i) { if (i) message += "; "; message += Signature(name, candidates[i]); }
+        AddDiagnostic(std::move(message), call.span);
+        return -1;
+    }
+    // Constructors of a type: declared overloads, plus the implicit default when no declared one takes no arguments.
+    std::vector<Callable> ConstructorCandidates(const std::string& name) {
+        std::vector<Callable> result;
+        if (IsNativeStruct(name)) {
+            for (const auto index : FindMembers("$type:" + name, "new")) result.push_back(MakeCallable(index));
+            return result;
+        }
+        const auto declared = constructors_.find(name);
+        if (declared != constructors_.end()) for (const auto index : declared->second) result.push_back(MakeCallable(index));
+        const bool inSource = FindClass(name) != nullptr;
+        const bool hasDefault = std::any_of(result.begin(), result.end(), [](const Callable& item) { return item.parameters.empty(); });
+        const bool defaultAllowed = structTypes_.contains(name) ? !hasDefault : result.empty();
+        if (inSource && defaultAllowed) { Callable fallback; fallback.result = types_.Intern(name); result.push_back(fallback); }
+        return result;
+    }
+    void CoerceArguments(const Callable& callable, NodeId arguments, size_t count) {
+        for (size_t i{}; i < count && i < callable.parameters.size(); ++i) Accepts(callable.parameters[i], arguments + static_cast<NodeId>(i));
+    }
+    void ApplyNative(const Callable& chosen, bool constructing, Lowering& lowering, const BuiltinMember*& nativeMember) {
+        nativeMember = chosen.builtin;
+        lowering = chosen.builtin->lowering;
+        if (lowering == Lowering::None && !chosen.builtin->cName.empty()) lowering = constructing ? Lowering::Construct : chosen.builtin->isStatic ? Lowering::NativeStatic : Lowering::NativeMethod;
+    }
+    // `new T(...)` for a class, or for a struct (which still produces a value).
+    void ResolveConstruction(const SyntaxExpression& expression, NodeId arguments, size_t count, TypeId& type, std::optional<size_t>& symbol, Lowering& lowering, const BuiltinMember*& nativeMember) {
+        const auto candidates = ConstructorCandidates(expression.text);
+        if (candidates.empty()) return;
+        const int pick = ResolveOverload(expression.text, candidates, arguments, count, expression, true);
+        if (pick < 0) return;
+        const auto& chosen = candidates[static_cast<size_t>(pick)];
+        symbol = chosen.symbol; type = chosen.result;
+        if (chosen.builtin) ApplyNative(chosen, true, lowering, nativeMember);
+        else if (structTypes_.contains(expression.text)) lowering = Lowering::Construct;
+        CoerceArguments(chosen, arguments, count);
+    }
+    // Calls to methods, static functions, struct constructors (`Vec3(1, 2, 3)`) and native members. Sets the call's type, symbol and lowering.
+    void ResolveCall(const SyntaxExpression& call, const SyntaxExpression& callee, NodeId calleeSlot, NodeId arguments, size_t argumentCount, const SyntaxClass* owner, TypeId& type, std::optional<size_t>& symbol, Lowering& lowering, const BuiltinMember*& nativeMember) {
+        using Kind = SyntaxExpression::Kind;
+        std::vector<Callable> candidates;
+        bool staticAccess = false, constructing = false;
+        std::string typeName;
+        const auto methodsOf = [&](std::string_view key, std::string_view name) {
+            for (const auto index : FindMembers(key, name)) if (result_.symbols[index].kind == SymbolKind::Method) candidates.push_back(MakeCallable(index));
+        };
+        if (callee.kind == Kind::Member) {
+            const auto receiver = Node(Node(calleeSlot).children.first).type;
+            if (types_.IsList(receiver)) RegisterBuiltinType(Name(receiver));
+            staticAccess = types_.Kind(receiver) == TypeKind::Meta;
+            typeName = staticAccess ? std::string(types_.Target(receiver)) : Name(receiver);
+            methodsOf(Name(receiver), callee.text);
+            if (candidates.empty()) methodsOf(staticAccess ? typeName : "$type:" + typeName, callee.text); // the other kind of method: misuse is reported below
+        } else if (callee.kind == Kind::Identifier && types_.Kind(type) == TypeKind::Meta) {
+            constructing = true; typeName = std::string(types_.Target(type));
+            if (structTypes_.contains(typeName)) candidates = ConstructorCandidates(typeName);
+            else if (FindClass(typeName)) { AddDiagnostic("Use 'new' to create an instance of class '" + typeName + "'", call.span); return; }
+            else { AddDiagnostic("Type '" + typeName + "' cannot be called", callee.span); return; }
+        } else if (callee.kind == Kind::Identifier && owner) {
+            methodsOf(owner->name, callee.text); methodsOf("$type:" + owner->name, callee.text);
+        }
+        if (candidates.empty()) {
+            if (type != TypeTable::Unknown && type != TypeTable::Any) AddDiagnostic("Expression of type " + DisplayType(type) + " is not callable", callee.span);
             return;
         }
-        for (size_t i{}; i < count; ++i) {
-            const std::string_view label = callable.parameters[i];
-            const auto expected = types_.Intern(label.substr(0, label.find(' '))), actual = Node(arguments + static_cast<NodeId>(i)).type;
-            if (!Accepts(expected, arguments + static_cast<NodeId>(i))) AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + callable.name + "' expects '" + Name(expected) + "', got " + DisplayType(actual), Syntax().Child(call, i + 1).span);
+        const int pick = ResolveOverload(constructing ? typeName : callee.text, candidates, arguments, argumentCount, call, constructing);
+        if (pick < 0) { type = candidates.front().result; return; }
+        const auto& chosen = candidates[static_cast<size_t>(pick)];
+        type = chosen.result; symbol = chosen.symbol;
+        if (!constructing) {
+            Node(calleeSlot).type = chosen.result;
+            if (chosen.symbol) Node(calleeSlot).symbolIndex = chosen.symbol;
+            if (callee.kind == Kind::Identifier) Node(calleeSlot).lowering = chosen.isStatic ? Lowering::StaticCall : Lowering::ImplicitMethod;
+        }
+        if (chosen.builtin) ApplyNative(chosen, constructing, lowering, nativeMember);
+        else if (constructing) lowering = Lowering::Construct;
+        else if (chosen.isStatic) lowering = Lowering::StaticCall;
+        if (!constructing && callee.kind == Kind::Member) {
+            if (staticAccess && !chosen.isStatic) AddDiagnostic("Instance method '" + callee.text + "' cannot be called on type '" + typeName + "'", callee.span);
+            else if (!staticAccess && chosen.isStatic) AddDiagnostic("Static method '" + callee.text + "' must be called on its type, not on a value", callee.span);
+        }
+        if (!constructing && callee.kind == Kind::Identifier && !chosen.isStatic && staticContext_) AddDiagnostic("Instance method '" + callee.text + "' cannot be called from a static method", callee.span);
+        CoerceArguments(chosen, arguments, argumentCount);
+    }
+    // Lambdas keep a pointer to nothing on the stack, so they cannot capture a struct's `this`.
+    void CheckStructLambdaCapture(const SyntaxClass* owner, TextSpan span) {
+        if (lambdaNesting_ > 0 && owner && owner->isStruct) AddDiagnostic("Lambdas inside struct methods cannot use 'this' or its members", span);
+    }
+    // True when the bound expression names storage, so its members can be assigned and its address taken.
+    bool IsAddressable(NodeId id) {
+        const auto& node = Node(id);
+        switch (node.kind) {
+        case SyntaxExpression::Kind::Identifier: return types_.Kind(node.type) != TypeKind::Meta;
+        case SyntaxExpression::Kind::Parenthesized: return IsAddressable(node.children.first);
+        case SyntaxExpression::Kind::Member: {
+            if (node.lowering == Lowering::NativeConstant) return false;
+            return IsStructType(Node(node.children.first).type) ? IsAddressable(node.children.first) : true;
+        }
+        case SyntaxExpression::Kind::Index: return node.lowering == Lowering::ListIndex;
+        default: return false;
         }
     }
     void CheckBuiltinArguments(std::string_view name, std::span<const BuiltinParameter> parameters, bool variadic, const SyntaxExpression& call, NodeId arguments, size_t count) {
@@ -339,6 +583,7 @@ private:
             return Infer(syntaxChild(index), locals, owner, first + static_cast<NodeId>(index));
         };
         TypeId type{}; std::optional<size_t> symbol; Lowering lowering{}; NodeRange lambdaBody;
+        const BuiltinMember* nativeMember = nullptr; const BuiltinOperator* nativeOperator = nullptr;
         switch (expression.kind) {
         case Kind::Missing: break;
         case Kind::Number: type = expression.text.find('.') == std::string::npos ? TypeTable::Int : TypeTable::Float; break;
@@ -354,27 +599,29 @@ private:
             type = types_.Intern(expression.text); CheckType(type, expression.span);
             for (size_t i{}; i < childCount; ++i) child(i);
             if (enumTypes_.contains(expression.text)) AddDiagnostic("Enum type '" + expression.text + "' cannot be constructed", expression.span);
-            if (const auto* classNode = FindClass(expression.text)) {
-                const auto constructor = std::find_if(classNode->functions.begin(), classNode->functions.end(), [](const auto& value) { return value.isConstructor; });
-                const size_t expected = constructor == classNode->functions.end() ? 0 : constructor->parameters.size();
-                if (childCount != expected) AddDiagnostic("Expected " + std::to_string(expected) + " constructor argument(s) for '" + expression.text + "', got " + std::to_string(childCount), expression.span);
-                else for (size_t i{}; i < expected; ++i) {
-                    const auto actual = Node(first + static_cast<NodeId>(i)).type;
-                    if (!Accepts(types_.Intern(constructor->parameters[i].type), first + static_cast<NodeId>(i))) AddDiagnostic("Constructor argument " + std::to_string(i + 1) + " for '" + expression.text + "' expects '" + constructor->parameters[i].type + "', got " + DisplayType(actual), syntaxChild(i).span);
-                }
-            }
+            else if (IsBuiltinType(expression.text) && !IsNativeStruct(expression.text)) AddDiagnostic("Type '" + expression.text + "' cannot be constructed with 'new'", expression.span);
+            else ResolveConstruction(expression, first, childCount, type, symbol, lowering, nativeMember);
             break;
         }
         case Kind::Identifier: {
-            if (const auto* local = FindLocal(locals, expression.text)) { type = local->type; symbol = local->symbolIndex; }
+            if (expression.text == "this" && staticContext_) AddDiagnostic("'this' cannot be used in a static method", expression.span);
+            if (const auto* local = FindLocal(locals, expression.text)) {
+                type = local->type; symbol = local->symbolIndex;
+                if (expression.text == "this") CheckStructLambdaCapture(owner, expression.span);
+            }
             else if (owner) {
                 if (const auto index = FindMember(owner->name, expression.text)) {
                     const auto& member = result_.symbols[*index];
                     type = symbolTypes_[*index]; symbol = index; lowering = member.kind == SymbolKind::Method ? Lowering::ImplicitMethod : Lowering::ImplicitField;
                     if (member.access == "private" && member.owner != owner->name) AddDiagnostic("Member '" + member.name + "' is private on '" + member.owner + "'", expression.span);
+                    if (staticContext_) AddDiagnostic("Instance member '" + member.name + "' cannot be used in a static method", expression.span);
+                    CheckStructLambdaCapture(owner, expression.span);
+                }
+                else if (const auto index = FindMember("$type:" + owner->name, expression.text); index && result_.symbols[*index].kind == SymbolKind::Method) {
+                    type = symbolTypes_[*index]; symbol = index; lowering = Lowering::StaticCall;
                 }
             }
-            if (type == TypeTable::Unknown && (IsBuiltinType(expression.text) || enumTypes_.contains(expression.text))) type = types_.Meta(expression.text);
+            if (type == TypeTable::Unknown && (IsBuiltinType(expression.text) || IsBuiltinStaticClass(expression.text) || declaredTypes_.contains(expression.text))) type = types_.Meta(expression.text);
             if (type == TypeTable::Unknown) if (const auto* builtin = FindBuiltinFunction(expression.text)) { type = types_.Builtin(builtin->name); symbol = BuiltinSymbolIndex(*builtin); }
             if (type == TypeTable::Unknown) AddDiagnostic("Unknown identifier '" + expression.text + "'", expression.span);
             break;
@@ -386,6 +633,7 @@ private:
                 const auto& member = result_.symbols[*index];
                 type = symbolTypes_[*index]; symbol = index;
                 if (member.access == "private" && (!owner || member.owner != owner->name)) AddDiagnostic("Member '" + member.name + "' is private on '" + member.owner + "'", MemberNameSpan(expression));
+                if (const auto builtin = symbolBuiltins_.find(*index); builtin != symbolBuiltins_.end() && builtin->second->isStatic && builtin->second->kind == SymbolKind::Field) { nativeMember = builtin->second; lowering = Lowering::NativeConstant; }
             }
             else if (IsOpen(target)) type = TypeTable::Any;
             else if (expression.text != "<missing>" && target != TypeTable::Unknown) AddDiagnostic("Unknown member '" + expression.text + "' on " + Name(types_.Base(target)), MemberNameSpan(expression), DiagnosticSeverity::Warning);
@@ -412,16 +660,7 @@ private:
                 if (argumentCount != expected) AddDiagnostic("Expected " + std::to_string(expected) + " argument(s) for lambda, got " + std::to_string(argumentCount), expression.span);
                 type = types_.Element(type); break;
             }
-            std::optional<size_t> callable;
-            const BuiltinMember* builtin = nullptr;
-            if (callee.kind == Kind::Member) {
-                const auto receiver = ChildType(first, 0); const bool isStatic = types_.Kind(receiver) == TypeKind::Meta;
-                builtin = FindBuiltinMember(isStatic ? types_.Target(receiver) : std::string_view(Name(receiver)), callee.text, isStatic); callable = FindMember(Name(receiver), callee.text);
-            }
-            else if (callee.kind == Kind::Identifier && owner) callable = FindMember(owner->name, callee.text);
-            if (builtin) { CheckBuiltinArguments(builtin->name, builtin->parameters, false, expression, arguments, argumentCount); lowering = builtin->lowering == Lowering::None && builtin->isStatic ? Lowering::StaticCall : builtin->lowering; }
-            else if (callable && result_.symbols[*callable].kind == SymbolKind::Method) CheckArguments(result_.symbols[*callable], expression, arguments, argumentCount);
-            else if (type != TypeTable::Unknown && type != TypeTable::Any) AddDiagnostic("Expression of type " + DisplayType(type) + " is not callable", callee.span);
+            ResolveCall(expression, callee, first, arguments, argumentCount, owner, type, symbol, lowering, nativeMember);
             break;
         }
         case Kind::Index: {
@@ -446,6 +685,7 @@ private:
             const auto parameters = Syntax().Parameters(expression);
             for (const auto& parameter : parameters) AddLocal(lambdaLocals, parameter.name, TypeTable::Any, SymbolKind::Parameter, parameter.span, expression.span, lambdaDepth);
             TypeId resultType{};
+            ++lambdaNesting_;
             if (expression.lambdaIsBlock) {
                 lambdaBody = AnalyzeStatements(expression.lambdaBody, lambdaLocals, owner, InferReturn, expression.span.End(), lambdaDepth + 1);
                 resultType = LambdaResult(expression, lambdaBody);
@@ -453,12 +693,17 @@ private:
                 assert(childCount == 1);
                 ++visited; resultType = Infer(syntaxChild(0), lambdaLocals, owner, first);
             }
+            --lambdaNesting_;
             type = types_.Function(parameters.size(), resultType == TypeTable::Unknown ? TypeTable::Any : resultType); break;
         }
         case Kind::Unary: {
             const auto operand = child(0);
             if (expression.text == "!") { type = TypeTable::Bool; if (operand != TypeTable::Bool && operand != TypeTable::Any) AddDiagnostic("Operator '!' requires 'bool', got " + DisplayType(operand), expression.span); }
-            else { type = operand; if (!IsNumeric(operand) && operand != vec3_ && operand != TypeTable::Any) AddDiagnostic("Unary '" + expression.text + "' is not defined for " + DisplayType(operand), expression.span); }
+            else {
+                type = operand;
+                if (const auto* native = FindBuiltinUnary(Name(operand), expression.text)) { nativeOperator = native; type = types_.Intern(native->result); }
+                else if (!IsNumeric(operand) && operand != TypeTable::Any) AddDiagnostic("Unary '" + expression.text + "' is not defined for " + DisplayType(operand), expression.span);
+            }
             break;
         }
         case Kind::Binary: {
@@ -466,10 +711,10 @@ private:
             if (operation == "&&" || operation == "||") { type = TypeTable::Bool; if ((left != TypeTable::Bool && left != TypeTable::Any) || (right != TypeTable::Bool && right != TypeTable::Any)) AddDiagnostic("Logical operator requires 'bool' operands", expression.span); }
             else if ((operation == "==" || operation == "!=") && (left == TypeTable::Null || right == TypeTable::Null)) {
                 const auto other = left == TypeTable::Null ? right : left; type = TypeTable::Bool;
-                if (other == TypeTable::Int || other == TypeTable::Float || other == TypeTable::Bool) AddDiagnostic("Cannot compare 'null' with '" + Name(other) + "'", expression.span);
+                if (IsValueType(other)) AddDiagnostic("Cannot compare 'null' with '" + Name(other) + "'", expression.span);
             }
             else if (left == TypeTable::Any || right == TypeTable::Any) type = operation == "==" || operation == "!=" || operation == "<" || operation == ">" || operation == "<=" || operation == ">=" ? TypeTable::Bool : TypeTable::Any;
-            else if (const auto* builtin = FindBuiltinOperator(Name(left), operation, Name(right))) { type = types_.Intern(builtin->result); lowering = builtin->lowering; }
+            else if (const auto* builtin = FindBuiltinOperator(Name(left), operation, Name(right))) { type = types_.Intern(builtin->result); lowering = builtin->lowering; if (!builtin->cName.empty()) nativeOperator = builtin; }
             else if (left != TypeTable::Unknown && right != TypeTable::Unknown) AddDiagnostic("Operator '" + operation + "' is not defined for '" + Name(left) + "' and '" + Name(right) + "'", expression.span);
             break;
         }
@@ -478,6 +723,7 @@ private:
             const auto targetKind = syntaxChild(0).kind;
             if (targetKind != Kind::Identifier && targetKind != Kind::Member && targetKind != Kind::Index) AddDiagnostic("Invalid assignment target", syntaxChild(0).span);
             if (targetKind == Kind::Index && types_.IsList(ChildType(first, 0))) lowering = Lowering::ListSet;
+            if (targetKind == Kind::Member && IsStructType(ChildType(first, 0)) && !IsAddressable(Node(first).children.first)) AddDiagnostic("Cannot modify a member of a temporary struct value", syntaxChild(0).span);
             if (expression.text == "=") {
                 if (!Accepts(left, first + 1)) AddDiagnostic("Cannot assign " + DisplayType(right) + " to " + DisplayType(left), syntaxChild(1).span);
             } else if (left == TypeTable::Any || right == TypeTable::Any) {
@@ -488,6 +734,7 @@ private:
                 else if (other != TypeTable::Any && other != TypeTable::Unknown && !IsNumeric(other)) AddDiagnostic("Operator '" + expression.text + "' is not defined for '" + Name(left) + "' and '" + Name(right) + "'", expression.span);
             } else if (const auto* builtin = FindBuiltinOperator(Name(left), std::string_view(expression.text).substr(0, 1), Name(right))) {
                 if (!Assignable(left, types_.Intern(builtin->result))) AddDiagnostic("Result of '" + expression.text + "' is '" + builtin->result + "', which cannot be assigned to '" + Name(left) + "'", expression.span);
+                if (!builtin->cName.empty()) nativeOperator = builtin;
                 if (builtin->lowering == Lowering::Concat && lowering != Lowering::ListSet) lowering = Lowering::CompoundConcat;
             } else if (left != TypeTable::Unknown && right != TypeTable::Unknown) AddDiagnostic("Operator '" + expression.text + "' is not defined for '" + Name(left) + "' and '" + Name(right) + "'", expression.span);
             break;
@@ -496,6 +743,7 @@ private:
         auto& bound = Node(slot);
         bound.kind = expression.kind; bound.lowering = lowering; bound.type = type; bound.span = expression.span; bound.symbolIndex = symbol;
         bound.children = {first, visited}; bound.lambdaBody = lambdaBody; bound.syntax = &expression;
+        bound.nativeMember = nativeMember; bound.nativeOperator = nativeOperator;
         return type;
     }
     TypeId LambdaResult(const SyntaxExpression& expression, NodeRange body) {
@@ -545,7 +793,7 @@ private:
     }
     bool Assignable(TypeId expected, TypeId actual) const {
         if (expected == TypeTable::Unknown || actual == TypeTable::Unknown || expected == TypeTable::Any || actual == TypeTable::Any || expected == actual) return true;
-        if (actual == TypeTable::Null) return expected == TypeTable::Table || types_.IsList(expected) || (!IsBuiltinType(Name(expected)) && !enumTypes_.contains(Name(expected)) && expected != TypeTable::Void);
+        if (actual == TypeTable::Null) return expected == TypeTable::Table || types_.IsList(expected) || (!IsBuiltinType(Name(expected)) && !enumTypes_.contains(Name(expected)) && !IsStructType(expected) && expected != TypeTable::Void);
         if (types_.IsList(expected) && actual == TypeTable::Table) return true;
         if (expected == TypeTable::Float && actual == TypeTable::Int) return true;
         if (expected == TypeTable::Table && types_.IsList(actual)) return true;
@@ -675,11 +923,11 @@ private:
             result_.bound.enums.push_back(std::move(boundEnum));
         }
         for (const auto& value : result_.syntax.root.classes) {
-            if (!value.baseName.empty()) if (const auto* base = FindClass(value.baseName)) {
+            if (!value.baseName.empty() && !value.isStruct) if (const auto* base = FindClass(value.baseName)) {
                 const auto constructor = std::find_if(base->functions.begin(), base->functions.end(), [](const auto& function) { return function.isConstructor; });
                 if (constructor != base->functions.end() && !constructor->parameters.empty()) AddDiagnostic("Base class '" + value.baseName + "' requires constructor arguments, but base constructor arguments are not supported", value.span);
             }
-            BoundClass boundClass; boundClass.name = value.name; boundClass.baseName = value.baseName; boundClass.span = value.span;
+            BoundClass boundClass; boundClass.name = value.name; boundClass.baseName = value.baseName; boundClass.span = value.span; boundClass.isStruct = value.isStruct;
             for (const auto& field : value.fields) {
                 BoundField boundField; boundField.access = field.access; boundField.type = field.type; boundField.name = field.name; boundField.span = field.span;
                 const auto& initializer = Syntax().Expression(field.initializer);
@@ -692,8 +940,10 @@ private:
             }
             for (const auto& function : value.functions) {
                 BoundFunction boundFunction; boundFunction.access = function.access; boundFunction.name = function.name; boundFunction.returnType = function.returnType; boundFunction.isConstructor = function.isConstructor; boundFunction.parameters = function.parameters; boundFunction.span = function.span;
+                boundFunction.isStatic = function.isStatic; boundFunction.symbolIndex = functionSymbols_.at(&function);
                 std::vector<Local> locals; const size_t scopeEnd = FunctionEnd(function);
-                AddLocal(locals, "this", types_.Intern(value.name), SymbolKind::Parameter, function.span, {function.span.offset, scopeEnd - function.span.offset}, 0);
+                staticContext_ = function.isStatic;
+                if (!function.isStatic) AddLocal(locals, "this", types_.Intern(value.name), SymbolKind::Parameter, function.span, {function.span.offset, scopeEnd - function.span.offset}, 0);
                 std::unordered_set<std::string_view> parameterNames;
                 for (const auto& parameter : function.parameters) {
                     const auto nameSpan = ParameterNameSpan(parameter);
@@ -702,6 +952,7 @@ private:
                 }
                 boundFunction.body = AnalyzeStatements(function.body, locals, &value, function.isConstructor ? TypeTable::Void : types_.Intern(function.returnType), scopeEnd, 1);
                 if (!function.isConstructor && function.returnType != "void" && !AlwaysReturns(function.body)) AddDiagnostic("Not all code paths return a value from '" + function.name + "'", function.span);
+                staticContext_ = false;
                 boundClass.functions.push_back(std::move(boundFunction));
             }
             result_.bound.classes.push_back(std::move(boundClass));
@@ -725,8 +976,13 @@ private:
     std::vector<size_t> lineStarts_;
     Analysis result_;
     TypeTable& types_;
-    TypeId vec3_{};
     std::vector<TypeId> symbolTypes_; // parallel to result_.symbols
+    std::unordered_map<size_t, const BuiltinMember*> symbolBuiltins_; // symbol index -> native member behind it
+    std::unordered_map<const SyntaxFunction*, size_t> functionSymbols_;
+    StringMap<std::vector<size_t>> constructors_; // type -> constructor symbols, declaration order
+    StringSet structTypes_;
+    bool staticContext_{};
+    size_t lambdaNesting_{};
     std::unordered_map<std::string_view, const SyntaxClass*> classes_; // first declaration wins
     std::unordered_map<const BuiltinFunction*, size_t> builtinSymbols_;
     StringSet knownTypes_;

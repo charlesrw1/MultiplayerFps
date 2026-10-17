@@ -3,7 +3,7 @@
 #ifndef LUASHARP_RUNTIME_H
 #define LUASHARP_RUNTIME_H
 
-#define LS_ABI_VERSION 6
+#define LS_ABI_VERSION 7
 
 typedef signed long long ls_int;          /* public LuaSharp int: signed 64-bit */
 typedef unsigned long long ls_wrap_bits;  /* internal arithmetic bits; never a LuaSharp value */
@@ -25,6 +25,12 @@ typedef LS_Table* ls_table;
 #define LS_KIND_TABLE 6
 #define LS_KIND_CLOSURE 7
 #define LS_KIND_LIST 8
+#define LS_KIND_STRUCT 9
+/* Field slot kinds beyond LS_KIND: packed native components. They never appear in an LS_Value. */
+#define LS_SLOT_FLOAT32 16
+#define LS_SLOT_INT32 17
+/* A boxed struct is a GC object: LS_TypeInfo pointer, then the value at this offset. Structs hold no references, so no tracing. */
+#define LS_STRUCT_PAYLOAD 16
 /* Element kind of an `any` slot: the slot holds a whole LS_Value. Other slots use the LS_KIND of their type. */
 #define LS_ELEMENT_VALUE 0
 
@@ -63,6 +69,7 @@ typedef struct LS_TypeInfo {
     const LS_FieldInfo* fields;
     ls_wrap_bits method_count;
     const LS_MethodInfo* methods;
+    ls_wrap_bits size;                  /* structs: sizeof the value, without the box header */
 } LS_TypeInfo;
 typedef struct LS_Object { const LS_TypeInfo* type; } LS_Object;
 
@@ -132,8 +139,8 @@ static void ls_report_parts(const char* a, const char* b, const char* c, const c
 }
 
 static const char* ls_kind_name(ls_wrap_bits kind) {
-    static const char* names[] = {"nil", "int", "float", "bool", "string", "object", "table", "function", "list"};
-    return kind <= LS_KIND_LIST ? names[kind] : "invalid value";
+    static const char* names[] = {"nil", "int", "float", "bool", "string", "object", "table", "function", "list", "struct"};
+    return kind <= LS_KIND_STRUCT ? names[kind] : "invalid value";
 }
 
 static void ls_kind_error(const char* expected, ls_wrap_bits actual) { ls_report_parts("expected ", expected, ", got ", ls_kind_name(actual)); }
@@ -147,7 +154,7 @@ static void* ls_alloc(ls_wrap_bits size, LS_TraceFunction trace) {
 }
 
 static void ls_mark_value(void* context, const LS_Value* value) {
-    if (value && value->kind >= LS_KIND_STRING && value->kind <= LS_KIND_LIST) ls_runtime->mark(context, value->as.pointer);
+    if (value && value->kind >= LS_KIND_STRING && value->kind <= LS_KIND_STRUCT) ls_runtime->mark(context, value->as.pointer);
 }
 
 static void ls_printf(ls_string format, ls_wrap_bits count, const LS_Value* arguments) {
@@ -215,13 +222,52 @@ static LS_List* ls_unbox_list(LS_Value v, ls_wrap_bits element_kind) {
     return (LS_List*)0;
 }
 
-/* Loads a typed slot (field, list element or cell) as an LS_Value. */
-static LS_Value ls_slot_load(const char* slot, ls_wrap_bits kind) {
+/* ---- structs: value types boxed on the GC heap only when they become `any` ---- */
+
+static int ls_cstr_equal(const char* a, const char* b) {
+    while (*a && *a == *b) { ++a; ++b; }
+    return *a == *b;
+}
+
+static void ls_copy_bytes(void* to, const void* from, ls_wrap_bits size) {
+    char* out = (char*)to;
+    const char* in = (const char*)from;
+    ls_wrap_bits i;
+    for (i = 0; i < size; ++i) out[i] = in[i];
+}
+
+static LS_Value ls_box_struct(const LS_TypeInfo* type, const void* value) {
+    char* box = (char*)ls_alloc(LS_STRUCT_PAYLOAD + type->size, (LS_TraceFunction)0);
+    if (!box) return ls_nil();
+    *(const LS_TypeInfo**)box = type;
+    ls_copy_bytes(box + LS_STRUCT_PAYLOAD, value, type->size);
+    return ls_box_pointer(LS_KIND_STRUCT, box);
+}
+
+/* Copies the boxed value into out (size bytes). A wrong kind or type reports an error and zeroes out. */
+static void ls_unbox_struct(LS_Value v, const LS_TypeInfo* type, void* out, ls_wrap_bits size) {
+    ls_wrap_bits i;
+    if (v.kind == LS_KIND_STRUCT) {
+        const LS_TypeInfo* actual = *(const LS_TypeInfo**)v.as.pointer;
+        if (actual == type || ls_cstr_equal(actual->name, type->name)) { ls_copy_bytes(out, (const char*)v.as.pointer + LS_STRUCT_PAYLOAD, size); return; }
+        ls_report_parts("expected ", type->name, ", got ", actual->name);
+    } else ls_report_parts("expected ", type->name, ", got ", ls_kind_name(v.kind));
+    for (i = 0; i < size; ++i) ((char*)out)[i] = 0;
+}
+
+/* Loads a typed slot (field, list element or cell) as an LS_Value. type is for struct slots. */
+static LS_Value ls_slot_load(const char* slot, ls_wrap_bits kind, const LS_TypeInfo* type) {
     switch (kind) {
     case LS_ELEMENT_VALUE: return *(const LS_Value*)slot;
     case LS_KIND_INT: return ls_box_int(*(const ls_int*)slot);
     case LS_KIND_FLOAT: return ls_box_float(*(const ls_float*)slot);
     case LS_KIND_BOOL: return ls_box_bool(*(const ls_bool*)slot);
+    case LS_SLOT_FLOAT32: return ls_box_float(*(const float*)slot);
+    case LS_SLOT_INT32: return ls_box_int(*(const int*)slot);
+    case LS_KIND_STRUCT:
+        if (type) return ls_box_struct(type, slot);
+        ls_report_error("a list of structs cannot be read through `any`");
+        return ls_nil();
     default: return ls_box_pointer(kind, *(void* const*)slot);
     }
 }
@@ -233,6 +279,9 @@ static void ls_slot_store(char* slot, ls_wrap_bits kind, ls_wrap_bits element_ki
     case LS_KIND_INT: *(ls_int*)slot = ls_unbox_int(v); return;
     case LS_KIND_FLOAT: *(ls_float*)slot = ls_unbox_float(v); return;
     case LS_KIND_BOOL: *(ls_bool*)slot = ls_unbox_bool(v); return;
+    case LS_SLOT_FLOAT32: *(float*)slot = (float)ls_unbox_float(v); return;
+    case LS_SLOT_INT32: *(int*)slot = (int)ls_unbox_int(v); return;
+    case LS_KIND_STRUCT: if (type) ls_unbox_struct(v, type, slot, type->size); return;
     case LS_KIND_OBJECT: *(void**)slot = ls_unbox_object(v, type); return;
     case LS_KIND_LIST: *(void**)slot = ls_unbox_list(v, element_kind); return;
     default: *(void**)slot = ls_unbox_pointer(v, kind); return;
@@ -271,7 +320,7 @@ static void ls_trace_cell_value(void* context, void* object) { ls_mark_value(con
 
 /* Heap slot for a captured local that is also assigned, so closures and the enclosing scope share it. */
 static void* ls_cell_create(ls_wrap_bits size, ls_wrap_bits kind) {
-    return ls_alloc(size, kind == LS_ELEMENT_VALUE ? ls_trace_cell_value : kind >= LS_KIND_STRING ? ls_trace_cell_pointer : (LS_TraceFunction)0);
+    return ls_alloc(size, kind == LS_ELEMENT_VALUE ? ls_trace_cell_value : (kind >= LS_KIND_STRING && kind <= LS_KIND_LIST) ? ls_trace_cell_pointer : (LS_TraceFunction)0);
 }
 
 /* ---- tables ---- */
@@ -325,6 +374,13 @@ static ls_bool ls_value_equal(LS_Value a, LS_Value b) {
     if (a.kind == LS_KIND_INT) return a.as.integer == b.as.integer;
     if (a.kind == LS_KIND_FLOAT) return a.as.number == b.as.number;
     if (a.kind == LS_KIND_BOOL) return a.as.boolean == b.as.boolean;
+    if (a.kind == LS_KIND_STRUCT) {
+        const LS_TypeInfo* type = *(const LS_TypeInfo**)a.as.pointer;
+        ls_wrap_bits i;
+        if (!ls_cstr_equal(type->name, (*(const LS_TypeInfo**)b.as.pointer)->name)) return 0;
+        for (i = 0; i < type->size; ++i) if (((const char*)a.as.pointer)[LS_STRUCT_PAYLOAD + i] != ((const char*)b.as.pointer)[LS_STRUCT_PAYLOAD + i]) return 0;
+        return 1;
+    }
     return a.as.pointer == b.as.pointer;
 }
 
@@ -510,10 +566,10 @@ static const LS_MethodInfo* ls_find_method(const LS_TypeInfo* type, ls_string na
 /* target[key], or target.field when target is an object and key a string. */
 static LS_Value ls_value_get(LS_Value target, LS_Value key) {
     if (target.kind == LS_KIND_TABLE) return ls_table_get((ls_table)target.as.pointer, key);
-    if (target.kind == LS_KIND_OBJECT && key.kind == LS_KIND_STRING) {
+    if ((target.kind == LS_KIND_OBJECT || target.kind == LS_KIND_STRUCT) && key.kind == LS_KIND_STRING) {
         const LS_TypeInfo* type = ((LS_Object*)target.as.pointer)->type;
         const LS_FieldInfo* field = ls_find_field(type, (ls_string)key.as.pointer);
-        if (field) return ls_slot_load((const char*)target.as.pointer + field->offset, field->kind);
+        if (field) return ls_slot_load((const char*)target.as.pointer + field->offset, field->kind, field->type);
         ls_report_parts("no field '", ((ls_string)key.as.pointer)->data, "' on ", type->name);
         return ls_nil();
     }
@@ -523,7 +579,7 @@ static LS_Value ls_value_get(LS_Value target, LS_Value key) {
 
 static void ls_value_set(LS_Value target, LS_Value key, LS_Value value) {
     if (target.kind == LS_KIND_TABLE) { ls_table_set((ls_table)target.as.pointer, key, value); return; }
-    if (target.kind == LS_KIND_OBJECT && key.kind == LS_KIND_STRING) {
+    if ((target.kind == LS_KIND_OBJECT || target.kind == LS_KIND_STRUCT) && key.kind == LS_KIND_STRING) {
         const LS_TypeInfo* type = ((LS_Object*)target.as.pointer)->type;
         const LS_FieldInfo* field = ls_find_field(type, (ls_string)key.as.pointer);
         if (field) { ls_slot_store((char*)target.as.pointer + field->offset, field->kind, field->element_kind, field->type, value); return; }
@@ -577,7 +633,7 @@ static int ls_value_next(LS_Value iterable, int ordered, ls_wrap_bits* cursor, L
     if (iterable.kind == LS_KIND_LIST) {
         LS_List* list = (LS_List*)iterable.as.pointer;
         if ((ls_int)*cursor >= list->count) return 0;
-        *value = ls_slot_load(list->data + *cursor * list->element_size, list->element_kind);
+        *value = ls_slot_load(list->data + *cursor * list->element_size, list->element_kind, (const LS_TypeInfo*)0);
         *key = ls_box_int((ls_int)++*cursor);
         return 1;
     }
@@ -592,5 +648,7 @@ static int ls_value_next(LS_Value iterable, int ordered, ls_wrap_bits* cursor, L
     ls_report_parts("attempt to iterate a ", ls_kind_name(iterable.kind), " value", 0);
     return 0;
 }
+
+#include "vecmath.h"
 
 #endif

@@ -55,9 +55,11 @@ std::optional<std::string_view> ScalarCType(std::string_view type, const StringS
     return std::nullopt;
 }
 
-void AppendCType(std::string& out, std::string_view type, const StringSet& enums) {
+// Value types (structs) are spelled by value, reference types as pointers.
+void AppendCType(std::string& out, std::string_view type, const StringSet& enums, const StringSet& structs) {
     if (const auto scalar = ScalarCType(type, enums)) { out += *scalar; return; }
     if (type.ends_with("[]")) { out += "LS_List*"; return; }
+    if (structs.contains(type)) { out += "LS_"; AppendIdentifier(out, type); return; }
     if (IsBuiltinType(type)) throw std::runtime_error("Native C backend requires a registered ABI for builtin type '" + std::string(type) + "'");
     out += "LS_"; AppendIdentifier(out, type); out += '*';
 }
@@ -82,7 +84,12 @@ struct CEmitter {
     const std::vector<ExternalType>& externalTypes;
     StringSet enums;
     StringSet externalNames;
-    StringMap<const BoundClass*> classes;
+    StringSet externalStructs;
+    StringSet structNames;                  // user and native value types
+    StringMap<const BoundClass*> classes;   // reference types
+    StringMap<const BoundClass*> structs;   // user value types
+    struct FunctionRef { const BoundClass* owner{}; const BoundFunction* function{}; std::string cName; size_t ordinal{}; };
+    std::unordered_map<size_t, FunctionRef> functionRefs; // symbol index -> emitted function
     std::unordered_set<size_t> globalSymbols;
     std::vector<const VariableBinding*> bindingsBySymbol;          // first binding of each symbol index
     std::unordered_map<size_t, const VariableBinding*> bindingAt;  // declaration offset -> binding
@@ -93,14 +100,20 @@ struct CEmitter {
     std::unordered_set<size_t> cellSymbols;      // captured locals that are also assigned
     std::vector<std::string_view> dynamicNames;  // member names used on table/any values
     std::optional<size_t> activeLambda;
+    std::string_view constructorResult;         // variable a bare `return;` yields inside a constructor
     TypeId functionReturn = TypeTable::Unknown; // return type of the method being emitted
     std::string output;
     size_t nextLabel{};
 
     CEmitter(const Analysis& value, const std::vector<ExternalType>& external) : analysis(value), program(value.bound), types(value.types), externalTypes(external) {
         for (const auto& item : program.enums) enums.insert(item.name);
-        for (const auto& item : program.classes) classes[item.name] = &item;
-        for (const auto& item : externalTypes) { externalNames.insert(item.name); if (item.isEnum) enums.insert(item.name); }
+        for (const auto& item : NativeStructTypes()) structNames.insert(item);
+        for (const auto& item : program.classes) {
+            (item.isStruct ? structs : classes)[item.name] = &item;
+            if (item.isStruct) structNames.insert(item.name);
+            AssignFunctionNames(item);
+        }
+        for (const auto& item : externalTypes) { externalNames.insert(item.name); if (item.isEnum) enums.insert(item.name); if (item.isStruct) externalStructs.insert(item.name); }
         bindingsBySymbol.resize(analysis.symbols.size());
         for (const auto& binding : analysis.bindings) {
             assert(binding.symbolIndex < bindingsBySymbol.size());
@@ -115,6 +128,8 @@ struct CEmitter {
         CaptureLambdas();
         std::unordered_set<size_t> captured;
         for (const auto& captures : lambdaCaptures) for (const auto* binding : captures) if (binding->name != "this") captured.insert(binding->symbolIndex);
+        // A captured struct may be changed through its members or methods, so it always lives in a shared cell.
+        for (const auto symbol : captured) if (const auto* binding = Binding(symbol); binding && IsStruct(binding->type)) cellSymbols.insert(symbol);
         for (const auto& item : program.expressions) {
             if (item.kind == SyntaxExpression::Kind::Assignment) {
                 const auto& target = Child(item, 0);
@@ -189,7 +204,7 @@ struct CEmitter {
         if constexpr (std::is_invocable_v<const T&>) part();
         else if constexpr (std::is_same_v<T, Id>) AppendIdentifier(output, part.value);
         else if constexpr (std::is_same_v<T, Fn>) AppendFunction(output, part.owner, part.name);
-        else if constexpr (std::is_same_v<T, CTypeName>) AppendCType(output, part.type, enums);
+        else if constexpr (std::is_same_v<T, CTypeName>) AppendCType(output, part.type, enums, structNames);
         else if constexpr (std::is_same_v<T, char>) output += part;
         else if constexpr (std::is_integral_v<T>) { char buffer[24]; output.append(buffer, std::to_chars(buffer, std::end(buffer), part).ptr); }
         else output.append(std::string_view(part));
@@ -208,6 +223,41 @@ struct CEmitter {
     bool IsEnum(TypeId type) const { return enums.contains(Name(type)); }
     bool IsClass(TypeId type) const { return classes.contains(Name(type)); }
     bool IsDynamic(TypeId type) const { return type == TypeTable::Table || type == TypeTable::Any; }
+    bool IsStruct(TypeId type) const { return structNames.contains(Name(type)); }
+    bool IsUserStruct(std::string_view name) const { return structs.contains(name); }
+    const BoundClass* UserType(std::string_view name) const {
+        if (const auto found = classes.find(name); found != classes.end()) return found->second;
+        if (const auto found = structs.find(name); found != structs.end()) return found->second;
+        return nullptr;
+    }
+    // The first function of a name keeps the plain symbol; later overloads get "__<ordinal>" so exported names stay stable.
+    void AssignFunctionNames(const BoundClass& type) {
+        StringMap<size_t> ordinals;
+        for (const auto& function : type.functions) {
+            const std::string key = function.isConstructor ? "new" : function.name;
+            const auto ordinal = ordinals[key]++;
+            auto name = FunctionName(type.name, key);
+            if (ordinal) name += "__" + std::to_string(ordinal);
+            functionRefs.emplace(function.symbolIndex, FunctionRef{&type, &function, std::move(name), ordinal});
+        }
+    }
+    const FunctionRef* FindFunctionRef(const BoundExpression& value) const {
+        if (!value.symbolIndex) return nullptr;
+        const auto found = functionRefs.find(*value.symbolIndex);
+        return found == functionRefs.end() ? nullptr : &found->second;
+    }
+    // True when the bound expression names storage, so `&` of it is valid.
+    bool IsAddressable(const BoundExpression& value) const {
+        switch (value.kind) {
+        case SyntaxExpression::Kind::Identifier: return types.Kind(value.type) != TypeKind::Meta;
+        case SyntaxExpression::Kind::Parenthesized: return IsAddressable(Child(value, 0));
+        case SyntaxExpression::Kind::Member:
+            if (value.lowering == Lowering::NativeConstant || types.Kind(Child(value, 0).type) == TypeKind::Meta) return false;
+            return IsStruct(Child(value, 0).type) ? IsAddressable(Child(value, 0)) : !IsDynamic(Child(value, 0).type);
+        case SyntaxExpression::Kind::Index: return value.lowering == Lowering::ListIndex;
+        default: return false;
+        }
+    }
     bool IsManagedObject(std::string_view type) const { return type == "string" || type == "table" || type == "any" || type.starts_with("$function:") || type.ends_with("[]") || classes.contains(type); }
     const BoundExpression& Child(const BoundExpression& value, size_t index) const { return program.Child(value, index); }
     const VariableBinding* Binding(size_t symbol) const { assert(symbol < bindingsBySymbol.size()); return bindingsBySymbol[symbol]; }
@@ -232,6 +282,7 @@ struct CEmitter {
         if (types.IsFunction(type)) return "LS_KIND_CLOSURE";
         if (types.IsList(type)) return "LS_KIND_LIST";
         if (IsClass(type)) return "LS_KIND_OBJECT";
+        if (IsStruct(type)) return "LS_KIND_STRUCT";
         return std::nullopt;
     }
     std::string_view KindName(TypeId type) const {
@@ -282,6 +333,7 @@ struct CEmitter {
         if (types.IsFunction(type)) return Put("((LS_Closure*)0)");
         if (types.IsList(type)) return NewList(types.Element(type), 0);
         if (type == TypeTable::Int || type == TypeTable::Bool || IsEnum(type)) return Put('0');
+        if (IsStruct(type)) return Put("ls_", Id{Name(type)}, "_default()");
         if (type != TypeTable::Unknown && !IsBuiltinType(Name(type))) return Put("((", Type(type), ")0)");
         throw std::runtime_error("Native C backend cannot default-initialize type '" + Name(type) + "'");
     }
@@ -293,6 +345,10 @@ struct CEmitter {
         if (type == TypeTable::Int || IsEnum(type)) return Put("ls_box_int(", part, ')');
         if (type == TypeTable::Float) return Put("ls_box_float(", part, ')');
         if (type == TypeTable::Bool) return Put("ls_box_bool(", part, ')');
+        if (IsStruct(type)) {
+            const auto temp = Temp("box", nextLabel++);
+            return Put("({ ", Type(type), ' ', temp, " = ", part, "; ls_box_struct(&ls_type_", Id{Name(type)}, ", &", temp, "); })");
+        }
         Put("ls_box_pointer(", KindName(type), ", ", part, ')');
     }
     void Box(const BoundExpression& value, std::string_view owner = {}) { BoxAs(value.type, Emitted(value, owner)); }
@@ -303,6 +359,10 @@ struct CEmitter {
         if (type == TypeTable::Float) return Put("ls_unbox_float(", part, ')');
         if (type == TypeTable::Bool) return Put("ls_unbox_bool(", part, ')');
         if (types.IsList(type)) return Put("ls_unbox_list(", part, ", ", KindName(types.Element(type)), ')');
+        if (IsStruct(type)) {
+            const auto temp = Temp("unbox", nextLabel++);
+            return Put("({ ", Type(type), ' ', temp, "; ls_unbox_struct(", part, ", &ls_type_", Id{Name(type)}, ", &", temp, ", sizeof(", Type(type), ")); ", temp, "; })");
+        }
         if (IsClass(type)) return Put("((", Type(type), ")ls_unbox_object(", part, ", &ls_type_", Id{Name(type)}, "))");
         Put("((", Type(type), ")ls_unbox_pointer(", part, ", ", KindName(type), "))");
     }
@@ -346,7 +406,8 @@ struct CEmitter {
         Box(right, owner);
     }
     // left <op> right for compound assignment; right comes from Operand().
-    void Combine(TypeId type, char operation, Lowering lowering, const auto& left, const auto& right) {
+    void Combine(TypeId type, char operation, Lowering lowering, const BuiltinOperator* native, const auto& left, const auto& right) {
+        if (native) return Put(Id{native->cName}, '(', left, ", ", right, ')');
         if (type == TypeTable::Any) {
             if (lowering == Lowering::CompoundConcat) return Put("ls_box_pointer(LS_KIND_STRING, ls_string_concat((ls_string)ls_unbox_pointer(", left, ", LS_KIND_STRING), ", right, "))");
             return Put("ls_value_arithmetic(", left, ", ", ArithmeticIndex(operation), ", ", right, ')');
@@ -388,7 +449,7 @@ struct CEmitter {
         switch (value.kind) {
         case SyntaxExpression::Kind::Missing: return;
         case SyntaxExpression::Kind::Identifier:
-            if (text == "this") return Put("self");
+            if (text == "this") return IsUserStruct(owner) ? Put("(*self)") : Put("self");
             if (value.lowering == Lowering::ImplicitField) return Put("self->", Id{text});
             if (value.symbolIndex && globalSymbols.contains(*value.symbolIndex)) return Put("ls_state.", Id{text});
             if (value.symbolIndex) return Variable(*value.symbolIndex, text);
@@ -398,13 +459,12 @@ struct CEmitter {
         case SyntaxExpression::Kind::Boolean: return Put(text == "true" ? '1' : '0');
         case SyntaxExpression::Kind::Null: return Put("((void*)0)");
         case SyntaxExpression::Kind::Parenthesized: return Put('(', child(0), ')');
-        case SyntaxExpression::Kind::New:
-            Put(Fn{text, "new"}, '(');
-            Arguments(ParameterTypes(FindFunction(text, {}, true)), value, 0, false, owner);
-            return Put(')');
+        case SyntaxExpression::Kind::New: return Construction(value, text, 0, owner);
         case SyntaxExpression::Kind::Member: {
             const auto target = Child(value, 0).type;
+            if (value.lowering == Lowering::NativeConstant) return Put(value.nativeMember->cName);
             if (types.Kind(target) == TypeKind::Meta) return Put("LS_", Id{types.Target(target)}, '_', Id{text});
+            if (IsStruct(target)) return Put('(', child(0), ").", Id{text});
             if (target == TypeTable::Table) return Put("ls_table_get(", child(0), ", ", NameValue(text), ')');
             if (target == TypeTable::Any) return Put("ls_value_get(", child(0), ", ", NameValue(text), ')');
             if (externalNames.contains(Name(target))) if (const auto* symbol = ExternalMember(Name(target), text); symbol && symbol->kind == SymbolKind::Field)
@@ -413,12 +473,15 @@ struct CEmitter {
         }
         case SyntaxExpression::Kind::Call: return Call(value, owner);
         case SyntaxExpression::Kind::Unary:
+            if (value.nativeOperator) return Put(Id{value.nativeOperator->cName}, '(', child(0), ')');
             if (Child(value, 0).type == TypeTable::Any) return Put(text == "!" ? "(!ls_value_truthy(" : "ls_value_negate(", child(0), text == "!" ? "))" : ")");
             if (text == "-" && value.type == TypeTable::Int) return Put("ls_int_neg(", child(0), ')');
             return Put('(', text, child(0), ')');
         case SyntaxExpression::Kind::Binary: {
             if (value.lowering == Lowering::Concat) return Put("ls_string_concat(", child(0), ", ", child(1), ')');
+            if (value.nativeOperator) return Put(Id{value.nativeOperator->cName}, '(', child(0), ", ", child(1), ')');
             const auto left = Child(value, 0).type, right = Child(value, 1).type;
+            if ((text == "==" || text == "!=") && IsStruct(left) && left == right) return Put(text == "!=" ? "(!" : "(", "ls_", Id{Name(left)}, "_eq(", child(0), ", ", child(1), "))");
             if (left == TypeTable::Any || right == TypeTable::Any) {
                 if (text == "&&" || text == "||")
                     return Put('(', [&] { Condition(Child(value, 0), owner); }, ' ', text, ' ', [&] { Condition(Child(value, 1), owner); }, ')');
@@ -503,13 +566,13 @@ struct CEmitter {
             if (target.kind == SyntaxExpression::Kind::Index) Box(Child(target, 1), owner); else Put(NameValue(target.Text()));
             Put("; LS_Value ", update, " = ");
             if (!compound) Box(right, owner);
-            else Combine(TypeTable::Any, operation, value.lowering, [&] { Put(table ? "ls_table_get(" : "ls_value_get(", container, ", ", key, ')'); }, [&] { Operand(TypeTable::Any, value.lowering, right, owner); });
+            else Combine(TypeTable::Any, operation, value.lowering, nullptr, [&] { Put(table ? "ls_table_get(" : "ls_value_get(", container, ", ", key, ')'); }, [&] { Operand(TypeTable::Any, value.lowering, right, owner); });
             return Put("; ", table ? "ls_table_set(" : "ls_value_set(", container, ", ", key, ", ", update, "); ", update, "; })");
         }
         const auto type = target.type;
         const auto slot = Temp("slot", label);
         const auto operand = [&] { Operand(type, value.lowering, right, owner); };
-        const auto store = [&] { if (compound) Combine(type, operation, value.lowering, [&] { Put('*', slot); }, update); else Put(update); };
+        const auto store = [&] { if (compound) Combine(type, operation, value.lowering, value.nativeOperator, [&] { Put('*', slot); }, update); else Put(update); };
         if (value.lowering == Lowering::ListSet) {
             const auto list = Temp("list", label), index = Temp("index", label);
             // Evaluates list, index, then value; the slot address is taken last because the value may grow the list.
@@ -518,7 +581,7 @@ struct CEmitter {
             return Put(Type(type), "* ", slot, " = (", Type(type), "*)ls_list_at(", list, ", ", index, "); *", slot, " = ", store, "; })");
         }
         if (!compound) return Put('(', Emitted(target, owner), " = ", Converted(type, right, owner), ')');
-        if (target.kind == SyntaxExpression::Kind::Identifier) return Put('(', Emitted(target, owner), " = ", [&] { Combine(type, operation, value.lowering, Emitted(target, owner), operand); }, ')');
+        if (target.kind == SyntaxExpression::Kind::Identifier) return Put('(', Emitted(target, owner), " = ", [&] { Combine(type, operation, value.lowering, value.nativeOperator, Emitted(target, owner), operand); }, ')');
         Put("({ ", Type(type), "* ", slot, " = &(", Emitted(target, owner), "); ", [&] { OperandType(type, value.lowering); }, ' ', update, " = ", operand, "; *", slot, " = ", store, "; })");
     }
 
@@ -582,20 +645,77 @@ struct CEmitter {
             const auto arguments = DynamicArguments(value, 1, owner);
             return Put("ls_value_call(", Emitted(callee, owner), ", ", arguments, ", ", childCount - 1, "); })");
         }
-        if (callee.lowering == Lowering::ImplicitMethod) {
-            Put(Fn{owner, callee.Text()}, "(self");
-            Arguments(ParameterTypes(FindFunction(owner, callee.Text())), value, 1, true, owner);
-        } else if (callee.kind == SyntaxExpression::Kind::Member && value.lowering != Lowering::StaticCall) {
+        if (value.lowering == Lowering::Construct) return Construction(value, Name(value.type), 1, owner);
+        if (value.lowering == Lowering::NativeStatic) {
+            Put(Id{value.nativeMember->cName}, '('); NativeArguments(*value.nativeMember, value, 1, false, owner);
+            return Put(')');
+        }
+        if (value.lowering == Lowering::NativeMethod) {
+            Put(Id{value.nativeMember->cName}, '(', receiver); NativeArguments(*value.nativeMember, value, 1, true, owner);
+            return Put(')');
+        }
+        if (const auto* ref = FindFunctionRef(value)) return UserCall(value, callee, *ref, owner);
+        if (callee.kind == SyntaxExpression::Kind::Member) {
             const auto& target = Child(callee, 0);
             const auto& type = Name(target.type);
-            if (classes.contains(type) && !FindFunction(type, callee.Text())) throw std::runtime_error("Native C backend cannot call unknown method '" + callee.Text() + "' on '" + type + "'");
+            if (classes.contains(type) || structs.contains(type)) throw std::runtime_error("Native C backend cannot call unknown method '" + callee.Text() + "' on '" + type + "'");
             Put(Fn{type, callee.Text()}, '(', Emitted(target, owner));
-            Arguments(classes.contains(type) ? ParameterTypes(FindFunction(type, callee.Text())) : ParameterTypes(ExternalMember(type, callee.Text())), value, 1, true, owner);
+            Arguments(ParameterTypes(ExternalMember(type, callee.Text())), value, 1, true, owner);
         } else {
             Put(Emitted(callee, owner), '(');
             Arguments({}, value, 1, false, owner);
         }
         Put(')');
+    }
+
+    // Native arguments from child `first`; omitted optional parameters use their default C expression.
+    void NativeArguments(const BuiltinMember& member, const BoundExpression& value, size_t first, bool leadingComma, std::string_view owner) {
+        const size_t provided = value.children.count - first;
+        for (size_t i{}; i < member.parameters.size(); ++i) {
+            if (i || leadingComma) Put(", ");
+            if (i < provided) Value(Find(member.parameters[i].type), Child(value, first + i), owner); else Put(member.parameters[i].defaultValue);
+        }
+    }
+
+    // `new T(...)`, or `T(...)` for a struct. Arguments start at child `first`.
+    void Construction(const BoundExpression& value, std::string_view typeName, size_t first, std::string_view owner) {
+        if (value.nativeMember) {
+            Put(Id{value.nativeMember->cName}, '('); NativeArguments(*value.nativeMember, value, first, false, owner);
+            return Put(')');
+        }
+        const auto* ref = FindFunctionRef(value);
+        if (!ref && IsUserStruct(typeName)) return Put("ls_", Id{typeName}, "_default()");
+        if (ref) Put(ref->cName); else Put(Fn{typeName, "new"});
+        Put('(');
+        Arguments(ref ? ParameterTypes(ref->function) : std::vector<TypeId>{}, value, first, false, owner);
+        Put(')');
+    }
+
+    // Calls a function declared in this module: instance (receiver first), static, or implicit-this.
+    void UserCall(const BoundExpression& value, const BoundExpression& callee, const FunctionRef& ref, std::string_view owner) {
+        const auto& function = *ref.function;
+        const auto parameters = ParameterTypes(ref.function);
+        if (function.isStatic) {
+            Put(ref.cName, '('); Arguments(parameters, value, 1, false, owner);
+            return Put(')');
+        }
+        if (callee.lowering == Lowering::ImplicitMethod) {
+            Put(ref.cName, "(self"); Arguments(parameters, value, 1, true, owner);
+            return Put(')');
+        }
+        const auto& target = Child(callee, 0);
+        if (!IsUserStruct(Name(target.type))) {
+            Put(ref.cName, '(', Emitted(target, owner)); Arguments(parameters, value, 1, true, owner);
+            return Put(')');
+        }
+        // Struct methods take the receiver by pointer; a temporary receiver is copied into a local first.
+        if (IsAddressable(target)) {
+            Put(ref.cName, "(&(", Emitted(target, owner), ")"); Arguments(parameters, value, 1, true, owner);
+            return Put(')');
+        }
+        const auto temp = Temp("receiver", nextLabel++);
+        Put("({ ", Type(target.type), ' ', temp, " = ", Emitted(target, owner), "; ", ref.cName, "(&", temp); Arguments(parameters, value, 1, true, owner);
+        Put("); })");
     }
 
     void Statements(NodeRange statements, size_t depth, std::string_view owner = {}, std::optional<size_t> continueLabel = {}, bool moduleTopLevel = false) {
@@ -612,7 +732,7 @@ struct CEmitter {
             }
             case SyntaxStatement::Kind::Expression: Line(depth, Emitted(expression, owner), ';'); break;
             case SyntaxStatement::Kind::Return:
-                if (expression.kind == SyntaxExpression::Kind::Missing) Line(depth, "return;");
+                if (expression.kind == SyntaxExpression::Kind::Missing) { if (constructorResult.empty()) Line(depth, "return;"); else Line(depth, "return ", constructorResult, ';'); }
                 else if (activeLambda) Line(depth, "*result = ", Boxed(expression, owner), "; return;");
                 else Line(depth, "return ", Converted(functionReturn, expression, owner), ';');
                 break;
@@ -684,7 +804,28 @@ struct CEmitter {
         Line(depth + 1, '}');
         Line(depth, '}');
     }
-
+    const FunctionRef& RefOf(const BoundFunction& function) const { return functionRefs.at(function.symbolIndex); }
+    static std::vector<const BoundFunction*> Constructors(const BoundClass& type) {
+        std::vector<const BoundFunction*> result;
+        for (const auto& item : type.functions) if (item.isConstructor) result.push_back(&item);
+        return result;
+    }
+    bool IsOverloaded(const BoundClass& type, const BoundFunction& function) const {
+        return std::count_if(type.functions.begin(), type.functions.end(), [&](const auto& item) { return item.isConstructor == function.isConstructor && item.name == function.name; }) > 1;
+    }
+    // Structs in dependency order: a struct is defined after the structs it contains.
+    void StructDefinitions() {
+        StringSet emitted;
+        const auto define = [&](auto&& self, const BoundClass& value) -> void {
+            if (!emitted.insert(value.name).second) return;
+            for (const auto& field : value.fields) if (const auto inner = structs.find(field.type); inner != structs.end()) self(self, *inner->second);
+            Line(0, "struct LS_", Id{value.name}, " {");
+            if (value.fields.empty()) Line(1, "char ls_empty;");
+            for (const auto& field : value.fields) Line(1, CTypeName{field.type}, ' ', Id{field.name}, ';');
+            Line(0, "};");
+        };
+        for (const auto& value : program.classes) if (value.isStruct) define(define, value);
+    }
     void Parameters(const BoundFunction& function) {
         if (function.parameters.empty()) return Put("void");
         for (size_t i{}; i < function.parameters.size(); ++i) {
@@ -697,21 +838,32 @@ struct CEmitter {
         for (const auto& parameter : parameters) if (const auto* binding = ParameterBinding(parameter); IsCell(binding))
             Declare(depth, binding, binding->type, parameter.name, Id{parameter.name});
     }
-    static const BoundFunction* Constructor(const BoundClass& type) {
-        const auto found = std::find_if(type.functions.begin(), type.functions.end(), [](const auto& item) { return item.isConstructor; });
-        return found == type.functions.end() ? nullptr : &*found;
-    }
-    // "LS_T* ls_T_new(...)"
-    void ConstructorSignature(const BoundClass& type) {
-        Put("LS_", Id{type.name}, "* ", Fn{type.name, "new"}, '(');
-        if (const auto* constructor = Constructor(type)) Parameters(*constructor); else Put("void");
+    // Classes construct on the heap ("LS_T* ls_T_new(...)"); structs return by value ("LS_S ls_S_new(...)").
+    void ConstructorSignature(const BoundClass& type, const BoundFunction* constructor) {
+        const std::string name = constructor ? RefOf(*constructor).cName : FunctionName(type.name, "new");
+        Put("LS_", Id{type.name}, type.isStruct ? " " : "* ", name, '(');
+        if (constructor) Parameters(*constructor); else Put("void");
         Put(')');
     }
-    // "R ls_T_name(LS_T* self, ...)"
+    // "R ls_T_name(LS_T* self, ...)"; static functions have no receiver.
     void MethodSignature(const BoundClass& type, const BoundFunction& function) {
-        Put(CTypeName{function.returnType}, ' ', Fn{type.name, function.name}, "(LS_", Id{type.name}, "* self");
-        for (const auto& parameter : function.parameters) Put(", ", CTypeName{parameter.type}, ' ', Id{parameter.name});
+        Put(CTypeName{function.returnType}, ' ', RefOf(function).cName, '(');
+        if (function.isStatic) Parameters(function);
+        else {
+            Put("LS_", Id{type.name}, "* self");
+            for (const auto& parameter : function.parameters) Put(", ", CTypeName{parameter.type}, ' ', Id{parameter.name});
+        }
         Put(')');
+    }
+    void Prototypes(const BoundClass& value) {
+        const auto constructors = Constructors(value);
+        if (constructors.empty()) { if (!value.isStruct) Line(0, [&] { ConstructorSignature(value, nullptr); }, ';'); }
+        for (const auto* constructor : constructors) Line(0, [&] { ConstructorSignature(value, constructor); }, ';');
+        if (value.isStruct) {
+            Line(0, "LS_", Id{value.name}, " ls_", Id{value.name}, "_default(void);");
+            Line(0, "ls_bool ls_", Id{value.name}, "_eq(LS_", Id{value.name}, " a, LS_", Id{value.name}, " b);");
+        }
+        for (const auto& function : value.functions) if (!function.isConstructor) Line(0, [&] { MethodSignature(value, function); }, ';');
     }
     // A method is reachable from `any` when its parameters and result can cross as LS_Value.
     bool IsDynamicCallable(const BoundFunction& function) const {
@@ -719,16 +871,16 @@ struct CEmitter {
         if (result != TypeTable::Void && !TryKindName(result)) return false;
         return std::all_of(function.parameters.begin(), function.parameters.end(), [&](const auto& parameter) { return TryKindName(Find(parameter.type)).has_value(); });
     }
-    // Field and method tables behind each object's LS_TypeInfo.
+    // Field and method tables behind each object's LS_TypeInfo. Structs expose fields only; their offsets include the box header.
     void TypeInfo(const BoundClass& value) {
         const Id name{value.name};
         std::vector<const BoundFunction*> methods;
-        for (const auto& function : value.functions) if (!function.isConstructor && IsDynamicCallable(function)) methods.push_back(&function);
+        if (!value.isStruct) for (const auto& function : value.functions) if (!function.isConstructor && !function.isStatic && !IsOverloaded(value, function) && IsDynamicCallable(function)) methods.push_back(&function);
         for (const auto* function : methods) {
             const auto returnType = Find(function->returnType);
             Line(0, "static void ls_invoke_", name, '_', Id{function->name}, "(void* self, const LS_Value* arguments, LS_Value* result) {");
             const auto call = [&] {
-                Put(Fn{value.name, function->name}, "((LS_", name, "*)self");
+                Put(RefOf(*function).cName, "((LS_", name, "*)self");
                 for (size_t i{}; i < function->parameters.size(); ++i) Put(", ", [&] { Unbox(Find(function->parameters[i].type), [&] { Put("arguments[", i, ']'); }); });
                 Put(')');
             };
@@ -744,8 +896,8 @@ struct CEmitter {
             for (const auto& field : value.fields) {
                 const auto type = Find(field.type);
                 if (!TryKindName(type)) continue;
-                Line(1, "{\"", field.name, "\", ls_offsetof(LS_", name, ", ", Id{field.name}, "), ", KindName(type), ", ", types.IsList(type) ? KindName(types.Element(type)) : "0", ", ",
-                    [&] { if (IsClass(type)) Put("&ls_type_", Id{field.type}); else Put("(const LS_TypeInfo*)0"); }, "},");
+                Line(1, "{\"", field.name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field.name}, "), ", KindName(type), ", ", types.IsList(type) ? KindName(types.Element(type)) : "0", ", ",
+                    [&] { if (IsClass(type) || IsStruct(type)) Put("&ls_type_", Id{field.type}); else Put("(const LS_TypeInfo*)0"); }, "},");
             }
             Line(0, "};");
         }
@@ -755,7 +907,78 @@ struct CEmitter {
             Line(0, "};");
         }
         Line(0, "static const LS_TypeInfo ls_type_", name, " = {\"", value.name, "\", ", fieldCount, ", ", [&] { if (fieldCount) Put("ls_fields_", name); else Put("(const LS_FieldInfo*)0"); }, ", ",
-            methods.size(), ", ", [&] { if (!methods.empty()) Put("ls_methods_", name); else Put("(const LS_MethodInfo*)0"); }, "};");
+            methods.size(), ", ", [&] { if (!methods.empty()) Put("ls_methods_", name); else Put("(const LS_MethodInfo*)0"); }, ", ", [&] { if (value.isStruct) Put("sizeof(LS_", name, ")"); else Put('0'); }, "};");
+    }
+
+    // Source name of an export: overloads after the first carry their parameter types.
+    std::string ExportName(const BoundClass& type, const BoundFunction& function) const {
+        auto name = type.name + "." + (function.isConstructor ? "new" : function.name);
+        if (RefOf(function).ordinal) {
+            name += '(';
+            for (size_t i{}; i < function.parameters.size(); ++i) { if (i) name += ','; name += function.parameters[i].type; }
+            name += ')';
+        }
+        return name;
+    }
+    // Field initializers run through `self`, a pointer to the object or to the struct's local.
+    void FieldInitializers(const BoundClass& value) {
+        for (const auto& field : value.fields) {
+            const auto& initializer = program.Expression(field.initializer);
+            const auto type = Find(field.type);
+            Line(1, "self->", Id{field.name}, " = ", [&] { if (initializer.kind == SyntaxExpression::Kind::Missing) Default(type); else Value(type, initializer, value.name); }, ';');
+        }
+    }
+    void Definitions(const BoundClass& value, CCompilationResult& result) {
+        const Id name{value.name};
+        const auto constructors = Constructors(value);
+        const auto emitConstructor = [&](const BoundFunction* constructor) {
+            Line(0, [&] { ConstructorSignature(value, constructor); }, " {");
+            if (value.isStruct) {
+                Line(1, "LS_", name, " ls_value = ls_", name, "_default();");
+                Line(1, "LS_", name, "* self = &ls_value; (void)self;");
+                constructorResult = "ls_value";
+            } else {
+                Line(1, "LS_", name, "* self = (LS_", name, "*)ls_alloc(sizeof(LS_", name, "), ls_trace_", name, ");");
+                Line(1, "if (!self) return (LS_", name, "*)0;");
+                Line(1, "self->ls_type = &ls_type_", name, ';');
+                FieldInitializers(value);
+                constructorResult = "self";
+            }
+            functionReturn = TypeTable::Void;
+            if (constructor) { ParameterCells(constructor->parameters, 1); Statements(constructor->body, 1, value.name); }
+            Line(1, "return ", constructorResult, ';'); Line(0, '}');
+            constructorResult = {};
+            std::vector<std::string> parameters;
+            if (constructor) for (const auto& parameter : constructor->parameters) parameters.push_back(parameter.type);
+            result.exports.push_back({constructor ? ExportName(value, *constructor) : value.name + ".new", constructor ? RefOf(*constructor).cName : FunctionName(value.name, "new"), value.name, std::move(parameters)});
+        };
+        if (value.isStruct) {
+            Line(0, "LS_", name, " ls_", name, "_default(void) {");
+            Line(1, "LS_", name, " ls_value = {0}; LS_", name, "* self = &ls_value; (void)self;");
+            functionReturn = TypeTable::Void;
+            FieldInitializers(value);
+            Line(1, "return ls_value;"); Line(0, '}');
+            Line(0, "ls_bool ls_", name, "_eq(LS_", name, " a, LS_", name, " b) {");
+            Line(1, "return 1", [&] { for (const auto& field : value.fields) {
+                if (IsStruct(Find(field.type))) Put(" && ls_", Id{field.type}, "_eq(a.", Id{field.name}, ", b.", Id{field.name}, ')');
+                else Put(" && a.", Id{field.name}, " == b.", Id{field.name});
+            } }, ';');
+            Line(0, '}');
+            for (const auto* constructor : constructors) emitConstructor(constructor);
+        } else if (constructors.empty()) emitConstructor(nullptr);
+        else for (const auto* constructor : constructors) emitConstructor(constructor);
+        for (const auto& function : value.functions) {
+            if (function.isConstructor) continue;
+            Line(0, [&] { MethodSignature(value, function); }, " {");
+            functionReturn = Find(function.returnType);
+            ParameterCells(function.parameters, 1);
+            Statements(function.body, 1, value.name); Line(0, '}');
+            functionReturn = TypeTable::Unknown;
+            std::vector<std::string> parameters;
+            if (!function.isStatic) parameters.push_back(value.name);
+            for (const auto& p : function.parameters) parameters.push_back(p.type);
+            result.exports.push_back({ExportName(value, function), RefOf(function).cName, function.returnType, std::move(parameters)});
+        }
     }
 
     CCompilationResult Run() {
@@ -784,7 +1007,9 @@ struct CEmitter {
             for (const auto& member : value.members) Line(0, "#define LS_", Id{value.name}, '_', Id{member.name}, " ((ls_int)", member.value, ')');
         }
         if (!program.enums.empty()) Line(0);
+        StructDefinitions();
         for (const auto& value : program.classes) {
+            if (value.isStruct) continue;
             if (!value.baseName.empty()) throw std::runtime_error("Native C backend does not support class inheritance yet ('" + value.name + "')");
             Line(0, "struct LS_", Id{value.name}, " {");
             Line(1, "const LS_TypeInfo* ls_type;");
@@ -810,6 +1035,7 @@ struct CEmitter {
         }
         if (!program.classes.empty()) Line(0);
         for (const auto& value : program.classes) {
+            if (value.isStruct) continue;
             Line(0, "static void ls_trace_", Id{value.name}, "(void* runtime_context, void* object) {");
             Line(1, "LS_", Id{value.name}, "* self = (LS_", Id{value.name}, "*)object;");
             bool tracesField = false;
@@ -856,41 +1082,11 @@ struct CEmitter {
             Line(0, "void* ", symbol, "(void) { return &ls_state.", Id{statement.Name()}, "; }");
             result.globals.push_back({statement.Name(), symbol, Name(statement.type)});
         }
-        for (const auto& value : program.classes) {
-            Line(0, [&] { ConstructorSignature(value); }, ';');
-            for (const auto& function : value.functions) if (!function.isConstructor) Line(0, [&] { MethodSignature(value, function); }, ';');
-        }
+        for (const auto& value : program.classes) Prototypes(value);
         Line(0);
         for (const auto& value : program.classes) TypeInfo(value);
         if (!program.classes.empty()) Line(0);
-        for (const auto& value : program.classes) {
-            const auto* constructor = Constructor(value);
-            Line(0, [&] { ConstructorSignature(value); }, " {");
-            Line(1, "LS_", Id{value.name}, "* self = (LS_", Id{value.name}, "*)ls_alloc(sizeof(LS_", Id{value.name}, "), ls_trace_", Id{value.name}, ");");
-            Line(1, "if (!self) return (LS_", Id{value.name}, "*)0;");
-            Line(1, "self->ls_type = &ls_type_", Id{value.name}, ';');
-            for (const auto& field : value.fields) {
-                const auto& initializer = program.Expression(field.initializer);
-                const auto type = Find(field.type);
-                Line(1, "self->", Id{field.name}, " = ", [&] { if (initializer.kind == SyntaxExpression::Kind::Missing) Default(type); else Value(type, initializer, value.name); }, ';');
-            }
-            functionReturn = TypeTable::Void;
-            if (constructor) { ParameterCells(constructor->parameters, 1); Statements(constructor->body, 1, value.name); }
-            Line(1, "return self;"); Line(0, '}');
-            std::vector<std::string> constructorParameters;
-            if (constructor) for (const auto& parameter : constructor->parameters) constructorParameters.push_back(parameter.type);
-            result.exports.push_back({value.name + ".new", FunctionName(value.name, "new"), value.name, std::move(constructorParameters)});
-            for (const auto& function : value.functions) {
-                if (function.isConstructor) continue;
-                Line(0, [&] { MethodSignature(value, function); }, " {");
-                functionReturn = Find(function.returnType);
-                ParameterCells(function.parameters, 1);
-                Statements(function.body, 1, value.name); Line(0, '}');
-                functionReturn = TypeTable::Unknown;
-                std::vector<std::string> parameters{value.name}; for (const auto& p : function.parameters) parameters.push_back(p.type);
-                result.exports.push_back({value.name + "." + function.name, FunctionName(value.name, function.name), function.returnType, std::move(parameters)});
-            }
-        }
+        for (const auto& value : program.classes) Definitions(value, result);
         for (size_t i{}; i < lambdas.size(); ++i) {
             const auto& lambda = *lambdas[i];
             const auto owner = lambdaOwners[i];

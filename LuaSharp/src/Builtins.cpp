@@ -10,7 +10,8 @@ namespace {
 using P = BuiltinParameter;
 using M = BuiltinMember;
 
-const std::vector<std::string> Types{"int", "float", "bool", "string", "table", "Vec3", "Quat", "Transform"};
+const std::vector<std::string> NativeStructs{"Vec2", "Vec3", "Vec2i", "Vec3i", "Quat", "Mat4x4"};
+const std::vector<std::string> Types{"int", "float", "bool", "string", "table", "Vec2", "Vec3", "Vec2i", "Vec3i", "Quat", "Mat4x4"};
 
 const std::vector<M> Members{
     {"string", "length", "int", {}, SymbolKind::Method, false, Lowering::StringLength},
@@ -22,42 +23,8 @@ const std::vector<M> Members{
     {"string", "lower", "string", {}, SymbolKind::Method, false, Lowering::StringLower},
     {"string", "upper", "string", {}, SymbolKind::Method, false, Lowering::StringUpper},
 
-    {"Vec3", "x", "float", {}, SymbolKind::Field}, {"Vec3", "y", "float", {}, SymbolKind::Field}, {"Vec3", "z", "float", {}, SymbolKind::Field},
-    {"Vec3", "length", "float", {}, SymbolKind::Method},
-    {"Vec3", "normalize", "Vec3", {}, SymbolKind::Method},
-    {"Vec3", "dot", "float", {{"Vec3", "other"}}, SymbolKind::Method},
-    {"Vec3", "cross", "Vec3", {{"Vec3", "other"}}, SymbolKind::Method},
-    {"Vec3", "clamp", "Vec3", {{"Vec3", "min"}, {"Vec3", "max"}}, SymbolKind::Method},
-    {"Vec3", "min", "Vec3", {{"Vec3", "other"}}, SymbolKind::Method},
-    {"Vec3", "max", "Vec3", {{"Vec3", "other"}}, SymbolKind::Method},
-    {"Vec3", "mix", "Vec3", {{"Vec3", "other"}, {"float", "t"}}, SymbolKind::Method},
-    {"Vec3", "new", "Vec3", {{"float", "x", true}, {"float", "y", true}, {"float", "z", true}}, SymbolKind::Method, true},
-    {"Vec3", "splat", "Vec3", {{"float", "value"}}, SymbolKind::Method, true},
 
-    {"Quat", "w", "float", {}, SymbolKind::Field}, {"Quat", "x", "float", {}, SymbolKind::Field}, {"Quat", "y", "float", {}, SymbolKind::Field}, {"Quat", "z", "float", {}, SymbolKind::Field},
-    {"Quat", "inverse", "Quat", {}, SymbolKind::Method},
-    {"Quat", "to_euler", "Vec3", {}, SymbolKind::Method},
-    {"Quat", "slerp", "Quat", {{"Quat", "other"}, {"float", "alpha"}}, SymbolKind::Method},
-    {"Quat", "delta_to", "Quat", {{"Quat", "other"}}, SymbolKind::Method},
-    {"Quat", "new", "Quat", {{"float", "w", true}, {"float", "x", true}, {"float", "y", true}, {"float", "z", true}}, SymbolKind::Method, true},
-    {"Quat", "identity", "Quat", {}, SymbolKind::Method, true},
-    {"Quat", "from_euler", "Quat", {{"Vec3", "euler"}}, SymbolKind::Method, true},
-
-    {"Transform", "inverse", "Transform", {}, SymbolKind::Method},
-    {"Transform", "translation", "Vec3", {}, SymbolKind::Method},
-    {"Transform", "rotation", "Quat", {}, SymbolKind::Method},
-    {"Transform", "scale", "Vec3", {}, SymbolKind::Method},
-    {"Transform", "decompose", "table", {}, SymbolKind::Method},
-    {"Transform", "set_translation", "Transform", {{"Vec3", "position"}}, SymbolKind::Method},
-    {"Transform", "transform_point", "Vec3", {{"Vec3", "point"}}, SymbolKind::Method},
-    {"Transform", "transform_direction", "Vec3", {{"Vec3", "direction"}}, SymbolKind::Method},
-    {"Transform", "mul", "Transform", {{"Transform", "other"}}, SymbolKind::Method},
-    {"Transform", "new", "Transform", {}, SymbolKind::Method, true},
-    {"Transform", "identity", "Transform", {}, SymbolKind::Method, true},
-    {"Transform", "from_pos", "Transform", {{"Vec3", "position"}}, SymbolKind::Method, true},
-    {"Transform", "from_pos_rot", "Transform", {{"Vec3", "position"}, {"Quat", "rotation"}}, SymbolKind::Method, true},
-    {"Transform", "from_pos_rot_scale", "Transform", {{"Vec3", "position"}, {"Quat", "rotation"}, {"Vec3", "scale"}}, SymbolKind::Method, true},
-    {"Transform", "look_at", "Transform", {{"Vec3", "eye"}, {"Vec3", "target"}, {"Vec3", "up"}}, SymbolKind::Method, true},
+#include "BuiltinMathMembers.inc"
 };
 
 const std::vector<BuiltinOperator> Operators{
@@ -66,9 +33,8 @@ const std::vector<BuiltinOperator> Operators{
     {"float", "+", "int", "float", {}}, {"float", "-", "int", "float", {}}, {"float", "*", "int", "float", {}}, {"float", "/", "int", "float", {}},
     {"int", "+", "float", "float", {}}, {"int", "-", "float", "float", {}}, {"int", "*", "float", "float", {}}, {"int", "/", "float", "float", {}},
     {"string", "+", "string", "string", Lowering::Concat},
-    {"Vec3", "+", "Vec3", "Vec3", {}}, {"Vec3", "-", "Vec3", "Vec3", {}}, {"Vec3", "*", "Vec3", "Vec3", {}}, {"Vec3", "*", "float", "Vec3", {}}, {"Vec3", "*", "int", "Vec3", {}},
-    {"Quat", "*", "Quat", "Quat", {}}, {"Quat", "*", "Vec3", "Vec3", {}},
-    {"Transform", "*", "Transform", "Transform", {}}, {"Transform", "*", "Vec3", "Vec3", {}},
+
+#include "BuiltinMathOperators.inc"
 };
 
 const std::vector<BuiltinFunction> Functions{
@@ -81,43 +47,60 @@ std::string ElementType(std::string_view array) { return std::string(array.subst
 
 const std::vector<std::string>& BuiltinTypes() { return Types; }
 bool IsBuiltinType(std::string_view type) { return std::find(Types.begin(), Types.end(), type) != Types.end(); }
+const std::vector<std::string>& NativeStructTypes() { return NativeStructs; }
+bool IsNativeStruct(std::string_view type) { return std::find(NativeStructs.begin(), NativeStructs.end(), type) != NativeStructs.end(); }
+bool IsBuiltinStaticClass(std::string_view type) { return type == "math"; }
 
-std::vector<BuiltinMember> BuiltinMembers(std::string_view type, bool staticMembers) {
-    if (type.ends_with("[]") && !staticMembers) {
-        const auto element = ElementType(type);
-        return {
-            {std::string(type), "push_back", "void", {{element, "value"}}, SymbolKind::Method, false, Lowering::ListPushBack},
-            {std::string(type), "pop_back", element, {}, SymbolKind::Method, false, Lowering::ListPopBack},
-            {std::string(type), "size", "int", {}, SymbolKind::Method, false, Lowering::ListSize},
-            {std::string(type), "empty", "bool", {}, SymbolKind::Method, false, Lowering::ListEmpty},
-            {std::string(type), "clear", "void", {}, SymbolKind::Method, false, Lowering::ListClear},
-        };
+namespace {
+// Members of a list type, created once per list type. Never erased, so returned pointers stay valid.
+const std::vector<BuiltinMember>& ListMembers(std::string_view type) {
+    static std::mutex mutex;
+    static std::map<std::string, std::vector<BuiltinMember>, std::less<>> lists;
+    std::lock_guard lock(mutex);
+    auto found = lists.find(type);
+    if (found != lists.end()) return found->second;
+    const auto element = ElementType(type);
+    return lists.emplace(std::string(type), std::vector<BuiltinMember>{
+        {std::string(type), "push_back", "void", {{element, "value"}}, SymbolKind::Method, false, Lowering::ListPushBack},
+        {std::string(type), "pop_back", element, {}, SymbolKind::Method, false, Lowering::ListPopBack},
+        {std::string(type), "size", "int", {}, SymbolKind::Method, false, Lowering::ListSize},
+        {std::string(type), "empty", "bool", {}, SymbolKind::Method, false, Lowering::ListEmpty},
+        {std::string(type), "clear", "void", {}, SymbolKind::Method, false, Lowering::ListClear},
+    }).first->second;
+}
+} // namespace
+
+std::vector<const BuiltinMember*> BuiltinMembers(std::string_view type, bool staticMembers) {
+    std::vector<const BuiltinMember*> result;
+    if (type.ends_with("[]")) {
+        if (!staticMembers) for (const auto& member : ListMembers(type)) result.push_back(&member);
+        return result;
     }
-    std::vector<BuiltinMember> result;
-    for (const auto& member : Members) if (member.owner == type && member.isStatic == staticMembers) result.push_back(member);
+    for (const auto& member : Members) if (member.owner == type && member.isStatic == staticMembers) result.push_back(&member);
+    return result;
+}
+
+std::vector<const BuiltinMember*> FindBuiltinMembers(std::string_view type, std::string_view name, bool staticMember) {
+    std::vector<const BuiltinMember*> result;
+    for (const auto* member : BuiltinMembers(type, staticMember)) if (member->name == name) result.push_back(member);
     return result;
 }
 
 const BuiltinMember* FindBuiltinMember(std::string_view type, std::string_view name, bool staticMember) {
-    const std::vector<BuiltinMember>* members = &Members;
-    if (type.ends_with("[]")) {
-        if (staticMember) return nullptr;
-        static std::mutex mutex;
-        static std::map<std::string, std::vector<BuiltinMember>, std::less<>> lists; // never erased, so returned pointers stay valid
-        std::lock_guard lock(mutex);
-        auto found = lists.find(type);
-        if (found == lists.end()) found = lists.emplace(std::string(type), BuiltinMembers(type, false)).first;
-        members = &found->second;
-    }
-    const auto found = std::find_if(members->begin(), members->end(), [&](const auto& value) { return value.owner == type && value.isStatic == staticMember && value.name == name; });
-    return found == members->end() ? nullptr : &*found;
+    const auto found = FindBuiltinMembers(type, name, staticMember);
+    return found.empty() ? nullptr : found.front();
+}
+
+const BuiltinOperator* FindBuiltinUnary(std::string_view operand, std::string_view operation) {
+    const auto found = std::find_if(Operators.begin(), Operators.end(), [&](const auto& value) { return value.right.empty() && value.left == operand && value.operation == operation; });
+    return found == Operators.end() ? nullptr : &*found;
 }
 
 const BuiltinOperator* FindBuiltinOperator(std::string_view left, std::string_view operation, std::string_view right) {
     static const BuiltinOperator comparison{{}, {}, {}, "bool", {}};
     if ((operation == "==" || operation == "!=") && left == right) return &comparison;
     if ((operation == "<" || operation == ">" || operation == "<=" || operation == ">=") && ((left == "int" || left == "float") && (right == "int" || right == "float"))) return &comparison;
-    const auto found = std::find_if(Operators.begin(), Operators.end(), [&](const auto& value) { return value.left == left && value.operation == operation && value.right == right; });
+    const auto found = std::find_if(Operators.begin(), Operators.end(), [&](const auto& value) { return !value.right.empty() && value.left == left && value.operation == operation && value.right == right; });
     return found == Operators.end() ? nullptr : &*found;
 }
 

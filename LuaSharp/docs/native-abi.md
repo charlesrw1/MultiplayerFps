@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `6`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `7`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -15,6 +15,7 @@ This document defines the native backend contract. The ABI version is currently 
 | `any` | 16-byte `LS_Value` | 64-bit kind tag (`LS_KIND_*`) plus a 64-bit scalar or managed pointer payload |
 | class reference | `LS_Type*` | Nullable, stable for the lifetime of its owning runtime heap. The first field is `const LS_TypeInfo*` |
 | enum | signed 64-bit `ls_int` | Values use the declaration's resolved integer value |
+| struct | C `LS_Name` by value | Value type. Copied on assignment, argument passing and return. Holds only value-type fields |
 
 `int / int` returns `float`. Integer remainder follows Lua floor-modulo semantics, so `-5 % 3` is `1`. Integer division by zero consequently follows floating-point division behavior. Integer remainder by zero reports a structured runtime error and returns zero so native control can unwind through an ABI-safe caller.
 
@@ -102,6 +103,23 @@ Module state remains inside the TinyCC module and therefore dies when that modul
 Host functions are registered explicitly with `NativeCompileOptions::symbols`. Semantic declarations are supplied separately through `NativeCompileOptions::externalTypes`; registering an address never bypasses LuaSharp type checking.
 
 External object types are opaque. Generated code may pass their pointers to declared methods, but it may not inspect their C++ layout. Engine integrations should use generation-checked handles or opaque API objects rather than exposing C++ object memory.
+
+## Structs
+
+A struct is a C `struct LS_Name` that is passed, returned and stored by value. A class field, a list element or a closure cell stores it inline. A struct holds only value-type fields, so the collector never traces one.
+
+- Constructors are `LS_S ls_S_new(...)`. `LS_S ls_S_default(void)` applies the field initializers. `ls_bool ls_S_eq(LS_S, LS_S)` compares member by member.
+- Instance methods take `LS_S* self`. A call on a variable passes its address. A call on a temporary first copies it to a local.
+- A list of structs has `element_kind` `LS_KIND_STRUCT` and any `element_size`. Reading such a list through `any` is not supported.
+- Converting a struct to `any` allocates a box: a `const LS_TypeInfo*` followed by the value at `LS_STRUCT_PAYLOAD` (16) bytes. `ls_unbox_struct` checks the type name and copies the value out. The box kind is `LS_KIND_STRUCT`.
+- The type info lists the fields with offsets that include the box header. A field has a slot kind: the `LS_KIND_*` of its type, or `LS_SLOT_FLOAT32` and `LS_SLOT_INT32` for packed native components. A nested struct field uses `LS_KIND_STRUCT` and points to its own type info. `LS_TypeInfo.size` is the size of the value.
+- `string(value)` formats a boxed struct as `Name(field, ...)`.
+
+The native types in `vecmath.h` follow the same rules. `Vec2`/`Vec3` use `float` components, `Vec2i`/`Vec3i` use `int`, `Quat` is `{x, y, z, w}` and `Mat4x4` is `float m[16]`, column-major.
+
+## Overloading and static methods
+
+The first declaration of a name keeps the symbol `ls_Type_name`. Each later overload gets `ls_Type_name__N`, where `N` is its declaration order. Export names of later overloads include the parameter types, for example `Type.name(float)`. A static method has no `self` parameter. Reload treats each overload as a separate function.
 
 ## Closures and current limits
 

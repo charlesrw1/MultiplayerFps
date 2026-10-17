@@ -1,6 +1,7 @@
 #include "Compiler.h"
 #include "CBackend.h"
 #include "Semantic.h"
+#include "Builtins.h"
 
 #include <algorithm>
 #include <functional>
@@ -247,7 +248,7 @@ Vec3 sum = a + b;
 float dot = a.dot(b);
 Quat rotation = Quat.from_euler(a);
 Vec3 rotated = rotation * sum;
-Transform transform = Transform.from_pos_rot(a, rotation);
+Mat4x4 transform = Mat4x4.from_pos_rot(a, rotation);
 Vec3 point = transform * rotated;
 )";
     const auto analysis = luasharp::Analyze(source);
@@ -1026,6 +1027,225 @@ void TestPrintfBuiltin() {
 }
 }
 
+bool HasDiagnostic(const luasharp::Analysis& analysis, std::string_view text) {
+    return std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [&](const auto& diagnostic) { return diagnostic.message.find(text) != std::string::npos; });
+}
+
+void RequireClean(std::string_view source, std::string_view message) {
+    const auto analysis = luasharp::Analyze(source);
+    std::string detail;
+    for (const auto& diagnostic : analysis.diagnostics) if (diagnostic.severity == luasharp::DiagnosticSeverity::Error) detail += " [" + diagnostic.message + "]";
+    Require(detail.empty(), std::string(message) + detail);
+}
+
+void RequireDiagnostic(std::string_view source, std::string_view expected) {
+    const auto analysis = luasharp::Analyze(source);
+    Require(HasDiagnostic(analysis, expected), "expected diagnostic '" + std::string(expected) + "' for: " + std::string(source));
+}
+
+void TestStructSemantics() {
+    RequireClean(R"(struct Pair {
+    int a = 1;
+    float b;
+    Vec3 where;
+    Pair(int x) { a = x; }
+    int sum() { return a; }
+    static Pair make() { return Pair(3); }
+}
+Pair p = Pair(2);
+Pair q = new Pair(5);
+Pair d = Pair();
+Pair[] many = {Pair(1), Pair(2)};
+many[0].a = 7;
+p.where.x = 4;
+int total = many[1].sum() + Pair.make().sum();
+bool same = p == q;)", "valid struct program");
+    RequireDiagnostic("class Node {} struct Bad { Node n; }", "must be a value type");
+    RequireDiagnostic("struct Bad { string s; }", "must be a value type");
+    RequireDiagnostic("struct Bad { int[] list; }", "must be a value type");
+    RequireDiagnostic("struct A { B inner; } struct B { A outer; }", "cannot contain itself");
+    RequireDiagnostic("struct Bad { Bad again; }", "cannot contain itself");
+    RequireDiagnostic("struct Base {} struct Derived : Base {}", "Structs cannot have a base type");
+    RequireDiagnostic("struct P { int a; } class F { static P make() { return P(); } } F.make().a = 3;", "temporary struct");
+    RequireDiagnostic("struct P { int a; } P p = null;", "Cannot assign");
+    RequireDiagnostic("struct P { int a; } bool b = P() == null;", "Cannot compare 'null'");
+    RequireDiagnostic("class C {} C c = C();", "Use 'new'");
+    RequireDiagnostic("struct Vec3 { int a; }", "built-in type");
+    RequireDiagnostic("struct S { int a; void f() { auto g = () => a; } }", "Lambdas inside struct methods");
+    RequireDiagnostic("struct S { static int count = 0; }", "Static fields are not supported");
+}
+
+void TestStaticMethodsAndOverloads() {
+    RequireClean(R"(class Util {
+    static int twice(int x) { return x * 2; }
+    static float twice(float x) { return x * 2; }
+    static string twice(string s) { return s + s; }
+    int base = 1;
+    int add(int a) { return base + a; }
+    int add(int a, int b) { return base + a + b; }
+    int add(Vec3 v) { return base; }
+    Util() {}
+    Util(int b) { base = b; }
+    static int viaStatic() { return twice(2); }
+}
+int i = Util.twice(2);
+float f = Util.twice(1.5);
+string s = Util.twice("ab");
+Util u = new Util(4);
+int r = u.add(1) + u.add(1, 2) + u.add(Vec3(1, 2, 3));
+float m1 = math.min(1.5, 2);
+int m2 = math.min(1, 2);
+Vec3 m3 = math.min(Vec3(1, 2, 3), Vec3(3, 2, 1));
+Vec2 m4 = math.max(Vec2(1, 2), Vec2(3, 0));
+Vec3i m5 = math.clamp(Vec3i(1, 2, 3), Vec3i(0, 0, 0), Vec3i(2, 2, 2));
+float len = math.length(Vec3(1, 2, 2));
+float pi = math.pi;)", "valid overloaded program");
+    const auto analysis = luasharp::Analyze("float a = math.min(1, 2);\nint b = math.min(1.5, 2);");
+    Require(HasDiagnostic(analysis, "Cannot assign"), "overload result types were not distinguished");
+    RequireDiagnostic("int bad = math.min(\"a\", 1);", "No overload of 'min'");
+    RequireDiagnostic("class A { void f(int x) {} void f(int y) {} }", "already declared");
+    RequireDiagnostic("class A { int f; void f(int x) {} }", "already declared");
+    RequireDiagnostic("class A { A(int x) {} A(int y) {} }", "Constructor with the same parameters");
+    RequireDiagnostic("class A { void f() {} } A.f();", "Instance method 'f' cannot be called on type 'A'");
+    RequireDiagnostic("class A { static void f() {} } A a = new A(); a.f();", "Static method 'f' must be called on its type");
+    RequireDiagnostic("class A { int x; static int f() { return x; } }", "Instance member 'x' cannot be used in a static method");
+    RequireDiagnostic("class A { static int f() { return this; } }", "'this' cannot be used in a static method");
+    RequireClean("class A { void f(int a) {} void f(float a) {} } A a = new A(); table t = {}; a.f(t.x);", "an `any` argument must not make overloads ambiguous");
+    {
+        // Equal-cost overloads are ambiguous unless an `any` argument decides at run time.
+        const auto ambiguous = luasharp::Analyze("class X {} class Y {} class A { void f(X a, Y b) {} void f(Y a, X b) {} } A a = new A(); a.f(null, null);");
+        Require(HasDiagnostic(ambiguous, "ambiguous"), "equally good overloads were not reported as ambiguous");
+    }
+}
+
+struct NativeVec3 { float x, y, z; };
+struct NativeQuat { float x, y, z, w; };
+bool Near(float left, float right) { return left - right < 1e-4f && right - left < 1e-4f; }
+
+void TestNativeStructs() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(struct Particle {
+    Vec3 pos;
+    float mass = 2;
+    Particle(Vec3 p) { pos = p; }
+    Particle(Vec3 p, float m) { pos = p; mass = m; }
+    void push(Vec3 d) { pos = pos + d; }
+    float weight() { return mass * 10; }
+    static Particle origin() { return Particle(Vec3(0, 0, 0)); }
+}
+Particle p = Particle(Vec3(1, 2, 3));
+p.push(Vec3(1, 1, 1));
+Particle copy = p;
+copy.pos.x = 100;
+Particle heavy = new Particle(Vec3(0, 0, 0), 5);
+float heavyWeight = heavy.weight();
+Particle origin = Particle.origin();
+Particle fresh = Particle(Vec3(1, 1, 1));
+Particle[] many = {p, copy};
+many[0].mass = 9;
+float listMass = many[0].mass + p.mass;
+Particle fromList = many[1];
+table bag = {value = p.pos};
+Vec3 unboxed = bag.value;
+float viaTable = bag.value.y;
+bool equal = unboxed == p.pos;
+Vec3 sum = Vec3(1, 2, 3) + Vec3(1, 1, 1) * 2;
+float dot = Vec3(1, 2, 3).dot(Vec3(4, 5, 6));
+Quat turn = Quat.from_axis_angle(Vec3(0, 0, 1), math.pi / 2);
+Vec3 turned = turn * Vec3(1, 0, 0);
+Mat4x4 move = Mat4x4.from_pos(Vec3(1, 2, 3));
+Vec3 moved = move * Vec3(1, 1, 1);
+Vec3 back = move.inverse() * moved;
+Vec2i grid = Vec2i(3, 4) * 2;
+int gridLength = grid.length_squared();
+float clamped = math.clamp(15.5, 0, 10);
+int smaller = math.min(7, 3);
+)");
+    const auto vector = [&](std::string_view name) { return NativeGlobal<NativeVec3>(module, name); };
+    const auto particlePos = vector("p");   // first field of Particle is its Vec3
+    Require(Near(particlePos.x, 2) && Near(particlePos.y, 3) && Near(particlePos.z, 4), "struct method did not update the receiver in place");
+    Require(Near(vector("copy").x, 100) && Near(vector("p").x, 2), "struct assignment shared storage instead of copying");
+    Require(NativeGlobal<double>(module, "heavyWeight") == 50.0, "constructor argument was not stored");
+    Require(NativeGlobal<double>(module, "listMass") == 11.0, "struct stored in a list aliased the original");
+    Require(Near(vector("fromList").x, 100), "list element copy was wrong");
+    Require(Near(NativeGlobal<NativeVec3>(module, "unboxed").y, 3) && NativeGlobal<double>(module, "viaTable") == 3.0, "struct did not survive boxing through a table");
+    Require(NativeGlobal<unsigned char>(module, "equal") == 1, "struct equality was wrong");
+    const auto sum = vector("sum");
+    Require(Near(sum.x, 3) && Near(sum.y, 4) && Near(sum.z, 5), "native vector operators were wrong");
+    Require(NativeGlobal<double>(module, "dot") == 32.0, "native vector method was wrong");
+    const auto turned = vector("turned");
+    Require(Near(turned.x, 0) && Near(turned.y, 1) && Near(turned.z, 0), "quaternion rotation was wrong");
+    const auto moved = vector("moved");
+    Require(Near(moved.x, 2) && Near(moved.y, 3) && Near(moved.z, 4), "Mat4x4 point transform was wrong");
+    const auto back = vector("back");
+    Require(Near(back.x, 1) && Near(back.y, 1) && Near(back.z, 1), "Mat4x4 inverse was wrong");
+    Require(NativeGlobal<long long>(module, "gridLength") == 100, "integer vector operations were wrong");
+    Require(NativeGlobal<double>(module, "clamped") == 10.0 && NativeGlobal<long long>(module, "smaller") == 3, "math overloads picked the wrong implementation");
+}
+
+void TestNativeStructBoundaries() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(struct Counter {
+    int n;
+    Counter(int start) { n = start; if (start < 0) { return; } n += 1; }
+    void bump() { n += 1; }
+}
+class Holder {
+    int run() {
+        Counter local = Counter(0);
+        auto f = () => { local.bump(); return local.n; };
+        f(); f();
+        return local.n;
+    }
+}
+Counter c = Counter(-1);
+Counter d = Counter(1);
+Counter captured = Counter(10);
+auto bumpIt = () => { captured.bump(); return captured.n; };
+int first = bumpIt();
+int second = bumpIt();
+int outside = captured.n;
+Holder holder = new Holder();
+int viaLocal = holder.run();
+string text = string(Vec3(1, 2, 3));
+string quat = string(Quat.identity());
+)");
+    Require(NativeGlobal<long long>(module, "c") == -1 && NativeGlobal<long long>(module, "d") == 2, "bare return in a struct constructor was wrong");
+    Require(NativeGlobal<long long>(module, "first") == 12 && NativeGlobal<long long>(module, "second") == 13 && NativeGlobal<long long>(module, "outside") == 13, "captured global struct was copied instead of shared");
+    Require(NativeGlobal<long long>(module, "viaLocal") == 3, "captured local struct was copied instead of shared");
+    const auto text = NativeGlobal<const NativeString*>(module, "text");
+    Require(text && std::string_view(text->data, static_cast<size_t>(text->length)) == "Vec3(1.0, 2.0, 3.0)", "struct to string was wrong");
+}
+
+// Every native function the registry advertises must exist in the generated C header.
+void TestNativeRegistryMatchesHeader() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto generated = luasharp::CompileToC("int x = 1;");
+    std::string table = "\nstatic const void* ls_registry_check[] = {\n";
+    size_t count{};
+    const auto reference = [&](const std::string& name) { if (!name.empty() && name.find('(') == std::string::npos) { table += "    (const void*)" + name + ",\n"; ++count; } };
+    std::vector<std::string> owners = luasharp::NativeStructTypes();
+    owners.push_back("math");
+    for (const auto& owner : owners) {
+        for (const bool isStatic : {false, true}) for (const auto* member : luasharp::BuiltinMembers(owner, isStatic)) if (member->kind == luasharp::SymbolKind::Method) reference(member->cName);
+        for (const auto* member : luasharp::BuiltinMembers(owner, true)) if (member->kind == luasharp::SymbolKind::Field && member->cName.find("()") != std::string::npos) { table += "    (const void*)" + member->cName.substr(0, member->cName.size() - 2) + ",\n"; ++count; }
+    }
+    for (const auto& type : owners) if (type != "math") { table += "    (const void*)ls_" + type + "_eq,\n    (const void*)ls_" + type + "_default,\n"; count += 2; }
+    table += "};\n";
+    Require(count > 200, "registry check collected too few functions");
+    generated.c += table;
+    static_cast<void>(luasharp::NativeModule::Load(std::move(generated), {}));
+}
+
+void TestStructEmission() {
+    const auto generated = luasharp::CompileToC("struct P { int a; Vec3 v; static int make(int x) { return x; } P(int a) { this.a = a; } }\nP p = P(1);\nint r = P.make(2);");
+    for (const auto expected : {"struct LS_P {", "LS_P ls_P_new(ls_int a)", "LS_P ls_P_default(void)", "ls_bool ls_P_eq(LS_P a, LS_P b)", "ls_int ls_P_make(ls_int x)", "((*self)).a = a"})
+        Require(generated.c.find(expected) != std::string::npos, std::string("missing struct lowering: ") + expected);
+    Require(generated.c.find("ls_trace_P") == std::string::npos, "structs must not have a GC trace function");
+    const auto overloads = luasharp::CompileToC("class A { int f(int x) { return x; } int f(float x) { return 1; } }");
+    Require(overloads.c.find("ls_A_f(LS_A* self, ls_int x)") != std::string::npos && overloads.c.find("ls_A_f__1(LS_A* self, ls_float x)") != std::string::npos, "overloaded functions did not get distinct C names");
+    Require(std::any_of(overloads.exports.begin(), overloads.exports.end(), [](const auto& item) { return item.sourceName == "A.f(float)" && item.symbolName == "ls_A_f__1"; }), "overload export name is wrong");
+}
 int main() {
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests{
         {"invalid syntax", TestInvalidSyntax},
@@ -1073,6 +1293,12 @@ int main() {
         {"native tables", TestNativeTables},
         {"native closures", TestNativeClosures},
         {"printf builtin", TestPrintfBuiltin},
+        {"struct semantics", TestStructSemantics},
+        {"static methods and overloads", TestStaticMethodsAndOverloads},
+        {"struct C emission", TestStructEmission},
+        {"native structs", TestNativeStructs},
+        {"native struct boundaries", TestNativeStructBoundaries},
+        {"native registry matches header", TestNativeRegistryMatchesHeader},
     };
 
     for (const auto& [name, test] : tests) {

@@ -44,13 +44,13 @@ The native slice supports these features:
 - hashed mixed-key/mixed-value tables: reads and writes through `t[k]` and `t.name`, compound assignment, nesting, and `t.f(args)` calls
 - `any` values: checked conversion to typed values, Lua truthiness, and field access and method calls on class objects through generated type info
 - closures with Lua upvalue semantics (assigned captures are shared), nested closures, and block closures that return values
+- `struct` value types, `static` methods, function and constructor overloading, the native math types (`Vec2`, `Vec3`, `Vec2i`, `Vec3i`, `Quat`, `Mat4x4`) and the `math` library (see below)
 
 The shared runtime uses a precise, non-moving mark-and-sweep heap. It traces module globals, class fields, list elements, table contents, closure environments and cells, and explicit host pins.
 
 These features fail with an explicit backend error:
 - inheritance
 - conversions between `table` and list values other than literals
-- native `Vec3`/`Quat`/`Transform` ABIs
 
 Semantic analysis accepts them, so they type-check in the editor.
 
@@ -60,7 +60,46 @@ The lexer produces a source-located token stream and recoverable diagnostics. Th
 
 The primitive types are `int`, `float`, `string`, `table`, and `bool`. `T[]` is a typed, zero-based list with negative indexing, slicing, and `push_back`, `pop_back`, `size`, `empty`, and `clear`. Strings expose `length`/`size`, `contains`, `starts_with`, `ends_with`, `substring`, `lower`, and `upper`. Primitive conversion uses ordinary call syntax such as `int(value)`, `float(value)`, `bool(value)`, and `string(value)`.
 
-`table` is the dynamic Lua-table type: arbitrary key and value types are accepted and reads have the internal dynamic type `any`. `Vec3`, `Quat`, and `Transform` are native language types whose constructors, methods, fields, and metatable operators mirror `vec_quat_lua_stubs.lua` and `transform_lua_stubs.lua`. These native definitions and typed default values live in one declarative registry. All other project and engine types must come from source declarations; the analyzer contains no engine-specific type or function exceptions.
+## Structs, static methods and overloading
+
+A `struct` is a value type. It is copied on assignment, on argument passing and on return, and it lives on the stack or inline in its container. It is never garbage collected on its own.
+
+```
+struct Particle {
+    Vec3 position;
+    float mass = 2;
+    Particle(Vec3 p) { position = p; }
+    Particle(Vec3 p, float m) { position = p; mass = m; }
+    void push(Vec3 d) { position = position + d; }
+    static Particle origin() { return Particle(Vec3(0, 0, 0)); }
+}
+Particle a = Particle(Vec3(1, 2, 3));
+Particle b = a;          // a copy
+b.position.x = 9;        // a is unchanged
+a.push(Vec3(1, 0, 0));   // changes a in place
+```
+
+- Construct a struct with `T(args)`, `new T(args)` or `T.new(args)` for the native types. All three give a value. `T()` uses the field initializers.
+- Fields must be value types: `int`, `float`, `bool`, enums and other structs. A struct cannot contain itself.
+- Structs have no base type. Lambdas in a struct method cannot use `this` or its members.
+- A captured struct local lives in a shared cell, so the lambda and the enclosing scope see the same value.
+- You can only assign a member of a struct that names storage (a variable, a field, or a list element). `makeParticle().mass = 1` is an error.
+- A struct that becomes `any` (or goes into a `table`) is boxed as a copy on the heap. Converting it back copies it out and checks the type.
+- `==` and `!=` compare structs member by member.
+
+`static` methods belong to the type: `Util.twice(3)`. A static method cannot use `this` or instance members. Static fields are not supported.
+
+Methods, constructors and static methods can be overloaded. The compiler chooses the overload at compile time. An exact type match is best. After that it prefers `int` to `float`, a derived class to its base class, `null`, and last a conversion through `any`. If two overloads match equally well, the call is an error, unless an argument has the type `any`. The first overload of a name keeps the plain C name (`ls_Util_twice`). Later overloads get a suffix (`ls_Util_twice__1`). Their export names include the parameter types (`Util.twice(float)`). Overloaded methods are not reachable through `any`.
+
+## Native math types and the `math` library
+
+`Vec2`, `Vec3` (float32 components), `Vec2i`, `Vec3i` (int32 components), `Quat` and `Mat4x4` are native structs with the layouts in [`runtime/luasharp/vecmath.h`](runtime/luasharp/vecmath.h). `Mat4x4` is column-major like glm: element (row r, column c) is `m[c * 4 + r]`. `Quat` stores `x, y, z, w` like glm, but `Quat.new` takes `(w, x, y, z)`. Euler angles are the glm convention (`pitch, yaw, roll` in `x, y, z`). The reference is in [`docs/math-library.md`](docs/math-library.md).
+
+`math` is a static class with overloaded functions: `math.min(1, 2)` returns an `int`, `math.min(1.5, 2)` a `float`, and `math.min(a, b)` works for `Vec2`, `Vec3`, `Vec2i` and `Vec3i`. Operators are defined per type (`+ - * /`, unary `-`, `==`, and scalar and matrix products).
+
+The vector, matrix and `math` sources are generated. Edit `scripts/gen_vecmath.py` and run `py LuaSharp/scripts/gen_vecmath.py`. It writes `runtime/luasharp/vecmath.h` and the registry rows in `src/BuiltinMath*.inc`.
+
+`table` is the dynamic Lua-table type: arbitrary key and value types are accepted and reads have the internal dynamic type `any`. `Vec3` and `Quat` are native language types whose constructors, methods, fields, and operators extend `vec_quat_lua_stubs.lua`. These native definitions and typed default values live in one declarative registry. All other project and engine types must come from source declarations; the analyzer contains no engine-specific type or function exceptions.
 
 `printf(format, values...)` writes without automatically appending a newline. Native formatting supports `%d`/`%i` for `int`, `%f` for numeric values, `%s` for strings, `%b` for booleans, `%p` for managed references, and `%%` for a literal percent sign. Use `\n` in the format when a newline is wanted.
 

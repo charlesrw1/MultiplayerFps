@@ -10,7 +10,7 @@ namespace luasharp {
 namespace {
 
 const std::unordered_set<std::string> Keywords{
-    "class", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return",
+    "class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return",
     "null", "true", "false"
 };
 
@@ -124,7 +124,7 @@ public:
         const auto mark = scratch_.size();
         while (!AtEnd()) {
             const size_t before = index_;
-            if (Is("class")) { auto value = ParseClass(); tree_.root.classes.push_back(std::move(value)); }
+            if (Is("class") || Is("struct")) { auto value = ParseClass(); tree_.root.classes.push_back(std::move(value)); }
             else if (Is("enum")) { auto value = ParseEnum(); tree_.root.enums.push_back(std::move(value)); }
             else { const auto statement = ParseStatement(); scratch_.push_back(statement); }
             if (index_ == before) Advance();
@@ -285,21 +285,27 @@ private:
         const auto close = Match("}"); result.span = Cover(start, close.span); return result;
     }
     SyntaxClass ParseClass() {
-        Match("class"); const auto name = Identifier("class name"); SyntaxClass result; result.name = name.text; result.span = name.span;
-        if (Is(":")) { Advance(); result.baseName = Identifier("base type").text; }
+        const bool isStruct = Is("struct"); Advance(); const auto name = Identifier(isStruct ? "struct name" : "class name"); SyntaxClass result; result.name = name.text; result.span = name.span; result.isStruct = isStruct;
+        if (Is(":")) {
+            Advance(); result.baseName = Identifier("base type").text;
+            if (isStruct) tree_.diagnostics.push_back({"Structs cannot have a base type", name.span});
+        }
         Match("{"); std::string access = "public";
         while (!AtEnd() && !Is("}")) {
             if ((Is("public") || Is("private")) && Is(":", 1)) { access = Advance().text; Advance(); continue; }
             const size_t before = index_;
+            const bool isStatic = Is("static") && !Is("(", 1) ? (Advance(), true) : false;
             const auto first = Identifier();
-            if (Is("(")) result.functions.push_back(ParseFunction(access, first, {}, true));
-            else {
+            if (Is("(")) {
+                result.functions.push_back(ParseFunction(access, first, {}, true));
+                if (isStatic) tree_.diagnostics.push_back({"Constructors cannot be static", first.span});
+            } else {
                 std::string type = first.text;
                 while (Is("[")) { Advance(); Match("]"); type += "[]"; }
                 const auto memberName = Identifier("member name");
-                if (Is("(")) result.functions.push_back(ParseFunction(access, memberName, std::move(type), false));
+                if (Is("(")) { result.functions.push_back(ParseFunction(access, memberName, std::move(type), false)); result.functions.back().isStatic = isStatic; }
                 else {
-                    SyntaxField field; field.access = access; field.type = std::move(type); field.name = memberName.text; field.span = memberName.span;
+                    SyntaxField field; field.access = access; field.type = std::move(type); field.name = memberName.text; field.span = memberName.span; field.isStatic = isStatic;
                     if (Is("=")) { Advance(); field.initializer = ParseExpression(); }
                     Match(";"); result.fields.push_back(std::move(field));
                 }

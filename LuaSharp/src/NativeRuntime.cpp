@@ -31,7 +31,7 @@ struct RuntimeString {
     char data[1]{};
 };
 
-constexpr unsigned long long AbiVersion = 6;
+constexpr unsigned long long AbiVersion = 7;
 
 // Field order must match LS_RuntimeApi in the generated C preamble.
 struct RuntimeAbi {
@@ -98,7 +98,7 @@ NativeValue NormalizeKey(NativeValue key) {
 }
 
 bool IsManaged(const NativeValue& value) {
-    return value.kind >= NativeValueKind::String && value.kind <= NativeValueKind::List;
+    return value.kind >= NativeValueKind::String && value.kind <= NativeValueKind::Struct;
 }
 
 void* Payload(Allocation* allocation) { return allocation + 1; }
@@ -111,9 +111,9 @@ std::string_view View(const void* string) {
 }
 
 // Lua 5.4 tostring() spelling of a float.
-std::string FormatFloat(double value) {
+std::string FormatFloat(double value, int digits = 14) {
     char buffer[64];
-    std::snprintf(buffer, sizeof(buffer), "%.14g", value);
+    std::snprintf(buffer, sizeof(buffer), "%.*g", digits, value);
     std::string result = buffer;
     if (result.find_first_not_of("-0123456789") == std::string::npos) result += ".0";
     return result;
@@ -268,7 +268,7 @@ void TraceList(void* context, void* object) {
     auto& runtime = *static_cast<NativeRuntime*>(context);
     const auto& list = static_cast<RuntimeList*>(object)->header;
     const bool tagged = list.elementKind == NativeElementKind::Value;
-    if (!tagged && list.elementKind < NativeElementKind::String) return;
+    if (!tagged && (list.elementKind < NativeElementKind::String || list.elementKind == NativeElementKind::Struct)) return;
     for (std::int64_t i{}; i < list.count; ++i) {
         const std::byte* slot = list.data + i * list.elementSize;
         if (tagged) { NativeValue item; std::memcpy(&item, slot, sizeof(item)); if (IsManaged(item)) runtime.Mark(item.as.pointer); }
@@ -283,7 +283,7 @@ void ReserveList(RuntimeList& list, std::int64_t capacity) {
     list.header.capacity = capacity;
 }
 void* AbiListCreate(void* context, unsigned long long elementSize, unsigned long long elementKind, unsigned long long capacity) {
-    assert(elementSize > 0 && elementSize <= sizeof(NativeValue) && elementKind <= static_cast<unsigned long long>(NativeElementKind::List));
+    assert(elementSize > 0 && elementKind <= static_cast<unsigned long long>(NativeElementKind::Struct));
     auto& runtime = *static_cast<NativeRuntime*>(context);
     auto* list = static_cast<RuntimeList*>(runtime.Allocate(sizeof(RuntimeList), TraceList, FinalizeList));
     if (!list) return nullptr;
@@ -345,6 +345,32 @@ void* AbiStringCase(void* context, void* value, int upper) {
     }
     return runtime.Intern(text);
 }
+// Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.
+struct NativeTypeInfo;
+struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; };
+struct NativeTypeInfo { const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size; };
+constexpr unsigned long long SlotFloat32 = 16, SlotInt32 = 17;
+
+// "Vec3(1, 2, 3)": fields in declaration order, nested structs recursively.
+std::string FormatStruct(const NativeTypeInfo& type, const char* data) {
+    std::string text = type.name; text += '(';
+    for (unsigned long long i{}; i < type.fieldCount; ++i) {
+        const auto& field = type.fields[i];
+        const char* slot = data + field.offset;
+        if (i) text += ", ";
+        switch (field.kind) {
+        case static_cast<unsigned long long>(NativeValueKind::Int): text += std::to_string(*reinterpret_cast<const std::int64_t*>(slot)); break;
+        case static_cast<unsigned long long>(NativeValueKind::Float): text += FormatFloat(*reinterpret_cast<const double*>(slot)); break;
+        case static_cast<unsigned long long>(NativeValueKind::Bool): text += *reinterpret_cast<const unsigned char*>(slot) ? "true" : "false"; break;
+        case SlotFloat32: text += FormatFloat(*reinterpret_cast<const float*>(slot), 7); break;
+        case SlotInt32: text += std::to_string(*reinterpret_cast<const int*>(slot)); break;
+        case static_cast<unsigned long long>(NativeValueKind::Struct): text += field.type ? FormatStruct(*field.type, slot) : "?"; break;
+        default: text += "?"; break;
+        }
+    }
+    return text + ')';
+}
+
 void* AbiToString(void* context, const NativeValue* value) {
     assert(value);
     auto& runtime = *static_cast<NativeRuntime*>(context);
@@ -356,6 +382,11 @@ void* AbiToString(void* context, const NativeValue* value) {
     case NativeValueKind::Bool: return runtime.Intern(value->as.boolean ? "true" : "false");
     case NativeValueKind::String: return value->as.pointer;
     case NativeValueKind::Closure: return reference("function");
+    case NativeValueKind::Struct: {
+        const auto* box = static_cast<const char*>(value->as.pointer);
+        const auto* type = *reinterpret_cast<const NativeTypeInfo* const*>(box);
+        return runtime.Intern(FormatStruct(*type, box));
+    }
     default: return reference("table");
     }
 }
