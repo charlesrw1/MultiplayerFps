@@ -181,5 +181,23 @@ try {
     send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri: indexedConsumerUri, languageId: "luasharp", version: 1, text: "IndexedType value = new IndexedType(); string label = value.label;" } } });
     const indexedDiagnostics = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === indexedConsumerUri, "indexed workspace diagnostics");
     assert.equal(indexedDiagnostics.params.diagnostics.some(d => /Unknown type|Unknown member/.test(d.message)), false, "unopened workspace files were not included in semantic indexing");
-    console.log("PASS native LSP: cross-file indexing, UTF-16 diagnostics, definitions, references, rename, symbols, tokens, signatures, hovers, and partial completions");
+    const indexedConsumerDiagnostics = async description => { const found = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === indexedConsumerUri, description); messages.splice(0); return found.params.diagnostics.some(d => /Unknown type 'IndexedType'/.test(d.message)); };
+    messages.splice(0);
+    send({ jsonrpc: "2.0", method: "luasharp/indexDocument", params: { uri: indexedUri, text: "class RenamedType { string label; }" } });
+    assert.equal(await indexedConsumerDiagnostics("diagnostics after indexDocument"), true, "indexDocument did not update another file's exported types");
+    send({ jsonrpc: "2.0", method: "luasharp/indexDocument", params: { uri: indexedUri, text: "class IndexedType { string label; }" } });
+    assert.equal(await indexedConsumerDiagnostics("diagnostics after restoring indexDocument"), false, "indexDocument did not restore the exported type");
+    send({ jsonrpc: "2.0", method: "luasharp/removeDocument", params: { uri: indexedUri } });
+    assert.equal(await indexedConsumerDiagnostics("diagnostics after removeDocument"), true, "removeDocument kept the deleted file's types");
+    const nativeUri = pathToFileURL(path.join(root, "LuaSharp", "native-types-test.ls")).toString();
+    const nativeSource = "Vec3 v = Vec3(1, 2, 3);\nMat4x4 m = Mat4x4.identity();\nfloat a = math.sqrt(2.0);\nVec2i[] list = null;";
+    send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri: nativeUri, languageId: "luasharp", version: 1, text: nativeSource } } });
+    send({ jsonrpc: "2.0", id: 21, method: "textDocument/semanticTokens/full", params: { textDocument: { uri: nativeUri } } });
+    const nativeTokens = decodeSemanticTokens((await waitFor(m => m.id === 21, "native type semantic tokens")).result.data);
+    const nativeLines = nativeSource.split("\n");
+    for (const [line, name, occurrence] of [[0, "Vec3", 0], [0, "Vec3", 1], [1, "Mat4x4", 0], [1, "Mat4x4", 1], [2, "math", 0], [3, "Vec2i", 0]]) {
+        let character = -1; for (let i = 0; i <= occurrence; ++i) character = nativeLines[line].indexOf(name, character + 1);
+        assert.ok(nativeTokens.some(token => token.line === line && token.character === character && token.length === name.length && token.type === 1), `built-in type '${name}' (line ${line}, use ${occurrence + 1}) was not emitted as a semantic type token`);
+    }
+    console.log("PASS native LSP: cross-file indexing, per-file index updates, built-in type tokens, UTF-16 diagnostics, definitions, references, rename, symbols, tokens, signatures, hovers, and partial completions");
 } finally { child.kill(); }

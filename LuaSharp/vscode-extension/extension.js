@@ -22,15 +22,16 @@ function activate(context) {
     );
     client.start().then(async () => {
         output.appendLine("Native LuaSharp language server started.");
-        const indexWorkspace = async () => {
-            const files = await vscode.workspace.findFiles("**/*.ls", "**/{.git,node_modules}/**");
-            const documents = await Promise.all(files.map(async uri => ({ uri: uri.toString(), text: Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8") })));
-            await client.sendNotification("luasharp/indexWorkspace", { documents });
-            output.appendLine(`Indexed ${documents.length} LuaSharp file(s).`);
-        };
-        await indexWorkspace();
+        const readDocument = async uri => ({ uri: uri.toString(), text: Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8") });
+        const files = await vscode.workspace.findFiles("**/*.ls", "**/{.git,node_modules}/**");
+        const documents = await Promise.all(files.map(readDocument));
+        await client.sendNotification("luasharp/indexWorkspace", { documents });
+        output.appendLine(`Indexed ${documents.length} LuaSharp file(s).`);
+        // After the first full index, send only the file that changed.
+        const indexDocument = async uri => client.sendNotification("luasharp/indexDocument", await readDocument(uri));
         const watcher = vscode.workspace.createFileSystemWatcher("**/*.ls");
-        watcher.onDidCreate(indexWorkspace); watcher.onDidChange(indexWorkspace); watcher.onDidDelete(indexWorkspace);
+        watcher.onDidCreate(indexDocument); watcher.onDidChange(indexDocument);
+        watcher.onDidDelete(uri => client.sendNotification("luasharp/removeDocument", { uri: uri.toString() }));
         context.subscriptions.push(watcher);
     }, error => {
         output.appendLine(`Native LuaSharp language server failed: ${error.stack || error}`);
