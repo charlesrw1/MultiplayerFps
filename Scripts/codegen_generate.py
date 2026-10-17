@@ -432,7 +432,9 @@ def append_to_array_R(arr:list[Property],classdef:ClassDef):
                 if not any(existing.name == f.name for existing in arr):
                     arr.append(f)
 
-def write_scriptable_class(newclass : ClassDef) -> str:
+# ls_slots: method -> LuaSharp slot call (codegen_luasharp.slot_call), or None when LuaSharp does not bind the class.
+# LuaSharp objects set ScriptImpl::ls_slots; the Lua path runs only when it is null.
+def write_scriptable_class(newclass : ClassDef, ls_slots:dict[str,str] | None = None) -> str:
     assert(newclass.scriptable)
     output = ""
     output += f"class ScriptImpl_{newclass.classname} : public {newclass.classname} " + " {\n"
@@ -441,6 +443,8 @@ def write_scriptable_class(newclass : ClassDef) -> str:
     const ClassTypeInfo* type = nullptr;
     const ClassTypeInfo& get_type() const final {{ return *type; }}
     """
+    if ls_slots is not None:
+        output += "void* const* ls_slots = nullptr; // LuaSharp overrides (LuaSharpEngine::create)\n"
 
     virtual_function_types : list[Property] = []
     append_to_array_R(virtual_function_types, newclass)
@@ -454,6 +458,9 @@ def write_scriptable_class(newclass : ClassDef) -> str:
             if len(f.func_args)>0:
                 output = output[:-2]
             output += ") final {"
+            if ls_slots is not None:
+                base_args = ", ".join(argName for _, argName in f.func_args)
+                output += f"\n        if (ls_slots) {{ {ls_slots.get(f.name, '')} return {newclass.classname}::{f.name}({base_args}); }}"
             # get my table
             # find function
             # push args
@@ -586,7 +593,7 @@ def get_bool_str(b:bool)->str:
         return "true"
     else:
         return "false"
-def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
+def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef, script_slots:dict[str,str] | None = None)->str:
 
 
     super_typeinfo_str = "nullptr"
@@ -620,7 +627,7 @@ def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
 
         scriptable_alloc = "nullptr"
         if newclass.scriptable:
-            output += write_scriptable_class(newclass)
+            output += write_scriptable_class(newclass, script_slots)
             scriptable_alloc = f"get_allocate_script_impl_internal<ScriptImpl_{newclass.classname}>()"
 
         spawnable_str = "true" if newclass.editor_spawnable else "false"
@@ -865,7 +872,8 @@ def write_lua_class(newclass:ClassDef) -> str:
     return output
   
 
-def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef], lua_stub_filename:str = "lua_stubs.lua", extra_source:str = ""):
+# script_slots: the LuaSharp slot calls of each scriptable class (codegen_luasharp.Output.slots).
+def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef], lua_stub_filename:str = "lua_stubs.lua", extra_source:str = "", script_slots:dict[str,dict[str,str]] | None = None):
     generated_path = root + "/" + os.path.splitext(filename)[0]
     if generated_path[0]=='.':
         generated_path=generated_path[2:]
@@ -894,10 +902,11 @@ def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,
 
         interfaces = [c for c in classes if c.object_type == ClassDef.TYPE_INTERFACE]
         non_interfaces = [c for c in classes if c.object_type != ClassDef.TYPE_INTERFACE]
+        slots = script_slots or {}
         for c in interfaces:
             generated += write_class_old(typenames,c)
         for c in non_interfaces:
-            generated += write_class_old(typenames,c)
+            generated += write_class_old(typenames,c,slots.get(c.classname))
         generated += extra_source
 
     write_if_changed(generated_path, generated, "generated source")

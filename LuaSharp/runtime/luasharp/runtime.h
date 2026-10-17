@@ -3,7 +3,7 @@
 #ifndef LUASHARP_RUNTIME_H
 #define LUASHARP_RUNTIME_H
 
-#define LS_ABI_VERSION 10
+#define LS_ABI_VERSION 11
 
 typedef signed long long ls_int;          /* public LuaSharp int: signed 64-bit */
 typedef unsigned long long ls_wrap_bits;  /* internal arithmetic bits; never a LuaSharp value */
@@ -75,10 +75,16 @@ typedef struct LS_TypeInfo {
     const struct LS_TypeInfo* base;     /* classes: the base class, or null */
     void* const* vtable;                /* classes: one function per virtual slot; null for an abstract slot */
     ls_wrap_bits flags;                 /* LS_TYPE_* */
+    ls_wrap_bits host_override_count;
+    const struct LS_HostOverride* host_overrides; /* LS_TYPE_NATIVE_BASE: script overrides of extern virtual methods */
 } LS_TypeInfo;
 /* The objects of the type are LS_NativeObject proxies for host objects (extern classes). Type infos with this
    flag match by name; the host's NativeRuntime owns the one its proxies point to. */
 #define LS_TYPE_NATIVE 1
+/* A script class that derives from an extern class. Its objects start with LS_NativeObject, then the script fields. */
+#define LS_TYPE_NATIVE_BASE 2
+/* The most-derived script implementation of an extern virtual method: R function(LS_T* self, ...). */
+typedef struct LS_HostOverride { const char* name; void* function; } LS_HostOverride;
 /* A class object; a derived class starts with the fields of its base, in the same order. */
 typedef struct LS_Object { const LS_TypeInfo* type; } LS_Object;
 /* A script reference to a host object. The host makes one proxy for each object and sets native to null
@@ -237,7 +243,7 @@ static int ls_is_a(const LS_TypeInfo* type, const LS_TypeInfo* target) {
 
 /* False for null and for a destroyed native object. */
 static ls_bool ls_object_alive(const void* object) {
-    return object && (!(((const LS_Object*)object)->type->flags & LS_TYPE_NATIVE) || ((const LS_NativeObject*)object)->native);
+    return object && (!(((const LS_Object*)object)->type->flags & (LS_TYPE_NATIVE | LS_TYPE_NATIVE_BASE)) || ((const LS_NativeObject*)object)->native);
 }
 /* A destroyed native object reads as nil. */
 static LS_Value ls_value_live(LS_Value v) {

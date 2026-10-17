@@ -61,6 +61,23 @@ private:
 	REF int secret = 11; // bound through its PropertyInfo offset
 };
 
+// A LuaSharp script class derives from it; C++ virtual calls go to the script overrides.
+class LsTestScriptable : public LsTestBase
+{
+public:
+	CLASS_BODY(LsTestScriptable, scriptable);
+	REF virtual int tick(int dt) {
+		hp -= dt;
+		return hp;
+	}
+	REF virtual std::string label_for(const std::string& prefix) { return prefix + "native"; }
+	REF virtual void notify(LsTestThing* other) { last = other; }
+	REF virtual LsTestThing* pick() { return nullptr; }
+	REF int call_tick(int dt) { return tick(dt); } // a virtual call from C++
+	REF int hp = 100;
+	LsTestThing* last = nullptr;
+};
+
 class ITestInterface {
 public:
 	INTERFACE_BODY();

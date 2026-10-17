@@ -9,7 +9,7 @@
 namespace luasharp {
 
 // Must equal LS_ABI_VERSION in runtime/luasharp/runtime.h.
-constexpr unsigned long long NativeAbiVersion = 10;
+constexpr unsigned long long NativeAbiVersion = 11;
 
 using NativeTraceFunction =void (*)(void* runtimeContext, void* object);
 using NativeFinalizeFunction = void (*)(void* object);
@@ -68,6 +68,14 @@ public:
     static void* NativeOf(const void* proxy);
     // Script then sees the proxy as null.
     static void DestroyNative(void* proxy);
+    // Objects of a script class that derives from an extern class (LS_TYPE_NATIVE_BASE). They are proxies too.
+    // The nearest extern class of the object's class.
+    static std::string_view NativeBaseName(const void* object);
+    // The script implementation of an extern virtual method; null when the class does not override it.
+    static void* HostOverride(const void* object, std::string_view method);
+    static size_t HostOverrideCount(const void* object);
+    // Links a new object to its host object, before its script constructor runs.
+    static void SetNative(void* object, void* native);
 
     void* Intern(std::string_view utf8);
     [[nodiscard]] size_t AllocationCount() const;

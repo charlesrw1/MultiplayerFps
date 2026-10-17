@@ -168,6 +168,7 @@ public:
         DeclareMembers();
         FlattenInheritance();
         CheckOverrides();
+        CheckNativeDerived();
         AnalyzeBodies();
         return std::move(result_);
     }
@@ -350,8 +351,8 @@ private:
                     const auto& candidate = result_.symbols[other];
                     if (candidate.kind == SymbolKind::Method && !candidate.isStatic && candidate.access != "private" && candidate.name == mine.name && SameParameterTypes(candidate.parameters, mine.parameters)) { match = &candidate; break; }
                 }
-                // Members of external types carry no modifiers; they can always be overridden.
-                const bool overridable = match && (match->isVirtual || match->implicit);
+                // Members of opaque external types carry no modifiers; they can always be overridden. Extern classes declare `virtual`.
+                const bool overridable = match && (match->isVirtual || (match->implicit && !nativeTypes_.contains(match->owner)));
                 const auto where = "Method '" + mine.name + "' on '" + value.name + "'";
                 if (mine.isOverride) {
                     if (!match) AddDiagnostic(where + " is marked 'override', but no inherited virtual method has the same parameters", mine.span);
@@ -361,6 +362,26 @@ private:
                     if (overridable) AddDiagnostic(where + " must be marked 'override' to replace inherited virtual method '" + match->owner + "." + mine.name + "'", mine.span);
                     else AddDiagnostic(where + " hides inherited method '" + match->owner + "." + mine.name + "', which is not virtual", mine.span);
                 }
+            }
+        }
+    }
+    // The nearest extern class that a script class derives from; empty when there is none.
+    std::string_view NativeAncestor(std::string_view name) const {
+        std::unordered_set<std::string_view> visited;
+        for (auto base = result_.baseTypes.find(name); base != result_.baseTypes.end() && visited.insert(base->second).second; base = result_.baseTypes.find(base->second))
+            if (nativeTypes_.contains(base->second)) return base->second;
+        return {};
+    }
+    // The host makes objects of script classes that derive from extern classes, so their constructors take no arguments.
+    void CheckNativeDerived() {
+        for (const auto& value : result_.syntax.root.classes) {
+            if (value.isExtern || value.isStruct) continue;
+            const auto native = NativeAncestor(value.name);
+            if (native.empty()) continue;
+            for (const auto& function : value.functions) {
+                if (!function.isConstructor) continue;
+                if (!function.parameters.empty()) AddDiagnostic("Constructor of '" + value.name + "' cannot have parameters: the class derives from extern class '" + std::string(native) + "', so the host creates its objects", function.span);
+                if (function.hasBaseCall) AddDiagnostic("Constructor of '" + value.name + "' cannot call ': base(...)': the class derives from extern class '" + std::string(native) + "'", function.span);
             }
         }
     }
@@ -564,6 +585,10 @@ private:
     // `new T(...)` for a class, or for a struct (which still produces a value).
     void ResolveConstruction(const SyntaxExpression& expression, NodeId arguments, size_t count, TypeId& type, std::optional<size_t>& symbol, Lowering& lowering, const BuiltinMember*& nativeMember) {
         if (const auto* declared = FindClass(expression.text); declared && declared->isAbstract) { AddDiagnostic("Cannot create an instance of abstract class '" + expression.text + "'", expression.span); return; }
+        if (const auto native = NativeAncestor(expression.text); !native.empty() && !nativeTypes_.contains(expression.text)) {
+            AddDiagnostic("Cannot create an instance of '" + expression.text + "' in script: it derives from extern class '" + std::string(native) + "', so the host creates its objects", expression.span);
+            return;
+        }
         const auto candidates = ConstructorCandidates(expression.text);
         if (candidates.empty()) {
             if (nativeTypes_.contains(expression.text)) AddDiagnostic("Cannot create an instance of extern class '" + expression.text + "': it declares no constructor", expression.span);
@@ -1098,9 +1123,10 @@ private:
         }
         std::vector<Local> locals; result_.bound.topLevel = AnalyzeStatements(result_.syntax.root.topLevel, locals, nullptr, TypeTable::Void, source_.size(), 0);
     }
-    // The base class has a constructor that takes no arguments (declared or implicit). External bases are not checked.
+    // The base class has a constructor that takes no arguments (declared or implicit). External and extern bases are not checked:
+    // the host makes the object of an extern base.
     void RequireDefaultBaseConstructor(const SyntaxClass& value, TextSpan span) {
-        if (value.isStruct || value.baseName.empty() || !FindClass(value.baseName)) return;
+        if (value.isStruct || value.baseName.empty() || !FindClass(value.baseName) || nativeTypes_.contains(value.baseName)) return;
         const auto candidates = ConstructorCandidates(value.baseName);
         if (std::none_of(candidates.begin(), candidates.end(), [](const Callable& candidate) { return candidate.required == 0; }))
             AddDiagnostic("Base class '" + value.baseName + "' has no parameterless constructor; call one with ': base(...)'", span);

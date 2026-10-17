@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `10`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `11`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -115,7 +115,7 @@ A class is a C `struct LS_Name` on the GC heap. Its first field is `const LS_Typ
 - A call to a virtual method loads the function from `obj->ls_type->vtable[slot]`. The function type uses the class that declared the slot as `self`. A call through `base`, a call to a sealed method and a call on a value of a sealed class are direct calls.
 - Construction has two functions. `LS_T* ls_T_new(...)` allocates the object, sets `ls_type` to `T` and calls `void ls_T__init(LS_T* self, ...)`. `ls_T__init` calls the init function of the base constructor, then runs the field initializers of `T`, then the constructor body. Because `ls_type` is set first, a virtual call in a base constructor calls the most-derived override. An abstract class has no `ls_T_new`.
 - Overloaded constructors use `ls_T_new__N` and `ls_T__init__N`.
-- A class cannot derive from an external type yet. The C backend reports an error.
+- A class can derive from an extern class (see Script classes that derive from extern classes). It cannot derive from other external types. The C backend reports an error.
 
 ## Extern classes
 
@@ -136,7 +136,7 @@ Rules:
 - A method has no body. A method can be `static` or `virtual`, but not `abstract`, `override` or `sealed`.
 - A field has no initializer. An extern class has no static fields.
 - An extern class has one constructor or none. Methods are not overloaded. Without a constructor, `new T()` is an error.
-- An extern class can derive only from an extern class. A script class cannot derive from an extern class yet.
+- An extern class can derive only from an extern class. A script class can derive from an extern class (see below).
 - Declarations can be in the module source or in `NativeCompileOptions::declarations`. A declaration source can contain only extern classes and enums. `DeclarationTypes()` converts declaration sources to `ExternalType` values.
 
 ### Proxies
@@ -175,6 +175,34 @@ The host registers one C function in `NativeCompileOptions::symbols` for each me
 - `NativeRef` is a move-only root slot. It keeps one GC object alive while it holds it. A move registers the new slot and removes the old one.
 - Host code must keep GC objects only in root slots, so that a later moving collector can update them.
 
+### Script classes that derive from extern classes
+
+```
+class Spinner : Component {
+    float extra = 5;
+    override int tick(int dt) { return base.tick(dt * 2) + extra; }
+}
+```
+
+Rules:
+
+- An `override` of an extern method needs a `virtual` extern method.
+- The host makes the objects. `new` in script is an error. Constructors cannot have parameters or call `: base(...)`.
+- An object starts with `LS_NativeObject` (`ls_type`, then `ls_native`), then the script fields. The host pointer is in `ls_native`, so the object is also the proxy of its host object.
+- The type info has the flag `LS_TYPE_NATIVE_BASE`. Its `base` is the extern class. A destroyed object is null for `==`, `is`, `as` and `any`, the same as a proxy.
+- The type info has a table of host overrides (`host_overrides`, `LS_HostOverride { name, function }`). Each entry is the most-derived script implementation of an extern virtual method. The function is `R ls_T_m(LS_T* self, ...)`, with the C types of the module. An extern class argument or result is a proxy.
+- Extern fields and methods on these objects, also through implicit `this`, use the extern wrappers.
+- A call to an extern method from script uses the host thunk. The host dispatches it, so it gets to the script override.
+- `base.m()` for an extern virtual method `m` calls the host thunk `ls_native_N__base_m(void* self, ...)`. `N` is the nearest extern ancestor. The host calls its implementation of `m` without virtual dispatch.
+
+Creation:
+
+1. `LS_T* ls_T__host_alloc(void)` allocates the object and sets `ls_type`. `ls_native` is null.
+2. The host makes its object and calls `NativeRuntime::SetNative(object, native)`. `NativeBaseName` gives the extern class, and `HostOverride` gives each override.
+3. `void ls_T__init(LS_T* self)` runs the field initializers and the constructor body.
+
+An abstract class has no `ls_T__host_alloc`.
+
 ### External enums
 
 - An enum in `NativeCompileOptions::declarations` or in other external types gets the C constant `LS_E_M`, the same as an enum in the module.
@@ -190,6 +218,16 @@ The engine binds its reflected classes with generated code (`Scripts/codegen_lua
 - `LuaSharpEngine::proxy_of` makes one proxy for each `ClassBase` and keeps it in `ClassBase::script_proxy`, which is a root slot. The type of the proxy is the nearest bound class of the object.
 - `~ClassBase` calls `DestroyNative` on the proxy and removes the root slot.
 - A `REFLECT(script_read)` field has a setter that reports a runtime error.
+
+A script class can derive from a bound class `X`:
+
+- For `CLASS_BODY(X, scriptable)`, codegen makes `ScriptImpl_X`. It has `ls_slots`, one slot for each bound virtual method of `X` and its ancestors. Each override calls the slot when it is set, else `X::m`. When `ls_slots` is null, the object is a Lua object, and the Lua path runs.
+- Codegen also makes the base thunks `ls_native_X__base_m` and registers the slot names with `lsbind::Registrar`.
+- `LuaSharpEngine::create(module, "Spinner")` allocates the script object, makes `ScriptImpl_X` with `scriptable_allocate`, and fills the slots from the host overrides. Then it sets `script_proxy` and runs the script constructor. It returns `std::unique_ptr<ClassBase>`.
+- A class that is not scriptable can be a base only when the script class overrides none of its methods. `create` then makes a plain `X`.
+- A method that returns a reference has no slot. `create` reports an error when a script class overrides it.
+- The module must stay loaded while its objects are alive.
+- A runtime error in an override stays in `NativeRuntime::LastError`. The override continues with default values, the same as other script code. No C++ exception goes through script frames.
 
 ## Structs
 

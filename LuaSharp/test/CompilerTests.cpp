@@ -1720,6 +1720,105 @@ auto childHealth = () => child.health;
     g_world = {};
 }
 
+// A host class with one virtual method. The host's virtual call goes to the script override when there is one (as ScriptImpl_X does).
+struct HostUnit { long long hp{}; void* script{}; };
+std::shared_ptr<luasharp::NativeRuntime> g_unitRuntime;
+long long UnitGetHp(void* self) { return static_cast<HostUnit*>(self)->hp; }
+void UnitSetHp(void* self, long long value) { static_cast<HostUnit*>(self)->hp = value; }
+long long UnitBaseHit(void* self, long long amount) { return static_cast<HostUnit*>(self)->hp -= amount; }
+long long UnitHit(void* self, long long amount) {
+    auto* unit = static_cast<HostUnit*>(self);
+    if (unit->script) if (auto* hit = luasharp::NativeRuntime::HostOverride(unit->script, "hit")) return reinterpret_cast<long long (*)(void*, long long)>(hit)(unit->script, amount);
+    return UnitBaseHit(self, amount);
+}
+void* UnitName(void*) { return g_unitRuntime->Intern("unit"); }
+long long UnitPlain(void*) { return 7; }
+
+constexpr std::string_view UnitDeclarations = "extern class Unit { int hp; virtual int hit(int amount); virtual string name(); int plain(); }";
+constexpr std::string_view UnitScript = R"(class Guard : Unit {
+    int armor = 2;
+    int made;
+    Guard() { made = hp + plain(); }
+    override int hit(int amount) { return base.hit(amount - armor) + 1000; }
+    int heal() { hp = hp + 5; return this.hp; }
+    int get_made() { return made; }
+}
+class Captain : Guard { override string name() { return "captain"; } }
+Unit held;
+auto heldNull = () => held == null;
+auto heldIsGuard = () => held is Guard;
+auto hitHeld = () => held.hit(10);
+)";
+
+void TestDerivedExternClassSemantics() {
+    const auto has = [](std::string_view source, std::string_view message) {
+        const auto analysis = luasharp::Analyze(std::string(UnitDeclarations) + "\n" + std::string(source));
+        return std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [&](const auto& item) { return item.message.find(message) != std::string::npos; });
+    };
+    Require(has("class G : Unit {} G g = new G();", "so the host creates its objects"), "'new' of a class that derives from an extern class was accepted");
+    Require(has("class G : Unit {} class H : G {} H h = new H();", "derives from extern class 'Unit'"), "'new' of an indirect derived class was accepted");
+    Require(has("class G : Unit { G(int x) {} }", "cannot have parameters"), "a constructor with parameters was accepted");
+    Require(has("class G : Unit { override int plain() { return 1; } }", "not virtual"), "an override of a non-virtual extern method was accepted");
+    const auto valid = luasharp::Analyze(std::string(UnitDeclarations) + "\n" + std::string(UnitScript));
+    Require(valid.diagnostics.empty(), "a valid derived class produced diagnostics: " + (valid.diagnostics.empty() ? std::string() : valid.diagnostics.front().message));
+
+    const auto generated = luasharp::CompileToC(std::string(UnitDeclarations) + "\n" + std::string(UnitScript));
+    for (const auto expected : {"void* ls_native; /* LS_NativeObject.native */", "LS_KIND_OBJECT, &ls_type_Unit, ls_vtable_Guard, LS_TYPE_NATIVE_BASE, 1, ls_host_overrides_Guard};",
+                                "{\"hit\", (void*)ls_Guard_hit},", "{\"name\", (void*)ls_Captain_name},", "extern ls_int ls_native_Unit__base_hit(void* self, ls_int amount);",
+                                "ls_Unit__base_hit((LS_Unit*)self", "LS_Guard* ls_Guard__host_alloc(void)", "ls_Unit__get_hp((LS_Unit*)self)", "ls_Unit__set_hp(", "ls_Unit_plain((LS_Unit*)self)"})
+        Require(generated.c.find(expected) != std::string::npos, std::string("missing derived extern class lowering: ") + expected);
+    Require(generated.c.find("ls_Guard_new") == std::string::npos, "a class that derives from an extern class got a script constructor");
+}
+
+void TestNativeDerivedExternClasses() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    g_unitRuntime = luasharp::NativeRuntime::Create();
+    luasharp::NativeCompileOptions options;
+    options.runtime = g_unitRuntime; options.declarations = {std::string(UnitDeclarations)};
+    options.symbols = {{"ls_native_Unit__get_hp", reinterpret_cast<const void*>(&UnitGetHp)}, {"ls_native_Unit__set_hp", reinterpret_cast<const void*>(&UnitSetHp)},
+                       {"ls_native_Unit_hit", reinterpret_cast<const void*>(&UnitHit)}, {"ls_native_Unit__base_hit", reinterpret_cast<const void*>(&UnitBaseHit)},
+                       {"ls_native_Unit_name", reinterpret_cast<const void*>(&UnitName)}, {"ls_native_Unit_plain", reinterpret_cast<const void*>(&UnitPlain)}};
+    {
+        auto module = luasharp::NativeModule::Compile(UnitScript, options);
+        using Alloc = void* (*)();
+        using Init = void (*)(void*);
+        using Method = long long (*)(void*);
+        // The host's part of LuaSharpEngine::create.
+        const auto create = [&](std::string_view name, HostUnit& host) {
+            const auto alloc = reinterpret_cast<Alloc>(module.FindSymbol("ls_" + std::string(name) + "__host_alloc"));
+            const auto init = reinterpret_cast<Init>(module.FindSymbol("ls_" + std::string(name) + "__init"));
+            Require(alloc && init, "derived extern class symbols were not exported");
+            void* object = alloc();
+            Require(luasharp::NativeRuntime::NativeBaseName(object) == "Unit", "the nearest extern class of a script object was wrong");
+            luasharp::NativeRuntime::SetNative(object, &host);
+            host.script = object;
+            init(object);
+            return object;
+        };
+        HostUnit guardHost{50}, captainHost{20};
+        void* guard = create("Guard", guardHost);
+        *static_cast<void**>(module.FindGlobal("held")) = guard;
+        Require(reinterpret_cast<Method>(module.FindSymbol("ls_Guard_get_made"))(guard) == 57, "the script constructor did not read extern members");
+        Require(luasharp::NativeRuntime::HostOverrideCount(guard) == 1 && !luasharp::NativeRuntime::HostOverride(guard, "name"), "Guard's host overrides were wrong");
+
+        Require(UnitHit(&guardHost, 12) == 1040 && guardHost.hp == 40, "a host virtual call did not reach the script override and its base call");
+        Require(CallGlobalClosure(module, "hitHeld").as.integer == 1032 && guardHost.hp == 32, "a script call through the extern type did not dispatch to the override");
+        Require(reinterpret_cast<Method>(module.FindSymbol("ls_Guard_heal"))(guard) == 37 && guardHost.hp == 37, "implicit extern field access was wrong");
+        Require(CallGlobalClosure(module, "heldIsGuard").as.boolean == 1 && CallGlobalClosure(module, "heldNull").as.boolean == 0, "'is' or '==' on a derived object was wrong");
+
+        void* captain = create("Captain", captainHost);
+        const auto name = reinterpret_cast<void* (*)(void*)>(luasharp::NativeRuntime::HostOverride(captain, "name"));
+        Require(luasharp::NativeRuntime::HostOverrideCount(captain) == 2 && name && static_cast<const char*>(name(captain)) + 8 == std::string_view("captain"), "an inherited or new host override was wrong");
+        Require(UnitHit(&captainHost, 4) == 1018, "an inherited override was not used");
+        Require(module.LastError().empty(), "derived extern classes reported a runtime error: " + module.LastError());
+
+        luasharp::NativeRuntime::DestroyNative(guard);
+        Require(CallGlobalClosure(module, "heldNull").as.boolean == 1 && CallGlobalClosure(module, "heldIsGuard").as.boolean == 0, "a destroyed derived object was not null");
+        Require(CallGlobalClosure(module, "hitHeld").as.integer == 0 && module.LastError().find("destroyed or null") != std::string::npos, "a call on a destroyed derived object did not report an error");
+    }
+    g_unitRuntime.reset();
+}
+
 void TestInheritanceEmission() {
     const auto generated = luasharp::CompileToC(R"(class B { int x; virtual int f() { return 1; } int g() { return f(); } }
 sealed class D : B { int y; override int f() { return base.f() + 1; } }
@@ -1864,6 +1963,8 @@ int main() {
         {"native inheritance", TestNativeInheritance},
         {"extern class semantics", TestExternClassSemantics},
         {"native extern classes", TestNativeExternClasses},
+        {"derived extern class semantics", TestDerivedExternClassSemantics},
+        {"native derived extern classes", TestNativeDerivedExternClasses},
         {"native value type thunks", TestNativeValueTypeThunks},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
     };

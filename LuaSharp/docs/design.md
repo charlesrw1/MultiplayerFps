@@ -46,7 +46,7 @@ Part 2 has these milestones (#35):
 
 1. `extern class` declarations, proxies and the host API (#37). Done.
 2. Engine codegen: `engine.ls`, the typed C thunks and `ClassBase::script_proxy`. The engine links LuaSharp (#38). Done.
-3. Script classes that derive from engine classes (`ScriptImpl_X` slot tables).
+3. Script classes that derive from engine classes (`ScriptImpl_X` slot tables) (#39). Done.
 4. `[Editable]` fields as `PropertyInfo`. Remove `PROP_LUA_BACKED`.
 5. Hot reload: stable type infos, migration and relocation.
 
@@ -58,6 +58,13 @@ Milestone 2 found these items:
 - The Python header parser does not keep the values of C++ enum members. The codegen therefore converts between the C++ value and the LuaSharp ordinal with a generated table.
 - Each module must declare all engine classes, so each compile takes approximately 0.6 s. A precompiled declaration header can make this faster.
 - `std::vector`, `std::optional`, structs, handles, delegates and overloads are not bound yet. `engine.ls` shows each skipped member as a comment.
+
+Milestone 3 found these items:
+
+- The Lua backend still uses its own path in `ScriptImpl_X`. It runs when `ls_slots` is null, so Lua scripts did not change. Lua can move to the slots later.
+- The engine makes objects only with `LuaSharpEngine::create`. Engine creation by class name (a `ClassTypeInfo` for each script class) is necessary for the editor and serialization (milestones 4 and 5).
+- C++ must not throw through script frames, so a runtime error in an override stays in `NativeRuntime::LastError`.
+- The host shares slot tables by content, not by type info address. A module that loads at the address of an unloaded module then cannot use its stale table.
 
 ### Declarations
 

@@ -11,6 +11,7 @@
 #include "Framework/ClassBase.h"
 #include "Framework/ReflectionProp.h"
 #include "Framework/StringName.h"
+#include "Framework/Util.h"
 
 namespace lsbind {
 
@@ -42,6 +43,8 @@ inline void* string(const char* text) { return string(std::string_view(text ? te
 template <typename T> T* object(void* native) { return static_cast<T*>(static_cast<ClassBase*>(native)); }
 // The one proxy of an object; null for null.
 void* proxy_of(const ClassBase* object);
+// The host object behind a proxy that a slot returns; null for null or destroyed.
+void* native_of(void* proxy);
 
 uint16_t field_offset(const PropertyInfoList* props, const char* name);
 template <typename T, typename C> T& field(C* object, uint16_t offset) {
@@ -64,6 +67,19 @@ struct Class
 	const char* name;
 	const char* base; // empty for ClassBase
 };
+// A CLASS_BODY(X, scriptable) class. ScriptImpl_X calls slots[i] for the script override of slot_names[i].
+struct Scriptable
+{
+	const char* name;
+	std::span<const char* const> slot_names;
+	void (*attach)(ClassBase* object, void* const* slots); // object was made by X's scriptable_allocate
+};
+template <typename Impl> void attach(ClassBase* object, void* const* slots) {
+	auto* impl = dynamic_cast<Impl*>(object);
+	ASSERT(impl && !impl->ls_slots);
+	impl->ls_slots = slots;
+}
+
 // The output of one codegen pass. Declarations are LuaSharp source chunks.
 struct Bindings
 {
@@ -71,6 +87,7 @@ struct Bindings
 	std::span<const char* const> declarations;
 	std::span<const Symbol> symbols;
 	std::span<const Class> classes;
+	std::span<const Scriptable> scriptables;
 };
 std::span<const Bindings* const> all_bindings();
 
@@ -78,7 +95,7 @@ std::span<const Bindings* const> all_bindings();
 struct Registrar
 {
 	Registrar(const char* pass, std::span<const char* const> declarations, std::span<const Symbol> symbols,
-			  std::span<const Class> classes);
+			  std::span<const Class> classes, std::span<const Scriptable> scriptables);
 	Bindings bindings;
 };
 

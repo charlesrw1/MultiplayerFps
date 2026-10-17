@@ -576,8 +576,9 @@ NEWENUM(Mode, uint8_t){
 };
 class Animal : public ClassBase {
 public:
-    CLASS_BODY(Animal);
+    CLASS_BODY(Animal, scriptable);
     REF virtual void speak(int times) {}
+    REF virtual Animal* best(const std::string& tag) { return nullptr; }
     REF int legs = 4;
 };
 class Dog : public Animal {
@@ -597,8 +598,7 @@ public:
 };
 """
 
-    def generate(self) -> tuple[str, str]:
-        import codegen_luasharp as ls
+    def parse(self):
         typenames = cg.read_typenames_from_text(io.StringIO(self.HEADER), "<test>")
         cg.ClassDef.fixup_types(typenames)
         with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
@@ -608,12 +608,17 @@ public:
             classes, _ = cg.parse_file(tmp_path, typenames)
         finally:
             os.unlink(tmp_path)
+        return classes, typenames
+
+    def generate(self):
+        import codegen_luasharp as ls
+        classes, typenames = self.parse()
         return ls.generate(classes, typenames, "TEST")
 
     def test_declarations(self):
-        declarations, _ = self.generate()
+        declarations = self.generate().declarations
         self.assertIn("enum Mode { Off, On }", declarations)
-        self.assertIn("extern class Animal : ClassBase {\n    virtual void speak(int times);\n    int legs;\n", declarations)
+        self.assertIn("extern class Animal : ClassBase {\n    virtual void speak(int times);\n    virtual Animal best(string tag);\n    int legs;\n", declarations)
         self.assertIn("extern class Dog : Animal {\n    static Dog find(string name);\n    Vec3 where(Mode m, Animal other);\n    void bark();\n    float speed;\n", declarations)
         self.assertNotIn("void speak", declarations.split("extern class Dog")[1])  # the Animal thunk dispatches the override
         self.assertIn("// skipped bones(): std::vector<int>", declarations)
@@ -622,7 +627,7 @@ public:
         self.assertNotIn("hidden", declarations)
 
     def test_thunks(self):
-        _, cpp = self.generate()
+        cpp = self.generate().cpp
         self.assertIn("static const int64_t ls_enum_Mode[] = {static_cast<int64_t>(Mode::Off), static_cast<int64_t>(Mode::On)};", cpp)
         self.assertIn("static void* ls_native_Dog_find(void* name) { return lsbind::proxy_of(Dog::find(std::string(lsbind::view(name)))); }", cpp)
         self.assertIn("lsbind::object<Dog>(self)->where(static_cast<Mode>(lsbind::enum_value(ls_enum_Mode, std::size(ls_enum_Mode), m)), lsbind::object<Animal>(other))", cpp)
@@ -630,12 +635,31 @@ public:
         self.assertIn("static void ls_native_Dog__set_speed(void*, double) { lsbind::report_error(\"field 'Dog.speed' is read-only\"); }", cpp)
         self.assertIn("{\"ls_native_Animal__get_legs\", reinterpret_cast<const void*>(&ls_native_Animal__get_legs)}", cpp)
         self.assertIn("\t{\"Dog\", \"Animal\"},\n", cpp)
-        self.assertIn("static const lsbind::Registrar ls_registrar{\"TEST\", ls_declarations, ls_symbols, ls_classes};", cpp)
+        self.assertIn("static const lsbind::Registrar ls_registrar{\"TEST\", ls_declarations, ls_symbols, ls_classes, ls_scriptables};", cpp)
+
+    def test_scriptable_slots(self):
+        out = self.generate()
+        self.assertEqual(list(out.slots), ["Animal"])  # Dog is not scriptable
+        self.assertEqual(out.slots["Animal"]["speak"], "if (auto ls_fn = reinterpret_cast<void (*)(void*, int64_t)>(ls_slots[0])) { ls_fn(get_script_proxy(), static_cast<int64_t>(times)); return; }")
+        self.assertEqual(out.slots["Animal"]["best"], "if (auto ls_fn = reinterpret_cast<void* (*)(void*, void*)>(ls_slots[1])) return lsbind::object<Animal>(lsbind::native_of(ls_fn(get_script_proxy(), lsbind::string(tag))));")
+        self.assertIn("static void ls_native_Animal__base_speak(void* self, int64_t times) { lsbind::object<Animal>(self)->Animal::speak(static_cast<int>(times)); }", out.cpp)
+        self.assertIn("static const char* const ls_slot_names_Animal[] = {\n\t\"speak\",\n\t\"best\",\n};", out.cpp)
+        self.assertIn("\t{\"Animal\", ls_slot_names_Animal, &lsbind::attach<ScriptImpl_Animal>},\n", out.cpp)
+        self.assertIn("{\"ls_native_Animal__base_best\", reinterpret_cast<const void*>(&ls_native_Animal__base_best)}", out.cpp)
+
+    def test_scriptable_class_calls_slots(self):
+        import codegen_generate as gen
+        out = self.generate()
+        classes, _ = self.parse()
+        animal = next(c for c in classes if c.classname == "Animal")
+        impl = gen.write_scriptable_class(animal, out.slots["Animal"])
+        self.assertIn("void* const* ls_slots = nullptr;", impl)
+        self.assertIn("if (ls_slots) { " + out.slots["Animal"]["speak"] + " return Animal::speak(times); }", impl)
+        self.assertNotIn("ls_slots", gen.write_scriptable_class(animal))  # the Lua-only class is unchanged
 
     def test_empty_pass(self):
         import codegen_luasharp as ls
-        _, cpp = ls.generate([], {}, "EMPTY")
-        self.assertEqual(cpp, "")
+        self.assertEqual(ls.generate([], {}, "EMPTY").cpp, "")
 
 
 if __name__ == "__main__":

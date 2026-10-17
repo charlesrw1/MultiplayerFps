@@ -60,12 +60,15 @@ struct RuntimeAbi {
 
 // Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.
 struct NativeTypeInfo;
+struct NativeHostOverride { const char* name; void* function; }; // LS_HostOverride
 struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; };
 struct NativeTypeInfo {
     const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind;
     const NativeTypeInfo* base; void* const* vtable; unsigned long long flags;
+    unsigned long long hostOverrideCount; const NativeHostOverride* hostOverrides;
 };
-constexpr unsigned long long TypeNative = 1; // LS_TYPE_NATIVE
+constexpr unsigned long long TypeNative = 1;     // LS_TYPE_NATIVE
+constexpr unsigned long long TypeNativeBase = 2; // LS_TYPE_NATIVE_BASE
 // Mirrors LS_NativeObject.
 struct NativeProxy { const NativeTypeInfo* type; void* native; };
 // An extern class type info and the name it points to.
@@ -470,7 +473,7 @@ std::string FormatValue(const NativeValue& value) {
     case NativeValueKind::Struct: return FormatStruct(BoxType(value.as.pointer), BoxValue(value.as.pointer));
     case NativeValueKind::Object: {
         const auto& proxy = *static_cast<const NativeProxy*>(value.as.pointer);
-        if ((proxy.type->flags & TypeNative) && !proxy.native) return "nil"; // destroyed
+        if ((proxy.type->flags & (TypeNative | TypeNativeBase)) && !proxy.native) return "nil"; // destroyed
         return reference("table");
     }
     default: return reference("table");
@@ -624,6 +627,30 @@ void* NativeRuntime::NewNativeProxy(const void* nativeClass, void* native, Nativ
 }
 void* NativeRuntime::NativeOf(const void* proxy) { return proxy ? static_cast<const NativeProxy*>(proxy)->native : nullptr; }
 void NativeRuntime::DestroyNative(void* proxy) { assert(proxy); static_cast<NativeProxy*>(proxy)->native = nullptr; }
+namespace {
+const NativeTypeInfo& DerivedType(const void* object) {
+    assert(object);
+    const auto& type = *static_cast<const NativeProxy*>(object)->type;
+    assert((type.flags & TypeNativeBase) && "the object's class does not derive from an extern class");
+    return type;
+}
+} // namespace
+std::string_view NativeRuntime::NativeBaseName(const void* object) {
+    for (const auto* type = &DerivedType(object); type; type = type->base) if (type->flags & TypeNative) return type->name;
+    assert(!"a class with LS_TYPE_NATIVE_BASE has an extern ancestor");
+    return {};
+}
+void* NativeRuntime::HostOverride(const void* object, std::string_view method) {
+    const auto& type = DerivedType(object);
+    for (const auto& entry : std::span(type.hostOverrides, static_cast<size_t>(type.hostOverrideCount))) if (entry.name == method) return entry.function;
+    return nullptr;
+}
+size_t NativeRuntime::HostOverrideCount(const void* object) { return static_cast<size_t>(DerivedType(object).hostOverrideCount); }
+void NativeRuntime::SetNative(void* object, void* native) {
+    static_cast<void>(DerivedType(object));
+    assert(native && !static_cast<NativeProxy*>(object)->native);
+    static_cast<NativeProxy*>(object)->native = native;
+}
 
 NativeRef::NativeRef(std::shared_ptr<NativeRuntime> runtime, void* object) : runtime_(std::move(runtime)), object_(object) {
     assert(runtime_);

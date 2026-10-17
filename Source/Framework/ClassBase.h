@@ -145,6 +145,10 @@ public:
 	// override to return their respective lua_owner_type.
 	virtual const LuaClassTypeInfo* get_lua_owner_type() const { return nullptr; }
 
+protected:
+	// The LuaSharp script object of a ScriptImpl_X object; the `self` of its slot calls.
+	void* get_script_proxy() const { return script_proxy; }
+
 private:
 	friend class LuaSharpEngine;
 	// The LuaSharp proxy (a GC root slot), or null. Not copied or moved; see LuaSharpEngine.

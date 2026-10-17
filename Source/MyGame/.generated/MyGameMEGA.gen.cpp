@@ -11,6 +11,7 @@
 #include "./MyGame\fps/fpsApp.h"
 #include "./MyGame\fps/fpsObjects.h"
 #include "./MyGame\fps/fpsTestObjects.h"
+#include "Scripting/LuaSharpBinding.h"
 
 void push_lVec3_to_lua(lua_State* L, const lVec3& value);
 lVec3 get_lVec3_from_lua(lua_State* L, int index);
@@ -172,7 +173,9 @@ public:
 
     const ClassTypeInfo* type = nullptr;
     const ClassTypeInfo& get_type() const final { return *type; }
-    	void init() final {
+    void* const* ls_slots = nullptr; // LuaSharp overrides (LuaSharpEngine::create)
+	void init() final {
+        if (ls_slots) { if (auto ls_fn = reinterpret_cast<void (*)(void*)>(ls_slots[0])) { ls_fn(get_script_proxy()); return; } return fpsLuaBridge::init(); }
         lua_State* L = ScriptManager::inst->get_lua_state();
         int myTable = get_table_registry_id();
         int top = lua_gettop(L);  // save stack
@@ -200,6 +203,7 @@ public:
 		}
 	}
 	void start_level_script() final {
+        if (ls_slots) { if (auto ls_fn = reinterpret_cast<void (*)(void*)>(ls_slots[1])) { ls_fn(get_script_proxy()); return; } return fpsLuaBridge::start_level_script(); }
         lua_State* L = ScriptManager::inst->get_lua_state();
         int myTable = get_table_registry_id();
         int top = lua_gettop(L);  // save stack
@@ -227,6 +231,7 @@ public:
 		}
 	}
 	void update() final {
+        if (ls_slots) { if (auto ls_fn = reinterpret_cast<void (*)(void*)>(ls_slots[2])) { ls_fn(get_script_proxy()); return; } return fpsLuaBridge::update(); }
         lua_State* L = ScriptManager::inst->get_lua_state();
         int myTable = get_table_registry_id();
         int top = lua_gettop(L);  // save stack
@@ -254,6 +259,7 @@ public:
 		}
 	}
 	void imgui_tick() final {
+        if (ls_slots) { if (auto ls_fn = reinterpret_cast<void (*)(void*)>(ls_slots[3])) { ls_fn(get_script_proxy()); return; } return fpsLuaBridge::imgui_tick(); }
         lua_State* L = ScriptManager::inst->get_lua_state();
         int myTable = get_table_registry_id();
         int top = lua_gettop(L);  // save stack
@@ -443,7 +449,6 @@ const PropertyInfoList* PhysicsLayerTesterRaycast::get_props()
 
 
 // ---- LuaSharp binding (Scripts/codegen_luasharp.py) ----
-#include "Scripting/LuaSharpBinding.h"
 static const int64_t ls_enum_AnimGraphTestMode[] = {static_cast<int64_t>(AnimGraphTestMode::BasicIK), static_cast<int64_t>(AnimGraphTestMode::LookAt), static_cast<int64_t>(AnimGraphTestMode::GunGripIK), static_cast<int64_t>(AnimGraphTestMode::FeetIK), static_cast<int64_t>(AnimGraphTestMode::BlendMasked), static_cast<int64_t>(AnimGraphTestMode::CopyBone), static_cast<int64_t>(AnimGraphTestMode::SlotPlaying), static_cast<int64_t>(AnimGraphTestMode::Additive), static_cast<int64_t>(AnimGraphTestMode::BlendByInt), static_cast<int64_t>(AnimGraphTestMode::DurationEventTest), static_cast<int64_t>(AnimGraphTestMode::BlendSpace2D), static_cast<int64_t>(AnimGraphTestMode::SpringBoneTest), static_cast<int64_t>(AnimGraphTestMode::CachedPoseTest)};
 static const int64_t ls_enum_Easing[] = {static_cast<int64_t>(Easing::Linear), static_cast<int64_t>(Easing::CubicEaseIn), static_cast<int64_t>(Easing::CubicEaseOut), static_cast<int64_t>(Easing::CubicEaseInOut), static_cast<int64_t>(Easing::Constant)};
 static const int64_t ls_enum_BodyType[] = {static_cast<int64_t>(BodyType::Static), static_cast<int64_t>(BodyType::Kinematic), static_cast<int64_t>(BodyType::Dynamic)};
@@ -627,6 +632,16 @@ static void ls_native_PhysicsLayerTesterRaycast__set_layer4(void* self, uint8_t 
 static uint16_t ls_offset_PhysicsLayerTesterRaycast_layer5() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterRaycast::get_props(), "layer5"); return offset; }
 static uint8_t ls_native_PhysicsLayerTesterRaycast__get_layer5(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer5()) ? 1 : 0); }
 static void ls_native_PhysicsLayerTesterRaycast__set_layer5(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer5()) = (value != 0); }
+static void ls_native_fpsLuaBridge__base_init(void* self) { lsbind::object<fpsLuaBridge>(self)->fpsLuaBridge::init(); }
+static void ls_native_fpsLuaBridge__base_start_level_script(void* self) { lsbind::object<fpsLuaBridge>(self)->fpsLuaBridge::start_level_script(); }
+static void ls_native_fpsLuaBridge__base_update(void* self) { lsbind::object<fpsLuaBridge>(self)->fpsLuaBridge::update(); }
+static void ls_native_fpsLuaBridge__base_imgui_tick(void* self) { lsbind::object<fpsLuaBridge>(self)->fpsLuaBridge::imgui_tick(); }
+static const char* const ls_slot_names_fpsLuaBridge[] = {
+	"init",
+	"start_level_script",
+	"update",
+	"imgui_tick",
+};
 static const char* const ls_declarations[] = {
 	R"ls(enum AnimGraphTestMode { BasicIK, LookAt, GunGripIK, FeetIK, BlendMasked, CopyBone, SlotPlaying, Additive, BlendByInt, DurationEventTest, BlendSpace2D, SpringBoneTest, CachedPoseTest }
 )ls",
@@ -881,6 +896,10 @@ static lsbind::Symbol const ls_symbols[] = {
 	{"ls_native_PhysicsLayerTesterRaycast__set_layer4", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__set_layer4)},
 	{"ls_native_PhysicsLayerTesterRaycast__get_layer5", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__get_layer5)},
 	{"ls_native_PhysicsLayerTesterRaycast__set_layer5", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__set_layer5)},
+	{"ls_native_fpsLuaBridge__base_init", reinterpret_cast<const void*>(&ls_native_fpsLuaBridge__base_init)},
+	{"ls_native_fpsLuaBridge__base_start_level_script", reinterpret_cast<const void*>(&ls_native_fpsLuaBridge__base_start_level_script)},
+	{"ls_native_fpsLuaBridge__base_update", reinterpret_cast<const void*>(&ls_native_fpsLuaBridge__base_update)},
+	{"ls_native_fpsLuaBridge__base_imgui_tick", reinterpret_cast<const void*>(&ls_native_fpsLuaBridge__base_imgui_tick)},
 };
 static lsbind::Class const ls_classes[] = {
 	{"BikeObject", "Component"},
@@ -896,4 +915,7 @@ static lsbind::Class const ls_classes[] = {
 	{"PhysicsLayerTesterObject", "Component"},
 	{"PhysicsLayerTesterRaycast", "Component"},
 };
-static const lsbind::Registrar ls_registrar{"MyGameMEGA", ls_declarations, ls_symbols, ls_classes};
+static lsbind::Scriptable const ls_scriptables[] = {
+	{"fpsLuaBridge", ls_slot_names_fpsLuaBridge, &lsbind::attach<ScriptImpl_fpsLuaBridge>},
+};
+static const lsbind::Registrar ls_registrar{"MyGameMEGA", ls_declarations, ls_symbols, ls_classes, ls_scriptables};

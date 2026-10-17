@@ -108,6 +108,7 @@ struct CEmitter {
     StringMap<bool> structReferences;            // memo for HasReferences
     std::vector<std::pair<const BoundClass*, const BoundField*>> staticFields; // declaration order
     std::vector<std::string_view> dynamicNames;  // member names used on table/any values
+    std::vector<std::pair<const ExternalType*, const Symbol*>> baseThunks; // `base.m()` of extern virtual methods: (nearest extern class, m)
     std::optional<size_t> activeLambda;
     std::string_view constructorResult;         // variable a bare `return;` yields inside a constructor
     TypeId functionReturn = TypeTable::Unknown; // return type of the method being emitted
@@ -154,15 +155,43 @@ struct CEmitter {
             const bool dynamicMember = item.kind == SyntaxExpression::Kind::Member && IsDynamic(Child(item, 0).type);
             const bool keyedEntry = item.kind == SyntaxExpression::Kind::TableEntry && !item.Text().empty();
             if ((dynamicMember || keyedEntry) && std::find(dynamicNames.begin(), dynamicNames.end(), item.Text()) == dynamicNames.end()) dynamicNames.push_back(item.Text());
+            if (const auto thunk = NativeBaseCall(item); thunk.first && std::find(baseThunks.begin(), baseThunks.end(), thunk) == baseThunks.end()) baseThunks.push_back(thunk);
         }
     }
+    // `base.m()` where m is an extern virtual method: the host calls the extern implementation without virtual dispatch.
+    std::pair<const ExternalType*, const Symbol*> NativeBaseCall(const BoundExpression& call) const {
+        if (call.kind != SyntaxExpression::Kind::Call) return {};
+        const auto& callee = Child(call, 0);
+        if (callee.kind != SyntaxExpression::Kind::Member || Child(callee, 0).lowering != Lowering::Base) return {};
+        const auto* member = NativeMember(call);
+        if (!member || !member->isVirtual || member->isStatic) return {};
+        const auto* native = NativeBaseOf(Name(Child(callee, 0).type));
+        assert(native);
+        return {native, member};
+    }
+    static std::string BaseThunkName(std::string_view method) { return "_base_" + std::string(method); }
 
+    // The script base class; null at the root of the script chain, also when the base is an extern class.
     const BoundClass* BaseOf(const BoundClass& type) const {
-        if (type.isStruct || type.baseName.empty()) return nullptr;
+        if (type.isStruct || type.baseName.empty() || natives.contains(type.baseName)) return nullptr;
         const auto found = classes.find(type.baseName);
         if (found == classes.end()) throw std::runtime_error("Native C backend cannot derive '" + type.name + "' from external type '" + type.baseName + "' yet");
         return found->second;
     }
+    // The nearest extern ancestor of a script class, or null. Its objects start with LS_NativeObject.
+    const ExternalType* NativeBaseOf(const BoundClass& type) const {
+        const auto* root = &type;
+        while (const auto* base = BaseOf(*root)) root = base;
+        const auto found = natives.find(root->baseName);
+        return found == natives.end() ? nullptr : found->second;
+    }
+    const ExternalType* NativeBaseOf(std::string_view type) const {
+        if (const auto found = natives.find(type); found != natives.end()) return found->second;
+        if (const auto found = classes.find(type); found != classes.end()) return NativeBaseOf(*found->second);
+        return nullptr;
+    }
+    // Extern objects and script objects that derive from extern classes: null once the host destroys them.
+    bool IsNativeBacked(TypeId type) const { return NativeBaseOf(Name(type)) != nullptr; }
     // The base of a script or extern class; empty at the root.
     std::string_view BaseName(std::string_view type) const {
         if (const auto found = classes.find(type); found != classes.end()) return found->second->baseName;
@@ -496,7 +525,7 @@ struct CEmitter {
         CheckFlow(target, value.type);
         if (target == TypeTable::Any) return Box(value, owner);
         if (value.type == TypeTable::Any) return Unbox(target, Emitted(value, owner));
-        if (IsClass(target) && IsClass(value.type)) return Put("((", Type(target), ')', Emitted(value, owner), ')'); // derived to base
+        if (IsObject(target) && IsObject(value.type)) return Put("((", Type(target), ')', Emitted(value, owner), ')'); // derived to base
         Expression(value, owner);
     }
     // `any` conditions use Lua truthiness.
@@ -508,6 +537,18 @@ struct CEmitter {
     std::string_view MemberOwner(const BoundExpression& member) const {
         if (member.symbolIndex) return analysis.symbols[*member.symbolIndex].owner;
         return Name(Child(member, 0).type);
+    }
+    // The extern class that declares the field `x.f` or an implicit `f` names; empty for other fields.
+    std::string_view NativeFieldOwner(const BoundExpression& target) const {
+        const bool member = target.kind == SyntaxExpression::Kind::Member;
+        if (member && IsNative(Child(target, 0).type)) return MemberOwner(target);
+        if (!target.symbolIndex || !(member || (target.kind == SyntaxExpression::Kind::Identifier && target.lowering == Lowering::ImplicitField))) return {};
+        const auto& symbol = analysis.symbols[*target.symbolIndex];
+        return symbol.kind == SymbolKind::Field && !symbol.isStatic && natives.contains(symbol.owner) ? std::string_view(symbol.owner) : std::string_view();
+    }
+    // The object of a NativeFieldOwner field, as the extern class that declares it.
+    auto NativeFieldObject(const BoundExpression& target, std::string_view fieldOwner, std::string_view owner) {
+        return [this, &target, fieldOwner, owner] { Put("(LS_", Id{fieldOwner}, "*)"); if (target.kind == SyntaxExpression::Kind::Identifier) Put("self"); else Expression(Child(target, 0), owner); };
     }
     // Generated accessor of an extern field: ls_<Owner>__get_<field> or ls_<Owner>__set_<field>.
     auto Accessor(std::string_view fieldOwner, std::string_view kind, std::string_view field) { return [this, fieldOwner, kind, field] { Put("ls_", Id{fieldOwner}, "__", kind, '_', Id{field}); }; }
@@ -588,6 +629,7 @@ struct CEmitter {
             if (value.lowering == Lowering::Base) return Put("((", Type(value.type), ")self)");
             if (text == "this") return IsUserStruct(owner) ? Put("(*self)") : Put("self");
             if (value.lowering == Lowering::StaticField) return Put(StaticSlot(value));
+            if (const auto fieldOwner = NativeFieldOwner(value); !fieldOwner.empty()) return Put(Accessor(fieldOwner, "get", text), '(', NativeFieldObject(value, fieldOwner, owner), ')');
             if (value.lowering == Lowering::ImplicitField) return Put("self->", Id{text});
             if (value.symbolIndex && globalSymbols.contains(*value.symbolIndex)) return Put("ls_state.", Id{text});
             if (value.symbolIndex) return Variable(*value.symbolIndex, text);
@@ -606,7 +648,7 @@ struct CEmitter {
             if (IsStruct(target)) return Put('(', child(0), ").", Id{text});
             if (target == TypeTable::Table) return Put("ls_table_get(", child(0), ", ", NameValue(text), ')');
             if (target == TypeTable::Any) return Put("ls_value_get(", child(0), ", ", NameValue(text), ')');
-            if (IsNative(target)) return Put(Accessor(MemberOwner(value), "get", text), '(', child(0), ')');
+            if (const auto fieldOwner = NativeFieldOwner(value); !fieldOwner.empty()) return Put(Accessor(fieldOwner, "get", text), '(', NativeFieldObject(value, fieldOwner, owner), ')');
             if (externalNames.contains(Name(target))) if (const auto* symbol = ExternalMember(Name(target), text); symbol && symbol->kind == SymbolKind::Field)
                 throw std::runtime_error("Native C backend cannot directly access field '" + text + "' on opaque external type '" + Name(target) + "'");
             return Put(child(0), "->", Id{text});
@@ -621,7 +663,7 @@ struct CEmitter {
             if (value.lowering == Lowering::Concat) return Put("ls_string_concat(", child(0), ", ", child(1), ')');
             if (value.nativeOperator) return Put(Id{value.nativeOperator->cName}, '(', child(0), ", ", child(1), ')');
             const auto left = Child(value, 0).type, right = Child(value, 1).type;
-            if ((text == "==" || text == "!=") && (IsNative(left) || IsNative(right)) && left != TypeTable::Any && right != TypeTable::Any)
+            if ((text == "==" || text == "!=") && (IsNativeBacked(left) || IsNativeBacked(right)) && left != TypeTable::Any && right != TypeTable::Any)
                 return Put(text == "!=" ? "(!" : "(", "ls_native_same(", child(0), ", ", child(1), "))");
             if ((text == "==" || text == "!=") && IsStruct(left) && left == right) return Put(text == "!=" ? "(!" : "(", "ls_", Id{Name(left)}, "_eq(", child(0), ", ", child(1), "))");
             if (left == TypeTable::Any || right == TypeTable::Any) {
@@ -739,10 +781,9 @@ struct CEmitter {
         }
         const auto type = target.type;
         // An extern field: the setter returns the stored value. Evaluates the object, then the value.
-        if (target.kind == SyntaxExpression::Kind::Member && IsNative(Child(target, 0).type)) {
+        if (const auto fieldOwner = NativeFieldOwner(target); !fieldOwner.empty()) {
             const auto object = Temp("object", label);
-            const auto fieldOwner = MemberOwner(target);
-            Put("({ ", Type(Child(target, 0).type), ' ', object, " = ", Emitted(Child(target, 0), owner), "; ", Accessor(fieldOwner, "set", target.Text()), '(', object, ", ");
+            Put("({ LS_", Id{fieldOwner}, "* ", object, " = ", NativeFieldObject(target, fieldOwner, owner), "; ", Accessor(fieldOwner, "set", target.Text()), '(', object, ", ");
             if (!compound) Value(type, right, owner);
             else Combine(type, operation, value.lowering, value.nativeOperator, [&] { Put(Accessor(fieldOwner, "get", target.Text()), '(', object, ')'); }, [&] { Operand(type, value.lowering, right, owner); });
             return Put("); })");
@@ -831,10 +872,15 @@ struct CEmitter {
             Put(Id{value.nativeMember->cName}, '(', receiver); NativeArguments(*value.nativeMember, value, 1, true, owner);
             return Put(')');
         }
+        if (const auto [native, member] = NativeBaseCall(value); native) {
+            Put(Fn{native->name, BaseThunkName(member->name)}, "((LS_", Id{native->name}, "*)self");
+            Arguments(ParameterTypes(member), value, 1, true, owner);
+            return Put(')');
+        }
         if (const auto* member = NativeMember(value)) {
             // ls_<Owner>_<name> checks the receiver and calls the host thunk.
             Put(Fn{member->owner, member->name}, '(');
-            if (!member->isStatic) Put(Emitted(Child(callee, 0), owner));
+            if (!member->isStatic) Put("(LS_", Id{member->owner}, "*)", [&] { if (callee.lowering == Lowering::ImplicitMethod) Put("self"); else Expression(Child(callee, 0), owner); });
             Arguments(ParameterTypes(member), value, 1, !member->isStatic, owner);
             return Put(')');
         }
@@ -1038,6 +1084,7 @@ struct CEmitter {
         Line(0, "struct LS_", Id{value.name}, " {");
         if (!value.isStruct) Line(1, "const LS_TypeInfo* ls_type;");
         else if (fields.empty()) Line(1, "char ls_empty;");
+        if (!value.isStruct && NativeBaseOf(value)) Line(1, "void* ls_native; /* LS_NativeObject.native */");
         for (const auto* field : fields) Line(1, CTypeName{field->type}, ' ', Id{field->name}, ';');
         Line(0, "};");
     }
@@ -1093,9 +1140,12 @@ struct CEmitter {
         if (result.empty() && !type.isStruct) result.push_back(nullptr);
         return result;
     }
+    // "LS_T* ls_T__host_alloc(void)": a class that derives from an extern class has no ls_T_new.
+    void HostAllocSignature(const BoundClass& type) { Put("LS_", Id{type.name}, "* ", FunctionName(type.name, "_host_alloc"), "(void)"); }
     void Prototypes(const BoundClass& value) {
         for (const auto* constructor : value.isStruct ? Constructors(value) : ClassConstructors(value)) {
-            if (!value.isAbstract) Line(0, [&] { ConstructorSignature(value, constructor); }, ';');
+            if (!value.isAbstract && !value.isStruct && NativeBaseOf(value)) Line(0, [&] { HostAllocSignature(value); }, ';');
+            else if (!value.isAbstract) Line(0, [&] { ConstructorSignature(value, constructor); }, ';');
             if (!value.isStruct) Line(0, [&] { InitSignature(value, constructor); }, ';');
         }
         if (value.isStruct) {
@@ -1164,11 +1214,33 @@ struct CEmitter {
             for (const auto& slot : *slots) Line(1, [&] { if (slot.impl) Put("(void*)", RefOf(*slot.impl).cName); else Put("(void*)0"); }, ", /* ", slot.key, " */");
             Line(0, "};");
         }
+        const auto* native = value.isStruct ? nullptr : NativeBaseOf(value);
+        const auto overrides = native ? HostOverrides(value, *native) : std::vector<std::pair<std::string_view, const BoundFunction*>>{};
+        if (!overrides.empty()) {
+            Line(0, "static const LS_HostOverride ls_host_overrides_", name, "[] = {");
+            for (const auto& [method, function] : overrides) Line(1, "{\"", method, "\", (void*)", RefOf(*function).cName, "},");
+            Line(0, "};");
+        }
         const auto* base = BaseOf(value);
+        const std::string_view baseName = base ? std::string_view(base->name) : native ? std::string_view(value.baseName) : std::string_view();
         Line(0, "static const LS_TypeInfo ls_type_", name, " = {\"", value.name, "\", ", fields.size(), ", ", [&] { if (!fields.empty()) Put("ls_fields_", name); else Put("(const LS_FieldInfo*)0"); }, ", ",
             methods.size(), ", ", [&] { if (!methods.empty()) Put("ls_methods_", name); else Put("(const LS_MethodInfo*)0"); }, ", ", [&] { if (value.isStruct) Put("sizeof(LS_", name, ")"); else Put('0'); }, ", ",
-            value.isStruct ? "LS_KIND_STRUCT" : "LS_KIND_OBJECT", ", ", [&] { if (base) Put("&ls_type_", Id{base->name}); else Put("(const LS_TypeInfo*)0"); }, ", ",
-            [&] { if (slots && !slots->empty()) Put("ls_vtable_", name); else Put("(void* const*)0"); }, "};");
+            value.isStruct ? "LS_KIND_STRUCT" : "LS_KIND_OBJECT", ", ", [&] { if (!baseName.empty()) Put("&ls_type_", Id{baseName}); else Put("(const LS_TypeInfo*)0"); }, ", ",
+            [&] { if (slots && !slots->empty()) Put("ls_vtable_", name); else Put("(void* const*)0"); }, [&] {
+                if (!native) return;
+                Put(", LS_TYPE_NATIVE_BASE, ", overrides.size(), ", ");
+                if (!overrides.empty()) Put("ls_host_overrides_", name); else Put("(const LS_HostOverride*)0");
+            }, "};");
+    }
+    // The most-derived script implementation of each extern virtual method that the class or its script bases override.
+    std::vector<std::pair<std::string_view, const BoundFunction*>> HostOverrides(const BoundClass& value, const ExternalType& native) const {
+        std::vector<std::pair<std::string_view, const BoundFunction*>> result;
+        for (const auto& slot : vtables.at(&value)) {
+            if (!slot.impl) continue;
+            const auto* member = ExternalMember(native.name, slot.impl->name);
+            if (member && member->kind == SymbolKind::Method && member->isVirtual && !member->isStatic) result.emplace_back(member->name, slot.impl);
+        }
+        return result;
     }
     // "Type name" or "Type? name" of an external parameter.
     static std::pair<std::string_view, std::string_view> SplitParameter(std::string_view parameter) {
@@ -1192,6 +1264,7 @@ struct CEmitter {
                 else if (constructor || member.kind == SymbolKind::Method) NativeMethod(*type, member, constructor);
             }
         }
+        for (const auto& [native, member] : baseThunks) NativeMethod(*native, *member, false, BaseThunkName(member->name));
         if (!orderedNatives.empty()) Line(0);
     }
     void NativeField(const ExternalType& type, const Symbol& field) {
@@ -1204,9 +1277,10 @@ struct CEmitter {
         Line(0, "static ", CTypeName{field.type}, ' ', Accessor(type.name, "set", field.name), "(LS_", name, "* self, ", CTypeName{field.type}, " value) { void* ls_host = ls_native_self(self, \"", label,
             "\"); if (ls_host) ls_native_", name, "__set_", member, "(ls_host, ", [&] { HostArgument(field.type, "value"); }, "); return value; }");
     }
-    void NativeMethod(const ExternalType& type, const Symbol& method, bool constructor) {
+    // thunkName: the member part of the thunk and wrapper names; empty for the member's own name.
+    void NativeMethod(const ExternalType& type, const Symbol& method, bool constructor, std::string_view thunkName = {}) {
         const Id name{type.name};
-        const std::string_view memberName = constructor ? std::string_view("new") : std::string_view(method.name);
+        const std::string_view memberName = !thunkName.empty() ? thunkName : constructor ? std::string_view("new") : std::string_view(method.name);
         const bool receiver = !constructor && !method.isStatic;
         const auto hostParameters = [&] {
             if (receiver) Put("void* self");
@@ -1300,10 +1374,18 @@ struct CEmitter {
             if (constructor) Statements(constructor->body, 1, value.name);
             Line(0, '}');
             if (value.isAbstract) return;
+            const auto allocate = [&] {
+                Line(1, "LS_", name, "* self = (LS_", name, "*)ls_alloc(sizeof(LS_", name, "), ls_trace_", name, ");");
+                Line(1, "if (!self) return (LS_", name, "*)0;");
+                Line(1, "self->ls_type = &ls_type_", name, ';');
+            };
+            // The host links the object to its host object, then runs ls_T__init (see LuaSharpEngine::create).
+            if (NativeBaseOf(value)) {
+                Line(0, [&] { HostAllocSignature(value); }, " {"); allocate(); Line(1, "return self;"); Line(0, '}');
+                return;
+            }
             Line(0, [&] { ConstructorSignature(value, constructor); }, " {");
-            Line(1, "LS_", name, "* self = (LS_", name, "*)ls_alloc(sizeof(LS_", name, "), ls_trace_", name, ");");
-            Line(1, "if (!self) return (LS_", name, "*)0;");
-            Line(1, "self->ls_type = &ls_type_", name, ';');
+            allocate();
             Line(1, InitName(value, constructor), "(self", [&] { if (constructor) for (const auto& parameter : constructor->parameters) Put(", ", Id{parameter.name}); }, ");");
             Line(1, "return self;"); Line(0, '}');
             exportConstructor(constructor);

@@ -13,6 +13,7 @@
 #include "./Render/PostProcessSettings.h"
 #include "./Render/Texture.h"
 #include "./Render\Editor/TextureEditor.h"
+#include "Scripting/LuaSharpBinding.h"
 
 void push_lVec3_to_lua(lua_State* L, const lVec3& value);
 lVec3 get_lVec3_from_lua(lua_State* L, int index);
@@ -280,7 +281,6 @@ const PropertyInfoList* TextureImportSettings::get_props()
 
 
 // ---- LuaSharp binding (Scripts/codegen_luasharp.py) ----
-#include "Scripting/LuaSharpBinding.h"
 static const int64_t ls_enum_TextureCompressionType[] = {static_cast<int64_t>(TextureCompressionType::Unset), static_cast<int64_t>(TextureCompressionType::Compressed_BC1), static_cast<int64_t>(TextureCompressionType::Uncompressed), static_cast<int64_t>(TextureCompressionType::NormalMap_BC5), static_cast<int64_t>(TextureCompressionType::GreyscaleMask_BC4), static_cast<int64_t>(TextureCompressionType::HighQuality_BC7), static_cast<int64_t>(TextureCompressionType::UseSourceFile)};
 static void* ls_native_MaterialInstance_load(void* path) { return lsbind::proxy_of(MaterialInstance::load(std::string(lsbind::view(path)))); }
 static void* ls_native_MaterialInstance_alloc_dynamic_mat(void* from) { return lsbind::proxy_of(MaterialInstance::alloc_dynamic_mat(lsbind::object<MaterialInstance>(from))); }
@@ -559,4 +559,5 @@ static lsbind::Class const ls_classes[] = {
 	{"Texture", "IAsset"},
 	{"TextureImportSettings", "ClassBase"},
 };
-static const lsbind::Registrar ls_registrar{"RenderMEGA", ls_declarations, ls_symbols, ls_classes};
+static const std::span<lsbind::Scriptable const> ls_scriptables;
+static const lsbind::Registrar ls_registrar{"RenderMEGA", ls_declarations, ls_symbols, ls_classes, ls_scriptables};

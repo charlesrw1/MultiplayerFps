@@ -34,6 +34,7 @@ luasharp::NativeValue call(const luasharp::NativeModule& module, std::string_vie
 class LuaSharpEngineTest : public ::testing::Test
 {
 protected:
+	static void SetUpTestSuite() { ClassBase::init_classes_startup(); } // create() finds engine classes by name
 	void SetUp() override {
 		if (!luasharp::NativeModule::IsLibTccAvailable())
 			GTEST_SKIP() << "libtcc.dll is not deployed";
@@ -180,6 +181,92 @@ bool isBase = base is LsTestBase;
 )");
 	EXPECT_EQ(global<uint8_t>(module, "isThing"), 1);
 	EXPECT_EQ(global<uint8_t>(module, "isBase"), 1);
+}
+
+namespace {
+constexpr const char* DerivedSource = R"(
+class Spinner : LsTestScriptable {
+	int extra = 5;
+	int made;
+	Spinner() { made = hp + base_value; }
+	override int tick(int dt) { return base.tick(dt * 2) + extra; }
+	override string label_for(string prefix) { return prefix + "script"; }
+	override void notify(LsTestThing other) { other.speed = 9.0; }
+	override LsTestThing pick() { return LsTestThing.find_first(); }
+	override int describe() { return 30 + base.describe(); }
+	int get_made() { return made; }
+}
+class Fast : Spinner { override int tick(int dt) { return 1; } }
+class Plain : LsTestScriptable { int extra = 1; }
+class PlainThing : LsTestThing { int extra = 1; }
+class BadThing : LsTestThing { override int describe() { return 0; } }
+LsTestScriptable held;
+auto heldNull = () => held == null;
+auto heldIsSpinner = () => held is Spinner;
+)";
+} // namespace
+
+TEST_F(LuaSharpEngineTest, DerivedClassOverridesVirtuals) {
+	LsTestThing thing;
+	LsTestThing::first = &thing;
+	auto module = engine->compile(DerivedSource);
+	std::unique_ptr<ClassBase> object = engine->create(module, "Spinner");
+	auto* spinner = dynamic_cast<LsTestScriptable*>(object.get());
+	ASSERT_NE(spinner, nullptr);
+	void* script = engine->proxy_of(spinner);
+	EXPECT_EQ(luasharp::NativeRuntime::NativeOf(script), static_cast<ClassBase*>(spinner));
+	using Method = int64_t (*)(void*);
+	EXPECT_EQ(reinterpret_cast<Method>(module.FindSymbol("ls_Spinner_get_made"))(script), 107); // the constructor read engine fields
+
+	EXPECT_EQ(spinner->tick(3), 99); // base.tick(6) leaves 94, plus extra
+	EXPECT_EQ(spinner->hp, 94);
+	EXPECT_EQ(spinner->call_tick(1), 97);
+	EXPECT_EQ(spinner->label_for("x"), "xscript");
+	spinner->notify(&thing);
+	EXPECT_EQ(thing.speed, 9.0f);
+	EXPECT_EQ(spinner->last, nullptr); // the override replaced the C++ function
+	EXPECT_EQ(spinner->pick(), &thing);
+	EXPECT_EQ(spinner->describe(), 31);
+	EXPECT_EQ(module.LastError(), "");
+
+	*static_cast<void**>(module.FindGlobal("held")) = script;
+	EXPECT_EQ(call(module, "heldIsSpinner").as.boolean, 1u);
+	EXPECT_EQ(call(module, "heldNull").as.boolean, 0u);
+	object.reset();
+	EXPECT_EQ(call(module, "heldNull").as.boolean, 1u); // ~ClassBase destroyed the script object
+	EXPECT_EQ(call(module, "heldIsSpinner").as.boolean, 0u);
+	engine->collect();
+}
+
+TEST_F(LuaSharpEngineTest, DerivedClassInheritsOverrides) {
+	auto module = engine->compile(DerivedSource);
+	auto fast = engine->create(module, "Fast");
+	auto* scriptable = dynamic_cast<LsTestScriptable*>(fast.get());
+	ASSERT_NE(scriptable, nullptr);
+	EXPECT_EQ(scriptable->tick(3), 1);
+	EXPECT_EQ(scriptable->describe(), 31); // from Spinner
+	EXPECT_EQ(scriptable->label_for("y"), "yscript");
+
+	auto plain = engine->create(module, "Plain");
+	auto* native = dynamic_cast<LsTestScriptable*>(plain.get());
+	ASSERT_NE(native, nullptr);
+	EXPECT_EQ(native->tick(3), 97); // no overrides: the C++ functions run
+	EXPECT_EQ(native->label_for("z"), "znative");
+	EXPECT_EQ(native->describe(), 1);
+}
+
+TEST_F(LuaSharpEngineTest, DerivedClassOfClassThatIsNotScriptable) {
+	auto module = engine->compile(DerivedSource);
+	auto plain = engine->create(module, "PlainThing");
+	ASSERT_NE(dynamic_cast<LsTestThing*>(plain.get()), nullptr);
+	EXPECT_EQ(luasharp::NativeRuntime::NativeOf(engine->proxy_of(plain.get())), plain.get());
+	try {
+		static_cast<void>(engine->create(module, "BadThing"));
+		ADD_FAILURE() << "an override of a class that is not scriptable was accepted";
+	} catch (const std::runtime_error& error) {
+		EXPECT_NE(std::string_view(error.what()).find("not scriptable"), std::string_view::npos) << error.what();
+	}
+	EXPECT_THROW(static_cast<void>(engine->create(module, "NoSuchClass")), std::runtime_error);
 }
 
 TEST_F(LuaSharpEngineTest, CompileErrorThrows) {
