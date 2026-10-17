@@ -217,6 +217,8 @@ for (int i = 0; i < 500; i += 1) {
 printf("loop: evens=%d odds=%d checksum=%d\n", evens, odds, checksum);
 
 int[] integers;
+
+
 for(i in 0..9) {
     integers.push_back(i);
 }
@@ -255,6 +257,10 @@ printf("%d\n",p.otherplayers.size());
 p.otherplayers.clear();
 
 class Application {
+
+    static float somefunc() {
+        return 0.0;
+    }
     table print_table(table t) {
         for(key,value in t) {
             printf("%s %s\n",key,value);
@@ -266,6 +272,40 @@ auto app = new Application();
 auto anothertable = app.print_table({key1="value1",key2="value2"});
 printf("=================\n");
 app.print_table(anothertable);
+
+Vec2i vi = Vec2i(1,2);
+Vec3i v3 = Vec3i(3,4,5);
+vi +=Vec2i(v3.x,v3.z);
+printf("%s",string(vi));
+
+class Board {
+    int get_board(Vec2i vec) {
+        return positions[vec.x + vec.y*size.x];
+    }
+    void set_board(Vec2i vec, int i) {
+        positions[vec.x + vec.y*size.x] = i;
+    }
+    void clear_board(Vec2i newsize, int value) {
+        positions.clear();
+        this.size = newsize;
+        int total = size.x*size.y;
+        for(i in 0..(total-1)) {
+            positions.push_back(value);
+        }
+    }
+
+    Vec2i size;
+    int[] positions;
+}
+
+Board theboard = new Board();
+theboard.clear_board(Vec2i(5,5),1);
+printf("board vavlue: %d\n",theboard.get_board(Vec2i(0,0)));
+
+Mat4x4 m = Mat4x4.identity();
+m = m * Mat4x4.from_pos_rot(Vec3(), Quat());
+m = m.inverse();
+
 
 
 /*
@@ -340,5 +380,8 @@ can only make raw_span of a struct or literal type.
 
 raw_spans are very dangerous. you shouldnt play around with them.
 
+easy serialization.
+
+slightly different lighter green syntax highlighting for struct/enum
 
 */

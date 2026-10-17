@@ -11,6 +11,7 @@ typedef struct LS_Fib LS_Fib;
 typedef struct LS_Text LS_Text;
 typedef struct LS_Player LS_Player;
 typedef struct LS_Application LS_Application;
+typedef struct LS_Board LS_Board;
 static const LS_TypeInfo ls_type_Random;
 static const LS_TypeInfo ls_type_Point;
 static const LS_TypeInfo ls_type_Calculator;
@@ -21,6 +22,14 @@ static const LS_TypeInfo ls_type_Fib;
 static const LS_TypeInfo ls_type_Text;
 static const LS_TypeInfo ls_type_Player;
 static const LS_TypeInfo ls_type_Application;
+static const LS_TypeInfo ls_type_Board;
+
+static const LS_TypeInfo ls_listtype_29;
+static const LS_TypeInfo ls_listtype_30;
+static const LS_FieldInfo ls_listfields_29[] = {{"element", 0, LS_KIND_OBJECT, 0, &ls_type_Player}};
+static const LS_TypeInfo ls_listtype_29 = {"Player[]", 1, ls_listfields_29, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
+static const LS_FieldInfo ls_listfields_30[] = {{"element", 0, LS_KIND_INT, 0, (const LS_TypeInfo*)0}};
+static const LS_TypeInfo ls_listtype_30 = {"int[]", 1, ls_listfields_30, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
 
 #define LS_Shape_Circle ((ls_int)0)
 #define LS_Shape_Square ((ls_int)1)
@@ -71,6 +80,11 @@ struct LS_Player {
 struct LS_Application {
     const LS_TypeInfo* ls_type;
 };
+struct LS_Board {
+    const LS_TypeInfo* ls_type;
+    LS_Vec2i size;
+    LS_List* positions;
+};
 
 static void ls_trace_Random(void* runtime_context, void* object) {
     LS_Random* self = (LS_Random*)object;
@@ -113,6 +127,10 @@ static void ls_trace_Application(void* runtime_context, void* object) {
     LS_Application* self = (LS_Application*)object;
     (void)runtime_context; (void)self;
 }
+static void ls_trace_Board(void* runtime_context, void* object) {
+    LS_Board* self = (LS_Board*)object;
+    ls_runtime->mark(runtime_context, self->positions);
+}
 static ls_string ls_name_name;
 static ls_string ls_name_key1;
 static ls_string ls_name_key2;
@@ -142,6 +160,10 @@ typedef struct LS_ModuleState {
     LS_Player* p;
     LS_Application* app;
     ls_table anothertable;
+    LS_Vec2i vi;
+    LS_Vec3i v3;
+    LS_Board* theboard;
+    LS_Mat4x4 m;
 } LS_ModuleState;
 static LS_ModuleState ls_state;
 void ls_module_trace_roots(void* runtime_context) {
@@ -169,6 +191,7 @@ void ls_module_trace_roots(void* runtime_context) {
     ls_runtime->mark(runtime_context, ls_state.p);
     ls_runtime->mark(runtime_context, ls_state.app);
     ls_runtime->mark(runtime_context, ls_state.anothertable);
+    ls_runtime->mark(runtime_context, ls_state.theboard);
 }
 
 static void ls_lambda_0(void* environment, const LS_Value* arguments, LS_Value* result);
@@ -201,6 +224,10 @@ void* ls_global_subintegers(void) { return &ls_state.subintegers; }
 void* ls_global_p(void) { return &ls_state.p; }
 void* ls_global_app(void) { return &ls_state.app; }
 void* ls_global_anothertable(void) { return &ls_state.anothertable; }
+void* ls_global_vi(void) { return &ls_state.vi; }
+void* ls_global_v3(void) { return &ls_state.v3; }
+void* ls_global_theboard(void) { return &ls_state.theboard; }
+void* ls_global_m(void) { return &ls_state.m; }
 LS_Random* ls_Random_new(ls_int seed);
 ls_int ls_Random_next(LS_Random* self);
 ls_int ls_Random_range(LS_Random* self, ls_int low, ls_int high);
@@ -226,7 +253,12 @@ LS_Player* ls_Player_new(void);
 ls_string ls_Player_player_func(LS_Player* self);
 void ls_Player_set_name(LS_Player* self, ls_string s);
 LS_Application* ls_Application_new(void);
+ls_float ls_Application_somefunc(void);
 ls_table ls_Application_print_table(LS_Application* self, ls_table t);
+LS_Board* ls_Board_new(void);
+ls_int ls_Board_get_board(LS_Board* self, LS_Vec2i vec);
+void ls_Board_set_board(LS_Board* self, LS_Vec2i vec, ls_int i);
+void ls_Board_clear_board(LS_Board* self, LS_Vec2i newsize, ls_int value);
 
 static void ls_invoke_Random_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
@@ -242,7 +274,7 @@ static const LS_MethodInfo ls_methods_Random[] = {
     {"next", ls_invoke_Random_next, 0},
     {"range", ls_invoke_Random_range, 2},
 };
-static const LS_TypeInfo ls_type_Random = {"Random", 1, ls_fields_Random, 2, ls_methods_Random};
+static const LS_TypeInfo ls_type_Random = {"Random", 1, ls_fields_Random, 2, ls_methods_Random, 0, LS_KIND_OBJECT};
 static void ls_invoke_Point_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Point_manhattan((LS_Point*)self, ((LS_Point*)ls_unbox_object(arguments[0], &ls_type_Point))));
 }
@@ -257,7 +289,7 @@ static const LS_MethodInfo ls_methods_Point[] = {
     {"manhattan", ls_invoke_Point_manhattan, 1},
     {"dot", ls_invoke_Point_dot, 1},
 };
-static const LS_TypeInfo ls_type_Point = {"Point", 2, ls_fields_Point, 2, ls_methods_Point};
+static const LS_TypeInfo ls_type_Point = {"Point", 2, ls_fields_Point, 2, ls_methods_Point, 0, LS_KIND_OBJECT};
 static void ls_invoke_Calculator_apply(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Calculator_apply((LS_Calculator*)self, ls_unbox_int(arguments[0]), ls_unbox_int(arguments[1])));
 }
@@ -268,7 +300,7 @@ static const LS_FieldInfo ls_fields_Calculator[] = {
 static const LS_MethodInfo ls_methods_Calculator[] = {
     {"apply", ls_invoke_Calculator_apply, 2},
 };
-static const LS_TypeInfo ls_type_Calculator = {"Calculator", 2, ls_fields_Calculator, 1, ls_methods_Calculator};
+static const LS_TypeInfo ls_type_Calculator = {"Calculator", 2, ls_fields_Calculator, 1, ls_methods_Calculator, 0, LS_KIND_OBJECT};
 static void ls_invoke_Stats_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Stats_add((LS_Stats*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -286,14 +318,14 @@ static const LS_MethodInfo ls_methods_Stats[] = {
     {"add", ls_invoke_Stats_add, 1},
     {"mean", ls_invoke_Stats_mean, 0},
 };
-static const LS_TypeInfo ls_type_Stats = {"Stats", 4, ls_fields_Stats, 2, ls_methods_Stats};
+static const LS_TypeInfo ls_type_Stats = {"Stats", 4, ls_fields_Stats, 2, ls_methods_Stats, 0, LS_KIND_OBJECT};
 static void ls_invoke_Shapes_area(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_float(ls_Shapes_area((LS_Shapes*)self, ls_unbox_int(arguments[0]), ls_unbox_float(arguments[1])));
 }
 static const LS_MethodInfo ls_methods_Shapes[] = {
     {"area", ls_invoke_Shapes_area, 2},
 };
-static const LS_TypeInfo ls_type_Shapes = {"Shapes", 0, (const LS_FieldInfo*)0, 1, ls_methods_Shapes};
+static const LS_TypeInfo ls_type_Shapes = {"Shapes", 0, (const LS_FieldInfo*)0, 1, ls_methods_Shapes, 0, LS_KIND_OBJECT};
 static void ls_invoke_Primes_isPrime(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_bool(ls_Primes_isPrime((LS_Primes*)self, ls_unbox_int(arguments[0])));
 }
@@ -304,7 +336,7 @@ static const LS_MethodInfo ls_methods_Primes[] = {
     {"isPrime", ls_invoke_Primes_isPrime, 1},
     {"countBelow", ls_invoke_Primes_countBelow, 1},
 };
-static const LS_TypeInfo ls_type_Primes = {"Primes", 0, (const LS_FieldInfo*)0, 2, ls_methods_Primes};
+static const LS_TypeInfo ls_type_Primes = {"Primes", 0, (const LS_FieldInfo*)0, 2, ls_methods_Primes, 0, LS_KIND_OBJECT};
 static void ls_invoke_Fib_iterative(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Fib_iterative((LS_Fib*)self, ls_unbox_int(arguments[0])));
 }
@@ -315,14 +347,14 @@ static const LS_MethodInfo ls_methods_Fib[] = {
     {"iterative", ls_invoke_Fib_iterative, 1},
     {"recursive", ls_invoke_Fib_recursive, 1},
 };
-static const LS_TypeInfo ls_type_Fib = {"Fib", 0, (const LS_FieldInfo*)0, 2, ls_methods_Fib};
+static const LS_TypeInfo ls_type_Fib = {"Fib", 0, (const LS_FieldInfo*)0, 2, ls_methods_Fib, 0, LS_KIND_OBJECT};
 static void ls_invoke_Text_score(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Text_score((LS_Text*)self, ((ls_string)ls_unbox_pointer(arguments[0], LS_KIND_STRING))));
 }
 static const LS_MethodInfo ls_methods_Text[] = {
     {"score", ls_invoke_Text_score, 1},
 };
-static const LS_TypeInfo ls_type_Text = {"Text", 0, (const LS_FieldInfo*)0, 1, ls_methods_Text};
+static const LS_TypeInfo ls_type_Text = {"Text", 0, (const LS_FieldInfo*)0, 1, ls_methods_Text, 0, LS_KIND_OBJECT};
 static void ls_invoke_Player_player_func(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_pointer(LS_KIND_STRING, ls_Player_player_func((LS_Player*)self));
@@ -331,21 +363,40 @@ static void ls_invoke_Player_set_name(void* self, const LS_Value* arguments, LS_
     ls_Player_set_name((LS_Player*)self, ((ls_string)ls_unbox_pointer(arguments[0], LS_KIND_STRING))); (void)result;
 }
 static const LS_FieldInfo ls_fields_Player[] = {
-    {"otherplayers", ls_offsetof(LS_Player, otherplayers), LS_KIND_LIST, LS_KIND_OBJECT, (const LS_TypeInfo*)0},
+    {"otherplayers", ls_offsetof(LS_Player, otherplayers), LS_KIND_LIST, LS_KIND_OBJECT, &ls_type_Player},
     {"name", ls_offsetof(LS_Player, name), LS_KIND_STRING, 0, (const LS_TypeInfo*)0},
 };
 static const LS_MethodInfo ls_methods_Player[] = {
     {"player_func", ls_invoke_Player_player_func, 0},
     {"set_name", ls_invoke_Player_set_name, 1},
 };
-static const LS_TypeInfo ls_type_Player = {"Player", 2, ls_fields_Player, 2, ls_methods_Player};
+static const LS_TypeInfo ls_type_Player = {"Player", 2, ls_fields_Player, 2, ls_methods_Player, 0, LS_KIND_OBJECT};
 static void ls_invoke_Application_print_table(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_pointer(LS_KIND_TABLE, ls_Application_print_table((LS_Application*)self, ((ls_table)ls_unbox_pointer(arguments[0], LS_KIND_TABLE))));
 }
 static const LS_MethodInfo ls_methods_Application[] = {
     {"print_table", ls_invoke_Application_print_table, 1},
 };
-static const LS_TypeInfo ls_type_Application = {"Application", 0, (const LS_FieldInfo*)0, 1, ls_methods_Application};
+static const LS_TypeInfo ls_type_Application = {"Application", 0, (const LS_FieldInfo*)0, 1, ls_methods_Application, 0, LS_KIND_OBJECT};
+static void ls_invoke_Board_get_board(void* self, const LS_Value* arguments, LS_Value* result) {
+    *result = ls_box_int(ls_Board_get_board((LS_Board*)self, ({ LS_Vec2i ls_unbox_0; ls_unbox_struct(arguments[0], &ls_type_Vec2i, &ls_unbox_0); ls_unbox_0; })));
+}
+static void ls_invoke_Board_set_board(void* self, const LS_Value* arguments, LS_Value* result) {
+    ls_Board_set_board((LS_Board*)self, ({ LS_Vec2i ls_unbox_1; ls_unbox_struct(arguments[0], &ls_type_Vec2i, &ls_unbox_1); ls_unbox_1; }), ls_unbox_int(arguments[1])); (void)result;
+}
+static void ls_invoke_Board_clear_board(void* self, const LS_Value* arguments, LS_Value* result) {
+    ls_Board_clear_board((LS_Board*)self, ({ LS_Vec2i ls_unbox_2; ls_unbox_struct(arguments[0], &ls_type_Vec2i, &ls_unbox_2); ls_unbox_2; }), ls_unbox_int(arguments[1])); (void)result;
+}
+static const LS_FieldInfo ls_fields_Board[] = {
+    {"size", ls_offsetof(LS_Board, size), LS_KIND_STRUCT, 0, &ls_type_Vec2i},
+    {"positions", ls_offsetof(LS_Board, positions), LS_KIND_LIST, LS_KIND_INT, (const LS_TypeInfo*)0},
+};
+static const LS_MethodInfo ls_methods_Board[] = {
+    {"get_board", ls_invoke_Board_get_board, 1},
+    {"set_board", ls_invoke_Board_set_board, 2},
+    {"clear_board", ls_invoke_Board_clear_board, 2},
+};
+static const LS_TypeInfo ls_type_Board = {"Board", 2, ls_fields_Board, 3, ls_methods_Board, 0, LS_KIND_OBJECT};
 
 LS_Random* ls_Random_new(ls_int seed) {
     LS_Random* self = (LS_Random*)ls_alloc(sizeof(LS_Random), ls_trace_Random);
@@ -479,7 +530,7 @@ ls_bool ls_Primes_isPrime(LS_Primes* self, ls_int n) {
             if ((ls_int_mod(n, d) == 0)) {
                 return 0;
             }
-            ls_continue_17:;
+            ls_continue_20:;
             (d = ls_int_add(d, 1));
         }
     }
@@ -491,10 +542,10 @@ ls_int ls_Primes_countBelow(LS_Primes* self, ls_int limit) {
         ls_int n = 0;
         while ((n < limit)) {
             if ((!ls_Primes_isPrime(self, n))) {
-                goto ls_continue_19;
+                goto ls_continue_22;
             }
             (found = ls_int_add(found, 1));
-            ls_continue_19:;
+            ls_continue_22:;
             (n = ls_int_add(n, 1));
         }
     }
@@ -550,7 +601,7 @@ LS_Player* ls_Player_new(void) {
     LS_Player* self = (LS_Player*)ls_alloc(sizeof(LS_Player), ls_trace_Player);
     if (!self) return (LS_Player*)0;
     self->ls_type = &ls_type_Player;
-    self->otherplayers = ls_list_create(sizeof(LS_Player*), LS_KIND_OBJECT, 0);
+    self->otherplayers = ls_list_create(sizeof(LS_Player*), LS_KIND_OBJECT, &ls_type_Player, 0);
     self->name = ls_intern("none");
     return self;
 }
@@ -566,16 +617,48 @@ LS_Application* ls_Application_new(void) {
     self->ls_type = &ls_type_Application;
     return self;
 }
+ls_float ls_Application_somefunc(void) {
+    return 0.0;
+}
 ls_table ls_Application_print_table(LS_Application* self, ls_table t) {
     {
-        LS_Value ls_iterable_29 = ls_box_pointer(LS_KIND_TABLE, t); ls_wrap_bits ls_cursor_29 = 0; LS_Value ls_key_29, ls_item_29;
-        while (ls_value_next(ls_iterable_29, 0, &ls_cursor_29, &ls_key_29, &ls_item_29)) {
-            LS_Value key = ls_key_29;
-            LS_Value value = ls_item_29;
-            ({ LS_Value ls_arguments_30[2]; ls_arguments_30[0] = key; ls_arguments_30[1] = value; ls_printf(ls_intern("%s %s\n"), 2, ls_arguments_30); });
+        LS_Value ls_iterable_32 = ls_box_pointer(LS_KIND_TABLE, t); ls_wrap_bits ls_cursor_32 = 0; LS_Value ls_key_32, ls_item_32;
+        while (ls_value_next(ls_iterable_32, 0, &ls_cursor_32, &ls_key_32, &ls_item_32)) {
+            LS_Value key = ls_key_32;
+            LS_Value value = ls_item_32;
+            ({ LS_Value ls_arguments_33[2]; ls_arguments_33[0] = key; ls_arguments_33[1] = value; ls_printf(ls_intern("%s %s\n"), 2, ls_arguments_33); });
         }
     }
     return t;
+}
+LS_Board* ls_Board_new(void) {
+    LS_Board* self = (LS_Board*)ls_alloc(sizeof(LS_Board), ls_trace_Board);
+    if (!self) return (LS_Board*)0;
+    self->ls_type = &ls_type_Board;
+    self->size = ls_Vec2i_default();
+    self->positions = ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 0);
+    return self;
+}
+ls_int ls_Board_get_board(LS_Board* self, LS_Vec2i vec) {
+    return (*(ls_int*)ls_list_at(self->positions, ls_int_add((vec).x, ls_int_mul((vec).y, (self->size).x))));
+}
+void ls_Board_set_board(LS_Board* self, LS_Vec2i vec, ls_int i) {
+    ({ LS_List* ls_list_34 = self->positions; ls_int ls_index_34 = ls_int_add((vec).x, ls_int_mul((vec).y, (self->size).x)); ls_int ls_value_34 = i; ls_int* ls_slot_34 = (ls_int*)ls_list_at(ls_list_34, ls_index_34); *ls_slot_34 = ls_value_34; });
+}
+void ls_Board_clear_board(LS_Board* self, LS_Vec2i newsize, ls_int value) {
+    ls_list_clear(self->positions);
+    (self->size = newsize);
+    ls_int total = ls_int_mul((self->size).x, (self->size).y);
+    {
+        ls_int ls_counter_36 = 0, ls_last_36 = (ls_int_sub(total, 1));
+        if (ls_counter_36 <= ls_last_36) for (;;) {
+            ls_int i = ls_counter_36;
+            ({ LS_List* ls_list_37 = self->positions; ls_int ls_value_37 = value; *(ls_int*)ls_list_push(ls_list_37) = ls_value_37; });
+            ls_continue_36:;
+            if (ls_counter_36 == ls_last_36) break;
+            ++ls_counter_36;
+        }
+    }
 }
 static void ls_lambda_0(void* environment, const LS_Value* arguments, LS_Value* result) {
     (void)environment;
@@ -599,7 +682,7 @@ static void ls_lambda_2(void* environment, const LS_Value* arguments, LS_Value* 
 static void ls_lambda_3(void* environment, const LS_Value* arguments, LS_Value* result) {
     (void)environment;
     (void)arguments; (void)result;
-    ({ ls_table ls_container_31 = ls_state.log; LS_Value ls_key_31 = ls_box_pointer(LS_KIND_STRING, ls_intern("done")); LS_Value ls_value_31 = ls_box_int(1); ls_table_set(ls_container_31, ls_key_31, ls_value_31); ls_value_31; });
+    ({ ls_table ls_container_38 = ls_state.log; LS_Value ls_key_38 = ls_box_pointer(LS_KIND_STRING, ls_intern("done")); LS_Value ls_value_38 = ls_box_int(1); ls_table_set(ls_container_38, ls_key_38, ls_value_38); ls_value_38; });
 }
 
 int ls_module_init(void) {
@@ -610,31 +693,31 @@ int ls_module_init(void) {
         ls_int i = 0;
         while ((i < 1000)) {
             ls_Stats_add(ls_state.stats, ls_Random_range(ls_state.rng, 1, 100));
-            ls_continue_33:;
+            ls_continue_40:;
             (i = ls_int_add(i, 1));
         }
     }
-    ({ LS_Value ls_arguments_35[4]; ls_arguments_35[0] = ls_box_int(ls_state.stats->count); ls_arguments_35[1] = ls_box_int(ls_state.stats->minimum); ls_arguments_35[2] = ls_box_int(ls_state.stats->maximum); ls_arguments_35[3] = ls_box_float(ls_Stats_mean(ls_state.stats)); ls_printf(ls_intern("stats: count=%d min=%d max=%d mean=%f\n"), 4, ls_arguments_35); });
+    ({ LS_Value ls_arguments_42[4]; ls_arguments_42[0] = ls_box_int(ls_state.stats->count); ls_arguments_42[1] = ls_box_int(ls_state.stats->minimum); ls_arguments_42[2] = ls_box_int(ls_state.stats->maximum); ls_arguments_42[3] = ls_box_float(ls_Stats_mean(ls_state.stats)); ls_printf(ls_intern("stats: count=%d min=%d max=%d mean=%f\n"), 4, ls_arguments_42); });
     ls_state.origin = ls_Point_new(0, 0);
     ls_state.target = ls_Point_new(7, ls_int_neg(3));
-    ({ LS_Value ls_arguments_36[2]; ls_arguments_36[0] = ls_box_int(ls_Point_manhattan(ls_state.origin, ls_state.target)); ls_arguments_36[1] = ls_box_int(ls_Point_dot(ls_state.target, ls_Point_new(2, 5))); ls_printf(ls_intern("points: manhattan=%d dot=%d\n"), 2, ls_arguments_36); });
+    ({ LS_Value ls_arguments_43[2]; ls_arguments_43[0] = ls_box_int(ls_Point_manhattan(ls_state.origin, ls_state.target)); ls_arguments_43[1] = ls_box_int(ls_Point_dot(ls_state.target, ls_Point_new(2, 5))); ls_printf(ls_intern("points: manhattan=%d dot=%d\n"), 2, ls_arguments_43); });
     ls_state.calc = ls_Calculator_new(10);
     ls_Calculator_apply(ls_state.calc, LS_Op_Add, 5);
     ls_Calculator_apply(ls_state.calc, LS_Op_Mul, 4);
     ls_Calculator_apply(ls_state.calc, LS_Op_Sub, 7);
     ls_Calculator_apply(ls_state.calc, LS_Op_Div, 9);
-    ({ LS_Value ls_arguments_37[2]; ls_arguments_37[0] = ls_box_int(ls_state.calc->value); ls_arguments_37[1] = ls_box_int(ls_state.calc->operations); ls_printf(ls_intern("calculator: value=%d ops=%d\n"), 2, ls_arguments_37); });
+    ({ LS_Value ls_arguments_44[2]; ls_arguments_44[0] = ls_box_int(ls_state.calc->value); ls_arguments_44[1] = ls_box_int(ls_state.calc->operations); ls_printf(ls_intern("calculator: value=%d ops=%d\n"), 2, ls_arguments_44); });
     ls_state.shapes = ls_Shapes_new();
-    ({ LS_Value ls_arguments_38[3]; ls_arguments_38[0] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Circle, 2.0)); ls_arguments_38[1] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Square, 3.0)); ls_arguments_38[2] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Triangle, 4.0)); ls_printf(ls_intern("areas: circle=%f square=%f triangle=%f\n"), 3, ls_arguments_38); });
+    ({ LS_Value ls_arguments_45[3]; ls_arguments_45[0] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Circle, 2.0)); ls_arguments_45[1] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Square, 3.0)); ls_arguments_45[2] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Triangle, 4.0)); ls_printf(ls_intern("areas: circle=%f square=%f triangle=%f\n"), 3, ls_arguments_45); });
     ls_state.primes = ls_Primes_new();
-    ({ LS_Value ls_arguments_39[1]; ls_arguments_39[0] = ls_box_int(ls_Primes_countBelow(ls_state.primes, 1000)); ls_printf(ls_intern("primes below 1000: %d\n"), 1, ls_arguments_39); });
+    ({ LS_Value ls_arguments_46[1]; ls_arguments_46[0] = ls_box_int(ls_Primes_countBelow(ls_state.primes, 1000)); ls_printf(ls_intern("primes below 1000: %d\n"), 1, ls_arguments_46); });
     ls_state.fib = ls_Fib_new();
-    ({ LS_Value ls_arguments_40[2]; ls_arguments_40[0] = ls_box_int(ls_Fib_iterative(ls_state.fib, 40)); ls_arguments_40[1] = ls_box_int(ls_Fib_recursive(ls_state.fib, 20)); ls_printf(ls_intern("fib: iterative(40)=%d recursive(20)=%d\n"), 2, ls_arguments_40); });
+    ({ LS_Value ls_arguments_47[2]; ls_arguments_47[0] = ls_box_int(ls_Fib_iterative(ls_state.fib, 40)); ls_arguments_47[1] = ls_box_int(ls_Fib_recursive(ls_state.fib, 20)); ls_printf(ls_intern("fib: iterative(40)=%d recursive(20)=%d\n"), 2, ls_arguments_47); });
     ls_state.text = ls_Text_new();
-    ({ LS_Value ls_arguments_41[1]; ls_arguments_41[0] = ls_box_int(ls_Text_score(ls_state.text, ls_intern("hello world"))); ls_printf(ls_intern("text score: %d\n"), 1, ls_arguments_41); });
-    ls_state.inventory = ({ ls_table ls_literal_42 = ls_table_create(); ls_table_set(ls_literal_42, ls_box_pointer(LS_KIND_STRING, LS_NAME(name)), ls_box_pointer(LS_KIND_STRING, ls_intern("crate"))); ls_table_set(ls_literal_42, ls_box_pointer(LS_KIND_STRING, ls_intern("weight")), ls_box_int(12)); ls_table_set(ls_literal_42, ls_box_int(1), ls_box_pointer(LS_KIND_OBJECT, ls_Point_new(1, 2))); ls_literal_42; });
-    ({ ls_table ls_container_43 = ls_state.inventory; LS_Value ls_key_43 = ls_box_pointer(LS_KIND_STRING, ls_intern("opened")); LS_Value ls_value_43 = ls_box_bool(1); ls_table_set(ls_container_43, ls_key_43, ls_value_43); ls_value_43; });
-    ({ LS_Value ls_arguments_44[2]; ls_arguments_44[0] = ls_box_pointer(LS_KIND_STRING, ls_intern("crate")); ls_arguments_44[1] = ls_box_bool(1); ls_printf(ls_intern("inventory: %s opened=%b\n"), 2, ls_arguments_44); });
+    ({ LS_Value ls_arguments_48[1]; ls_arguments_48[0] = ls_box_int(ls_Text_score(ls_state.text, ls_intern("hello world"))); ls_printf(ls_intern("text score: %d\n"), 1, ls_arguments_48); });
+    ls_state.inventory = ({ ls_table ls_literal_49 = ls_table_create(); ls_table_set(ls_literal_49, ls_box_pointer(LS_KIND_STRING, LS_NAME(name)), ls_box_pointer(LS_KIND_STRING, ls_intern("crate"))); ls_table_set(ls_literal_49, ls_box_pointer(LS_KIND_STRING, ls_intern("weight")), ls_box_int(12)); ls_table_set(ls_literal_49, ls_box_int(1), ls_box_pointer(LS_KIND_OBJECT, ls_Point_new(1, 2))); ls_literal_49; });
+    ({ ls_table ls_container_50 = ls_state.inventory; LS_Value ls_key_50 = ls_box_pointer(LS_KIND_STRING, ls_intern("opened")); LS_Value ls_value_50 = ls_box_bool(1); ls_table_set(ls_container_50, ls_key_50, ls_value_50); ls_value_50; });
+    ({ LS_Value ls_arguments_51[2]; ls_arguments_51[0] = ls_box_pointer(LS_KIND_STRING, ls_intern("crate")); ls_arguments_51[1] = ls_box_bool(1); ls_printf(ls_intern("inventory: %s opened=%b\n"), 2, ls_arguments_51); });
     ls_state.base = 3;
     ls_state.scale = ls_closure_create(ls_lambda_0, (void*)0, 1);
     ls_state.hypot2 = ls_closure_create(ls_lambda_1, (void*)0, 2);
@@ -642,65 +725,75 @@ int ls_module_init(void) {
     ls_state.log = ls_table_create();
     ls_state.record = ls_closure_create(ls_lambda_3, (void*)0, 0);
     ({ ls_closure_call(ls_state.record, (const LS_Value*)0); });
-    ({ LS_Value ls_arguments_46[3]; ls_arguments_46[0] = ({ LS_Value ls_arguments_47[1]; ls_arguments_47[0] = ls_box_int(14); ls_closure_call(ls_state.scale, ls_arguments_47); }); ls_arguments_46[1] = ({ LS_Value ls_arguments_48[2]; ls_arguments_48[0] = ls_box_int(3); ls_arguments_48[1] = ls_box_int(4); ls_closure_call(ls_state.hypot2, ls_arguments_48); }); ls_arguments_46[2] = ls_box_bool(({ LS_Value ls_arguments_49[1]; ls_arguments_49[0] = ls_box_int(10); ls_unbox_bool(ls_closure_call(ls_state.isEven, ls_arguments_49)); })); ls_printf(ls_intern("closures: scale=%d hypot2=%d even=%b\n"), 3, ls_arguments_46); });
+    ({ LS_Value ls_arguments_53[3]; ls_arguments_53[0] = ({ LS_Value ls_arguments_54[1]; ls_arguments_54[0] = ls_box_int(14); ls_closure_call(ls_state.scale, ls_arguments_54); }); ls_arguments_53[1] = ({ LS_Value ls_arguments_55[2]; ls_arguments_55[0] = ls_box_int(3); ls_arguments_55[1] = ls_box_int(4); ls_closure_call(ls_state.hypot2, ls_arguments_55); }); ls_arguments_53[2] = ls_box_bool(({ LS_Value ls_arguments_56[1]; ls_arguments_56[0] = ls_box_int(10); ls_unbox_bool(ls_closure_call(ls_state.isEven, ls_arguments_56)); })); ls_printf(ls_intern("closures: scale=%d hypot2=%d even=%b\n"), 3, ls_arguments_53); });
     ls_state.evens = 0;
     ls_state.odds = 0;
     ls_state.checksum = 0;
     {
         ls_int i = 0;
         while ((i < 500)) {
-            if (({ LS_Value ls_arguments_51[1]; ls_arguments_51[0] = ls_box_int(i); ls_unbox_bool(ls_closure_call(ls_state.isEven, ls_arguments_51)); })) {
+            if (({ LS_Value ls_arguments_58[1]; ls_arguments_58[0] = ls_box_int(i); ls_unbox_bool(ls_closure_call(ls_state.isEven, ls_arguments_58)); })) {
                 (ls_state.evens = ls_int_add(ls_state.evens, 1));
             }
             else {
                 (ls_state.odds = ls_int_add(ls_state.odds, 1));
             }
             (ls_state.checksum = ls_int_mod((ls_int_add(ls_int_mul(ls_state.checksum, 31), i)), 1000003));
-            ls_continue_50:;
+            ls_continue_57:;
             (i = ls_int_add(i, 1));
         }
     }
-    ({ LS_Value ls_arguments_56[3]; ls_arguments_56[0] = ls_box_int(ls_state.evens); ls_arguments_56[1] = ls_box_int(ls_state.odds); ls_arguments_56[2] = ls_box_int(ls_state.checksum); ls_printf(ls_intern("loop: evens=%d odds=%d checksum=%d\n"), 3, ls_arguments_56); });
-    ls_state.integers = ls_list_create(sizeof(ls_int), LS_KIND_INT, 0);
+    ({ LS_Value ls_arguments_63[3]; ls_arguments_63[0] = ls_box_int(ls_state.evens); ls_arguments_63[1] = ls_box_int(ls_state.odds); ls_arguments_63[2] = ls_box_int(ls_state.checksum); ls_printf(ls_intern("loop: evens=%d odds=%d checksum=%d\n"), 3, ls_arguments_63); });
+    ls_state.integers = ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 0);
     {
-        ls_int ls_counter_57 = 0, ls_last_57 = 9;
-        if (ls_counter_57 <= ls_last_57) for (;;) {
-            ls_int i = ls_counter_57;
-            ({ LS_List* ls_list_58 = ls_state.integers; ls_int ls_value_58 = i; *(ls_int*)ls_list_push(ls_list_58) = ls_value_58; });
-            ls_continue_57:;
-            if (ls_counter_57 == ls_last_57) break;
-            ++ls_counter_57;
+        ls_int ls_counter_64 = 0, ls_last_64 = 9;
+        if (ls_counter_64 <= ls_last_64) for (;;) {
+            ls_int i = ls_counter_64;
+            ({ LS_List* ls_list_65 = ls_state.integers; ls_int ls_value_65 = i; *(ls_int*)ls_list_push(ls_list_65) = ls_value_65; });
+            ls_continue_64:;
+            if (ls_counter_64 == ls_last_64) break;
+            ++ls_counter_64;
         }
     }
-    ({ LS_Value ls_arguments_59[1]; ls_arguments_59[0] = ls_box_int(ls_list_size(ls_state.integers)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_59); });
+    ({ LS_Value ls_arguments_66[1]; ls_arguments_66[0] = ls_box_int(ls_list_size(ls_state.integers)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_66); });
     {
-        LS_List* ls_list_60 = ls_state.integers; ls_int ls_index_60;
-        for (ls_index_60 = 0; ls_index_60 < ls_list_size(ls_list_60); ++ls_index_60) {
-            ls_int i = *(ls_int*)(ls_list_60->data + ls_index_60 * (ls_int)ls_list_60->element_size);
-            ({ LS_Value ls_arguments_61[1]; ls_arguments_61[0] = ls_box_int(ls_int_mul(i, 2)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_61); });
+        LS_List* ls_list_67 = ls_state.integers; ls_int ls_index_67;
+        for (ls_index_67 = 0; ls_index_67 < ls_list_size(ls_list_67); ++ls_index_67) {
+            ls_int i = *(ls_int*)(ls_list_67->data + ls_index_67 * (ls_int)ls_list_67->element_size);
+            ({ LS_Value ls_arguments_68[1]; ls_arguments_68[0] = ls_box_int(ls_int_mul(i, 2)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_68); });
         }
     }
     ls_state.somestr = ls_intern("Hello...");
     (ls_state.somestr = ls_string_concat(ls_state.somestr, ls_intern("WORLD!\n")));
     ({ ls_printf(ls_state.somestr, 0, (const LS_Value*)0); });
-    ls_state.subintegers = ({ LS_List* ls_literal_64 = ls_list_create(sizeof(ls_int), LS_KIND_INT, 3); *(ls_int*)ls_list_push(ls_literal_64) = 69; *(ls_int*)ls_list_push(ls_literal_64) = 70; *(ls_int*)ls_list_push(ls_literal_64) = 71; ls_literal_64; });
+    ls_state.subintegers = ({ LS_List* ls_literal_71 = ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 3); *(ls_int*)ls_list_push(ls_literal_71) = 69; *(ls_int*)ls_list_push(ls_literal_71) = 70; *(ls_int*)ls_list_push(ls_literal_71) = 71; ls_literal_71; });
     {
-        LS_List* ls_list_65 = ls_state.subintegers; ls_int ls_index_65;
-        for (ls_index_65 = 0; ls_index_65 < ls_list_size(ls_list_65); ++ls_index_65) {
-            ls_int i = *(ls_int*)(ls_list_65->data + ls_index_65 * (ls_int)ls_list_65->element_size);
-            ({ LS_Value ls_arguments_66[1]; ls_arguments_66[0] = ls_box_int(ls_int_mul(i, 2)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_66); });
+        LS_List* ls_list_72 = ls_state.subintegers; ls_int ls_index_72;
+        for (ls_index_72 = 0; ls_index_72 < ls_list_size(ls_list_72); ++ls_index_72) {
+            ls_int i = *(ls_int*)(ls_list_72->data + ls_index_72 * (ls_int)ls_list_72->element_size);
+            ({ LS_Value ls_arguments_73[1]; ls_arguments_73[0] = ls_box_int(ls_int_mul(i, 2)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_73); });
         }
     }
-    ({ LS_Value ls_arguments_67[1]; ls_arguments_67[0] = ls_box_int((*(ls_int*)ls_list_at(ls_state.integers, 0))); ls_printf(ls_intern("%d\n"), 1, ls_arguments_67); });
+    ({ LS_Value ls_arguments_74[1]; ls_arguments_74[0] = ls_box_int((*(ls_int*)ls_list_at(ls_state.integers, 0))); ls_printf(ls_intern("%d\n"), 1, ls_arguments_74); });
     ls_state.p = ls_Player_new();
     ls_Player_set_name(ls_state.p, ls_intern("charlie"));
     ({ ls_printf(ls_Player_player_func(ls_state.p), 0, (const LS_Value*)0); });
-    ({ LS_List* ls_list_69 = ls_state.p->otherplayers; LS_Player* ls_value_69 = ls_state.p; *(LS_Player**)ls_list_push(ls_list_69) = ls_value_69; });
-    ({ LS_Value ls_arguments_70[1]; ls_arguments_70[0] = ls_box_int(ls_list_size(ls_state.p->otherplayers)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_70); });
+    ({ LS_List* ls_list_76 = ls_state.p->otherplayers; LS_Player* ls_value_76 = ls_state.p; *(LS_Player**)ls_list_push(ls_list_76) = ls_value_76; });
+    ({ LS_Value ls_arguments_77[1]; ls_arguments_77[0] = ls_box_int(ls_list_size(ls_state.p->otherplayers)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_77); });
     ls_list_clear(ls_state.p->otherplayers);
     ls_state.app = ls_Application_new();
-    ls_state.anothertable = ls_Application_print_table(ls_state.app, ({ ls_table ls_literal_71 = ls_table_create(); ls_table_set(ls_literal_71, ls_box_pointer(LS_KIND_STRING, LS_NAME(key1)), ls_box_pointer(LS_KIND_STRING, ls_intern("value1"))); ls_table_set(ls_literal_71, ls_box_pointer(LS_KIND_STRING, LS_NAME(key2)), ls_box_pointer(LS_KIND_STRING, ls_intern("value2"))); ls_literal_71; }));
+    ls_state.anothertable = ls_Application_print_table(ls_state.app, ({ ls_table ls_literal_78 = ls_table_create(); ls_table_set(ls_literal_78, ls_box_pointer(LS_KIND_STRING, LS_NAME(key1)), ls_box_pointer(LS_KIND_STRING, ls_intern("value1"))); ls_table_set(ls_literal_78, ls_box_pointer(LS_KIND_STRING, LS_NAME(key2)), ls_box_pointer(LS_KIND_STRING, ls_intern("value2"))); ls_literal_78; }));
     ({ ls_printf(ls_intern("=================\n"), 0, (const LS_Value*)0); });
     ls_Application_print_table(ls_state.app, ls_state.anothertable);
+    ls_state.vi = ls_Vec2i_new(1, 2);
+    ls_state.v3 = ls_Vec3i_new(3, 4, 5);
+    (ls_state.vi = ls_Vec2i_op_add(ls_state.vi, ls_Vec2i_new((ls_state.v3).x, (ls_state.v3).z)));
+    ({ LS_Value ls_arguments_81[1]; ls_arguments_81[0] = ls_box_pointer(LS_KIND_STRING, ls_to_string(({ LS_Vec2i ls_box_82 = ls_state.vi; ls_box_struct(&ls_type_Vec2i, &ls_box_82); }))); ls_printf(ls_intern("%s"), 1, ls_arguments_81); });
+    ls_state.theboard = ls_Board_new();
+    ls_Board_clear_board(ls_state.theboard, ls_Vec2i_new(5, 5), 1);
+    ({ LS_Value ls_arguments_83[1]; ls_arguments_83[0] = ls_box_int(ls_Board_get_board(ls_state.theboard, ls_Vec2i_new(0, 0))); ls_printf(ls_intern("board vavlue: %d\n"), 1, ls_arguments_83); });
+    ls_state.m = ls_Mat4x4_identity();
+    (ls_state.m = ls_Mat4x4_op_mul(ls_state.m, ls_Mat4x4_from_pos_rot(ls_Vec3_new(0, 0, 0), ls_Quat_new(1, 0, 0, 0))));
+    (ls_state.m = ls_Mat4x4_inverse(ls_state.m));
     return 0;
 }
