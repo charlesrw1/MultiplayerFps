@@ -13630,7 +13630,7 @@ static const LS_MethodInfo ls_methods_Rng0[] = {
     {"next", ls_invoke_Rng0_next, 0},
     {"range", ls_invoke_Rng0_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng0 = {"Rng0", 1, ls_fields_Rng0, 2, ls_methods_Rng0};
+static const LS_TypeInfo ls_type_Rng0 = {"Rng0", 1, ls_fields_Rng0, 2, ls_methods_Rng0, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt0_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt0_manhattan((LS_Pt0*)self, ((LS_Pt0*)ls_unbox_object(arguments[0], &ls_type_Pt0))));
 }
@@ -13645,7 +13645,7 @@ static const LS_MethodInfo ls_methods_Pt0[] = {
     {"manhattan", ls_invoke_Pt0_manhattan, 1},
     {"dot", ls_invoke_Pt0_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt0 = {"Pt0", 2, ls_fields_Pt0, 2, ls_methods_Pt0};
+static const LS_TypeInfo ls_type_Pt0 = {"Pt0", 2, ls_fields_Pt0, 2, ls_methods_Pt0, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker0_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker0_add((LS_Worker0*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -13675,7 +13675,7 @@ static const LS_MethodInfo ls_methods_Worker0[] = {
     {"fib", ls_invoke_Worker0_fib, 1},
     {"text", ls_invoke_Worker0_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker0 = {"Worker0", 4, ls_fields_Worker0, 5, ls_methods_Worker0};
+static const LS_TypeInfo ls_type_Worker0 = {"Worker0", 4, ls_fields_Worker0, 5, ls_methods_Worker0, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner0_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner0_run((LS_Runner0*)self));
@@ -13683,7 +13683,7 @@ static void ls_invoke_Runner0_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner0[] = {
     {"run", ls_invoke_Runner0_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner0 = {"Runner0", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner0};
+static const LS_TypeInfo ls_type_Runner0 = {"Runner0", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner0, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng1_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng1_next((LS_Rng1*)self));
@@ -13698,7 +13698,7 @@ static const LS_MethodInfo ls_methods_Rng1[] = {
     {"next", ls_invoke_Rng1_next, 0},
     {"range", ls_invoke_Rng1_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng1 = {"Rng1", 1, ls_fields_Rng1, 2, ls_methods_Rng1};
+static const LS_TypeInfo ls_type_Rng1 = {"Rng1", 1, ls_fields_Rng1, 2, ls_methods_Rng1, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt1_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt1_manhattan((LS_Pt1*)self, ((LS_Pt1*)ls_unbox_object(arguments[0], &ls_type_Pt1))));
 }
@@ -13713,7 +13713,7 @@ static const LS_MethodInfo ls_methods_Pt1[] = {
     {"manhattan", ls_invoke_Pt1_manhattan, 1},
     {"dot", ls_invoke_Pt1_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt1 = {"Pt1", 2, ls_fields_Pt1, 2, ls_methods_Pt1};
+static const LS_TypeInfo ls_type_Pt1 = {"Pt1", 2, ls_fields_Pt1, 2, ls_methods_Pt1, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker1_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker1_add((LS_Worker1*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -13743,7 +13743,7 @@ static const LS_MethodInfo ls_methods_Worker1[] = {
     {"fib", ls_invoke_Worker1_fib, 1},
     {"text", ls_invoke_Worker1_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker1 = {"Worker1", 4, ls_fields_Worker1, 5, ls_methods_Worker1};
+static const LS_TypeInfo ls_type_Worker1 = {"Worker1", 4, ls_fields_Worker1, 5, ls_methods_Worker1, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner1_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner1_run((LS_Runner1*)self));
@@ -13751,7 +13751,7 @@ static void ls_invoke_Runner1_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner1[] = {
     {"run", ls_invoke_Runner1_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner1 = {"Runner1", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner1};
+static const LS_TypeInfo ls_type_Runner1 = {"Runner1", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner1, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng2_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng2_next((LS_Rng2*)self));
@@ -13766,7 +13766,7 @@ static const LS_MethodInfo ls_methods_Rng2[] = {
     {"next", ls_invoke_Rng2_next, 0},
     {"range", ls_invoke_Rng2_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng2 = {"Rng2", 1, ls_fields_Rng2, 2, ls_methods_Rng2};
+static const LS_TypeInfo ls_type_Rng2 = {"Rng2", 1, ls_fields_Rng2, 2, ls_methods_Rng2, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt2_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt2_manhattan((LS_Pt2*)self, ((LS_Pt2*)ls_unbox_object(arguments[0], &ls_type_Pt2))));
 }
@@ -13781,7 +13781,7 @@ static const LS_MethodInfo ls_methods_Pt2[] = {
     {"manhattan", ls_invoke_Pt2_manhattan, 1},
     {"dot", ls_invoke_Pt2_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt2 = {"Pt2", 2, ls_fields_Pt2, 2, ls_methods_Pt2};
+static const LS_TypeInfo ls_type_Pt2 = {"Pt2", 2, ls_fields_Pt2, 2, ls_methods_Pt2, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker2_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker2_add((LS_Worker2*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -13811,7 +13811,7 @@ static const LS_MethodInfo ls_methods_Worker2[] = {
     {"fib", ls_invoke_Worker2_fib, 1},
     {"text", ls_invoke_Worker2_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker2 = {"Worker2", 4, ls_fields_Worker2, 5, ls_methods_Worker2};
+static const LS_TypeInfo ls_type_Worker2 = {"Worker2", 4, ls_fields_Worker2, 5, ls_methods_Worker2, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner2_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner2_run((LS_Runner2*)self));
@@ -13819,7 +13819,7 @@ static void ls_invoke_Runner2_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner2[] = {
     {"run", ls_invoke_Runner2_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner2 = {"Runner2", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner2};
+static const LS_TypeInfo ls_type_Runner2 = {"Runner2", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner2, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng3_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng3_next((LS_Rng3*)self));
@@ -13834,7 +13834,7 @@ static const LS_MethodInfo ls_methods_Rng3[] = {
     {"next", ls_invoke_Rng3_next, 0},
     {"range", ls_invoke_Rng3_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng3 = {"Rng3", 1, ls_fields_Rng3, 2, ls_methods_Rng3};
+static const LS_TypeInfo ls_type_Rng3 = {"Rng3", 1, ls_fields_Rng3, 2, ls_methods_Rng3, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt3_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt3_manhattan((LS_Pt3*)self, ((LS_Pt3*)ls_unbox_object(arguments[0], &ls_type_Pt3))));
 }
@@ -13849,7 +13849,7 @@ static const LS_MethodInfo ls_methods_Pt3[] = {
     {"manhattan", ls_invoke_Pt3_manhattan, 1},
     {"dot", ls_invoke_Pt3_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt3 = {"Pt3", 2, ls_fields_Pt3, 2, ls_methods_Pt3};
+static const LS_TypeInfo ls_type_Pt3 = {"Pt3", 2, ls_fields_Pt3, 2, ls_methods_Pt3, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker3_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker3_add((LS_Worker3*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -13879,7 +13879,7 @@ static const LS_MethodInfo ls_methods_Worker3[] = {
     {"fib", ls_invoke_Worker3_fib, 1},
     {"text", ls_invoke_Worker3_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker3 = {"Worker3", 4, ls_fields_Worker3, 5, ls_methods_Worker3};
+static const LS_TypeInfo ls_type_Worker3 = {"Worker3", 4, ls_fields_Worker3, 5, ls_methods_Worker3, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner3_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner3_run((LS_Runner3*)self));
@@ -13887,7 +13887,7 @@ static void ls_invoke_Runner3_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner3[] = {
     {"run", ls_invoke_Runner3_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner3 = {"Runner3", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner3};
+static const LS_TypeInfo ls_type_Runner3 = {"Runner3", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner3, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng4_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng4_next((LS_Rng4*)self));
@@ -13902,7 +13902,7 @@ static const LS_MethodInfo ls_methods_Rng4[] = {
     {"next", ls_invoke_Rng4_next, 0},
     {"range", ls_invoke_Rng4_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng4 = {"Rng4", 1, ls_fields_Rng4, 2, ls_methods_Rng4};
+static const LS_TypeInfo ls_type_Rng4 = {"Rng4", 1, ls_fields_Rng4, 2, ls_methods_Rng4, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt4_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt4_manhattan((LS_Pt4*)self, ((LS_Pt4*)ls_unbox_object(arguments[0], &ls_type_Pt4))));
 }
@@ -13917,7 +13917,7 @@ static const LS_MethodInfo ls_methods_Pt4[] = {
     {"manhattan", ls_invoke_Pt4_manhattan, 1},
     {"dot", ls_invoke_Pt4_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt4 = {"Pt4", 2, ls_fields_Pt4, 2, ls_methods_Pt4};
+static const LS_TypeInfo ls_type_Pt4 = {"Pt4", 2, ls_fields_Pt4, 2, ls_methods_Pt4, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker4_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker4_add((LS_Worker4*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -13947,7 +13947,7 @@ static const LS_MethodInfo ls_methods_Worker4[] = {
     {"fib", ls_invoke_Worker4_fib, 1},
     {"text", ls_invoke_Worker4_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker4 = {"Worker4", 4, ls_fields_Worker4, 5, ls_methods_Worker4};
+static const LS_TypeInfo ls_type_Worker4 = {"Worker4", 4, ls_fields_Worker4, 5, ls_methods_Worker4, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner4_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner4_run((LS_Runner4*)self));
@@ -13955,7 +13955,7 @@ static void ls_invoke_Runner4_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner4[] = {
     {"run", ls_invoke_Runner4_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner4 = {"Runner4", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner4};
+static const LS_TypeInfo ls_type_Runner4 = {"Runner4", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner4, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng5_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng5_next((LS_Rng5*)self));
@@ -13970,7 +13970,7 @@ static const LS_MethodInfo ls_methods_Rng5[] = {
     {"next", ls_invoke_Rng5_next, 0},
     {"range", ls_invoke_Rng5_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng5 = {"Rng5", 1, ls_fields_Rng5, 2, ls_methods_Rng5};
+static const LS_TypeInfo ls_type_Rng5 = {"Rng5", 1, ls_fields_Rng5, 2, ls_methods_Rng5, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt5_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt5_manhattan((LS_Pt5*)self, ((LS_Pt5*)ls_unbox_object(arguments[0], &ls_type_Pt5))));
 }
@@ -13985,7 +13985,7 @@ static const LS_MethodInfo ls_methods_Pt5[] = {
     {"manhattan", ls_invoke_Pt5_manhattan, 1},
     {"dot", ls_invoke_Pt5_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt5 = {"Pt5", 2, ls_fields_Pt5, 2, ls_methods_Pt5};
+static const LS_TypeInfo ls_type_Pt5 = {"Pt5", 2, ls_fields_Pt5, 2, ls_methods_Pt5, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker5_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker5_add((LS_Worker5*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14015,7 +14015,7 @@ static const LS_MethodInfo ls_methods_Worker5[] = {
     {"fib", ls_invoke_Worker5_fib, 1},
     {"text", ls_invoke_Worker5_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker5 = {"Worker5", 4, ls_fields_Worker5, 5, ls_methods_Worker5};
+static const LS_TypeInfo ls_type_Worker5 = {"Worker5", 4, ls_fields_Worker5, 5, ls_methods_Worker5, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner5_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner5_run((LS_Runner5*)self));
@@ -14023,7 +14023,7 @@ static void ls_invoke_Runner5_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner5[] = {
     {"run", ls_invoke_Runner5_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner5 = {"Runner5", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner5};
+static const LS_TypeInfo ls_type_Runner5 = {"Runner5", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner5, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng6_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng6_next((LS_Rng6*)self));
@@ -14038,7 +14038,7 @@ static const LS_MethodInfo ls_methods_Rng6[] = {
     {"next", ls_invoke_Rng6_next, 0},
     {"range", ls_invoke_Rng6_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng6 = {"Rng6", 1, ls_fields_Rng6, 2, ls_methods_Rng6};
+static const LS_TypeInfo ls_type_Rng6 = {"Rng6", 1, ls_fields_Rng6, 2, ls_methods_Rng6, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt6_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt6_manhattan((LS_Pt6*)self, ((LS_Pt6*)ls_unbox_object(arguments[0], &ls_type_Pt6))));
 }
@@ -14053,7 +14053,7 @@ static const LS_MethodInfo ls_methods_Pt6[] = {
     {"manhattan", ls_invoke_Pt6_manhattan, 1},
     {"dot", ls_invoke_Pt6_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt6 = {"Pt6", 2, ls_fields_Pt6, 2, ls_methods_Pt6};
+static const LS_TypeInfo ls_type_Pt6 = {"Pt6", 2, ls_fields_Pt6, 2, ls_methods_Pt6, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker6_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker6_add((LS_Worker6*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14083,7 +14083,7 @@ static const LS_MethodInfo ls_methods_Worker6[] = {
     {"fib", ls_invoke_Worker6_fib, 1},
     {"text", ls_invoke_Worker6_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker6 = {"Worker6", 4, ls_fields_Worker6, 5, ls_methods_Worker6};
+static const LS_TypeInfo ls_type_Worker6 = {"Worker6", 4, ls_fields_Worker6, 5, ls_methods_Worker6, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner6_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner6_run((LS_Runner6*)self));
@@ -14091,7 +14091,7 @@ static void ls_invoke_Runner6_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner6[] = {
     {"run", ls_invoke_Runner6_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner6 = {"Runner6", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner6};
+static const LS_TypeInfo ls_type_Runner6 = {"Runner6", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner6, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng7_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng7_next((LS_Rng7*)self));
@@ -14106,7 +14106,7 @@ static const LS_MethodInfo ls_methods_Rng7[] = {
     {"next", ls_invoke_Rng7_next, 0},
     {"range", ls_invoke_Rng7_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng7 = {"Rng7", 1, ls_fields_Rng7, 2, ls_methods_Rng7};
+static const LS_TypeInfo ls_type_Rng7 = {"Rng7", 1, ls_fields_Rng7, 2, ls_methods_Rng7, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt7_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt7_manhattan((LS_Pt7*)self, ((LS_Pt7*)ls_unbox_object(arguments[0], &ls_type_Pt7))));
 }
@@ -14121,7 +14121,7 @@ static const LS_MethodInfo ls_methods_Pt7[] = {
     {"manhattan", ls_invoke_Pt7_manhattan, 1},
     {"dot", ls_invoke_Pt7_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt7 = {"Pt7", 2, ls_fields_Pt7, 2, ls_methods_Pt7};
+static const LS_TypeInfo ls_type_Pt7 = {"Pt7", 2, ls_fields_Pt7, 2, ls_methods_Pt7, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker7_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker7_add((LS_Worker7*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14151,7 +14151,7 @@ static const LS_MethodInfo ls_methods_Worker7[] = {
     {"fib", ls_invoke_Worker7_fib, 1},
     {"text", ls_invoke_Worker7_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker7 = {"Worker7", 4, ls_fields_Worker7, 5, ls_methods_Worker7};
+static const LS_TypeInfo ls_type_Worker7 = {"Worker7", 4, ls_fields_Worker7, 5, ls_methods_Worker7, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner7_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner7_run((LS_Runner7*)self));
@@ -14159,7 +14159,7 @@ static void ls_invoke_Runner7_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner7[] = {
     {"run", ls_invoke_Runner7_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner7 = {"Runner7", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner7};
+static const LS_TypeInfo ls_type_Runner7 = {"Runner7", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner7, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng8_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng8_next((LS_Rng8*)self));
@@ -14174,7 +14174,7 @@ static const LS_MethodInfo ls_methods_Rng8[] = {
     {"next", ls_invoke_Rng8_next, 0},
     {"range", ls_invoke_Rng8_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng8 = {"Rng8", 1, ls_fields_Rng8, 2, ls_methods_Rng8};
+static const LS_TypeInfo ls_type_Rng8 = {"Rng8", 1, ls_fields_Rng8, 2, ls_methods_Rng8, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt8_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt8_manhattan((LS_Pt8*)self, ((LS_Pt8*)ls_unbox_object(arguments[0], &ls_type_Pt8))));
 }
@@ -14189,7 +14189,7 @@ static const LS_MethodInfo ls_methods_Pt8[] = {
     {"manhattan", ls_invoke_Pt8_manhattan, 1},
     {"dot", ls_invoke_Pt8_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt8 = {"Pt8", 2, ls_fields_Pt8, 2, ls_methods_Pt8};
+static const LS_TypeInfo ls_type_Pt8 = {"Pt8", 2, ls_fields_Pt8, 2, ls_methods_Pt8, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker8_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker8_add((LS_Worker8*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14219,7 +14219,7 @@ static const LS_MethodInfo ls_methods_Worker8[] = {
     {"fib", ls_invoke_Worker8_fib, 1},
     {"text", ls_invoke_Worker8_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker8 = {"Worker8", 4, ls_fields_Worker8, 5, ls_methods_Worker8};
+static const LS_TypeInfo ls_type_Worker8 = {"Worker8", 4, ls_fields_Worker8, 5, ls_methods_Worker8, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner8_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner8_run((LS_Runner8*)self));
@@ -14227,7 +14227,7 @@ static void ls_invoke_Runner8_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner8[] = {
     {"run", ls_invoke_Runner8_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner8 = {"Runner8", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner8};
+static const LS_TypeInfo ls_type_Runner8 = {"Runner8", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner8, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng9_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng9_next((LS_Rng9*)self));
@@ -14242,7 +14242,7 @@ static const LS_MethodInfo ls_methods_Rng9[] = {
     {"next", ls_invoke_Rng9_next, 0},
     {"range", ls_invoke_Rng9_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng9 = {"Rng9", 1, ls_fields_Rng9, 2, ls_methods_Rng9};
+static const LS_TypeInfo ls_type_Rng9 = {"Rng9", 1, ls_fields_Rng9, 2, ls_methods_Rng9, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt9_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt9_manhattan((LS_Pt9*)self, ((LS_Pt9*)ls_unbox_object(arguments[0], &ls_type_Pt9))));
 }
@@ -14257,7 +14257,7 @@ static const LS_MethodInfo ls_methods_Pt9[] = {
     {"manhattan", ls_invoke_Pt9_manhattan, 1},
     {"dot", ls_invoke_Pt9_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt9 = {"Pt9", 2, ls_fields_Pt9, 2, ls_methods_Pt9};
+static const LS_TypeInfo ls_type_Pt9 = {"Pt9", 2, ls_fields_Pt9, 2, ls_methods_Pt9, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker9_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker9_add((LS_Worker9*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14287,7 +14287,7 @@ static const LS_MethodInfo ls_methods_Worker9[] = {
     {"fib", ls_invoke_Worker9_fib, 1},
     {"text", ls_invoke_Worker9_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker9 = {"Worker9", 4, ls_fields_Worker9, 5, ls_methods_Worker9};
+static const LS_TypeInfo ls_type_Worker9 = {"Worker9", 4, ls_fields_Worker9, 5, ls_methods_Worker9, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner9_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner9_run((LS_Runner9*)self));
@@ -14295,7 +14295,7 @@ static void ls_invoke_Runner9_run(void* self, const LS_Value* arguments, LS_Valu
 static const LS_MethodInfo ls_methods_Runner9[] = {
     {"run", ls_invoke_Runner9_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner9 = {"Runner9", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner9};
+static const LS_TypeInfo ls_type_Runner9 = {"Runner9", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner9, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng10_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng10_next((LS_Rng10*)self));
@@ -14310,7 +14310,7 @@ static const LS_MethodInfo ls_methods_Rng10[] = {
     {"next", ls_invoke_Rng10_next, 0},
     {"range", ls_invoke_Rng10_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng10 = {"Rng10", 1, ls_fields_Rng10, 2, ls_methods_Rng10};
+static const LS_TypeInfo ls_type_Rng10 = {"Rng10", 1, ls_fields_Rng10, 2, ls_methods_Rng10, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt10_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt10_manhattan((LS_Pt10*)self, ((LS_Pt10*)ls_unbox_object(arguments[0], &ls_type_Pt10))));
 }
@@ -14325,7 +14325,7 @@ static const LS_MethodInfo ls_methods_Pt10[] = {
     {"manhattan", ls_invoke_Pt10_manhattan, 1},
     {"dot", ls_invoke_Pt10_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt10 = {"Pt10", 2, ls_fields_Pt10, 2, ls_methods_Pt10};
+static const LS_TypeInfo ls_type_Pt10 = {"Pt10", 2, ls_fields_Pt10, 2, ls_methods_Pt10, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker10_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker10_add((LS_Worker10*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14355,7 +14355,7 @@ static const LS_MethodInfo ls_methods_Worker10[] = {
     {"fib", ls_invoke_Worker10_fib, 1},
     {"text", ls_invoke_Worker10_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker10 = {"Worker10", 4, ls_fields_Worker10, 5, ls_methods_Worker10};
+static const LS_TypeInfo ls_type_Worker10 = {"Worker10", 4, ls_fields_Worker10, 5, ls_methods_Worker10, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner10_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner10_run((LS_Runner10*)self));
@@ -14363,7 +14363,7 @@ static void ls_invoke_Runner10_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner10[] = {
     {"run", ls_invoke_Runner10_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner10 = {"Runner10", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner10};
+static const LS_TypeInfo ls_type_Runner10 = {"Runner10", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner10, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng11_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng11_next((LS_Rng11*)self));
@@ -14378,7 +14378,7 @@ static const LS_MethodInfo ls_methods_Rng11[] = {
     {"next", ls_invoke_Rng11_next, 0},
     {"range", ls_invoke_Rng11_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng11 = {"Rng11", 1, ls_fields_Rng11, 2, ls_methods_Rng11};
+static const LS_TypeInfo ls_type_Rng11 = {"Rng11", 1, ls_fields_Rng11, 2, ls_methods_Rng11, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt11_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt11_manhattan((LS_Pt11*)self, ((LS_Pt11*)ls_unbox_object(arguments[0], &ls_type_Pt11))));
 }
@@ -14393,7 +14393,7 @@ static const LS_MethodInfo ls_methods_Pt11[] = {
     {"manhattan", ls_invoke_Pt11_manhattan, 1},
     {"dot", ls_invoke_Pt11_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt11 = {"Pt11", 2, ls_fields_Pt11, 2, ls_methods_Pt11};
+static const LS_TypeInfo ls_type_Pt11 = {"Pt11", 2, ls_fields_Pt11, 2, ls_methods_Pt11, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker11_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker11_add((LS_Worker11*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14423,7 +14423,7 @@ static const LS_MethodInfo ls_methods_Worker11[] = {
     {"fib", ls_invoke_Worker11_fib, 1},
     {"text", ls_invoke_Worker11_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker11 = {"Worker11", 4, ls_fields_Worker11, 5, ls_methods_Worker11};
+static const LS_TypeInfo ls_type_Worker11 = {"Worker11", 4, ls_fields_Worker11, 5, ls_methods_Worker11, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner11_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner11_run((LS_Runner11*)self));
@@ -14431,7 +14431,7 @@ static void ls_invoke_Runner11_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner11[] = {
     {"run", ls_invoke_Runner11_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner11 = {"Runner11", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner11};
+static const LS_TypeInfo ls_type_Runner11 = {"Runner11", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner11, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng12_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng12_next((LS_Rng12*)self));
@@ -14446,7 +14446,7 @@ static const LS_MethodInfo ls_methods_Rng12[] = {
     {"next", ls_invoke_Rng12_next, 0},
     {"range", ls_invoke_Rng12_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng12 = {"Rng12", 1, ls_fields_Rng12, 2, ls_methods_Rng12};
+static const LS_TypeInfo ls_type_Rng12 = {"Rng12", 1, ls_fields_Rng12, 2, ls_methods_Rng12, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt12_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt12_manhattan((LS_Pt12*)self, ((LS_Pt12*)ls_unbox_object(arguments[0], &ls_type_Pt12))));
 }
@@ -14461,7 +14461,7 @@ static const LS_MethodInfo ls_methods_Pt12[] = {
     {"manhattan", ls_invoke_Pt12_manhattan, 1},
     {"dot", ls_invoke_Pt12_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt12 = {"Pt12", 2, ls_fields_Pt12, 2, ls_methods_Pt12};
+static const LS_TypeInfo ls_type_Pt12 = {"Pt12", 2, ls_fields_Pt12, 2, ls_methods_Pt12, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker12_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker12_add((LS_Worker12*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14491,7 +14491,7 @@ static const LS_MethodInfo ls_methods_Worker12[] = {
     {"fib", ls_invoke_Worker12_fib, 1},
     {"text", ls_invoke_Worker12_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker12 = {"Worker12", 4, ls_fields_Worker12, 5, ls_methods_Worker12};
+static const LS_TypeInfo ls_type_Worker12 = {"Worker12", 4, ls_fields_Worker12, 5, ls_methods_Worker12, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner12_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner12_run((LS_Runner12*)self));
@@ -14499,7 +14499,7 @@ static void ls_invoke_Runner12_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner12[] = {
     {"run", ls_invoke_Runner12_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner12 = {"Runner12", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner12};
+static const LS_TypeInfo ls_type_Runner12 = {"Runner12", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner12, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng13_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng13_next((LS_Rng13*)self));
@@ -14514,7 +14514,7 @@ static const LS_MethodInfo ls_methods_Rng13[] = {
     {"next", ls_invoke_Rng13_next, 0},
     {"range", ls_invoke_Rng13_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng13 = {"Rng13", 1, ls_fields_Rng13, 2, ls_methods_Rng13};
+static const LS_TypeInfo ls_type_Rng13 = {"Rng13", 1, ls_fields_Rng13, 2, ls_methods_Rng13, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt13_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt13_manhattan((LS_Pt13*)self, ((LS_Pt13*)ls_unbox_object(arguments[0], &ls_type_Pt13))));
 }
@@ -14529,7 +14529,7 @@ static const LS_MethodInfo ls_methods_Pt13[] = {
     {"manhattan", ls_invoke_Pt13_manhattan, 1},
     {"dot", ls_invoke_Pt13_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt13 = {"Pt13", 2, ls_fields_Pt13, 2, ls_methods_Pt13};
+static const LS_TypeInfo ls_type_Pt13 = {"Pt13", 2, ls_fields_Pt13, 2, ls_methods_Pt13, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker13_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker13_add((LS_Worker13*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14559,7 +14559,7 @@ static const LS_MethodInfo ls_methods_Worker13[] = {
     {"fib", ls_invoke_Worker13_fib, 1},
     {"text", ls_invoke_Worker13_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker13 = {"Worker13", 4, ls_fields_Worker13, 5, ls_methods_Worker13};
+static const LS_TypeInfo ls_type_Worker13 = {"Worker13", 4, ls_fields_Worker13, 5, ls_methods_Worker13, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner13_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner13_run((LS_Runner13*)self));
@@ -14567,7 +14567,7 @@ static void ls_invoke_Runner13_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner13[] = {
     {"run", ls_invoke_Runner13_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner13 = {"Runner13", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner13};
+static const LS_TypeInfo ls_type_Runner13 = {"Runner13", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner13, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng14_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng14_next((LS_Rng14*)self));
@@ -14582,7 +14582,7 @@ static const LS_MethodInfo ls_methods_Rng14[] = {
     {"next", ls_invoke_Rng14_next, 0},
     {"range", ls_invoke_Rng14_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng14 = {"Rng14", 1, ls_fields_Rng14, 2, ls_methods_Rng14};
+static const LS_TypeInfo ls_type_Rng14 = {"Rng14", 1, ls_fields_Rng14, 2, ls_methods_Rng14, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt14_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt14_manhattan((LS_Pt14*)self, ((LS_Pt14*)ls_unbox_object(arguments[0], &ls_type_Pt14))));
 }
@@ -14597,7 +14597,7 @@ static const LS_MethodInfo ls_methods_Pt14[] = {
     {"manhattan", ls_invoke_Pt14_manhattan, 1},
     {"dot", ls_invoke_Pt14_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt14 = {"Pt14", 2, ls_fields_Pt14, 2, ls_methods_Pt14};
+static const LS_TypeInfo ls_type_Pt14 = {"Pt14", 2, ls_fields_Pt14, 2, ls_methods_Pt14, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker14_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker14_add((LS_Worker14*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14627,7 +14627,7 @@ static const LS_MethodInfo ls_methods_Worker14[] = {
     {"fib", ls_invoke_Worker14_fib, 1},
     {"text", ls_invoke_Worker14_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker14 = {"Worker14", 4, ls_fields_Worker14, 5, ls_methods_Worker14};
+static const LS_TypeInfo ls_type_Worker14 = {"Worker14", 4, ls_fields_Worker14, 5, ls_methods_Worker14, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner14_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner14_run((LS_Runner14*)self));
@@ -14635,7 +14635,7 @@ static void ls_invoke_Runner14_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner14[] = {
     {"run", ls_invoke_Runner14_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner14 = {"Runner14", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner14};
+static const LS_TypeInfo ls_type_Runner14 = {"Runner14", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner14, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng15_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng15_next((LS_Rng15*)self));
@@ -14650,7 +14650,7 @@ static const LS_MethodInfo ls_methods_Rng15[] = {
     {"next", ls_invoke_Rng15_next, 0},
     {"range", ls_invoke_Rng15_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng15 = {"Rng15", 1, ls_fields_Rng15, 2, ls_methods_Rng15};
+static const LS_TypeInfo ls_type_Rng15 = {"Rng15", 1, ls_fields_Rng15, 2, ls_methods_Rng15, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt15_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt15_manhattan((LS_Pt15*)self, ((LS_Pt15*)ls_unbox_object(arguments[0], &ls_type_Pt15))));
 }
@@ -14665,7 +14665,7 @@ static const LS_MethodInfo ls_methods_Pt15[] = {
     {"manhattan", ls_invoke_Pt15_manhattan, 1},
     {"dot", ls_invoke_Pt15_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt15 = {"Pt15", 2, ls_fields_Pt15, 2, ls_methods_Pt15};
+static const LS_TypeInfo ls_type_Pt15 = {"Pt15", 2, ls_fields_Pt15, 2, ls_methods_Pt15, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker15_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker15_add((LS_Worker15*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14695,7 +14695,7 @@ static const LS_MethodInfo ls_methods_Worker15[] = {
     {"fib", ls_invoke_Worker15_fib, 1},
     {"text", ls_invoke_Worker15_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker15 = {"Worker15", 4, ls_fields_Worker15, 5, ls_methods_Worker15};
+static const LS_TypeInfo ls_type_Worker15 = {"Worker15", 4, ls_fields_Worker15, 5, ls_methods_Worker15, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner15_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner15_run((LS_Runner15*)self));
@@ -14703,7 +14703,7 @@ static void ls_invoke_Runner15_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner15[] = {
     {"run", ls_invoke_Runner15_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner15 = {"Runner15", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner15};
+static const LS_TypeInfo ls_type_Runner15 = {"Runner15", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner15, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng16_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng16_next((LS_Rng16*)self));
@@ -14718,7 +14718,7 @@ static const LS_MethodInfo ls_methods_Rng16[] = {
     {"next", ls_invoke_Rng16_next, 0},
     {"range", ls_invoke_Rng16_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng16 = {"Rng16", 1, ls_fields_Rng16, 2, ls_methods_Rng16};
+static const LS_TypeInfo ls_type_Rng16 = {"Rng16", 1, ls_fields_Rng16, 2, ls_methods_Rng16, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt16_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt16_manhattan((LS_Pt16*)self, ((LS_Pt16*)ls_unbox_object(arguments[0], &ls_type_Pt16))));
 }
@@ -14733,7 +14733,7 @@ static const LS_MethodInfo ls_methods_Pt16[] = {
     {"manhattan", ls_invoke_Pt16_manhattan, 1},
     {"dot", ls_invoke_Pt16_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt16 = {"Pt16", 2, ls_fields_Pt16, 2, ls_methods_Pt16};
+static const LS_TypeInfo ls_type_Pt16 = {"Pt16", 2, ls_fields_Pt16, 2, ls_methods_Pt16, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker16_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker16_add((LS_Worker16*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14763,7 +14763,7 @@ static const LS_MethodInfo ls_methods_Worker16[] = {
     {"fib", ls_invoke_Worker16_fib, 1},
     {"text", ls_invoke_Worker16_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker16 = {"Worker16", 4, ls_fields_Worker16, 5, ls_methods_Worker16};
+static const LS_TypeInfo ls_type_Worker16 = {"Worker16", 4, ls_fields_Worker16, 5, ls_methods_Worker16, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner16_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner16_run((LS_Runner16*)self));
@@ -14771,7 +14771,7 @@ static void ls_invoke_Runner16_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner16[] = {
     {"run", ls_invoke_Runner16_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner16 = {"Runner16", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner16};
+static const LS_TypeInfo ls_type_Runner16 = {"Runner16", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner16, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng17_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng17_next((LS_Rng17*)self));
@@ -14786,7 +14786,7 @@ static const LS_MethodInfo ls_methods_Rng17[] = {
     {"next", ls_invoke_Rng17_next, 0},
     {"range", ls_invoke_Rng17_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng17 = {"Rng17", 1, ls_fields_Rng17, 2, ls_methods_Rng17};
+static const LS_TypeInfo ls_type_Rng17 = {"Rng17", 1, ls_fields_Rng17, 2, ls_methods_Rng17, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt17_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt17_manhattan((LS_Pt17*)self, ((LS_Pt17*)ls_unbox_object(arguments[0], &ls_type_Pt17))));
 }
@@ -14801,7 +14801,7 @@ static const LS_MethodInfo ls_methods_Pt17[] = {
     {"manhattan", ls_invoke_Pt17_manhattan, 1},
     {"dot", ls_invoke_Pt17_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt17 = {"Pt17", 2, ls_fields_Pt17, 2, ls_methods_Pt17};
+static const LS_TypeInfo ls_type_Pt17 = {"Pt17", 2, ls_fields_Pt17, 2, ls_methods_Pt17, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker17_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker17_add((LS_Worker17*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14831,7 +14831,7 @@ static const LS_MethodInfo ls_methods_Worker17[] = {
     {"fib", ls_invoke_Worker17_fib, 1},
     {"text", ls_invoke_Worker17_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker17 = {"Worker17", 4, ls_fields_Worker17, 5, ls_methods_Worker17};
+static const LS_TypeInfo ls_type_Worker17 = {"Worker17", 4, ls_fields_Worker17, 5, ls_methods_Worker17, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner17_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner17_run((LS_Runner17*)self));
@@ -14839,7 +14839,7 @@ static void ls_invoke_Runner17_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner17[] = {
     {"run", ls_invoke_Runner17_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner17 = {"Runner17", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner17};
+static const LS_TypeInfo ls_type_Runner17 = {"Runner17", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner17, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng18_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng18_next((LS_Rng18*)self));
@@ -14854,7 +14854,7 @@ static const LS_MethodInfo ls_methods_Rng18[] = {
     {"next", ls_invoke_Rng18_next, 0},
     {"range", ls_invoke_Rng18_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng18 = {"Rng18", 1, ls_fields_Rng18, 2, ls_methods_Rng18};
+static const LS_TypeInfo ls_type_Rng18 = {"Rng18", 1, ls_fields_Rng18, 2, ls_methods_Rng18, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt18_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt18_manhattan((LS_Pt18*)self, ((LS_Pt18*)ls_unbox_object(arguments[0], &ls_type_Pt18))));
 }
@@ -14869,7 +14869,7 @@ static const LS_MethodInfo ls_methods_Pt18[] = {
     {"manhattan", ls_invoke_Pt18_manhattan, 1},
     {"dot", ls_invoke_Pt18_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt18 = {"Pt18", 2, ls_fields_Pt18, 2, ls_methods_Pt18};
+static const LS_TypeInfo ls_type_Pt18 = {"Pt18", 2, ls_fields_Pt18, 2, ls_methods_Pt18, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker18_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker18_add((LS_Worker18*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14899,7 +14899,7 @@ static const LS_MethodInfo ls_methods_Worker18[] = {
     {"fib", ls_invoke_Worker18_fib, 1},
     {"text", ls_invoke_Worker18_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker18 = {"Worker18", 4, ls_fields_Worker18, 5, ls_methods_Worker18};
+static const LS_TypeInfo ls_type_Worker18 = {"Worker18", 4, ls_fields_Worker18, 5, ls_methods_Worker18, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner18_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner18_run((LS_Runner18*)self));
@@ -14907,7 +14907,7 @@ static void ls_invoke_Runner18_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner18[] = {
     {"run", ls_invoke_Runner18_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner18 = {"Runner18", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner18};
+static const LS_TypeInfo ls_type_Runner18 = {"Runner18", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner18, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng19_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng19_next((LS_Rng19*)self));
@@ -14922,7 +14922,7 @@ static const LS_MethodInfo ls_methods_Rng19[] = {
     {"next", ls_invoke_Rng19_next, 0},
     {"range", ls_invoke_Rng19_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng19 = {"Rng19", 1, ls_fields_Rng19, 2, ls_methods_Rng19};
+static const LS_TypeInfo ls_type_Rng19 = {"Rng19", 1, ls_fields_Rng19, 2, ls_methods_Rng19, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt19_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt19_manhattan((LS_Pt19*)self, ((LS_Pt19*)ls_unbox_object(arguments[0], &ls_type_Pt19))));
 }
@@ -14937,7 +14937,7 @@ static const LS_MethodInfo ls_methods_Pt19[] = {
     {"manhattan", ls_invoke_Pt19_manhattan, 1},
     {"dot", ls_invoke_Pt19_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt19 = {"Pt19", 2, ls_fields_Pt19, 2, ls_methods_Pt19};
+static const LS_TypeInfo ls_type_Pt19 = {"Pt19", 2, ls_fields_Pt19, 2, ls_methods_Pt19, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker19_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker19_add((LS_Worker19*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -14967,7 +14967,7 @@ static const LS_MethodInfo ls_methods_Worker19[] = {
     {"fib", ls_invoke_Worker19_fib, 1},
     {"text", ls_invoke_Worker19_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker19 = {"Worker19", 4, ls_fields_Worker19, 5, ls_methods_Worker19};
+static const LS_TypeInfo ls_type_Worker19 = {"Worker19", 4, ls_fields_Worker19, 5, ls_methods_Worker19, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner19_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner19_run((LS_Runner19*)self));
@@ -14975,7 +14975,7 @@ static void ls_invoke_Runner19_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner19[] = {
     {"run", ls_invoke_Runner19_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner19 = {"Runner19", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner19};
+static const LS_TypeInfo ls_type_Runner19 = {"Runner19", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner19, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng20_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng20_next((LS_Rng20*)self));
@@ -14990,7 +14990,7 @@ static const LS_MethodInfo ls_methods_Rng20[] = {
     {"next", ls_invoke_Rng20_next, 0},
     {"range", ls_invoke_Rng20_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng20 = {"Rng20", 1, ls_fields_Rng20, 2, ls_methods_Rng20};
+static const LS_TypeInfo ls_type_Rng20 = {"Rng20", 1, ls_fields_Rng20, 2, ls_methods_Rng20, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt20_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt20_manhattan((LS_Pt20*)self, ((LS_Pt20*)ls_unbox_object(arguments[0], &ls_type_Pt20))));
 }
@@ -15005,7 +15005,7 @@ static const LS_MethodInfo ls_methods_Pt20[] = {
     {"manhattan", ls_invoke_Pt20_manhattan, 1},
     {"dot", ls_invoke_Pt20_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt20 = {"Pt20", 2, ls_fields_Pt20, 2, ls_methods_Pt20};
+static const LS_TypeInfo ls_type_Pt20 = {"Pt20", 2, ls_fields_Pt20, 2, ls_methods_Pt20, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker20_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker20_add((LS_Worker20*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15035,7 +15035,7 @@ static const LS_MethodInfo ls_methods_Worker20[] = {
     {"fib", ls_invoke_Worker20_fib, 1},
     {"text", ls_invoke_Worker20_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker20 = {"Worker20", 4, ls_fields_Worker20, 5, ls_methods_Worker20};
+static const LS_TypeInfo ls_type_Worker20 = {"Worker20", 4, ls_fields_Worker20, 5, ls_methods_Worker20, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner20_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner20_run((LS_Runner20*)self));
@@ -15043,7 +15043,7 @@ static void ls_invoke_Runner20_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner20[] = {
     {"run", ls_invoke_Runner20_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner20 = {"Runner20", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner20};
+static const LS_TypeInfo ls_type_Runner20 = {"Runner20", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner20, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng21_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng21_next((LS_Rng21*)self));
@@ -15058,7 +15058,7 @@ static const LS_MethodInfo ls_methods_Rng21[] = {
     {"next", ls_invoke_Rng21_next, 0},
     {"range", ls_invoke_Rng21_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng21 = {"Rng21", 1, ls_fields_Rng21, 2, ls_methods_Rng21};
+static const LS_TypeInfo ls_type_Rng21 = {"Rng21", 1, ls_fields_Rng21, 2, ls_methods_Rng21, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt21_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt21_manhattan((LS_Pt21*)self, ((LS_Pt21*)ls_unbox_object(arguments[0], &ls_type_Pt21))));
 }
@@ -15073,7 +15073,7 @@ static const LS_MethodInfo ls_methods_Pt21[] = {
     {"manhattan", ls_invoke_Pt21_manhattan, 1},
     {"dot", ls_invoke_Pt21_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt21 = {"Pt21", 2, ls_fields_Pt21, 2, ls_methods_Pt21};
+static const LS_TypeInfo ls_type_Pt21 = {"Pt21", 2, ls_fields_Pt21, 2, ls_methods_Pt21, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker21_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker21_add((LS_Worker21*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15103,7 +15103,7 @@ static const LS_MethodInfo ls_methods_Worker21[] = {
     {"fib", ls_invoke_Worker21_fib, 1},
     {"text", ls_invoke_Worker21_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker21 = {"Worker21", 4, ls_fields_Worker21, 5, ls_methods_Worker21};
+static const LS_TypeInfo ls_type_Worker21 = {"Worker21", 4, ls_fields_Worker21, 5, ls_methods_Worker21, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner21_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner21_run((LS_Runner21*)self));
@@ -15111,7 +15111,7 @@ static void ls_invoke_Runner21_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner21[] = {
     {"run", ls_invoke_Runner21_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner21 = {"Runner21", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner21};
+static const LS_TypeInfo ls_type_Runner21 = {"Runner21", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner21, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng22_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng22_next((LS_Rng22*)self));
@@ -15126,7 +15126,7 @@ static const LS_MethodInfo ls_methods_Rng22[] = {
     {"next", ls_invoke_Rng22_next, 0},
     {"range", ls_invoke_Rng22_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng22 = {"Rng22", 1, ls_fields_Rng22, 2, ls_methods_Rng22};
+static const LS_TypeInfo ls_type_Rng22 = {"Rng22", 1, ls_fields_Rng22, 2, ls_methods_Rng22, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt22_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt22_manhattan((LS_Pt22*)self, ((LS_Pt22*)ls_unbox_object(arguments[0], &ls_type_Pt22))));
 }
@@ -15141,7 +15141,7 @@ static const LS_MethodInfo ls_methods_Pt22[] = {
     {"manhattan", ls_invoke_Pt22_manhattan, 1},
     {"dot", ls_invoke_Pt22_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt22 = {"Pt22", 2, ls_fields_Pt22, 2, ls_methods_Pt22};
+static const LS_TypeInfo ls_type_Pt22 = {"Pt22", 2, ls_fields_Pt22, 2, ls_methods_Pt22, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker22_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker22_add((LS_Worker22*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15171,7 +15171,7 @@ static const LS_MethodInfo ls_methods_Worker22[] = {
     {"fib", ls_invoke_Worker22_fib, 1},
     {"text", ls_invoke_Worker22_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker22 = {"Worker22", 4, ls_fields_Worker22, 5, ls_methods_Worker22};
+static const LS_TypeInfo ls_type_Worker22 = {"Worker22", 4, ls_fields_Worker22, 5, ls_methods_Worker22, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner22_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner22_run((LS_Runner22*)self));
@@ -15179,7 +15179,7 @@ static void ls_invoke_Runner22_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner22[] = {
     {"run", ls_invoke_Runner22_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner22 = {"Runner22", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner22};
+static const LS_TypeInfo ls_type_Runner22 = {"Runner22", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner22, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng23_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng23_next((LS_Rng23*)self));
@@ -15194,7 +15194,7 @@ static const LS_MethodInfo ls_methods_Rng23[] = {
     {"next", ls_invoke_Rng23_next, 0},
     {"range", ls_invoke_Rng23_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng23 = {"Rng23", 1, ls_fields_Rng23, 2, ls_methods_Rng23};
+static const LS_TypeInfo ls_type_Rng23 = {"Rng23", 1, ls_fields_Rng23, 2, ls_methods_Rng23, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt23_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt23_manhattan((LS_Pt23*)self, ((LS_Pt23*)ls_unbox_object(arguments[0], &ls_type_Pt23))));
 }
@@ -15209,7 +15209,7 @@ static const LS_MethodInfo ls_methods_Pt23[] = {
     {"manhattan", ls_invoke_Pt23_manhattan, 1},
     {"dot", ls_invoke_Pt23_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt23 = {"Pt23", 2, ls_fields_Pt23, 2, ls_methods_Pt23};
+static const LS_TypeInfo ls_type_Pt23 = {"Pt23", 2, ls_fields_Pt23, 2, ls_methods_Pt23, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker23_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker23_add((LS_Worker23*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15239,7 +15239,7 @@ static const LS_MethodInfo ls_methods_Worker23[] = {
     {"fib", ls_invoke_Worker23_fib, 1},
     {"text", ls_invoke_Worker23_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker23 = {"Worker23", 4, ls_fields_Worker23, 5, ls_methods_Worker23};
+static const LS_TypeInfo ls_type_Worker23 = {"Worker23", 4, ls_fields_Worker23, 5, ls_methods_Worker23, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner23_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner23_run((LS_Runner23*)self));
@@ -15247,7 +15247,7 @@ static void ls_invoke_Runner23_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner23[] = {
     {"run", ls_invoke_Runner23_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner23 = {"Runner23", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner23};
+static const LS_TypeInfo ls_type_Runner23 = {"Runner23", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner23, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng24_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng24_next((LS_Rng24*)self));
@@ -15262,7 +15262,7 @@ static const LS_MethodInfo ls_methods_Rng24[] = {
     {"next", ls_invoke_Rng24_next, 0},
     {"range", ls_invoke_Rng24_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng24 = {"Rng24", 1, ls_fields_Rng24, 2, ls_methods_Rng24};
+static const LS_TypeInfo ls_type_Rng24 = {"Rng24", 1, ls_fields_Rng24, 2, ls_methods_Rng24, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt24_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt24_manhattan((LS_Pt24*)self, ((LS_Pt24*)ls_unbox_object(arguments[0], &ls_type_Pt24))));
 }
@@ -15277,7 +15277,7 @@ static const LS_MethodInfo ls_methods_Pt24[] = {
     {"manhattan", ls_invoke_Pt24_manhattan, 1},
     {"dot", ls_invoke_Pt24_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt24 = {"Pt24", 2, ls_fields_Pt24, 2, ls_methods_Pt24};
+static const LS_TypeInfo ls_type_Pt24 = {"Pt24", 2, ls_fields_Pt24, 2, ls_methods_Pt24, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker24_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker24_add((LS_Worker24*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15307,7 +15307,7 @@ static const LS_MethodInfo ls_methods_Worker24[] = {
     {"fib", ls_invoke_Worker24_fib, 1},
     {"text", ls_invoke_Worker24_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker24 = {"Worker24", 4, ls_fields_Worker24, 5, ls_methods_Worker24};
+static const LS_TypeInfo ls_type_Worker24 = {"Worker24", 4, ls_fields_Worker24, 5, ls_methods_Worker24, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner24_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner24_run((LS_Runner24*)self));
@@ -15315,7 +15315,7 @@ static void ls_invoke_Runner24_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner24[] = {
     {"run", ls_invoke_Runner24_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner24 = {"Runner24", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner24};
+static const LS_TypeInfo ls_type_Runner24 = {"Runner24", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner24, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng25_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng25_next((LS_Rng25*)self));
@@ -15330,7 +15330,7 @@ static const LS_MethodInfo ls_methods_Rng25[] = {
     {"next", ls_invoke_Rng25_next, 0},
     {"range", ls_invoke_Rng25_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng25 = {"Rng25", 1, ls_fields_Rng25, 2, ls_methods_Rng25};
+static const LS_TypeInfo ls_type_Rng25 = {"Rng25", 1, ls_fields_Rng25, 2, ls_methods_Rng25, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt25_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt25_manhattan((LS_Pt25*)self, ((LS_Pt25*)ls_unbox_object(arguments[0], &ls_type_Pt25))));
 }
@@ -15345,7 +15345,7 @@ static const LS_MethodInfo ls_methods_Pt25[] = {
     {"manhattan", ls_invoke_Pt25_manhattan, 1},
     {"dot", ls_invoke_Pt25_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt25 = {"Pt25", 2, ls_fields_Pt25, 2, ls_methods_Pt25};
+static const LS_TypeInfo ls_type_Pt25 = {"Pt25", 2, ls_fields_Pt25, 2, ls_methods_Pt25, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker25_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker25_add((LS_Worker25*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15375,7 +15375,7 @@ static const LS_MethodInfo ls_methods_Worker25[] = {
     {"fib", ls_invoke_Worker25_fib, 1},
     {"text", ls_invoke_Worker25_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker25 = {"Worker25", 4, ls_fields_Worker25, 5, ls_methods_Worker25};
+static const LS_TypeInfo ls_type_Worker25 = {"Worker25", 4, ls_fields_Worker25, 5, ls_methods_Worker25, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner25_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner25_run((LS_Runner25*)self));
@@ -15383,7 +15383,7 @@ static void ls_invoke_Runner25_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner25[] = {
     {"run", ls_invoke_Runner25_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner25 = {"Runner25", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner25};
+static const LS_TypeInfo ls_type_Runner25 = {"Runner25", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner25, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng26_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng26_next((LS_Rng26*)self));
@@ -15398,7 +15398,7 @@ static const LS_MethodInfo ls_methods_Rng26[] = {
     {"next", ls_invoke_Rng26_next, 0},
     {"range", ls_invoke_Rng26_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng26 = {"Rng26", 1, ls_fields_Rng26, 2, ls_methods_Rng26};
+static const LS_TypeInfo ls_type_Rng26 = {"Rng26", 1, ls_fields_Rng26, 2, ls_methods_Rng26, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt26_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt26_manhattan((LS_Pt26*)self, ((LS_Pt26*)ls_unbox_object(arguments[0], &ls_type_Pt26))));
 }
@@ -15413,7 +15413,7 @@ static const LS_MethodInfo ls_methods_Pt26[] = {
     {"manhattan", ls_invoke_Pt26_manhattan, 1},
     {"dot", ls_invoke_Pt26_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt26 = {"Pt26", 2, ls_fields_Pt26, 2, ls_methods_Pt26};
+static const LS_TypeInfo ls_type_Pt26 = {"Pt26", 2, ls_fields_Pt26, 2, ls_methods_Pt26, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker26_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker26_add((LS_Worker26*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15443,7 +15443,7 @@ static const LS_MethodInfo ls_methods_Worker26[] = {
     {"fib", ls_invoke_Worker26_fib, 1},
     {"text", ls_invoke_Worker26_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker26 = {"Worker26", 4, ls_fields_Worker26, 5, ls_methods_Worker26};
+static const LS_TypeInfo ls_type_Worker26 = {"Worker26", 4, ls_fields_Worker26, 5, ls_methods_Worker26, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner26_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner26_run((LS_Runner26*)self));
@@ -15451,7 +15451,7 @@ static void ls_invoke_Runner26_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner26[] = {
     {"run", ls_invoke_Runner26_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner26 = {"Runner26", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner26};
+static const LS_TypeInfo ls_type_Runner26 = {"Runner26", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner26, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng27_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng27_next((LS_Rng27*)self));
@@ -15466,7 +15466,7 @@ static const LS_MethodInfo ls_methods_Rng27[] = {
     {"next", ls_invoke_Rng27_next, 0},
     {"range", ls_invoke_Rng27_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng27 = {"Rng27", 1, ls_fields_Rng27, 2, ls_methods_Rng27};
+static const LS_TypeInfo ls_type_Rng27 = {"Rng27", 1, ls_fields_Rng27, 2, ls_methods_Rng27, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt27_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt27_manhattan((LS_Pt27*)self, ((LS_Pt27*)ls_unbox_object(arguments[0], &ls_type_Pt27))));
 }
@@ -15481,7 +15481,7 @@ static const LS_MethodInfo ls_methods_Pt27[] = {
     {"manhattan", ls_invoke_Pt27_manhattan, 1},
     {"dot", ls_invoke_Pt27_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt27 = {"Pt27", 2, ls_fields_Pt27, 2, ls_methods_Pt27};
+static const LS_TypeInfo ls_type_Pt27 = {"Pt27", 2, ls_fields_Pt27, 2, ls_methods_Pt27, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker27_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker27_add((LS_Worker27*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15511,7 +15511,7 @@ static const LS_MethodInfo ls_methods_Worker27[] = {
     {"fib", ls_invoke_Worker27_fib, 1},
     {"text", ls_invoke_Worker27_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker27 = {"Worker27", 4, ls_fields_Worker27, 5, ls_methods_Worker27};
+static const LS_TypeInfo ls_type_Worker27 = {"Worker27", 4, ls_fields_Worker27, 5, ls_methods_Worker27, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner27_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner27_run((LS_Runner27*)self));
@@ -15519,7 +15519,7 @@ static void ls_invoke_Runner27_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner27[] = {
     {"run", ls_invoke_Runner27_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner27 = {"Runner27", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner27};
+static const LS_TypeInfo ls_type_Runner27 = {"Runner27", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner27, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng28_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng28_next((LS_Rng28*)self));
@@ -15534,7 +15534,7 @@ static const LS_MethodInfo ls_methods_Rng28[] = {
     {"next", ls_invoke_Rng28_next, 0},
     {"range", ls_invoke_Rng28_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng28 = {"Rng28", 1, ls_fields_Rng28, 2, ls_methods_Rng28};
+static const LS_TypeInfo ls_type_Rng28 = {"Rng28", 1, ls_fields_Rng28, 2, ls_methods_Rng28, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt28_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt28_manhattan((LS_Pt28*)self, ((LS_Pt28*)ls_unbox_object(arguments[0], &ls_type_Pt28))));
 }
@@ -15549,7 +15549,7 @@ static const LS_MethodInfo ls_methods_Pt28[] = {
     {"manhattan", ls_invoke_Pt28_manhattan, 1},
     {"dot", ls_invoke_Pt28_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt28 = {"Pt28", 2, ls_fields_Pt28, 2, ls_methods_Pt28};
+static const LS_TypeInfo ls_type_Pt28 = {"Pt28", 2, ls_fields_Pt28, 2, ls_methods_Pt28, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker28_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker28_add((LS_Worker28*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15579,7 +15579,7 @@ static const LS_MethodInfo ls_methods_Worker28[] = {
     {"fib", ls_invoke_Worker28_fib, 1},
     {"text", ls_invoke_Worker28_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker28 = {"Worker28", 4, ls_fields_Worker28, 5, ls_methods_Worker28};
+static const LS_TypeInfo ls_type_Worker28 = {"Worker28", 4, ls_fields_Worker28, 5, ls_methods_Worker28, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner28_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner28_run((LS_Runner28*)self));
@@ -15587,7 +15587,7 @@ static void ls_invoke_Runner28_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner28[] = {
     {"run", ls_invoke_Runner28_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner28 = {"Runner28", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner28};
+static const LS_TypeInfo ls_type_Runner28 = {"Runner28", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner28, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng29_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng29_next((LS_Rng29*)self));
@@ -15602,7 +15602,7 @@ static const LS_MethodInfo ls_methods_Rng29[] = {
     {"next", ls_invoke_Rng29_next, 0},
     {"range", ls_invoke_Rng29_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng29 = {"Rng29", 1, ls_fields_Rng29, 2, ls_methods_Rng29};
+static const LS_TypeInfo ls_type_Rng29 = {"Rng29", 1, ls_fields_Rng29, 2, ls_methods_Rng29, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt29_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt29_manhattan((LS_Pt29*)self, ((LS_Pt29*)ls_unbox_object(arguments[0], &ls_type_Pt29))));
 }
@@ -15617,7 +15617,7 @@ static const LS_MethodInfo ls_methods_Pt29[] = {
     {"manhattan", ls_invoke_Pt29_manhattan, 1},
     {"dot", ls_invoke_Pt29_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt29 = {"Pt29", 2, ls_fields_Pt29, 2, ls_methods_Pt29};
+static const LS_TypeInfo ls_type_Pt29 = {"Pt29", 2, ls_fields_Pt29, 2, ls_methods_Pt29, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker29_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker29_add((LS_Worker29*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15647,7 +15647,7 @@ static const LS_MethodInfo ls_methods_Worker29[] = {
     {"fib", ls_invoke_Worker29_fib, 1},
     {"text", ls_invoke_Worker29_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker29 = {"Worker29", 4, ls_fields_Worker29, 5, ls_methods_Worker29};
+static const LS_TypeInfo ls_type_Worker29 = {"Worker29", 4, ls_fields_Worker29, 5, ls_methods_Worker29, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner29_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner29_run((LS_Runner29*)self));
@@ -15655,7 +15655,7 @@ static void ls_invoke_Runner29_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner29[] = {
     {"run", ls_invoke_Runner29_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner29 = {"Runner29", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner29};
+static const LS_TypeInfo ls_type_Runner29 = {"Runner29", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner29, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng30_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng30_next((LS_Rng30*)self));
@@ -15670,7 +15670,7 @@ static const LS_MethodInfo ls_methods_Rng30[] = {
     {"next", ls_invoke_Rng30_next, 0},
     {"range", ls_invoke_Rng30_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng30 = {"Rng30", 1, ls_fields_Rng30, 2, ls_methods_Rng30};
+static const LS_TypeInfo ls_type_Rng30 = {"Rng30", 1, ls_fields_Rng30, 2, ls_methods_Rng30, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt30_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt30_manhattan((LS_Pt30*)self, ((LS_Pt30*)ls_unbox_object(arguments[0], &ls_type_Pt30))));
 }
@@ -15685,7 +15685,7 @@ static const LS_MethodInfo ls_methods_Pt30[] = {
     {"manhattan", ls_invoke_Pt30_manhattan, 1},
     {"dot", ls_invoke_Pt30_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt30 = {"Pt30", 2, ls_fields_Pt30, 2, ls_methods_Pt30};
+static const LS_TypeInfo ls_type_Pt30 = {"Pt30", 2, ls_fields_Pt30, 2, ls_methods_Pt30, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker30_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker30_add((LS_Worker30*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15715,7 +15715,7 @@ static const LS_MethodInfo ls_methods_Worker30[] = {
     {"fib", ls_invoke_Worker30_fib, 1},
     {"text", ls_invoke_Worker30_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker30 = {"Worker30", 4, ls_fields_Worker30, 5, ls_methods_Worker30};
+static const LS_TypeInfo ls_type_Worker30 = {"Worker30", 4, ls_fields_Worker30, 5, ls_methods_Worker30, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner30_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner30_run((LS_Runner30*)self));
@@ -15723,7 +15723,7 @@ static void ls_invoke_Runner30_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner30[] = {
     {"run", ls_invoke_Runner30_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner30 = {"Runner30", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner30};
+static const LS_TypeInfo ls_type_Runner30 = {"Runner30", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner30, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng31_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng31_next((LS_Rng31*)self));
@@ -15738,7 +15738,7 @@ static const LS_MethodInfo ls_methods_Rng31[] = {
     {"next", ls_invoke_Rng31_next, 0},
     {"range", ls_invoke_Rng31_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng31 = {"Rng31", 1, ls_fields_Rng31, 2, ls_methods_Rng31};
+static const LS_TypeInfo ls_type_Rng31 = {"Rng31", 1, ls_fields_Rng31, 2, ls_methods_Rng31, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt31_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt31_manhattan((LS_Pt31*)self, ((LS_Pt31*)ls_unbox_object(arguments[0], &ls_type_Pt31))));
 }
@@ -15753,7 +15753,7 @@ static const LS_MethodInfo ls_methods_Pt31[] = {
     {"manhattan", ls_invoke_Pt31_manhattan, 1},
     {"dot", ls_invoke_Pt31_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt31 = {"Pt31", 2, ls_fields_Pt31, 2, ls_methods_Pt31};
+static const LS_TypeInfo ls_type_Pt31 = {"Pt31", 2, ls_fields_Pt31, 2, ls_methods_Pt31, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker31_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker31_add((LS_Worker31*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15783,7 +15783,7 @@ static const LS_MethodInfo ls_methods_Worker31[] = {
     {"fib", ls_invoke_Worker31_fib, 1},
     {"text", ls_invoke_Worker31_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker31 = {"Worker31", 4, ls_fields_Worker31, 5, ls_methods_Worker31};
+static const LS_TypeInfo ls_type_Worker31 = {"Worker31", 4, ls_fields_Worker31, 5, ls_methods_Worker31, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner31_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner31_run((LS_Runner31*)self));
@@ -15791,7 +15791,7 @@ static void ls_invoke_Runner31_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner31[] = {
     {"run", ls_invoke_Runner31_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner31 = {"Runner31", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner31};
+static const LS_TypeInfo ls_type_Runner31 = {"Runner31", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner31, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng32_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng32_next((LS_Rng32*)self));
@@ -15806,7 +15806,7 @@ static const LS_MethodInfo ls_methods_Rng32[] = {
     {"next", ls_invoke_Rng32_next, 0},
     {"range", ls_invoke_Rng32_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng32 = {"Rng32", 1, ls_fields_Rng32, 2, ls_methods_Rng32};
+static const LS_TypeInfo ls_type_Rng32 = {"Rng32", 1, ls_fields_Rng32, 2, ls_methods_Rng32, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt32_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt32_manhattan((LS_Pt32*)self, ((LS_Pt32*)ls_unbox_object(arguments[0], &ls_type_Pt32))));
 }
@@ -15821,7 +15821,7 @@ static const LS_MethodInfo ls_methods_Pt32[] = {
     {"manhattan", ls_invoke_Pt32_manhattan, 1},
     {"dot", ls_invoke_Pt32_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt32 = {"Pt32", 2, ls_fields_Pt32, 2, ls_methods_Pt32};
+static const LS_TypeInfo ls_type_Pt32 = {"Pt32", 2, ls_fields_Pt32, 2, ls_methods_Pt32, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker32_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker32_add((LS_Worker32*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15851,7 +15851,7 @@ static const LS_MethodInfo ls_methods_Worker32[] = {
     {"fib", ls_invoke_Worker32_fib, 1},
     {"text", ls_invoke_Worker32_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker32 = {"Worker32", 4, ls_fields_Worker32, 5, ls_methods_Worker32};
+static const LS_TypeInfo ls_type_Worker32 = {"Worker32", 4, ls_fields_Worker32, 5, ls_methods_Worker32, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner32_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner32_run((LS_Runner32*)self));
@@ -15859,7 +15859,7 @@ static void ls_invoke_Runner32_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner32[] = {
     {"run", ls_invoke_Runner32_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner32 = {"Runner32", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner32};
+static const LS_TypeInfo ls_type_Runner32 = {"Runner32", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner32, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng33_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng33_next((LS_Rng33*)self));
@@ -15874,7 +15874,7 @@ static const LS_MethodInfo ls_methods_Rng33[] = {
     {"next", ls_invoke_Rng33_next, 0},
     {"range", ls_invoke_Rng33_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng33 = {"Rng33", 1, ls_fields_Rng33, 2, ls_methods_Rng33};
+static const LS_TypeInfo ls_type_Rng33 = {"Rng33", 1, ls_fields_Rng33, 2, ls_methods_Rng33, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt33_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt33_manhattan((LS_Pt33*)self, ((LS_Pt33*)ls_unbox_object(arguments[0], &ls_type_Pt33))));
 }
@@ -15889,7 +15889,7 @@ static const LS_MethodInfo ls_methods_Pt33[] = {
     {"manhattan", ls_invoke_Pt33_manhattan, 1},
     {"dot", ls_invoke_Pt33_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt33 = {"Pt33", 2, ls_fields_Pt33, 2, ls_methods_Pt33};
+static const LS_TypeInfo ls_type_Pt33 = {"Pt33", 2, ls_fields_Pt33, 2, ls_methods_Pt33, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker33_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker33_add((LS_Worker33*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15919,7 +15919,7 @@ static const LS_MethodInfo ls_methods_Worker33[] = {
     {"fib", ls_invoke_Worker33_fib, 1},
     {"text", ls_invoke_Worker33_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker33 = {"Worker33", 4, ls_fields_Worker33, 5, ls_methods_Worker33};
+static const LS_TypeInfo ls_type_Worker33 = {"Worker33", 4, ls_fields_Worker33, 5, ls_methods_Worker33, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner33_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner33_run((LS_Runner33*)self));
@@ -15927,7 +15927,7 @@ static void ls_invoke_Runner33_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner33[] = {
     {"run", ls_invoke_Runner33_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner33 = {"Runner33", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner33};
+static const LS_TypeInfo ls_type_Runner33 = {"Runner33", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner33, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng34_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng34_next((LS_Rng34*)self));
@@ -15942,7 +15942,7 @@ static const LS_MethodInfo ls_methods_Rng34[] = {
     {"next", ls_invoke_Rng34_next, 0},
     {"range", ls_invoke_Rng34_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng34 = {"Rng34", 1, ls_fields_Rng34, 2, ls_methods_Rng34};
+static const LS_TypeInfo ls_type_Rng34 = {"Rng34", 1, ls_fields_Rng34, 2, ls_methods_Rng34, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt34_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt34_manhattan((LS_Pt34*)self, ((LS_Pt34*)ls_unbox_object(arguments[0], &ls_type_Pt34))));
 }
@@ -15957,7 +15957,7 @@ static const LS_MethodInfo ls_methods_Pt34[] = {
     {"manhattan", ls_invoke_Pt34_manhattan, 1},
     {"dot", ls_invoke_Pt34_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt34 = {"Pt34", 2, ls_fields_Pt34, 2, ls_methods_Pt34};
+static const LS_TypeInfo ls_type_Pt34 = {"Pt34", 2, ls_fields_Pt34, 2, ls_methods_Pt34, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker34_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker34_add((LS_Worker34*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -15987,7 +15987,7 @@ static const LS_MethodInfo ls_methods_Worker34[] = {
     {"fib", ls_invoke_Worker34_fib, 1},
     {"text", ls_invoke_Worker34_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker34 = {"Worker34", 4, ls_fields_Worker34, 5, ls_methods_Worker34};
+static const LS_TypeInfo ls_type_Worker34 = {"Worker34", 4, ls_fields_Worker34, 5, ls_methods_Worker34, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner34_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner34_run((LS_Runner34*)self));
@@ -15995,7 +15995,7 @@ static void ls_invoke_Runner34_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner34[] = {
     {"run", ls_invoke_Runner34_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner34 = {"Runner34", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner34};
+static const LS_TypeInfo ls_type_Runner34 = {"Runner34", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner34, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng35_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng35_next((LS_Rng35*)self));
@@ -16010,7 +16010,7 @@ static const LS_MethodInfo ls_methods_Rng35[] = {
     {"next", ls_invoke_Rng35_next, 0},
     {"range", ls_invoke_Rng35_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng35 = {"Rng35", 1, ls_fields_Rng35, 2, ls_methods_Rng35};
+static const LS_TypeInfo ls_type_Rng35 = {"Rng35", 1, ls_fields_Rng35, 2, ls_methods_Rng35, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt35_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt35_manhattan((LS_Pt35*)self, ((LS_Pt35*)ls_unbox_object(arguments[0], &ls_type_Pt35))));
 }
@@ -16025,7 +16025,7 @@ static const LS_MethodInfo ls_methods_Pt35[] = {
     {"manhattan", ls_invoke_Pt35_manhattan, 1},
     {"dot", ls_invoke_Pt35_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt35 = {"Pt35", 2, ls_fields_Pt35, 2, ls_methods_Pt35};
+static const LS_TypeInfo ls_type_Pt35 = {"Pt35", 2, ls_fields_Pt35, 2, ls_methods_Pt35, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker35_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker35_add((LS_Worker35*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16055,7 +16055,7 @@ static const LS_MethodInfo ls_methods_Worker35[] = {
     {"fib", ls_invoke_Worker35_fib, 1},
     {"text", ls_invoke_Worker35_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker35 = {"Worker35", 4, ls_fields_Worker35, 5, ls_methods_Worker35};
+static const LS_TypeInfo ls_type_Worker35 = {"Worker35", 4, ls_fields_Worker35, 5, ls_methods_Worker35, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner35_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner35_run((LS_Runner35*)self));
@@ -16063,7 +16063,7 @@ static void ls_invoke_Runner35_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner35[] = {
     {"run", ls_invoke_Runner35_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner35 = {"Runner35", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner35};
+static const LS_TypeInfo ls_type_Runner35 = {"Runner35", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner35, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng36_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng36_next((LS_Rng36*)self));
@@ -16078,7 +16078,7 @@ static const LS_MethodInfo ls_methods_Rng36[] = {
     {"next", ls_invoke_Rng36_next, 0},
     {"range", ls_invoke_Rng36_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng36 = {"Rng36", 1, ls_fields_Rng36, 2, ls_methods_Rng36};
+static const LS_TypeInfo ls_type_Rng36 = {"Rng36", 1, ls_fields_Rng36, 2, ls_methods_Rng36, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt36_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt36_manhattan((LS_Pt36*)self, ((LS_Pt36*)ls_unbox_object(arguments[0], &ls_type_Pt36))));
 }
@@ -16093,7 +16093,7 @@ static const LS_MethodInfo ls_methods_Pt36[] = {
     {"manhattan", ls_invoke_Pt36_manhattan, 1},
     {"dot", ls_invoke_Pt36_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt36 = {"Pt36", 2, ls_fields_Pt36, 2, ls_methods_Pt36};
+static const LS_TypeInfo ls_type_Pt36 = {"Pt36", 2, ls_fields_Pt36, 2, ls_methods_Pt36, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker36_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker36_add((LS_Worker36*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16123,7 +16123,7 @@ static const LS_MethodInfo ls_methods_Worker36[] = {
     {"fib", ls_invoke_Worker36_fib, 1},
     {"text", ls_invoke_Worker36_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker36 = {"Worker36", 4, ls_fields_Worker36, 5, ls_methods_Worker36};
+static const LS_TypeInfo ls_type_Worker36 = {"Worker36", 4, ls_fields_Worker36, 5, ls_methods_Worker36, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner36_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner36_run((LS_Runner36*)self));
@@ -16131,7 +16131,7 @@ static void ls_invoke_Runner36_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner36[] = {
     {"run", ls_invoke_Runner36_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner36 = {"Runner36", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner36};
+static const LS_TypeInfo ls_type_Runner36 = {"Runner36", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner36, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng37_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng37_next((LS_Rng37*)self));
@@ -16146,7 +16146,7 @@ static const LS_MethodInfo ls_methods_Rng37[] = {
     {"next", ls_invoke_Rng37_next, 0},
     {"range", ls_invoke_Rng37_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng37 = {"Rng37", 1, ls_fields_Rng37, 2, ls_methods_Rng37};
+static const LS_TypeInfo ls_type_Rng37 = {"Rng37", 1, ls_fields_Rng37, 2, ls_methods_Rng37, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt37_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt37_manhattan((LS_Pt37*)self, ((LS_Pt37*)ls_unbox_object(arguments[0], &ls_type_Pt37))));
 }
@@ -16161,7 +16161,7 @@ static const LS_MethodInfo ls_methods_Pt37[] = {
     {"manhattan", ls_invoke_Pt37_manhattan, 1},
     {"dot", ls_invoke_Pt37_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt37 = {"Pt37", 2, ls_fields_Pt37, 2, ls_methods_Pt37};
+static const LS_TypeInfo ls_type_Pt37 = {"Pt37", 2, ls_fields_Pt37, 2, ls_methods_Pt37, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker37_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker37_add((LS_Worker37*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16191,7 +16191,7 @@ static const LS_MethodInfo ls_methods_Worker37[] = {
     {"fib", ls_invoke_Worker37_fib, 1},
     {"text", ls_invoke_Worker37_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker37 = {"Worker37", 4, ls_fields_Worker37, 5, ls_methods_Worker37};
+static const LS_TypeInfo ls_type_Worker37 = {"Worker37", 4, ls_fields_Worker37, 5, ls_methods_Worker37, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner37_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner37_run((LS_Runner37*)self));
@@ -16199,7 +16199,7 @@ static void ls_invoke_Runner37_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner37[] = {
     {"run", ls_invoke_Runner37_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner37 = {"Runner37", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner37};
+static const LS_TypeInfo ls_type_Runner37 = {"Runner37", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner37, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng38_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng38_next((LS_Rng38*)self));
@@ -16214,7 +16214,7 @@ static const LS_MethodInfo ls_methods_Rng38[] = {
     {"next", ls_invoke_Rng38_next, 0},
     {"range", ls_invoke_Rng38_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng38 = {"Rng38", 1, ls_fields_Rng38, 2, ls_methods_Rng38};
+static const LS_TypeInfo ls_type_Rng38 = {"Rng38", 1, ls_fields_Rng38, 2, ls_methods_Rng38, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt38_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt38_manhattan((LS_Pt38*)self, ((LS_Pt38*)ls_unbox_object(arguments[0], &ls_type_Pt38))));
 }
@@ -16229,7 +16229,7 @@ static const LS_MethodInfo ls_methods_Pt38[] = {
     {"manhattan", ls_invoke_Pt38_manhattan, 1},
     {"dot", ls_invoke_Pt38_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt38 = {"Pt38", 2, ls_fields_Pt38, 2, ls_methods_Pt38};
+static const LS_TypeInfo ls_type_Pt38 = {"Pt38", 2, ls_fields_Pt38, 2, ls_methods_Pt38, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker38_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker38_add((LS_Worker38*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16259,7 +16259,7 @@ static const LS_MethodInfo ls_methods_Worker38[] = {
     {"fib", ls_invoke_Worker38_fib, 1},
     {"text", ls_invoke_Worker38_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker38 = {"Worker38", 4, ls_fields_Worker38, 5, ls_methods_Worker38};
+static const LS_TypeInfo ls_type_Worker38 = {"Worker38", 4, ls_fields_Worker38, 5, ls_methods_Worker38, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner38_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner38_run((LS_Runner38*)self));
@@ -16267,7 +16267,7 @@ static void ls_invoke_Runner38_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner38[] = {
     {"run", ls_invoke_Runner38_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner38 = {"Runner38", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner38};
+static const LS_TypeInfo ls_type_Runner38 = {"Runner38", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner38, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng39_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng39_next((LS_Rng39*)self));
@@ -16282,7 +16282,7 @@ static const LS_MethodInfo ls_methods_Rng39[] = {
     {"next", ls_invoke_Rng39_next, 0},
     {"range", ls_invoke_Rng39_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng39 = {"Rng39", 1, ls_fields_Rng39, 2, ls_methods_Rng39};
+static const LS_TypeInfo ls_type_Rng39 = {"Rng39", 1, ls_fields_Rng39, 2, ls_methods_Rng39, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt39_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt39_manhattan((LS_Pt39*)self, ((LS_Pt39*)ls_unbox_object(arguments[0], &ls_type_Pt39))));
 }
@@ -16297,7 +16297,7 @@ static const LS_MethodInfo ls_methods_Pt39[] = {
     {"manhattan", ls_invoke_Pt39_manhattan, 1},
     {"dot", ls_invoke_Pt39_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt39 = {"Pt39", 2, ls_fields_Pt39, 2, ls_methods_Pt39};
+static const LS_TypeInfo ls_type_Pt39 = {"Pt39", 2, ls_fields_Pt39, 2, ls_methods_Pt39, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker39_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker39_add((LS_Worker39*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16327,7 +16327,7 @@ static const LS_MethodInfo ls_methods_Worker39[] = {
     {"fib", ls_invoke_Worker39_fib, 1},
     {"text", ls_invoke_Worker39_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker39 = {"Worker39", 4, ls_fields_Worker39, 5, ls_methods_Worker39};
+static const LS_TypeInfo ls_type_Worker39 = {"Worker39", 4, ls_fields_Worker39, 5, ls_methods_Worker39, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner39_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner39_run((LS_Runner39*)self));
@@ -16335,7 +16335,7 @@ static void ls_invoke_Runner39_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner39[] = {
     {"run", ls_invoke_Runner39_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner39 = {"Runner39", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner39};
+static const LS_TypeInfo ls_type_Runner39 = {"Runner39", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner39, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng40_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng40_next((LS_Rng40*)self));
@@ -16350,7 +16350,7 @@ static const LS_MethodInfo ls_methods_Rng40[] = {
     {"next", ls_invoke_Rng40_next, 0},
     {"range", ls_invoke_Rng40_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng40 = {"Rng40", 1, ls_fields_Rng40, 2, ls_methods_Rng40};
+static const LS_TypeInfo ls_type_Rng40 = {"Rng40", 1, ls_fields_Rng40, 2, ls_methods_Rng40, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt40_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt40_manhattan((LS_Pt40*)self, ((LS_Pt40*)ls_unbox_object(arguments[0], &ls_type_Pt40))));
 }
@@ -16365,7 +16365,7 @@ static const LS_MethodInfo ls_methods_Pt40[] = {
     {"manhattan", ls_invoke_Pt40_manhattan, 1},
     {"dot", ls_invoke_Pt40_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt40 = {"Pt40", 2, ls_fields_Pt40, 2, ls_methods_Pt40};
+static const LS_TypeInfo ls_type_Pt40 = {"Pt40", 2, ls_fields_Pt40, 2, ls_methods_Pt40, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker40_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker40_add((LS_Worker40*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16395,7 +16395,7 @@ static const LS_MethodInfo ls_methods_Worker40[] = {
     {"fib", ls_invoke_Worker40_fib, 1},
     {"text", ls_invoke_Worker40_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker40 = {"Worker40", 4, ls_fields_Worker40, 5, ls_methods_Worker40};
+static const LS_TypeInfo ls_type_Worker40 = {"Worker40", 4, ls_fields_Worker40, 5, ls_methods_Worker40, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner40_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner40_run((LS_Runner40*)self));
@@ -16403,7 +16403,7 @@ static void ls_invoke_Runner40_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner40[] = {
     {"run", ls_invoke_Runner40_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner40 = {"Runner40", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner40};
+static const LS_TypeInfo ls_type_Runner40 = {"Runner40", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner40, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng41_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng41_next((LS_Rng41*)self));
@@ -16418,7 +16418,7 @@ static const LS_MethodInfo ls_methods_Rng41[] = {
     {"next", ls_invoke_Rng41_next, 0},
     {"range", ls_invoke_Rng41_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng41 = {"Rng41", 1, ls_fields_Rng41, 2, ls_methods_Rng41};
+static const LS_TypeInfo ls_type_Rng41 = {"Rng41", 1, ls_fields_Rng41, 2, ls_methods_Rng41, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt41_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt41_manhattan((LS_Pt41*)self, ((LS_Pt41*)ls_unbox_object(arguments[0], &ls_type_Pt41))));
 }
@@ -16433,7 +16433,7 @@ static const LS_MethodInfo ls_methods_Pt41[] = {
     {"manhattan", ls_invoke_Pt41_manhattan, 1},
     {"dot", ls_invoke_Pt41_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt41 = {"Pt41", 2, ls_fields_Pt41, 2, ls_methods_Pt41};
+static const LS_TypeInfo ls_type_Pt41 = {"Pt41", 2, ls_fields_Pt41, 2, ls_methods_Pt41, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker41_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker41_add((LS_Worker41*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16463,7 +16463,7 @@ static const LS_MethodInfo ls_methods_Worker41[] = {
     {"fib", ls_invoke_Worker41_fib, 1},
     {"text", ls_invoke_Worker41_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker41 = {"Worker41", 4, ls_fields_Worker41, 5, ls_methods_Worker41};
+static const LS_TypeInfo ls_type_Worker41 = {"Worker41", 4, ls_fields_Worker41, 5, ls_methods_Worker41, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner41_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner41_run((LS_Runner41*)self));
@@ -16471,7 +16471,7 @@ static void ls_invoke_Runner41_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner41[] = {
     {"run", ls_invoke_Runner41_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner41 = {"Runner41", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner41};
+static const LS_TypeInfo ls_type_Runner41 = {"Runner41", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner41, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng42_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng42_next((LS_Rng42*)self));
@@ -16486,7 +16486,7 @@ static const LS_MethodInfo ls_methods_Rng42[] = {
     {"next", ls_invoke_Rng42_next, 0},
     {"range", ls_invoke_Rng42_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng42 = {"Rng42", 1, ls_fields_Rng42, 2, ls_methods_Rng42};
+static const LS_TypeInfo ls_type_Rng42 = {"Rng42", 1, ls_fields_Rng42, 2, ls_methods_Rng42, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt42_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt42_manhattan((LS_Pt42*)self, ((LS_Pt42*)ls_unbox_object(arguments[0], &ls_type_Pt42))));
 }
@@ -16501,7 +16501,7 @@ static const LS_MethodInfo ls_methods_Pt42[] = {
     {"manhattan", ls_invoke_Pt42_manhattan, 1},
     {"dot", ls_invoke_Pt42_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt42 = {"Pt42", 2, ls_fields_Pt42, 2, ls_methods_Pt42};
+static const LS_TypeInfo ls_type_Pt42 = {"Pt42", 2, ls_fields_Pt42, 2, ls_methods_Pt42, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker42_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker42_add((LS_Worker42*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16531,7 +16531,7 @@ static const LS_MethodInfo ls_methods_Worker42[] = {
     {"fib", ls_invoke_Worker42_fib, 1},
     {"text", ls_invoke_Worker42_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker42 = {"Worker42", 4, ls_fields_Worker42, 5, ls_methods_Worker42};
+static const LS_TypeInfo ls_type_Worker42 = {"Worker42", 4, ls_fields_Worker42, 5, ls_methods_Worker42, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner42_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner42_run((LS_Runner42*)self));
@@ -16539,7 +16539,7 @@ static void ls_invoke_Runner42_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner42[] = {
     {"run", ls_invoke_Runner42_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner42 = {"Runner42", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner42};
+static const LS_TypeInfo ls_type_Runner42 = {"Runner42", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner42, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng43_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng43_next((LS_Rng43*)self));
@@ -16554,7 +16554,7 @@ static const LS_MethodInfo ls_methods_Rng43[] = {
     {"next", ls_invoke_Rng43_next, 0},
     {"range", ls_invoke_Rng43_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng43 = {"Rng43", 1, ls_fields_Rng43, 2, ls_methods_Rng43};
+static const LS_TypeInfo ls_type_Rng43 = {"Rng43", 1, ls_fields_Rng43, 2, ls_methods_Rng43, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt43_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt43_manhattan((LS_Pt43*)self, ((LS_Pt43*)ls_unbox_object(arguments[0], &ls_type_Pt43))));
 }
@@ -16569,7 +16569,7 @@ static const LS_MethodInfo ls_methods_Pt43[] = {
     {"manhattan", ls_invoke_Pt43_manhattan, 1},
     {"dot", ls_invoke_Pt43_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt43 = {"Pt43", 2, ls_fields_Pt43, 2, ls_methods_Pt43};
+static const LS_TypeInfo ls_type_Pt43 = {"Pt43", 2, ls_fields_Pt43, 2, ls_methods_Pt43, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker43_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker43_add((LS_Worker43*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16599,7 +16599,7 @@ static const LS_MethodInfo ls_methods_Worker43[] = {
     {"fib", ls_invoke_Worker43_fib, 1},
     {"text", ls_invoke_Worker43_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker43 = {"Worker43", 4, ls_fields_Worker43, 5, ls_methods_Worker43};
+static const LS_TypeInfo ls_type_Worker43 = {"Worker43", 4, ls_fields_Worker43, 5, ls_methods_Worker43, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner43_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner43_run((LS_Runner43*)self));
@@ -16607,7 +16607,7 @@ static void ls_invoke_Runner43_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner43[] = {
     {"run", ls_invoke_Runner43_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner43 = {"Runner43", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner43};
+static const LS_TypeInfo ls_type_Runner43 = {"Runner43", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner43, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng44_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng44_next((LS_Rng44*)self));
@@ -16622,7 +16622,7 @@ static const LS_MethodInfo ls_methods_Rng44[] = {
     {"next", ls_invoke_Rng44_next, 0},
     {"range", ls_invoke_Rng44_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng44 = {"Rng44", 1, ls_fields_Rng44, 2, ls_methods_Rng44};
+static const LS_TypeInfo ls_type_Rng44 = {"Rng44", 1, ls_fields_Rng44, 2, ls_methods_Rng44, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt44_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt44_manhattan((LS_Pt44*)self, ((LS_Pt44*)ls_unbox_object(arguments[0], &ls_type_Pt44))));
 }
@@ -16637,7 +16637,7 @@ static const LS_MethodInfo ls_methods_Pt44[] = {
     {"manhattan", ls_invoke_Pt44_manhattan, 1},
     {"dot", ls_invoke_Pt44_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt44 = {"Pt44", 2, ls_fields_Pt44, 2, ls_methods_Pt44};
+static const LS_TypeInfo ls_type_Pt44 = {"Pt44", 2, ls_fields_Pt44, 2, ls_methods_Pt44, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker44_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker44_add((LS_Worker44*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16667,7 +16667,7 @@ static const LS_MethodInfo ls_methods_Worker44[] = {
     {"fib", ls_invoke_Worker44_fib, 1},
     {"text", ls_invoke_Worker44_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker44 = {"Worker44", 4, ls_fields_Worker44, 5, ls_methods_Worker44};
+static const LS_TypeInfo ls_type_Worker44 = {"Worker44", 4, ls_fields_Worker44, 5, ls_methods_Worker44, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner44_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner44_run((LS_Runner44*)self));
@@ -16675,7 +16675,7 @@ static void ls_invoke_Runner44_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner44[] = {
     {"run", ls_invoke_Runner44_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner44 = {"Runner44", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner44};
+static const LS_TypeInfo ls_type_Runner44 = {"Runner44", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner44, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng45_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng45_next((LS_Rng45*)self));
@@ -16690,7 +16690,7 @@ static const LS_MethodInfo ls_methods_Rng45[] = {
     {"next", ls_invoke_Rng45_next, 0},
     {"range", ls_invoke_Rng45_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng45 = {"Rng45", 1, ls_fields_Rng45, 2, ls_methods_Rng45};
+static const LS_TypeInfo ls_type_Rng45 = {"Rng45", 1, ls_fields_Rng45, 2, ls_methods_Rng45, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt45_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt45_manhattan((LS_Pt45*)self, ((LS_Pt45*)ls_unbox_object(arguments[0], &ls_type_Pt45))));
 }
@@ -16705,7 +16705,7 @@ static const LS_MethodInfo ls_methods_Pt45[] = {
     {"manhattan", ls_invoke_Pt45_manhattan, 1},
     {"dot", ls_invoke_Pt45_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt45 = {"Pt45", 2, ls_fields_Pt45, 2, ls_methods_Pt45};
+static const LS_TypeInfo ls_type_Pt45 = {"Pt45", 2, ls_fields_Pt45, 2, ls_methods_Pt45, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker45_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker45_add((LS_Worker45*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16735,7 +16735,7 @@ static const LS_MethodInfo ls_methods_Worker45[] = {
     {"fib", ls_invoke_Worker45_fib, 1},
     {"text", ls_invoke_Worker45_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker45 = {"Worker45", 4, ls_fields_Worker45, 5, ls_methods_Worker45};
+static const LS_TypeInfo ls_type_Worker45 = {"Worker45", 4, ls_fields_Worker45, 5, ls_methods_Worker45, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner45_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner45_run((LS_Runner45*)self));
@@ -16743,7 +16743,7 @@ static void ls_invoke_Runner45_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner45[] = {
     {"run", ls_invoke_Runner45_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner45 = {"Runner45", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner45};
+static const LS_TypeInfo ls_type_Runner45 = {"Runner45", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner45, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng46_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng46_next((LS_Rng46*)self));
@@ -16758,7 +16758,7 @@ static const LS_MethodInfo ls_methods_Rng46[] = {
     {"next", ls_invoke_Rng46_next, 0},
     {"range", ls_invoke_Rng46_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng46 = {"Rng46", 1, ls_fields_Rng46, 2, ls_methods_Rng46};
+static const LS_TypeInfo ls_type_Rng46 = {"Rng46", 1, ls_fields_Rng46, 2, ls_methods_Rng46, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt46_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt46_manhattan((LS_Pt46*)self, ((LS_Pt46*)ls_unbox_object(arguments[0], &ls_type_Pt46))));
 }
@@ -16773,7 +16773,7 @@ static const LS_MethodInfo ls_methods_Pt46[] = {
     {"manhattan", ls_invoke_Pt46_manhattan, 1},
     {"dot", ls_invoke_Pt46_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt46 = {"Pt46", 2, ls_fields_Pt46, 2, ls_methods_Pt46};
+static const LS_TypeInfo ls_type_Pt46 = {"Pt46", 2, ls_fields_Pt46, 2, ls_methods_Pt46, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker46_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker46_add((LS_Worker46*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16803,7 +16803,7 @@ static const LS_MethodInfo ls_methods_Worker46[] = {
     {"fib", ls_invoke_Worker46_fib, 1},
     {"text", ls_invoke_Worker46_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker46 = {"Worker46", 4, ls_fields_Worker46, 5, ls_methods_Worker46};
+static const LS_TypeInfo ls_type_Worker46 = {"Worker46", 4, ls_fields_Worker46, 5, ls_methods_Worker46, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner46_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner46_run((LS_Runner46*)self));
@@ -16811,7 +16811,7 @@ static void ls_invoke_Runner46_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner46[] = {
     {"run", ls_invoke_Runner46_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner46 = {"Runner46", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner46};
+static const LS_TypeInfo ls_type_Runner46 = {"Runner46", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner46, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng47_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng47_next((LS_Rng47*)self));
@@ -16826,7 +16826,7 @@ static const LS_MethodInfo ls_methods_Rng47[] = {
     {"next", ls_invoke_Rng47_next, 0},
     {"range", ls_invoke_Rng47_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng47 = {"Rng47", 1, ls_fields_Rng47, 2, ls_methods_Rng47};
+static const LS_TypeInfo ls_type_Rng47 = {"Rng47", 1, ls_fields_Rng47, 2, ls_methods_Rng47, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt47_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt47_manhattan((LS_Pt47*)self, ((LS_Pt47*)ls_unbox_object(arguments[0], &ls_type_Pt47))));
 }
@@ -16841,7 +16841,7 @@ static const LS_MethodInfo ls_methods_Pt47[] = {
     {"manhattan", ls_invoke_Pt47_manhattan, 1},
     {"dot", ls_invoke_Pt47_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt47 = {"Pt47", 2, ls_fields_Pt47, 2, ls_methods_Pt47};
+static const LS_TypeInfo ls_type_Pt47 = {"Pt47", 2, ls_fields_Pt47, 2, ls_methods_Pt47, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker47_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker47_add((LS_Worker47*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16871,7 +16871,7 @@ static const LS_MethodInfo ls_methods_Worker47[] = {
     {"fib", ls_invoke_Worker47_fib, 1},
     {"text", ls_invoke_Worker47_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker47 = {"Worker47", 4, ls_fields_Worker47, 5, ls_methods_Worker47};
+static const LS_TypeInfo ls_type_Worker47 = {"Worker47", 4, ls_fields_Worker47, 5, ls_methods_Worker47, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner47_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner47_run((LS_Runner47*)self));
@@ -16879,7 +16879,7 @@ static void ls_invoke_Runner47_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner47[] = {
     {"run", ls_invoke_Runner47_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner47 = {"Runner47", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner47};
+static const LS_TypeInfo ls_type_Runner47 = {"Runner47", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner47, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng48_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng48_next((LS_Rng48*)self));
@@ -16894,7 +16894,7 @@ static const LS_MethodInfo ls_methods_Rng48[] = {
     {"next", ls_invoke_Rng48_next, 0},
     {"range", ls_invoke_Rng48_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng48 = {"Rng48", 1, ls_fields_Rng48, 2, ls_methods_Rng48};
+static const LS_TypeInfo ls_type_Rng48 = {"Rng48", 1, ls_fields_Rng48, 2, ls_methods_Rng48, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt48_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt48_manhattan((LS_Pt48*)self, ((LS_Pt48*)ls_unbox_object(arguments[0], &ls_type_Pt48))));
 }
@@ -16909,7 +16909,7 @@ static const LS_MethodInfo ls_methods_Pt48[] = {
     {"manhattan", ls_invoke_Pt48_manhattan, 1},
     {"dot", ls_invoke_Pt48_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt48 = {"Pt48", 2, ls_fields_Pt48, 2, ls_methods_Pt48};
+static const LS_TypeInfo ls_type_Pt48 = {"Pt48", 2, ls_fields_Pt48, 2, ls_methods_Pt48, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker48_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker48_add((LS_Worker48*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -16939,7 +16939,7 @@ static const LS_MethodInfo ls_methods_Worker48[] = {
     {"fib", ls_invoke_Worker48_fib, 1},
     {"text", ls_invoke_Worker48_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker48 = {"Worker48", 4, ls_fields_Worker48, 5, ls_methods_Worker48};
+static const LS_TypeInfo ls_type_Worker48 = {"Worker48", 4, ls_fields_Worker48, 5, ls_methods_Worker48, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner48_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner48_run((LS_Runner48*)self));
@@ -16947,7 +16947,7 @@ static void ls_invoke_Runner48_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner48[] = {
     {"run", ls_invoke_Runner48_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner48 = {"Runner48", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner48};
+static const LS_TypeInfo ls_type_Runner48 = {"Runner48", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner48, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng49_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng49_next((LS_Rng49*)self));
@@ -16962,7 +16962,7 @@ static const LS_MethodInfo ls_methods_Rng49[] = {
     {"next", ls_invoke_Rng49_next, 0},
     {"range", ls_invoke_Rng49_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng49 = {"Rng49", 1, ls_fields_Rng49, 2, ls_methods_Rng49};
+static const LS_TypeInfo ls_type_Rng49 = {"Rng49", 1, ls_fields_Rng49, 2, ls_methods_Rng49, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt49_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt49_manhattan((LS_Pt49*)self, ((LS_Pt49*)ls_unbox_object(arguments[0], &ls_type_Pt49))));
 }
@@ -16977,7 +16977,7 @@ static const LS_MethodInfo ls_methods_Pt49[] = {
     {"manhattan", ls_invoke_Pt49_manhattan, 1},
     {"dot", ls_invoke_Pt49_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt49 = {"Pt49", 2, ls_fields_Pt49, 2, ls_methods_Pt49};
+static const LS_TypeInfo ls_type_Pt49 = {"Pt49", 2, ls_fields_Pt49, 2, ls_methods_Pt49, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker49_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker49_add((LS_Worker49*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17007,7 +17007,7 @@ static const LS_MethodInfo ls_methods_Worker49[] = {
     {"fib", ls_invoke_Worker49_fib, 1},
     {"text", ls_invoke_Worker49_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker49 = {"Worker49", 4, ls_fields_Worker49, 5, ls_methods_Worker49};
+static const LS_TypeInfo ls_type_Worker49 = {"Worker49", 4, ls_fields_Worker49, 5, ls_methods_Worker49, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner49_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner49_run((LS_Runner49*)self));
@@ -17015,7 +17015,7 @@ static void ls_invoke_Runner49_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner49[] = {
     {"run", ls_invoke_Runner49_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner49 = {"Runner49", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner49};
+static const LS_TypeInfo ls_type_Runner49 = {"Runner49", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner49, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng50_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng50_next((LS_Rng50*)self));
@@ -17030,7 +17030,7 @@ static const LS_MethodInfo ls_methods_Rng50[] = {
     {"next", ls_invoke_Rng50_next, 0},
     {"range", ls_invoke_Rng50_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng50 = {"Rng50", 1, ls_fields_Rng50, 2, ls_methods_Rng50};
+static const LS_TypeInfo ls_type_Rng50 = {"Rng50", 1, ls_fields_Rng50, 2, ls_methods_Rng50, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt50_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt50_manhattan((LS_Pt50*)self, ((LS_Pt50*)ls_unbox_object(arguments[0], &ls_type_Pt50))));
 }
@@ -17045,7 +17045,7 @@ static const LS_MethodInfo ls_methods_Pt50[] = {
     {"manhattan", ls_invoke_Pt50_manhattan, 1},
     {"dot", ls_invoke_Pt50_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt50 = {"Pt50", 2, ls_fields_Pt50, 2, ls_methods_Pt50};
+static const LS_TypeInfo ls_type_Pt50 = {"Pt50", 2, ls_fields_Pt50, 2, ls_methods_Pt50, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker50_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker50_add((LS_Worker50*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17075,7 +17075,7 @@ static const LS_MethodInfo ls_methods_Worker50[] = {
     {"fib", ls_invoke_Worker50_fib, 1},
     {"text", ls_invoke_Worker50_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker50 = {"Worker50", 4, ls_fields_Worker50, 5, ls_methods_Worker50};
+static const LS_TypeInfo ls_type_Worker50 = {"Worker50", 4, ls_fields_Worker50, 5, ls_methods_Worker50, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner50_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner50_run((LS_Runner50*)self));
@@ -17083,7 +17083,7 @@ static void ls_invoke_Runner50_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner50[] = {
     {"run", ls_invoke_Runner50_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner50 = {"Runner50", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner50};
+static const LS_TypeInfo ls_type_Runner50 = {"Runner50", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner50, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng51_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng51_next((LS_Rng51*)self));
@@ -17098,7 +17098,7 @@ static const LS_MethodInfo ls_methods_Rng51[] = {
     {"next", ls_invoke_Rng51_next, 0},
     {"range", ls_invoke_Rng51_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng51 = {"Rng51", 1, ls_fields_Rng51, 2, ls_methods_Rng51};
+static const LS_TypeInfo ls_type_Rng51 = {"Rng51", 1, ls_fields_Rng51, 2, ls_methods_Rng51, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt51_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt51_manhattan((LS_Pt51*)self, ((LS_Pt51*)ls_unbox_object(arguments[0], &ls_type_Pt51))));
 }
@@ -17113,7 +17113,7 @@ static const LS_MethodInfo ls_methods_Pt51[] = {
     {"manhattan", ls_invoke_Pt51_manhattan, 1},
     {"dot", ls_invoke_Pt51_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt51 = {"Pt51", 2, ls_fields_Pt51, 2, ls_methods_Pt51};
+static const LS_TypeInfo ls_type_Pt51 = {"Pt51", 2, ls_fields_Pt51, 2, ls_methods_Pt51, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker51_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker51_add((LS_Worker51*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17143,7 +17143,7 @@ static const LS_MethodInfo ls_methods_Worker51[] = {
     {"fib", ls_invoke_Worker51_fib, 1},
     {"text", ls_invoke_Worker51_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker51 = {"Worker51", 4, ls_fields_Worker51, 5, ls_methods_Worker51};
+static const LS_TypeInfo ls_type_Worker51 = {"Worker51", 4, ls_fields_Worker51, 5, ls_methods_Worker51, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner51_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner51_run((LS_Runner51*)self));
@@ -17151,7 +17151,7 @@ static void ls_invoke_Runner51_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner51[] = {
     {"run", ls_invoke_Runner51_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner51 = {"Runner51", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner51};
+static const LS_TypeInfo ls_type_Runner51 = {"Runner51", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner51, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng52_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng52_next((LS_Rng52*)self));
@@ -17166,7 +17166,7 @@ static const LS_MethodInfo ls_methods_Rng52[] = {
     {"next", ls_invoke_Rng52_next, 0},
     {"range", ls_invoke_Rng52_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng52 = {"Rng52", 1, ls_fields_Rng52, 2, ls_methods_Rng52};
+static const LS_TypeInfo ls_type_Rng52 = {"Rng52", 1, ls_fields_Rng52, 2, ls_methods_Rng52, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt52_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt52_manhattan((LS_Pt52*)self, ((LS_Pt52*)ls_unbox_object(arguments[0], &ls_type_Pt52))));
 }
@@ -17181,7 +17181,7 @@ static const LS_MethodInfo ls_methods_Pt52[] = {
     {"manhattan", ls_invoke_Pt52_manhattan, 1},
     {"dot", ls_invoke_Pt52_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt52 = {"Pt52", 2, ls_fields_Pt52, 2, ls_methods_Pt52};
+static const LS_TypeInfo ls_type_Pt52 = {"Pt52", 2, ls_fields_Pt52, 2, ls_methods_Pt52, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker52_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker52_add((LS_Worker52*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17211,7 +17211,7 @@ static const LS_MethodInfo ls_methods_Worker52[] = {
     {"fib", ls_invoke_Worker52_fib, 1},
     {"text", ls_invoke_Worker52_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker52 = {"Worker52", 4, ls_fields_Worker52, 5, ls_methods_Worker52};
+static const LS_TypeInfo ls_type_Worker52 = {"Worker52", 4, ls_fields_Worker52, 5, ls_methods_Worker52, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner52_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner52_run((LS_Runner52*)self));
@@ -17219,7 +17219,7 @@ static void ls_invoke_Runner52_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner52[] = {
     {"run", ls_invoke_Runner52_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner52 = {"Runner52", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner52};
+static const LS_TypeInfo ls_type_Runner52 = {"Runner52", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner52, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng53_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng53_next((LS_Rng53*)self));
@@ -17234,7 +17234,7 @@ static const LS_MethodInfo ls_methods_Rng53[] = {
     {"next", ls_invoke_Rng53_next, 0},
     {"range", ls_invoke_Rng53_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng53 = {"Rng53", 1, ls_fields_Rng53, 2, ls_methods_Rng53};
+static const LS_TypeInfo ls_type_Rng53 = {"Rng53", 1, ls_fields_Rng53, 2, ls_methods_Rng53, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt53_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt53_manhattan((LS_Pt53*)self, ((LS_Pt53*)ls_unbox_object(arguments[0], &ls_type_Pt53))));
 }
@@ -17249,7 +17249,7 @@ static const LS_MethodInfo ls_methods_Pt53[] = {
     {"manhattan", ls_invoke_Pt53_manhattan, 1},
     {"dot", ls_invoke_Pt53_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt53 = {"Pt53", 2, ls_fields_Pt53, 2, ls_methods_Pt53};
+static const LS_TypeInfo ls_type_Pt53 = {"Pt53", 2, ls_fields_Pt53, 2, ls_methods_Pt53, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker53_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker53_add((LS_Worker53*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17279,7 +17279,7 @@ static const LS_MethodInfo ls_methods_Worker53[] = {
     {"fib", ls_invoke_Worker53_fib, 1},
     {"text", ls_invoke_Worker53_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker53 = {"Worker53", 4, ls_fields_Worker53, 5, ls_methods_Worker53};
+static const LS_TypeInfo ls_type_Worker53 = {"Worker53", 4, ls_fields_Worker53, 5, ls_methods_Worker53, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner53_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner53_run((LS_Runner53*)self));
@@ -17287,7 +17287,7 @@ static void ls_invoke_Runner53_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner53[] = {
     {"run", ls_invoke_Runner53_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner53 = {"Runner53", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner53};
+static const LS_TypeInfo ls_type_Runner53 = {"Runner53", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner53, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng54_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng54_next((LS_Rng54*)self));
@@ -17302,7 +17302,7 @@ static const LS_MethodInfo ls_methods_Rng54[] = {
     {"next", ls_invoke_Rng54_next, 0},
     {"range", ls_invoke_Rng54_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng54 = {"Rng54", 1, ls_fields_Rng54, 2, ls_methods_Rng54};
+static const LS_TypeInfo ls_type_Rng54 = {"Rng54", 1, ls_fields_Rng54, 2, ls_methods_Rng54, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt54_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt54_manhattan((LS_Pt54*)self, ((LS_Pt54*)ls_unbox_object(arguments[0], &ls_type_Pt54))));
 }
@@ -17317,7 +17317,7 @@ static const LS_MethodInfo ls_methods_Pt54[] = {
     {"manhattan", ls_invoke_Pt54_manhattan, 1},
     {"dot", ls_invoke_Pt54_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt54 = {"Pt54", 2, ls_fields_Pt54, 2, ls_methods_Pt54};
+static const LS_TypeInfo ls_type_Pt54 = {"Pt54", 2, ls_fields_Pt54, 2, ls_methods_Pt54, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker54_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker54_add((LS_Worker54*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17347,7 +17347,7 @@ static const LS_MethodInfo ls_methods_Worker54[] = {
     {"fib", ls_invoke_Worker54_fib, 1},
     {"text", ls_invoke_Worker54_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker54 = {"Worker54", 4, ls_fields_Worker54, 5, ls_methods_Worker54};
+static const LS_TypeInfo ls_type_Worker54 = {"Worker54", 4, ls_fields_Worker54, 5, ls_methods_Worker54, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner54_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner54_run((LS_Runner54*)self));
@@ -17355,7 +17355,7 @@ static void ls_invoke_Runner54_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner54[] = {
     {"run", ls_invoke_Runner54_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner54 = {"Runner54", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner54};
+static const LS_TypeInfo ls_type_Runner54 = {"Runner54", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner54, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng55_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng55_next((LS_Rng55*)self));
@@ -17370,7 +17370,7 @@ static const LS_MethodInfo ls_methods_Rng55[] = {
     {"next", ls_invoke_Rng55_next, 0},
     {"range", ls_invoke_Rng55_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng55 = {"Rng55", 1, ls_fields_Rng55, 2, ls_methods_Rng55};
+static const LS_TypeInfo ls_type_Rng55 = {"Rng55", 1, ls_fields_Rng55, 2, ls_methods_Rng55, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt55_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt55_manhattan((LS_Pt55*)self, ((LS_Pt55*)ls_unbox_object(arguments[0], &ls_type_Pt55))));
 }
@@ -17385,7 +17385,7 @@ static const LS_MethodInfo ls_methods_Pt55[] = {
     {"manhattan", ls_invoke_Pt55_manhattan, 1},
     {"dot", ls_invoke_Pt55_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt55 = {"Pt55", 2, ls_fields_Pt55, 2, ls_methods_Pt55};
+static const LS_TypeInfo ls_type_Pt55 = {"Pt55", 2, ls_fields_Pt55, 2, ls_methods_Pt55, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker55_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker55_add((LS_Worker55*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17415,7 +17415,7 @@ static const LS_MethodInfo ls_methods_Worker55[] = {
     {"fib", ls_invoke_Worker55_fib, 1},
     {"text", ls_invoke_Worker55_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker55 = {"Worker55", 4, ls_fields_Worker55, 5, ls_methods_Worker55};
+static const LS_TypeInfo ls_type_Worker55 = {"Worker55", 4, ls_fields_Worker55, 5, ls_methods_Worker55, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner55_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner55_run((LS_Runner55*)self));
@@ -17423,7 +17423,7 @@ static void ls_invoke_Runner55_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner55[] = {
     {"run", ls_invoke_Runner55_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner55 = {"Runner55", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner55};
+static const LS_TypeInfo ls_type_Runner55 = {"Runner55", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner55, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng56_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng56_next((LS_Rng56*)self));
@@ -17438,7 +17438,7 @@ static const LS_MethodInfo ls_methods_Rng56[] = {
     {"next", ls_invoke_Rng56_next, 0},
     {"range", ls_invoke_Rng56_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng56 = {"Rng56", 1, ls_fields_Rng56, 2, ls_methods_Rng56};
+static const LS_TypeInfo ls_type_Rng56 = {"Rng56", 1, ls_fields_Rng56, 2, ls_methods_Rng56, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt56_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt56_manhattan((LS_Pt56*)self, ((LS_Pt56*)ls_unbox_object(arguments[0], &ls_type_Pt56))));
 }
@@ -17453,7 +17453,7 @@ static const LS_MethodInfo ls_methods_Pt56[] = {
     {"manhattan", ls_invoke_Pt56_manhattan, 1},
     {"dot", ls_invoke_Pt56_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt56 = {"Pt56", 2, ls_fields_Pt56, 2, ls_methods_Pt56};
+static const LS_TypeInfo ls_type_Pt56 = {"Pt56", 2, ls_fields_Pt56, 2, ls_methods_Pt56, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker56_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker56_add((LS_Worker56*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17483,7 +17483,7 @@ static const LS_MethodInfo ls_methods_Worker56[] = {
     {"fib", ls_invoke_Worker56_fib, 1},
     {"text", ls_invoke_Worker56_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker56 = {"Worker56", 4, ls_fields_Worker56, 5, ls_methods_Worker56};
+static const LS_TypeInfo ls_type_Worker56 = {"Worker56", 4, ls_fields_Worker56, 5, ls_methods_Worker56, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner56_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner56_run((LS_Runner56*)self));
@@ -17491,7 +17491,7 @@ static void ls_invoke_Runner56_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner56[] = {
     {"run", ls_invoke_Runner56_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner56 = {"Runner56", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner56};
+static const LS_TypeInfo ls_type_Runner56 = {"Runner56", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner56, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng57_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng57_next((LS_Rng57*)self));
@@ -17506,7 +17506,7 @@ static const LS_MethodInfo ls_methods_Rng57[] = {
     {"next", ls_invoke_Rng57_next, 0},
     {"range", ls_invoke_Rng57_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng57 = {"Rng57", 1, ls_fields_Rng57, 2, ls_methods_Rng57};
+static const LS_TypeInfo ls_type_Rng57 = {"Rng57", 1, ls_fields_Rng57, 2, ls_methods_Rng57, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt57_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt57_manhattan((LS_Pt57*)self, ((LS_Pt57*)ls_unbox_object(arguments[0], &ls_type_Pt57))));
 }
@@ -17521,7 +17521,7 @@ static const LS_MethodInfo ls_methods_Pt57[] = {
     {"manhattan", ls_invoke_Pt57_manhattan, 1},
     {"dot", ls_invoke_Pt57_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt57 = {"Pt57", 2, ls_fields_Pt57, 2, ls_methods_Pt57};
+static const LS_TypeInfo ls_type_Pt57 = {"Pt57", 2, ls_fields_Pt57, 2, ls_methods_Pt57, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker57_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker57_add((LS_Worker57*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17551,7 +17551,7 @@ static const LS_MethodInfo ls_methods_Worker57[] = {
     {"fib", ls_invoke_Worker57_fib, 1},
     {"text", ls_invoke_Worker57_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker57 = {"Worker57", 4, ls_fields_Worker57, 5, ls_methods_Worker57};
+static const LS_TypeInfo ls_type_Worker57 = {"Worker57", 4, ls_fields_Worker57, 5, ls_methods_Worker57, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner57_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner57_run((LS_Runner57*)self));
@@ -17559,7 +17559,7 @@ static void ls_invoke_Runner57_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner57[] = {
     {"run", ls_invoke_Runner57_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner57 = {"Runner57", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner57};
+static const LS_TypeInfo ls_type_Runner57 = {"Runner57", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner57, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng58_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng58_next((LS_Rng58*)self));
@@ -17574,7 +17574,7 @@ static const LS_MethodInfo ls_methods_Rng58[] = {
     {"next", ls_invoke_Rng58_next, 0},
     {"range", ls_invoke_Rng58_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng58 = {"Rng58", 1, ls_fields_Rng58, 2, ls_methods_Rng58};
+static const LS_TypeInfo ls_type_Rng58 = {"Rng58", 1, ls_fields_Rng58, 2, ls_methods_Rng58, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt58_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt58_manhattan((LS_Pt58*)self, ((LS_Pt58*)ls_unbox_object(arguments[0], &ls_type_Pt58))));
 }
@@ -17589,7 +17589,7 @@ static const LS_MethodInfo ls_methods_Pt58[] = {
     {"manhattan", ls_invoke_Pt58_manhattan, 1},
     {"dot", ls_invoke_Pt58_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt58 = {"Pt58", 2, ls_fields_Pt58, 2, ls_methods_Pt58};
+static const LS_TypeInfo ls_type_Pt58 = {"Pt58", 2, ls_fields_Pt58, 2, ls_methods_Pt58, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker58_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker58_add((LS_Worker58*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17619,7 +17619,7 @@ static const LS_MethodInfo ls_methods_Worker58[] = {
     {"fib", ls_invoke_Worker58_fib, 1},
     {"text", ls_invoke_Worker58_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker58 = {"Worker58", 4, ls_fields_Worker58, 5, ls_methods_Worker58};
+static const LS_TypeInfo ls_type_Worker58 = {"Worker58", 4, ls_fields_Worker58, 5, ls_methods_Worker58, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner58_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner58_run((LS_Runner58*)self));
@@ -17627,7 +17627,7 @@ static void ls_invoke_Runner58_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner58[] = {
     {"run", ls_invoke_Runner58_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner58 = {"Runner58", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner58};
+static const LS_TypeInfo ls_type_Runner58 = {"Runner58", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner58, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng59_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng59_next((LS_Rng59*)self));
@@ -17642,7 +17642,7 @@ static const LS_MethodInfo ls_methods_Rng59[] = {
     {"next", ls_invoke_Rng59_next, 0},
     {"range", ls_invoke_Rng59_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng59 = {"Rng59", 1, ls_fields_Rng59, 2, ls_methods_Rng59};
+static const LS_TypeInfo ls_type_Rng59 = {"Rng59", 1, ls_fields_Rng59, 2, ls_methods_Rng59, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt59_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt59_manhattan((LS_Pt59*)self, ((LS_Pt59*)ls_unbox_object(arguments[0], &ls_type_Pt59))));
 }
@@ -17657,7 +17657,7 @@ static const LS_MethodInfo ls_methods_Pt59[] = {
     {"manhattan", ls_invoke_Pt59_manhattan, 1},
     {"dot", ls_invoke_Pt59_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt59 = {"Pt59", 2, ls_fields_Pt59, 2, ls_methods_Pt59};
+static const LS_TypeInfo ls_type_Pt59 = {"Pt59", 2, ls_fields_Pt59, 2, ls_methods_Pt59, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker59_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker59_add((LS_Worker59*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17687,7 +17687,7 @@ static const LS_MethodInfo ls_methods_Worker59[] = {
     {"fib", ls_invoke_Worker59_fib, 1},
     {"text", ls_invoke_Worker59_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker59 = {"Worker59", 4, ls_fields_Worker59, 5, ls_methods_Worker59};
+static const LS_TypeInfo ls_type_Worker59 = {"Worker59", 4, ls_fields_Worker59, 5, ls_methods_Worker59, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner59_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner59_run((LS_Runner59*)self));
@@ -17695,7 +17695,7 @@ static void ls_invoke_Runner59_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner59[] = {
     {"run", ls_invoke_Runner59_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner59 = {"Runner59", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner59};
+static const LS_TypeInfo ls_type_Runner59 = {"Runner59", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner59, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng60_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng60_next((LS_Rng60*)self));
@@ -17710,7 +17710,7 @@ static const LS_MethodInfo ls_methods_Rng60[] = {
     {"next", ls_invoke_Rng60_next, 0},
     {"range", ls_invoke_Rng60_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng60 = {"Rng60", 1, ls_fields_Rng60, 2, ls_methods_Rng60};
+static const LS_TypeInfo ls_type_Rng60 = {"Rng60", 1, ls_fields_Rng60, 2, ls_methods_Rng60, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt60_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt60_manhattan((LS_Pt60*)self, ((LS_Pt60*)ls_unbox_object(arguments[0], &ls_type_Pt60))));
 }
@@ -17725,7 +17725,7 @@ static const LS_MethodInfo ls_methods_Pt60[] = {
     {"manhattan", ls_invoke_Pt60_manhattan, 1},
     {"dot", ls_invoke_Pt60_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt60 = {"Pt60", 2, ls_fields_Pt60, 2, ls_methods_Pt60};
+static const LS_TypeInfo ls_type_Pt60 = {"Pt60", 2, ls_fields_Pt60, 2, ls_methods_Pt60, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker60_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker60_add((LS_Worker60*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17755,7 +17755,7 @@ static const LS_MethodInfo ls_methods_Worker60[] = {
     {"fib", ls_invoke_Worker60_fib, 1},
     {"text", ls_invoke_Worker60_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker60 = {"Worker60", 4, ls_fields_Worker60, 5, ls_methods_Worker60};
+static const LS_TypeInfo ls_type_Worker60 = {"Worker60", 4, ls_fields_Worker60, 5, ls_methods_Worker60, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner60_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner60_run((LS_Runner60*)self));
@@ -17763,7 +17763,7 @@ static void ls_invoke_Runner60_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner60[] = {
     {"run", ls_invoke_Runner60_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner60 = {"Runner60", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner60};
+static const LS_TypeInfo ls_type_Runner60 = {"Runner60", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner60, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng61_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng61_next((LS_Rng61*)self));
@@ -17778,7 +17778,7 @@ static const LS_MethodInfo ls_methods_Rng61[] = {
     {"next", ls_invoke_Rng61_next, 0},
     {"range", ls_invoke_Rng61_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng61 = {"Rng61", 1, ls_fields_Rng61, 2, ls_methods_Rng61};
+static const LS_TypeInfo ls_type_Rng61 = {"Rng61", 1, ls_fields_Rng61, 2, ls_methods_Rng61, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt61_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt61_manhattan((LS_Pt61*)self, ((LS_Pt61*)ls_unbox_object(arguments[0], &ls_type_Pt61))));
 }
@@ -17793,7 +17793,7 @@ static const LS_MethodInfo ls_methods_Pt61[] = {
     {"manhattan", ls_invoke_Pt61_manhattan, 1},
     {"dot", ls_invoke_Pt61_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt61 = {"Pt61", 2, ls_fields_Pt61, 2, ls_methods_Pt61};
+static const LS_TypeInfo ls_type_Pt61 = {"Pt61", 2, ls_fields_Pt61, 2, ls_methods_Pt61, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker61_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker61_add((LS_Worker61*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17823,7 +17823,7 @@ static const LS_MethodInfo ls_methods_Worker61[] = {
     {"fib", ls_invoke_Worker61_fib, 1},
     {"text", ls_invoke_Worker61_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker61 = {"Worker61", 4, ls_fields_Worker61, 5, ls_methods_Worker61};
+static const LS_TypeInfo ls_type_Worker61 = {"Worker61", 4, ls_fields_Worker61, 5, ls_methods_Worker61, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner61_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner61_run((LS_Runner61*)self));
@@ -17831,7 +17831,7 @@ static void ls_invoke_Runner61_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner61[] = {
     {"run", ls_invoke_Runner61_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner61 = {"Runner61", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner61};
+static const LS_TypeInfo ls_type_Runner61 = {"Runner61", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner61, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng62_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng62_next((LS_Rng62*)self));
@@ -17846,7 +17846,7 @@ static const LS_MethodInfo ls_methods_Rng62[] = {
     {"next", ls_invoke_Rng62_next, 0},
     {"range", ls_invoke_Rng62_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng62 = {"Rng62", 1, ls_fields_Rng62, 2, ls_methods_Rng62};
+static const LS_TypeInfo ls_type_Rng62 = {"Rng62", 1, ls_fields_Rng62, 2, ls_methods_Rng62, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt62_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt62_manhattan((LS_Pt62*)self, ((LS_Pt62*)ls_unbox_object(arguments[0], &ls_type_Pt62))));
 }
@@ -17861,7 +17861,7 @@ static const LS_MethodInfo ls_methods_Pt62[] = {
     {"manhattan", ls_invoke_Pt62_manhattan, 1},
     {"dot", ls_invoke_Pt62_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt62 = {"Pt62", 2, ls_fields_Pt62, 2, ls_methods_Pt62};
+static const LS_TypeInfo ls_type_Pt62 = {"Pt62", 2, ls_fields_Pt62, 2, ls_methods_Pt62, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker62_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker62_add((LS_Worker62*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17891,7 +17891,7 @@ static const LS_MethodInfo ls_methods_Worker62[] = {
     {"fib", ls_invoke_Worker62_fib, 1},
     {"text", ls_invoke_Worker62_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker62 = {"Worker62", 4, ls_fields_Worker62, 5, ls_methods_Worker62};
+static const LS_TypeInfo ls_type_Worker62 = {"Worker62", 4, ls_fields_Worker62, 5, ls_methods_Worker62, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner62_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner62_run((LS_Runner62*)self));
@@ -17899,7 +17899,7 @@ static void ls_invoke_Runner62_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner62[] = {
     {"run", ls_invoke_Runner62_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner62 = {"Runner62", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner62};
+static const LS_TypeInfo ls_type_Runner62 = {"Runner62", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner62, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng63_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng63_next((LS_Rng63*)self));
@@ -17914,7 +17914,7 @@ static const LS_MethodInfo ls_methods_Rng63[] = {
     {"next", ls_invoke_Rng63_next, 0},
     {"range", ls_invoke_Rng63_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng63 = {"Rng63", 1, ls_fields_Rng63, 2, ls_methods_Rng63};
+static const LS_TypeInfo ls_type_Rng63 = {"Rng63", 1, ls_fields_Rng63, 2, ls_methods_Rng63, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt63_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt63_manhattan((LS_Pt63*)self, ((LS_Pt63*)ls_unbox_object(arguments[0], &ls_type_Pt63))));
 }
@@ -17929,7 +17929,7 @@ static const LS_MethodInfo ls_methods_Pt63[] = {
     {"manhattan", ls_invoke_Pt63_manhattan, 1},
     {"dot", ls_invoke_Pt63_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt63 = {"Pt63", 2, ls_fields_Pt63, 2, ls_methods_Pt63};
+static const LS_TypeInfo ls_type_Pt63 = {"Pt63", 2, ls_fields_Pt63, 2, ls_methods_Pt63, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker63_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker63_add((LS_Worker63*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -17959,7 +17959,7 @@ static const LS_MethodInfo ls_methods_Worker63[] = {
     {"fib", ls_invoke_Worker63_fib, 1},
     {"text", ls_invoke_Worker63_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker63 = {"Worker63", 4, ls_fields_Worker63, 5, ls_methods_Worker63};
+static const LS_TypeInfo ls_type_Worker63 = {"Worker63", 4, ls_fields_Worker63, 5, ls_methods_Worker63, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner63_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner63_run((LS_Runner63*)self));
@@ -17967,7 +17967,7 @@ static void ls_invoke_Runner63_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner63[] = {
     {"run", ls_invoke_Runner63_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner63 = {"Runner63", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner63};
+static const LS_TypeInfo ls_type_Runner63 = {"Runner63", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner63, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng64_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng64_next((LS_Rng64*)self));
@@ -17982,7 +17982,7 @@ static const LS_MethodInfo ls_methods_Rng64[] = {
     {"next", ls_invoke_Rng64_next, 0},
     {"range", ls_invoke_Rng64_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng64 = {"Rng64", 1, ls_fields_Rng64, 2, ls_methods_Rng64};
+static const LS_TypeInfo ls_type_Rng64 = {"Rng64", 1, ls_fields_Rng64, 2, ls_methods_Rng64, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt64_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt64_manhattan((LS_Pt64*)self, ((LS_Pt64*)ls_unbox_object(arguments[0], &ls_type_Pt64))));
 }
@@ -17997,7 +17997,7 @@ static const LS_MethodInfo ls_methods_Pt64[] = {
     {"manhattan", ls_invoke_Pt64_manhattan, 1},
     {"dot", ls_invoke_Pt64_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt64 = {"Pt64", 2, ls_fields_Pt64, 2, ls_methods_Pt64};
+static const LS_TypeInfo ls_type_Pt64 = {"Pt64", 2, ls_fields_Pt64, 2, ls_methods_Pt64, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker64_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker64_add((LS_Worker64*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18027,7 +18027,7 @@ static const LS_MethodInfo ls_methods_Worker64[] = {
     {"fib", ls_invoke_Worker64_fib, 1},
     {"text", ls_invoke_Worker64_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker64 = {"Worker64", 4, ls_fields_Worker64, 5, ls_methods_Worker64};
+static const LS_TypeInfo ls_type_Worker64 = {"Worker64", 4, ls_fields_Worker64, 5, ls_methods_Worker64, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner64_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner64_run((LS_Runner64*)self));
@@ -18035,7 +18035,7 @@ static void ls_invoke_Runner64_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner64[] = {
     {"run", ls_invoke_Runner64_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner64 = {"Runner64", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner64};
+static const LS_TypeInfo ls_type_Runner64 = {"Runner64", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner64, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng65_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng65_next((LS_Rng65*)self));
@@ -18050,7 +18050,7 @@ static const LS_MethodInfo ls_methods_Rng65[] = {
     {"next", ls_invoke_Rng65_next, 0},
     {"range", ls_invoke_Rng65_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng65 = {"Rng65", 1, ls_fields_Rng65, 2, ls_methods_Rng65};
+static const LS_TypeInfo ls_type_Rng65 = {"Rng65", 1, ls_fields_Rng65, 2, ls_methods_Rng65, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt65_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt65_manhattan((LS_Pt65*)self, ((LS_Pt65*)ls_unbox_object(arguments[0], &ls_type_Pt65))));
 }
@@ -18065,7 +18065,7 @@ static const LS_MethodInfo ls_methods_Pt65[] = {
     {"manhattan", ls_invoke_Pt65_manhattan, 1},
     {"dot", ls_invoke_Pt65_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt65 = {"Pt65", 2, ls_fields_Pt65, 2, ls_methods_Pt65};
+static const LS_TypeInfo ls_type_Pt65 = {"Pt65", 2, ls_fields_Pt65, 2, ls_methods_Pt65, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker65_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker65_add((LS_Worker65*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18095,7 +18095,7 @@ static const LS_MethodInfo ls_methods_Worker65[] = {
     {"fib", ls_invoke_Worker65_fib, 1},
     {"text", ls_invoke_Worker65_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker65 = {"Worker65", 4, ls_fields_Worker65, 5, ls_methods_Worker65};
+static const LS_TypeInfo ls_type_Worker65 = {"Worker65", 4, ls_fields_Worker65, 5, ls_methods_Worker65, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner65_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner65_run((LS_Runner65*)self));
@@ -18103,7 +18103,7 @@ static void ls_invoke_Runner65_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner65[] = {
     {"run", ls_invoke_Runner65_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner65 = {"Runner65", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner65};
+static const LS_TypeInfo ls_type_Runner65 = {"Runner65", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner65, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng66_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng66_next((LS_Rng66*)self));
@@ -18118,7 +18118,7 @@ static const LS_MethodInfo ls_methods_Rng66[] = {
     {"next", ls_invoke_Rng66_next, 0},
     {"range", ls_invoke_Rng66_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng66 = {"Rng66", 1, ls_fields_Rng66, 2, ls_methods_Rng66};
+static const LS_TypeInfo ls_type_Rng66 = {"Rng66", 1, ls_fields_Rng66, 2, ls_methods_Rng66, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt66_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt66_manhattan((LS_Pt66*)self, ((LS_Pt66*)ls_unbox_object(arguments[0], &ls_type_Pt66))));
 }
@@ -18133,7 +18133,7 @@ static const LS_MethodInfo ls_methods_Pt66[] = {
     {"manhattan", ls_invoke_Pt66_manhattan, 1},
     {"dot", ls_invoke_Pt66_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt66 = {"Pt66", 2, ls_fields_Pt66, 2, ls_methods_Pt66};
+static const LS_TypeInfo ls_type_Pt66 = {"Pt66", 2, ls_fields_Pt66, 2, ls_methods_Pt66, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker66_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker66_add((LS_Worker66*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18163,7 +18163,7 @@ static const LS_MethodInfo ls_methods_Worker66[] = {
     {"fib", ls_invoke_Worker66_fib, 1},
     {"text", ls_invoke_Worker66_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker66 = {"Worker66", 4, ls_fields_Worker66, 5, ls_methods_Worker66};
+static const LS_TypeInfo ls_type_Worker66 = {"Worker66", 4, ls_fields_Worker66, 5, ls_methods_Worker66, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner66_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner66_run((LS_Runner66*)self));
@@ -18171,7 +18171,7 @@ static void ls_invoke_Runner66_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner66[] = {
     {"run", ls_invoke_Runner66_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner66 = {"Runner66", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner66};
+static const LS_TypeInfo ls_type_Runner66 = {"Runner66", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner66, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng67_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng67_next((LS_Rng67*)self));
@@ -18186,7 +18186,7 @@ static const LS_MethodInfo ls_methods_Rng67[] = {
     {"next", ls_invoke_Rng67_next, 0},
     {"range", ls_invoke_Rng67_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng67 = {"Rng67", 1, ls_fields_Rng67, 2, ls_methods_Rng67};
+static const LS_TypeInfo ls_type_Rng67 = {"Rng67", 1, ls_fields_Rng67, 2, ls_methods_Rng67, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt67_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt67_manhattan((LS_Pt67*)self, ((LS_Pt67*)ls_unbox_object(arguments[0], &ls_type_Pt67))));
 }
@@ -18201,7 +18201,7 @@ static const LS_MethodInfo ls_methods_Pt67[] = {
     {"manhattan", ls_invoke_Pt67_manhattan, 1},
     {"dot", ls_invoke_Pt67_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt67 = {"Pt67", 2, ls_fields_Pt67, 2, ls_methods_Pt67};
+static const LS_TypeInfo ls_type_Pt67 = {"Pt67", 2, ls_fields_Pt67, 2, ls_methods_Pt67, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker67_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker67_add((LS_Worker67*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18231,7 +18231,7 @@ static const LS_MethodInfo ls_methods_Worker67[] = {
     {"fib", ls_invoke_Worker67_fib, 1},
     {"text", ls_invoke_Worker67_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker67 = {"Worker67", 4, ls_fields_Worker67, 5, ls_methods_Worker67};
+static const LS_TypeInfo ls_type_Worker67 = {"Worker67", 4, ls_fields_Worker67, 5, ls_methods_Worker67, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner67_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner67_run((LS_Runner67*)self));
@@ -18239,7 +18239,7 @@ static void ls_invoke_Runner67_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner67[] = {
     {"run", ls_invoke_Runner67_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner67 = {"Runner67", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner67};
+static const LS_TypeInfo ls_type_Runner67 = {"Runner67", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner67, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng68_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng68_next((LS_Rng68*)self));
@@ -18254,7 +18254,7 @@ static const LS_MethodInfo ls_methods_Rng68[] = {
     {"next", ls_invoke_Rng68_next, 0},
     {"range", ls_invoke_Rng68_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng68 = {"Rng68", 1, ls_fields_Rng68, 2, ls_methods_Rng68};
+static const LS_TypeInfo ls_type_Rng68 = {"Rng68", 1, ls_fields_Rng68, 2, ls_methods_Rng68, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt68_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt68_manhattan((LS_Pt68*)self, ((LS_Pt68*)ls_unbox_object(arguments[0], &ls_type_Pt68))));
 }
@@ -18269,7 +18269,7 @@ static const LS_MethodInfo ls_methods_Pt68[] = {
     {"manhattan", ls_invoke_Pt68_manhattan, 1},
     {"dot", ls_invoke_Pt68_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt68 = {"Pt68", 2, ls_fields_Pt68, 2, ls_methods_Pt68};
+static const LS_TypeInfo ls_type_Pt68 = {"Pt68", 2, ls_fields_Pt68, 2, ls_methods_Pt68, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker68_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker68_add((LS_Worker68*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18299,7 +18299,7 @@ static const LS_MethodInfo ls_methods_Worker68[] = {
     {"fib", ls_invoke_Worker68_fib, 1},
     {"text", ls_invoke_Worker68_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker68 = {"Worker68", 4, ls_fields_Worker68, 5, ls_methods_Worker68};
+static const LS_TypeInfo ls_type_Worker68 = {"Worker68", 4, ls_fields_Worker68, 5, ls_methods_Worker68, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner68_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner68_run((LS_Runner68*)self));
@@ -18307,7 +18307,7 @@ static void ls_invoke_Runner68_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner68[] = {
     {"run", ls_invoke_Runner68_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner68 = {"Runner68", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner68};
+static const LS_TypeInfo ls_type_Runner68 = {"Runner68", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner68, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng69_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng69_next((LS_Rng69*)self));
@@ -18322,7 +18322,7 @@ static const LS_MethodInfo ls_methods_Rng69[] = {
     {"next", ls_invoke_Rng69_next, 0},
     {"range", ls_invoke_Rng69_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng69 = {"Rng69", 1, ls_fields_Rng69, 2, ls_methods_Rng69};
+static const LS_TypeInfo ls_type_Rng69 = {"Rng69", 1, ls_fields_Rng69, 2, ls_methods_Rng69, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt69_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt69_manhattan((LS_Pt69*)self, ((LS_Pt69*)ls_unbox_object(arguments[0], &ls_type_Pt69))));
 }
@@ -18337,7 +18337,7 @@ static const LS_MethodInfo ls_methods_Pt69[] = {
     {"manhattan", ls_invoke_Pt69_manhattan, 1},
     {"dot", ls_invoke_Pt69_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt69 = {"Pt69", 2, ls_fields_Pt69, 2, ls_methods_Pt69};
+static const LS_TypeInfo ls_type_Pt69 = {"Pt69", 2, ls_fields_Pt69, 2, ls_methods_Pt69, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker69_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker69_add((LS_Worker69*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18367,7 +18367,7 @@ static const LS_MethodInfo ls_methods_Worker69[] = {
     {"fib", ls_invoke_Worker69_fib, 1},
     {"text", ls_invoke_Worker69_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker69 = {"Worker69", 4, ls_fields_Worker69, 5, ls_methods_Worker69};
+static const LS_TypeInfo ls_type_Worker69 = {"Worker69", 4, ls_fields_Worker69, 5, ls_methods_Worker69, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner69_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner69_run((LS_Runner69*)self));
@@ -18375,7 +18375,7 @@ static void ls_invoke_Runner69_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner69[] = {
     {"run", ls_invoke_Runner69_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner69 = {"Runner69", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner69};
+static const LS_TypeInfo ls_type_Runner69 = {"Runner69", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner69, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng70_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng70_next((LS_Rng70*)self));
@@ -18390,7 +18390,7 @@ static const LS_MethodInfo ls_methods_Rng70[] = {
     {"next", ls_invoke_Rng70_next, 0},
     {"range", ls_invoke_Rng70_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng70 = {"Rng70", 1, ls_fields_Rng70, 2, ls_methods_Rng70};
+static const LS_TypeInfo ls_type_Rng70 = {"Rng70", 1, ls_fields_Rng70, 2, ls_methods_Rng70, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt70_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt70_manhattan((LS_Pt70*)self, ((LS_Pt70*)ls_unbox_object(arguments[0], &ls_type_Pt70))));
 }
@@ -18405,7 +18405,7 @@ static const LS_MethodInfo ls_methods_Pt70[] = {
     {"manhattan", ls_invoke_Pt70_manhattan, 1},
     {"dot", ls_invoke_Pt70_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt70 = {"Pt70", 2, ls_fields_Pt70, 2, ls_methods_Pt70};
+static const LS_TypeInfo ls_type_Pt70 = {"Pt70", 2, ls_fields_Pt70, 2, ls_methods_Pt70, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker70_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker70_add((LS_Worker70*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18435,7 +18435,7 @@ static const LS_MethodInfo ls_methods_Worker70[] = {
     {"fib", ls_invoke_Worker70_fib, 1},
     {"text", ls_invoke_Worker70_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker70 = {"Worker70", 4, ls_fields_Worker70, 5, ls_methods_Worker70};
+static const LS_TypeInfo ls_type_Worker70 = {"Worker70", 4, ls_fields_Worker70, 5, ls_methods_Worker70, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner70_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner70_run((LS_Runner70*)self));
@@ -18443,7 +18443,7 @@ static void ls_invoke_Runner70_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner70[] = {
     {"run", ls_invoke_Runner70_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner70 = {"Runner70", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner70};
+static const LS_TypeInfo ls_type_Runner70 = {"Runner70", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner70, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng71_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng71_next((LS_Rng71*)self));
@@ -18458,7 +18458,7 @@ static const LS_MethodInfo ls_methods_Rng71[] = {
     {"next", ls_invoke_Rng71_next, 0},
     {"range", ls_invoke_Rng71_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng71 = {"Rng71", 1, ls_fields_Rng71, 2, ls_methods_Rng71};
+static const LS_TypeInfo ls_type_Rng71 = {"Rng71", 1, ls_fields_Rng71, 2, ls_methods_Rng71, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt71_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt71_manhattan((LS_Pt71*)self, ((LS_Pt71*)ls_unbox_object(arguments[0], &ls_type_Pt71))));
 }
@@ -18473,7 +18473,7 @@ static const LS_MethodInfo ls_methods_Pt71[] = {
     {"manhattan", ls_invoke_Pt71_manhattan, 1},
     {"dot", ls_invoke_Pt71_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt71 = {"Pt71", 2, ls_fields_Pt71, 2, ls_methods_Pt71};
+static const LS_TypeInfo ls_type_Pt71 = {"Pt71", 2, ls_fields_Pt71, 2, ls_methods_Pt71, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker71_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker71_add((LS_Worker71*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18503,7 +18503,7 @@ static const LS_MethodInfo ls_methods_Worker71[] = {
     {"fib", ls_invoke_Worker71_fib, 1},
     {"text", ls_invoke_Worker71_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker71 = {"Worker71", 4, ls_fields_Worker71, 5, ls_methods_Worker71};
+static const LS_TypeInfo ls_type_Worker71 = {"Worker71", 4, ls_fields_Worker71, 5, ls_methods_Worker71, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner71_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner71_run((LS_Runner71*)self));
@@ -18511,7 +18511,7 @@ static void ls_invoke_Runner71_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner71[] = {
     {"run", ls_invoke_Runner71_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner71 = {"Runner71", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner71};
+static const LS_TypeInfo ls_type_Runner71 = {"Runner71", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner71, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng72_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng72_next((LS_Rng72*)self));
@@ -18526,7 +18526,7 @@ static const LS_MethodInfo ls_methods_Rng72[] = {
     {"next", ls_invoke_Rng72_next, 0},
     {"range", ls_invoke_Rng72_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng72 = {"Rng72", 1, ls_fields_Rng72, 2, ls_methods_Rng72};
+static const LS_TypeInfo ls_type_Rng72 = {"Rng72", 1, ls_fields_Rng72, 2, ls_methods_Rng72, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt72_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt72_manhattan((LS_Pt72*)self, ((LS_Pt72*)ls_unbox_object(arguments[0], &ls_type_Pt72))));
 }
@@ -18541,7 +18541,7 @@ static const LS_MethodInfo ls_methods_Pt72[] = {
     {"manhattan", ls_invoke_Pt72_manhattan, 1},
     {"dot", ls_invoke_Pt72_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt72 = {"Pt72", 2, ls_fields_Pt72, 2, ls_methods_Pt72};
+static const LS_TypeInfo ls_type_Pt72 = {"Pt72", 2, ls_fields_Pt72, 2, ls_methods_Pt72, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker72_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker72_add((LS_Worker72*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18571,7 +18571,7 @@ static const LS_MethodInfo ls_methods_Worker72[] = {
     {"fib", ls_invoke_Worker72_fib, 1},
     {"text", ls_invoke_Worker72_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker72 = {"Worker72", 4, ls_fields_Worker72, 5, ls_methods_Worker72};
+static const LS_TypeInfo ls_type_Worker72 = {"Worker72", 4, ls_fields_Worker72, 5, ls_methods_Worker72, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner72_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner72_run((LS_Runner72*)self));
@@ -18579,7 +18579,7 @@ static void ls_invoke_Runner72_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner72[] = {
     {"run", ls_invoke_Runner72_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner72 = {"Runner72", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner72};
+static const LS_TypeInfo ls_type_Runner72 = {"Runner72", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner72, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng73_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng73_next((LS_Rng73*)self));
@@ -18594,7 +18594,7 @@ static const LS_MethodInfo ls_methods_Rng73[] = {
     {"next", ls_invoke_Rng73_next, 0},
     {"range", ls_invoke_Rng73_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng73 = {"Rng73", 1, ls_fields_Rng73, 2, ls_methods_Rng73};
+static const LS_TypeInfo ls_type_Rng73 = {"Rng73", 1, ls_fields_Rng73, 2, ls_methods_Rng73, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt73_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt73_manhattan((LS_Pt73*)self, ((LS_Pt73*)ls_unbox_object(arguments[0], &ls_type_Pt73))));
 }
@@ -18609,7 +18609,7 @@ static const LS_MethodInfo ls_methods_Pt73[] = {
     {"manhattan", ls_invoke_Pt73_manhattan, 1},
     {"dot", ls_invoke_Pt73_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt73 = {"Pt73", 2, ls_fields_Pt73, 2, ls_methods_Pt73};
+static const LS_TypeInfo ls_type_Pt73 = {"Pt73", 2, ls_fields_Pt73, 2, ls_methods_Pt73, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker73_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker73_add((LS_Worker73*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18639,7 +18639,7 @@ static const LS_MethodInfo ls_methods_Worker73[] = {
     {"fib", ls_invoke_Worker73_fib, 1},
     {"text", ls_invoke_Worker73_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker73 = {"Worker73", 4, ls_fields_Worker73, 5, ls_methods_Worker73};
+static const LS_TypeInfo ls_type_Worker73 = {"Worker73", 4, ls_fields_Worker73, 5, ls_methods_Worker73, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner73_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner73_run((LS_Runner73*)self));
@@ -18647,7 +18647,7 @@ static void ls_invoke_Runner73_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner73[] = {
     {"run", ls_invoke_Runner73_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner73 = {"Runner73", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner73};
+static const LS_TypeInfo ls_type_Runner73 = {"Runner73", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner73, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng74_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng74_next((LS_Rng74*)self));
@@ -18662,7 +18662,7 @@ static const LS_MethodInfo ls_methods_Rng74[] = {
     {"next", ls_invoke_Rng74_next, 0},
     {"range", ls_invoke_Rng74_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng74 = {"Rng74", 1, ls_fields_Rng74, 2, ls_methods_Rng74};
+static const LS_TypeInfo ls_type_Rng74 = {"Rng74", 1, ls_fields_Rng74, 2, ls_methods_Rng74, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt74_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt74_manhattan((LS_Pt74*)self, ((LS_Pt74*)ls_unbox_object(arguments[0], &ls_type_Pt74))));
 }
@@ -18677,7 +18677,7 @@ static const LS_MethodInfo ls_methods_Pt74[] = {
     {"manhattan", ls_invoke_Pt74_manhattan, 1},
     {"dot", ls_invoke_Pt74_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt74 = {"Pt74", 2, ls_fields_Pt74, 2, ls_methods_Pt74};
+static const LS_TypeInfo ls_type_Pt74 = {"Pt74", 2, ls_fields_Pt74, 2, ls_methods_Pt74, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker74_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker74_add((LS_Worker74*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18707,7 +18707,7 @@ static const LS_MethodInfo ls_methods_Worker74[] = {
     {"fib", ls_invoke_Worker74_fib, 1},
     {"text", ls_invoke_Worker74_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker74 = {"Worker74", 4, ls_fields_Worker74, 5, ls_methods_Worker74};
+static const LS_TypeInfo ls_type_Worker74 = {"Worker74", 4, ls_fields_Worker74, 5, ls_methods_Worker74, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner74_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner74_run((LS_Runner74*)self));
@@ -18715,7 +18715,7 @@ static void ls_invoke_Runner74_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner74[] = {
     {"run", ls_invoke_Runner74_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner74 = {"Runner74", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner74};
+static const LS_TypeInfo ls_type_Runner74 = {"Runner74", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner74, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng75_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng75_next((LS_Rng75*)self));
@@ -18730,7 +18730,7 @@ static const LS_MethodInfo ls_methods_Rng75[] = {
     {"next", ls_invoke_Rng75_next, 0},
     {"range", ls_invoke_Rng75_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng75 = {"Rng75", 1, ls_fields_Rng75, 2, ls_methods_Rng75};
+static const LS_TypeInfo ls_type_Rng75 = {"Rng75", 1, ls_fields_Rng75, 2, ls_methods_Rng75, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt75_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt75_manhattan((LS_Pt75*)self, ((LS_Pt75*)ls_unbox_object(arguments[0], &ls_type_Pt75))));
 }
@@ -18745,7 +18745,7 @@ static const LS_MethodInfo ls_methods_Pt75[] = {
     {"manhattan", ls_invoke_Pt75_manhattan, 1},
     {"dot", ls_invoke_Pt75_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt75 = {"Pt75", 2, ls_fields_Pt75, 2, ls_methods_Pt75};
+static const LS_TypeInfo ls_type_Pt75 = {"Pt75", 2, ls_fields_Pt75, 2, ls_methods_Pt75, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker75_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker75_add((LS_Worker75*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18775,7 +18775,7 @@ static const LS_MethodInfo ls_methods_Worker75[] = {
     {"fib", ls_invoke_Worker75_fib, 1},
     {"text", ls_invoke_Worker75_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker75 = {"Worker75", 4, ls_fields_Worker75, 5, ls_methods_Worker75};
+static const LS_TypeInfo ls_type_Worker75 = {"Worker75", 4, ls_fields_Worker75, 5, ls_methods_Worker75, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner75_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner75_run((LS_Runner75*)self));
@@ -18783,7 +18783,7 @@ static void ls_invoke_Runner75_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner75[] = {
     {"run", ls_invoke_Runner75_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner75 = {"Runner75", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner75};
+static const LS_TypeInfo ls_type_Runner75 = {"Runner75", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner75, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng76_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng76_next((LS_Rng76*)self));
@@ -18798,7 +18798,7 @@ static const LS_MethodInfo ls_methods_Rng76[] = {
     {"next", ls_invoke_Rng76_next, 0},
     {"range", ls_invoke_Rng76_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng76 = {"Rng76", 1, ls_fields_Rng76, 2, ls_methods_Rng76};
+static const LS_TypeInfo ls_type_Rng76 = {"Rng76", 1, ls_fields_Rng76, 2, ls_methods_Rng76, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt76_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt76_manhattan((LS_Pt76*)self, ((LS_Pt76*)ls_unbox_object(arguments[0], &ls_type_Pt76))));
 }
@@ -18813,7 +18813,7 @@ static const LS_MethodInfo ls_methods_Pt76[] = {
     {"manhattan", ls_invoke_Pt76_manhattan, 1},
     {"dot", ls_invoke_Pt76_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt76 = {"Pt76", 2, ls_fields_Pt76, 2, ls_methods_Pt76};
+static const LS_TypeInfo ls_type_Pt76 = {"Pt76", 2, ls_fields_Pt76, 2, ls_methods_Pt76, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker76_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker76_add((LS_Worker76*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18843,7 +18843,7 @@ static const LS_MethodInfo ls_methods_Worker76[] = {
     {"fib", ls_invoke_Worker76_fib, 1},
     {"text", ls_invoke_Worker76_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker76 = {"Worker76", 4, ls_fields_Worker76, 5, ls_methods_Worker76};
+static const LS_TypeInfo ls_type_Worker76 = {"Worker76", 4, ls_fields_Worker76, 5, ls_methods_Worker76, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner76_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner76_run((LS_Runner76*)self));
@@ -18851,7 +18851,7 @@ static void ls_invoke_Runner76_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner76[] = {
     {"run", ls_invoke_Runner76_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner76 = {"Runner76", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner76};
+static const LS_TypeInfo ls_type_Runner76 = {"Runner76", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner76, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng77_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng77_next((LS_Rng77*)self));
@@ -18866,7 +18866,7 @@ static const LS_MethodInfo ls_methods_Rng77[] = {
     {"next", ls_invoke_Rng77_next, 0},
     {"range", ls_invoke_Rng77_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng77 = {"Rng77", 1, ls_fields_Rng77, 2, ls_methods_Rng77};
+static const LS_TypeInfo ls_type_Rng77 = {"Rng77", 1, ls_fields_Rng77, 2, ls_methods_Rng77, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt77_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt77_manhattan((LS_Pt77*)self, ((LS_Pt77*)ls_unbox_object(arguments[0], &ls_type_Pt77))));
 }
@@ -18881,7 +18881,7 @@ static const LS_MethodInfo ls_methods_Pt77[] = {
     {"manhattan", ls_invoke_Pt77_manhattan, 1},
     {"dot", ls_invoke_Pt77_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt77 = {"Pt77", 2, ls_fields_Pt77, 2, ls_methods_Pt77};
+static const LS_TypeInfo ls_type_Pt77 = {"Pt77", 2, ls_fields_Pt77, 2, ls_methods_Pt77, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker77_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker77_add((LS_Worker77*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18911,7 +18911,7 @@ static const LS_MethodInfo ls_methods_Worker77[] = {
     {"fib", ls_invoke_Worker77_fib, 1},
     {"text", ls_invoke_Worker77_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker77 = {"Worker77", 4, ls_fields_Worker77, 5, ls_methods_Worker77};
+static const LS_TypeInfo ls_type_Worker77 = {"Worker77", 4, ls_fields_Worker77, 5, ls_methods_Worker77, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner77_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner77_run((LS_Runner77*)self));
@@ -18919,7 +18919,7 @@ static void ls_invoke_Runner77_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner77[] = {
     {"run", ls_invoke_Runner77_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner77 = {"Runner77", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner77};
+static const LS_TypeInfo ls_type_Runner77 = {"Runner77", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner77, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng78_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng78_next((LS_Rng78*)self));
@@ -18934,7 +18934,7 @@ static const LS_MethodInfo ls_methods_Rng78[] = {
     {"next", ls_invoke_Rng78_next, 0},
     {"range", ls_invoke_Rng78_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng78 = {"Rng78", 1, ls_fields_Rng78, 2, ls_methods_Rng78};
+static const LS_TypeInfo ls_type_Rng78 = {"Rng78", 1, ls_fields_Rng78, 2, ls_methods_Rng78, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt78_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt78_manhattan((LS_Pt78*)self, ((LS_Pt78*)ls_unbox_object(arguments[0], &ls_type_Pt78))));
 }
@@ -18949,7 +18949,7 @@ static const LS_MethodInfo ls_methods_Pt78[] = {
     {"manhattan", ls_invoke_Pt78_manhattan, 1},
     {"dot", ls_invoke_Pt78_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt78 = {"Pt78", 2, ls_fields_Pt78, 2, ls_methods_Pt78};
+static const LS_TypeInfo ls_type_Pt78 = {"Pt78", 2, ls_fields_Pt78, 2, ls_methods_Pt78, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker78_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker78_add((LS_Worker78*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -18979,7 +18979,7 @@ static const LS_MethodInfo ls_methods_Worker78[] = {
     {"fib", ls_invoke_Worker78_fib, 1},
     {"text", ls_invoke_Worker78_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker78 = {"Worker78", 4, ls_fields_Worker78, 5, ls_methods_Worker78};
+static const LS_TypeInfo ls_type_Worker78 = {"Worker78", 4, ls_fields_Worker78, 5, ls_methods_Worker78, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner78_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner78_run((LS_Runner78*)self));
@@ -18987,7 +18987,7 @@ static void ls_invoke_Runner78_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner78[] = {
     {"run", ls_invoke_Runner78_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner78 = {"Runner78", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner78};
+static const LS_TypeInfo ls_type_Runner78 = {"Runner78", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner78, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng79_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng79_next((LS_Rng79*)self));
@@ -19002,7 +19002,7 @@ static const LS_MethodInfo ls_methods_Rng79[] = {
     {"next", ls_invoke_Rng79_next, 0},
     {"range", ls_invoke_Rng79_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng79 = {"Rng79", 1, ls_fields_Rng79, 2, ls_methods_Rng79};
+static const LS_TypeInfo ls_type_Rng79 = {"Rng79", 1, ls_fields_Rng79, 2, ls_methods_Rng79, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt79_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt79_manhattan((LS_Pt79*)self, ((LS_Pt79*)ls_unbox_object(arguments[0], &ls_type_Pt79))));
 }
@@ -19017,7 +19017,7 @@ static const LS_MethodInfo ls_methods_Pt79[] = {
     {"manhattan", ls_invoke_Pt79_manhattan, 1},
     {"dot", ls_invoke_Pt79_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt79 = {"Pt79", 2, ls_fields_Pt79, 2, ls_methods_Pt79};
+static const LS_TypeInfo ls_type_Pt79 = {"Pt79", 2, ls_fields_Pt79, 2, ls_methods_Pt79, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker79_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker79_add((LS_Worker79*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19047,7 +19047,7 @@ static const LS_MethodInfo ls_methods_Worker79[] = {
     {"fib", ls_invoke_Worker79_fib, 1},
     {"text", ls_invoke_Worker79_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker79 = {"Worker79", 4, ls_fields_Worker79, 5, ls_methods_Worker79};
+static const LS_TypeInfo ls_type_Worker79 = {"Worker79", 4, ls_fields_Worker79, 5, ls_methods_Worker79, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner79_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner79_run((LS_Runner79*)self));
@@ -19055,7 +19055,7 @@ static void ls_invoke_Runner79_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner79[] = {
     {"run", ls_invoke_Runner79_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner79 = {"Runner79", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner79};
+static const LS_TypeInfo ls_type_Runner79 = {"Runner79", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner79, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng80_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng80_next((LS_Rng80*)self));
@@ -19070,7 +19070,7 @@ static const LS_MethodInfo ls_methods_Rng80[] = {
     {"next", ls_invoke_Rng80_next, 0},
     {"range", ls_invoke_Rng80_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng80 = {"Rng80", 1, ls_fields_Rng80, 2, ls_methods_Rng80};
+static const LS_TypeInfo ls_type_Rng80 = {"Rng80", 1, ls_fields_Rng80, 2, ls_methods_Rng80, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt80_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt80_manhattan((LS_Pt80*)self, ((LS_Pt80*)ls_unbox_object(arguments[0], &ls_type_Pt80))));
 }
@@ -19085,7 +19085,7 @@ static const LS_MethodInfo ls_methods_Pt80[] = {
     {"manhattan", ls_invoke_Pt80_manhattan, 1},
     {"dot", ls_invoke_Pt80_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt80 = {"Pt80", 2, ls_fields_Pt80, 2, ls_methods_Pt80};
+static const LS_TypeInfo ls_type_Pt80 = {"Pt80", 2, ls_fields_Pt80, 2, ls_methods_Pt80, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker80_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker80_add((LS_Worker80*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19115,7 +19115,7 @@ static const LS_MethodInfo ls_methods_Worker80[] = {
     {"fib", ls_invoke_Worker80_fib, 1},
     {"text", ls_invoke_Worker80_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker80 = {"Worker80", 4, ls_fields_Worker80, 5, ls_methods_Worker80};
+static const LS_TypeInfo ls_type_Worker80 = {"Worker80", 4, ls_fields_Worker80, 5, ls_methods_Worker80, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner80_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner80_run((LS_Runner80*)self));
@@ -19123,7 +19123,7 @@ static void ls_invoke_Runner80_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner80[] = {
     {"run", ls_invoke_Runner80_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner80 = {"Runner80", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner80};
+static const LS_TypeInfo ls_type_Runner80 = {"Runner80", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner80, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng81_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng81_next((LS_Rng81*)self));
@@ -19138,7 +19138,7 @@ static const LS_MethodInfo ls_methods_Rng81[] = {
     {"next", ls_invoke_Rng81_next, 0},
     {"range", ls_invoke_Rng81_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng81 = {"Rng81", 1, ls_fields_Rng81, 2, ls_methods_Rng81};
+static const LS_TypeInfo ls_type_Rng81 = {"Rng81", 1, ls_fields_Rng81, 2, ls_methods_Rng81, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt81_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt81_manhattan((LS_Pt81*)self, ((LS_Pt81*)ls_unbox_object(arguments[0], &ls_type_Pt81))));
 }
@@ -19153,7 +19153,7 @@ static const LS_MethodInfo ls_methods_Pt81[] = {
     {"manhattan", ls_invoke_Pt81_manhattan, 1},
     {"dot", ls_invoke_Pt81_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt81 = {"Pt81", 2, ls_fields_Pt81, 2, ls_methods_Pt81};
+static const LS_TypeInfo ls_type_Pt81 = {"Pt81", 2, ls_fields_Pt81, 2, ls_methods_Pt81, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker81_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker81_add((LS_Worker81*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19183,7 +19183,7 @@ static const LS_MethodInfo ls_methods_Worker81[] = {
     {"fib", ls_invoke_Worker81_fib, 1},
     {"text", ls_invoke_Worker81_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker81 = {"Worker81", 4, ls_fields_Worker81, 5, ls_methods_Worker81};
+static const LS_TypeInfo ls_type_Worker81 = {"Worker81", 4, ls_fields_Worker81, 5, ls_methods_Worker81, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner81_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner81_run((LS_Runner81*)self));
@@ -19191,7 +19191,7 @@ static void ls_invoke_Runner81_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner81[] = {
     {"run", ls_invoke_Runner81_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner81 = {"Runner81", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner81};
+static const LS_TypeInfo ls_type_Runner81 = {"Runner81", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner81, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng82_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng82_next((LS_Rng82*)self));
@@ -19206,7 +19206,7 @@ static const LS_MethodInfo ls_methods_Rng82[] = {
     {"next", ls_invoke_Rng82_next, 0},
     {"range", ls_invoke_Rng82_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng82 = {"Rng82", 1, ls_fields_Rng82, 2, ls_methods_Rng82};
+static const LS_TypeInfo ls_type_Rng82 = {"Rng82", 1, ls_fields_Rng82, 2, ls_methods_Rng82, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt82_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt82_manhattan((LS_Pt82*)self, ((LS_Pt82*)ls_unbox_object(arguments[0], &ls_type_Pt82))));
 }
@@ -19221,7 +19221,7 @@ static const LS_MethodInfo ls_methods_Pt82[] = {
     {"manhattan", ls_invoke_Pt82_manhattan, 1},
     {"dot", ls_invoke_Pt82_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt82 = {"Pt82", 2, ls_fields_Pt82, 2, ls_methods_Pt82};
+static const LS_TypeInfo ls_type_Pt82 = {"Pt82", 2, ls_fields_Pt82, 2, ls_methods_Pt82, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker82_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker82_add((LS_Worker82*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19251,7 +19251,7 @@ static const LS_MethodInfo ls_methods_Worker82[] = {
     {"fib", ls_invoke_Worker82_fib, 1},
     {"text", ls_invoke_Worker82_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker82 = {"Worker82", 4, ls_fields_Worker82, 5, ls_methods_Worker82};
+static const LS_TypeInfo ls_type_Worker82 = {"Worker82", 4, ls_fields_Worker82, 5, ls_methods_Worker82, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner82_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner82_run((LS_Runner82*)self));
@@ -19259,7 +19259,7 @@ static void ls_invoke_Runner82_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner82[] = {
     {"run", ls_invoke_Runner82_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner82 = {"Runner82", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner82};
+static const LS_TypeInfo ls_type_Runner82 = {"Runner82", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner82, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng83_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng83_next((LS_Rng83*)self));
@@ -19274,7 +19274,7 @@ static const LS_MethodInfo ls_methods_Rng83[] = {
     {"next", ls_invoke_Rng83_next, 0},
     {"range", ls_invoke_Rng83_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng83 = {"Rng83", 1, ls_fields_Rng83, 2, ls_methods_Rng83};
+static const LS_TypeInfo ls_type_Rng83 = {"Rng83", 1, ls_fields_Rng83, 2, ls_methods_Rng83, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt83_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt83_manhattan((LS_Pt83*)self, ((LS_Pt83*)ls_unbox_object(arguments[0], &ls_type_Pt83))));
 }
@@ -19289,7 +19289,7 @@ static const LS_MethodInfo ls_methods_Pt83[] = {
     {"manhattan", ls_invoke_Pt83_manhattan, 1},
     {"dot", ls_invoke_Pt83_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt83 = {"Pt83", 2, ls_fields_Pt83, 2, ls_methods_Pt83};
+static const LS_TypeInfo ls_type_Pt83 = {"Pt83", 2, ls_fields_Pt83, 2, ls_methods_Pt83, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker83_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker83_add((LS_Worker83*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19319,7 +19319,7 @@ static const LS_MethodInfo ls_methods_Worker83[] = {
     {"fib", ls_invoke_Worker83_fib, 1},
     {"text", ls_invoke_Worker83_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker83 = {"Worker83", 4, ls_fields_Worker83, 5, ls_methods_Worker83};
+static const LS_TypeInfo ls_type_Worker83 = {"Worker83", 4, ls_fields_Worker83, 5, ls_methods_Worker83, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner83_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner83_run((LS_Runner83*)self));
@@ -19327,7 +19327,7 @@ static void ls_invoke_Runner83_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner83[] = {
     {"run", ls_invoke_Runner83_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner83 = {"Runner83", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner83};
+static const LS_TypeInfo ls_type_Runner83 = {"Runner83", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner83, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng84_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng84_next((LS_Rng84*)self));
@@ -19342,7 +19342,7 @@ static const LS_MethodInfo ls_methods_Rng84[] = {
     {"next", ls_invoke_Rng84_next, 0},
     {"range", ls_invoke_Rng84_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng84 = {"Rng84", 1, ls_fields_Rng84, 2, ls_methods_Rng84};
+static const LS_TypeInfo ls_type_Rng84 = {"Rng84", 1, ls_fields_Rng84, 2, ls_methods_Rng84, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt84_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt84_manhattan((LS_Pt84*)self, ((LS_Pt84*)ls_unbox_object(arguments[0], &ls_type_Pt84))));
 }
@@ -19357,7 +19357,7 @@ static const LS_MethodInfo ls_methods_Pt84[] = {
     {"manhattan", ls_invoke_Pt84_manhattan, 1},
     {"dot", ls_invoke_Pt84_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt84 = {"Pt84", 2, ls_fields_Pt84, 2, ls_methods_Pt84};
+static const LS_TypeInfo ls_type_Pt84 = {"Pt84", 2, ls_fields_Pt84, 2, ls_methods_Pt84, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker84_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker84_add((LS_Worker84*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19387,7 +19387,7 @@ static const LS_MethodInfo ls_methods_Worker84[] = {
     {"fib", ls_invoke_Worker84_fib, 1},
     {"text", ls_invoke_Worker84_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker84 = {"Worker84", 4, ls_fields_Worker84, 5, ls_methods_Worker84};
+static const LS_TypeInfo ls_type_Worker84 = {"Worker84", 4, ls_fields_Worker84, 5, ls_methods_Worker84, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner84_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner84_run((LS_Runner84*)self));
@@ -19395,7 +19395,7 @@ static void ls_invoke_Runner84_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner84[] = {
     {"run", ls_invoke_Runner84_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner84 = {"Runner84", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner84};
+static const LS_TypeInfo ls_type_Runner84 = {"Runner84", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner84, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng85_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng85_next((LS_Rng85*)self));
@@ -19410,7 +19410,7 @@ static const LS_MethodInfo ls_methods_Rng85[] = {
     {"next", ls_invoke_Rng85_next, 0},
     {"range", ls_invoke_Rng85_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng85 = {"Rng85", 1, ls_fields_Rng85, 2, ls_methods_Rng85};
+static const LS_TypeInfo ls_type_Rng85 = {"Rng85", 1, ls_fields_Rng85, 2, ls_methods_Rng85, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt85_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt85_manhattan((LS_Pt85*)self, ((LS_Pt85*)ls_unbox_object(arguments[0], &ls_type_Pt85))));
 }
@@ -19425,7 +19425,7 @@ static const LS_MethodInfo ls_methods_Pt85[] = {
     {"manhattan", ls_invoke_Pt85_manhattan, 1},
     {"dot", ls_invoke_Pt85_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt85 = {"Pt85", 2, ls_fields_Pt85, 2, ls_methods_Pt85};
+static const LS_TypeInfo ls_type_Pt85 = {"Pt85", 2, ls_fields_Pt85, 2, ls_methods_Pt85, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker85_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker85_add((LS_Worker85*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19455,7 +19455,7 @@ static const LS_MethodInfo ls_methods_Worker85[] = {
     {"fib", ls_invoke_Worker85_fib, 1},
     {"text", ls_invoke_Worker85_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker85 = {"Worker85", 4, ls_fields_Worker85, 5, ls_methods_Worker85};
+static const LS_TypeInfo ls_type_Worker85 = {"Worker85", 4, ls_fields_Worker85, 5, ls_methods_Worker85, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner85_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner85_run((LS_Runner85*)self));
@@ -19463,7 +19463,7 @@ static void ls_invoke_Runner85_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner85[] = {
     {"run", ls_invoke_Runner85_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner85 = {"Runner85", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner85};
+static const LS_TypeInfo ls_type_Runner85 = {"Runner85", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner85, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng86_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng86_next((LS_Rng86*)self));
@@ -19478,7 +19478,7 @@ static const LS_MethodInfo ls_methods_Rng86[] = {
     {"next", ls_invoke_Rng86_next, 0},
     {"range", ls_invoke_Rng86_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng86 = {"Rng86", 1, ls_fields_Rng86, 2, ls_methods_Rng86};
+static const LS_TypeInfo ls_type_Rng86 = {"Rng86", 1, ls_fields_Rng86, 2, ls_methods_Rng86, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt86_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt86_manhattan((LS_Pt86*)self, ((LS_Pt86*)ls_unbox_object(arguments[0], &ls_type_Pt86))));
 }
@@ -19493,7 +19493,7 @@ static const LS_MethodInfo ls_methods_Pt86[] = {
     {"manhattan", ls_invoke_Pt86_manhattan, 1},
     {"dot", ls_invoke_Pt86_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt86 = {"Pt86", 2, ls_fields_Pt86, 2, ls_methods_Pt86};
+static const LS_TypeInfo ls_type_Pt86 = {"Pt86", 2, ls_fields_Pt86, 2, ls_methods_Pt86, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker86_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker86_add((LS_Worker86*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19523,7 +19523,7 @@ static const LS_MethodInfo ls_methods_Worker86[] = {
     {"fib", ls_invoke_Worker86_fib, 1},
     {"text", ls_invoke_Worker86_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker86 = {"Worker86", 4, ls_fields_Worker86, 5, ls_methods_Worker86};
+static const LS_TypeInfo ls_type_Worker86 = {"Worker86", 4, ls_fields_Worker86, 5, ls_methods_Worker86, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner86_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner86_run((LS_Runner86*)self));
@@ -19531,7 +19531,7 @@ static void ls_invoke_Runner86_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner86[] = {
     {"run", ls_invoke_Runner86_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner86 = {"Runner86", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner86};
+static const LS_TypeInfo ls_type_Runner86 = {"Runner86", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner86, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng87_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng87_next((LS_Rng87*)self));
@@ -19546,7 +19546,7 @@ static const LS_MethodInfo ls_methods_Rng87[] = {
     {"next", ls_invoke_Rng87_next, 0},
     {"range", ls_invoke_Rng87_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng87 = {"Rng87", 1, ls_fields_Rng87, 2, ls_methods_Rng87};
+static const LS_TypeInfo ls_type_Rng87 = {"Rng87", 1, ls_fields_Rng87, 2, ls_methods_Rng87, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt87_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt87_manhattan((LS_Pt87*)self, ((LS_Pt87*)ls_unbox_object(arguments[0], &ls_type_Pt87))));
 }
@@ -19561,7 +19561,7 @@ static const LS_MethodInfo ls_methods_Pt87[] = {
     {"manhattan", ls_invoke_Pt87_manhattan, 1},
     {"dot", ls_invoke_Pt87_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt87 = {"Pt87", 2, ls_fields_Pt87, 2, ls_methods_Pt87};
+static const LS_TypeInfo ls_type_Pt87 = {"Pt87", 2, ls_fields_Pt87, 2, ls_methods_Pt87, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker87_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker87_add((LS_Worker87*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19591,7 +19591,7 @@ static const LS_MethodInfo ls_methods_Worker87[] = {
     {"fib", ls_invoke_Worker87_fib, 1},
     {"text", ls_invoke_Worker87_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker87 = {"Worker87", 4, ls_fields_Worker87, 5, ls_methods_Worker87};
+static const LS_TypeInfo ls_type_Worker87 = {"Worker87", 4, ls_fields_Worker87, 5, ls_methods_Worker87, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner87_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner87_run((LS_Runner87*)self));
@@ -19599,7 +19599,7 @@ static void ls_invoke_Runner87_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner87[] = {
     {"run", ls_invoke_Runner87_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner87 = {"Runner87", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner87};
+static const LS_TypeInfo ls_type_Runner87 = {"Runner87", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner87, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng88_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng88_next((LS_Rng88*)self));
@@ -19614,7 +19614,7 @@ static const LS_MethodInfo ls_methods_Rng88[] = {
     {"next", ls_invoke_Rng88_next, 0},
     {"range", ls_invoke_Rng88_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng88 = {"Rng88", 1, ls_fields_Rng88, 2, ls_methods_Rng88};
+static const LS_TypeInfo ls_type_Rng88 = {"Rng88", 1, ls_fields_Rng88, 2, ls_methods_Rng88, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt88_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt88_manhattan((LS_Pt88*)self, ((LS_Pt88*)ls_unbox_object(arguments[0], &ls_type_Pt88))));
 }
@@ -19629,7 +19629,7 @@ static const LS_MethodInfo ls_methods_Pt88[] = {
     {"manhattan", ls_invoke_Pt88_manhattan, 1},
     {"dot", ls_invoke_Pt88_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt88 = {"Pt88", 2, ls_fields_Pt88, 2, ls_methods_Pt88};
+static const LS_TypeInfo ls_type_Pt88 = {"Pt88", 2, ls_fields_Pt88, 2, ls_methods_Pt88, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker88_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker88_add((LS_Worker88*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19659,7 +19659,7 @@ static const LS_MethodInfo ls_methods_Worker88[] = {
     {"fib", ls_invoke_Worker88_fib, 1},
     {"text", ls_invoke_Worker88_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker88 = {"Worker88", 4, ls_fields_Worker88, 5, ls_methods_Worker88};
+static const LS_TypeInfo ls_type_Worker88 = {"Worker88", 4, ls_fields_Worker88, 5, ls_methods_Worker88, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner88_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner88_run((LS_Runner88*)self));
@@ -19667,7 +19667,7 @@ static void ls_invoke_Runner88_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner88[] = {
     {"run", ls_invoke_Runner88_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner88 = {"Runner88", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner88};
+static const LS_TypeInfo ls_type_Runner88 = {"Runner88", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner88, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng89_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng89_next((LS_Rng89*)self));
@@ -19682,7 +19682,7 @@ static const LS_MethodInfo ls_methods_Rng89[] = {
     {"next", ls_invoke_Rng89_next, 0},
     {"range", ls_invoke_Rng89_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng89 = {"Rng89", 1, ls_fields_Rng89, 2, ls_methods_Rng89};
+static const LS_TypeInfo ls_type_Rng89 = {"Rng89", 1, ls_fields_Rng89, 2, ls_methods_Rng89, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt89_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt89_manhattan((LS_Pt89*)self, ((LS_Pt89*)ls_unbox_object(arguments[0], &ls_type_Pt89))));
 }
@@ -19697,7 +19697,7 @@ static const LS_MethodInfo ls_methods_Pt89[] = {
     {"manhattan", ls_invoke_Pt89_manhattan, 1},
     {"dot", ls_invoke_Pt89_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt89 = {"Pt89", 2, ls_fields_Pt89, 2, ls_methods_Pt89};
+static const LS_TypeInfo ls_type_Pt89 = {"Pt89", 2, ls_fields_Pt89, 2, ls_methods_Pt89, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker89_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker89_add((LS_Worker89*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19727,7 +19727,7 @@ static const LS_MethodInfo ls_methods_Worker89[] = {
     {"fib", ls_invoke_Worker89_fib, 1},
     {"text", ls_invoke_Worker89_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker89 = {"Worker89", 4, ls_fields_Worker89, 5, ls_methods_Worker89};
+static const LS_TypeInfo ls_type_Worker89 = {"Worker89", 4, ls_fields_Worker89, 5, ls_methods_Worker89, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner89_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner89_run((LS_Runner89*)self));
@@ -19735,7 +19735,7 @@ static void ls_invoke_Runner89_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner89[] = {
     {"run", ls_invoke_Runner89_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner89 = {"Runner89", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner89};
+static const LS_TypeInfo ls_type_Runner89 = {"Runner89", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner89, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng90_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng90_next((LS_Rng90*)self));
@@ -19750,7 +19750,7 @@ static const LS_MethodInfo ls_methods_Rng90[] = {
     {"next", ls_invoke_Rng90_next, 0},
     {"range", ls_invoke_Rng90_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng90 = {"Rng90", 1, ls_fields_Rng90, 2, ls_methods_Rng90};
+static const LS_TypeInfo ls_type_Rng90 = {"Rng90", 1, ls_fields_Rng90, 2, ls_methods_Rng90, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt90_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt90_manhattan((LS_Pt90*)self, ((LS_Pt90*)ls_unbox_object(arguments[0], &ls_type_Pt90))));
 }
@@ -19765,7 +19765,7 @@ static const LS_MethodInfo ls_methods_Pt90[] = {
     {"manhattan", ls_invoke_Pt90_manhattan, 1},
     {"dot", ls_invoke_Pt90_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt90 = {"Pt90", 2, ls_fields_Pt90, 2, ls_methods_Pt90};
+static const LS_TypeInfo ls_type_Pt90 = {"Pt90", 2, ls_fields_Pt90, 2, ls_methods_Pt90, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker90_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker90_add((LS_Worker90*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19795,7 +19795,7 @@ static const LS_MethodInfo ls_methods_Worker90[] = {
     {"fib", ls_invoke_Worker90_fib, 1},
     {"text", ls_invoke_Worker90_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker90 = {"Worker90", 4, ls_fields_Worker90, 5, ls_methods_Worker90};
+static const LS_TypeInfo ls_type_Worker90 = {"Worker90", 4, ls_fields_Worker90, 5, ls_methods_Worker90, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner90_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner90_run((LS_Runner90*)self));
@@ -19803,7 +19803,7 @@ static void ls_invoke_Runner90_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner90[] = {
     {"run", ls_invoke_Runner90_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner90 = {"Runner90", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner90};
+static const LS_TypeInfo ls_type_Runner90 = {"Runner90", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner90, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng91_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng91_next((LS_Rng91*)self));
@@ -19818,7 +19818,7 @@ static const LS_MethodInfo ls_methods_Rng91[] = {
     {"next", ls_invoke_Rng91_next, 0},
     {"range", ls_invoke_Rng91_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng91 = {"Rng91", 1, ls_fields_Rng91, 2, ls_methods_Rng91};
+static const LS_TypeInfo ls_type_Rng91 = {"Rng91", 1, ls_fields_Rng91, 2, ls_methods_Rng91, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt91_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt91_manhattan((LS_Pt91*)self, ((LS_Pt91*)ls_unbox_object(arguments[0], &ls_type_Pt91))));
 }
@@ -19833,7 +19833,7 @@ static const LS_MethodInfo ls_methods_Pt91[] = {
     {"manhattan", ls_invoke_Pt91_manhattan, 1},
     {"dot", ls_invoke_Pt91_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt91 = {"Pt91", 2, ls_fields_Pt91, 2, ls_methods_Pt91};
+static const LS_TypeInfo ls_type_Pt91 = {"Pt91", 2, ls_fields_Pt91, 2, ls_methods_Pt91, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker91_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker91_add((LS_Worker91*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19863,7 +19863,7 @@ static const LS_MethodInfo ls_methods_Worker91[] = {
     {"fib", ls_invoke_Worker91_fib, 1},
     {"text", ls_invoke_Worker91_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker91 = {"Worker91", 4, ls_fields_Worker91, 5, ls_methods_Worker91};
+static const LS_TypeInfo ls_type_Worker91 = {"Worker91", 4, ls_fields_Worker91, 5, ls_methods_Worker91, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner91_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner91_run((LS_Runner91*)self));
@@ -19871,7 +19871,7 @@ static void ls_invoke_Runner91_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner91[] = {
     {"run", ls_invoke_Runner91_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner91 = {"Runner91", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner91};
+static const LS_TypeInfo ls_type_Runner91 = {"Runner91", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner91, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng92_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng92_next((LS_Rng92*)self));
@@ -19886,7 +19886,7 @@ static const LS_MethodInfo ls_methods_Rng92[] = {
     {"next", ls_invoke_Rng92_next, 0},
     {"range", ls_invoke_Rng92_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng92 = {"Rng92", 1, ls_fields_Rng92, 2, ls_methods_Rng92};
+static const LS_TypeInfo ls_type_Rng92 = {"Rng92", 1, ls_fields_Rng92, 2, ls_methods_Rng92, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt92_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt92_manhattan((LS_Pt92*)self, ((LS_Pt92*)ls_unbox_object(arguments[0], &ls_type_Pt92))));
 }
@@ -19901,7 +19901,7 @@ static const LS_MethodInfo ls_methods_Pt92[] = {
     {"manhattan", ls_invoke_Pt92_manhattan, 1},
     {"dot", ls_invoke_Pt92_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt92 = {"Pt92", 2, ls_fields_Pt92, 2, ls_methods_Pt92};
+static const LS_TypeInfo ls_type_Pt92 = {"Pt92", 2, ls_fields_Pt92, 2, ls_methods_Pt92, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker92_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker92_add((LS_Worker92*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19931,7 +19931,7 @@ static const LS_MethodInfo ls_methods_Worker92[] = {
     {"fib", ls_invoke_Worker92_fib, 1},
     {"text", ls_invoke_Worker92_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker92 = {"Worker92", 4, ls_fields_Worker92, 5, ls_methods_Worker92};
+static const LS_TypeInfo ls_type_Worker92 = {"Worker92", 4, ls_fields_Worker92, 5, ls_methods_Worker92, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner92_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner92_run((LS_Runner92*)self));
@@ -19939,7 +19939,7 @@ static void ls_invoke_Runner92_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner92[] = {
     {"run", ls_invoke_Runner92_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner92 = {"Runner92", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner92};
+static const LS_TypeInfo ls_type_Runner92 = {"Runner92", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner92, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng93_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng93_next((LS_Rng93*)self));
@@ -19954,7 +19954,7 @@ static const LS_MethodInfo ls_methods_Rng93[] = {
     {"next", ls_invoke_Rng93_next, 0},
     {"range", ls_invoke_Rng93_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng93 = {"Rng93", 1, ls_fields_Rng93, 2, ls_methods_Rng93};
+static const LS_TypeInfo ls_type_Rng93 = {"Rng93", 1, ls_fields_Rng93, 2, ls_methods_Rng93, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt93_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt93_manhattan((LS_Pt93*)self, ((LS_Pt93*)ls_unbox_object(arguments[0], &ls_type_Pt93))));
 }
@@ -19969,7 +19969,7 @@ static const LS_MethodInfo ls_methods_Pt93[] = {
     {"manhattan", ls_invoke_Pt93_manhattan, 1},
     {"dot", ls_invoke_Pt93_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt93 = {"Pt93", 2, ls_fields_Pt93, 2, ls_methods_Pt93};
+static const LS_TypeInfo ls_type_Pt93 = {"Pt93", 2, ls_fields_Pt93, 2, ls_methods_Pt93, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker93_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker93_add((LS_Worker93*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -19999,7 +19999,7 @@ static const LS_MethodInfo ls_methods_Worker93[] = {
     {"fib", ls_invoke_Worker93_fib, 1},
     {"text", ls_invoke_Worker93_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker93 = {"Worker93", 4, ls_fields_Worker93, 5, ls_methods_Worker93};
+static const LS_TypeInfo ls_type_Worker93 = {"Worker93", 4, ls_fields_Worker93, 5, ls_methods_Worker93, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner93_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner93_run((LS_Runner93*)self));
@@ -20007,7 +20007,7 @@ static void ls_invoke_Runner93_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner93[] = {
     {"run", ls_invoke_Runner93_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner93 = {"Runner93", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner93};
+static const LS_TypeInfo ls_type_Runner93 = {"Runner93", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner93, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng94_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng94_next((LS_Rng94*)self));
@@ -20022,7 +20022,7 @@ static const LS_MethodInfo ls_methods_Rng94[] = {
     {"next", ls_invoke_Rng94_next, 0},
     {"range", ls_invoke_Rng94_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng94 = {"Rng94", 1, ls_fields_Rng94, 2, ls_methods_Rng94};
+static const LS_TypeInfo ls_type_Rng94 = {"Rng94", 1, ls_fields_Rng94, 2, ls_methods_Rng94, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt94_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt94_manhattan((LS_Pt94*)self, ((LS_Pt94*)ls_unbox_object(arguments[0], &ls_type_Pt94))));
 }
@@ -20037,7 +20037,7 @@ static const LS_MethodInfo ls_methods_Pt94[] = {
     {"manhattan", ls_invoke_Pt94_manhattan, 1},
     {"dot", ls_invoke_Pt94_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt94 = {"Pt94", 2, ls_fields_Pt94, 2, ls_methods_Pt94};
+static const LS_TypeInfo ls_type_Pt94 = {"Pt94", 2, ls_fields_Pt94, 2, ls_methods_Pt94, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker94_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker94_add((LS_Worker94*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20067,7 +20067,7 @@ static const LS_MethodInfo ls_methods_Worker94[] = {
     {"fib", ls_invoke_Worker94_fib, 1},
     {"text", ls_invoke_Worker94_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker94 = {"Worker94", 4, ls_fields_Worker94, 5, ls_methods_Worker94};
+static const LS_TypeInfo ls_type_Worker94 = {"Worker94", 4, ls_fields_Worker94, 5, ls_methods_Worker94, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner94_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner94_run((LS_Runner94*)self));
@@ -20075,7 +20075,7 @@ static void ls_invoke_Runner94_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner94[] = {
     {"run", ls_invoke_Runner94_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner94 = {"Runner94", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner94};
+static const LS_TypeInfo ls_type_Runner94 = {"Runner94", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner94, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng95_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng95_next((LS_Rng95*)self));
@@ -20090,7 +20090,7 @@ static const LS_MethodInfo ls_methods_Rng95[] = {
     {"next", ls_invoke_Rng95_next, 0},
     {"range", ls_invoke_Rng95_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng95 = {"Rng95", 1, ls_fields_Rng95, 2, ls_methods_Rng95};
+static const LS_TypeInfo ls_type_Rng95 = {"Rng95", 1, ls_fields_Rng95, 2, ls_methods_Rng95, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt95_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt95_manhattan((LS_Pt95*)self, ((LS_Pt95*)ls_unbox_object(arguments[0], &ls_type_Pt95))));
 }
@@ -20105,7 +20105,7 @@ static const LS_MethodInfo ls_methods_Pt95[] = {
     {"manhattan", ls_invoke_Pt95_manhattan, 1},
     {"dot", ls_invoke_Pt95_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt95 = {"Pt95", 2, ls_fields_Pt95, 2, ls_methods_Pt95};
+static const LS_TypeInfo ls_type_Pt95 = {"Pt95", 2, ls_fields_Pt95, 2, ls_methods_Pt95, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker95_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker95_add((LS_Worker95*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20135,7 +20135,7 @@ static const LS_MethodInfo ls_methods_Worker95[] = {
     {"fib", ls_invoke_Worker95_fib, 1},
     {"text", ls_invoke_Worker95_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker95 = {"Worker95", 4, ls_fields_Worker95, 5, ls_methods_Worker95};
+static const LS_TypeInfo ls_type_Worker95 = {"Worker95", 4, ls_fields_Worker95, 5, ls_methods_Worker95, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner95_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner95_run((LS_Runner95*)self));
@@ -20143,7 +20143,7 @@ static void ls_invoke_Runner95_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner95[] = {
     {"run", ls_invoke_Runner95_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner95 = {"Runner95", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner95};
+static const LS_TypeInfo ls_type_Runner95 = {"Runner95", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner95, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng96_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng96_next((LS_Rng96*)self));
@@ -20158,7 +20158,7 @@ static const LS_MethodInfo ls_methods_Rng96[] = {
     {"next", ls_invoke_Rng96_next, 0},
     {"range", ls_invoke_Rng96_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng96 = {"Rng96", 1, ls_fields_Rng96, 2, ls_methods_Rng96};
+static const LS_TypeInfo ls_type_Rng96 = {"Rng96", 1, ls_fields_Rng96, 2, ls_methods_Rng96, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt96_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt96_manhattan((LS_Pt96*)self, ((LS_Pt96*)ls_unbox_object(arguments[0], &ls_type_Pt96))));
 }
@@ -20173,7 +20173,7 @@ static const LS_MethodInfo ls_methods_Pt96[] = {
     {"manhattan", ls_invoke_Pt96_manhattan, 1},
     {"dot", ls_invoke_Pt96_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt96 = {"Pt96", 2, ls_fields_Pt96, 2, ls_methods_Pt96};
+static const LS_TypeInfo ls_type_Pt96 = {"Pt96", 2, ls_fields_Pt96, 2, ls_methods_Pt96, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker96_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker96_add((LS_Worker96*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20203,7 +20203,7 @@ static const LS_MethodInfo ls_methods_Worker96[] = {
     {"fib", ls_invoke_Worker96_fib, 1},
     {"text", ls_invoke_Worker96_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker96 = {"Worker96", 4, ls_fields_Worker96, 5, ls_methods_Worker96};
+static const LS_TypeInfo ls_type_Worker96 = {"Worker96", 4, ls_fields_Worker96, 5, ls_methods_Worker96, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner96_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner96_run((LS_Runner96*)self));
@@ -20211,7 +20211,7 @@ static void ls_invoke_Runner96_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner96[] = {
     {"run", ls_invoke_Runner96_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner96 = {"Runner96", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner96};
+static const LS_TypeInfo ls_type_Runner96 = {"Runner96", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner96, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng97_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng97_next((LS_Rng97*)self));
@@ -20226,7 +20226,7 @@ static const LS_MethodInfo ls_methods_Rng97[] = {
     {"next", ls_invoke_Rng97_next, 0},
     {"range", ls_invoke_Rng97_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng97 = {"Rng97", 1, ls_fields_Rng97, 2, ls_methods_Rng97};
+static const LS_TypeInfo ls_type_Rng97 = {"Rng97", 1, ls_fields_Rng97, 2, ls_methods_Rng97, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt97_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt97_manhattan((LS_Pt97*)self, ((LS_Pt97*)ls_unbox_object(arguments[0], &ls_type_Pt97))));
 }
@@ -20241,7 +20241,7 @@ static const LS_MethodInfo ls_methods_Pt97[] = {
     {"manhattan", ls_invoke_Pt97_manhattan, 1},
     {"dot", ls_invoke_Pt97_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt97 = {"Pt97", 2, ls_fields_Pt97, 2, ls_methods_Pt97};
+static const LS_TypeInfo ls_type_Pt97 = {"Pt97", 2, ls_fields_Pt97, 2, ls_methods_Pt97, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker97_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker97_add((LS_Worker97*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20271,7 +20271,7 @@ static const LS_MethodInfo ls_methods_Worker97[] = {
     {"fib", ls_invoke_Worker97_fib, 1},
     {"text", ls_invoke_Worker97_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker97 = {"Worker97", 4, ls_fields_Worker97, 5, ls_methods_Worker97};
+static const LS_TypeInfo ls_type_Worker97 = {"Worker97", 4, ls_fields_Worker97, 5, ls_methods_Worker97, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner97_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner97_run((LS_Runner97*)self));
@@ -20279,7 +20279,7 @@ static void ls_invoke_Runner97_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner97[] = {
     {"run", ls_invoke_Runner97_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner97 = {"Runner97", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner97};
+static const LS_TypeInfo ls_type_Runner97 = {"Runner97", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner97, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng98_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng98_next((LS_Rng98*)self));
@@ -20294,7 +20294,7 @@ static const LS_MethodInfo ls_methods_Rng98[] = {
     {"next", ls_invoke_Rng98_next, 0},
     {"range", ls_invoke_Rng98_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng98 = {"Rng98", 1, ls_fields_Rng98, 2, ls_methods_Rng98};
+static const LS_TypeInfo ls_type_Rng98 = {"Rng98", 1, ls_fields_Rng98, 2, ls_methods_Rng98, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt98_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt98_manhattan((LS_Pt98*)self, ((LS_Pt98*)ls_unbox_object(arguments[0], &ls_type_Pt98))));
 }
@@ -20309,7 +20309,7 @@ static const LS_MethodInfo ls_methods_Pt98[] = {
     {"manhattan", ls_invoke_Pt98_manhattan, 1},
     {"dot", ls_invoke_Pt98_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt98 = {"Pt98", 2, ls_fields_Pt98, 2, ls_methods_Pt98};
+static const LS_TypeInfo ls_type_Pt98 = {"Pt98", 2, ls_fields_Pt98, 2, ls_methods_Pt98, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker98_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker98_add((LS_Worker98*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20339,7 +20339,7 @@ static const LS_MethodInfo ls_methods_Worker98[] = {
     {"fib", ls_invoke_Worker98_fib, 1},
     {"text", ls_invoke_Worker98_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker98 = {"Worker98", 4, ls_fields_Worker98, 5, ls_methods_Worker98};
+static const LS_TypeInfo ls_type_Worker98 = {"Worker98", 4, ls_fields_Worker98, 5, ls_methods_Worker98, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner98_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner98_run((LS_Runner98*)self));
@@ -20347,7 +20347,7 @@ static void ls_invoke_Runner98_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner98[] = {
     {"run", ls_invoke_Runner98_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner98 = {"Runner98", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner98};
+static const LS_TypeInfo ls_type_Runner98 = {"Runner98", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner98, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng99_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng99_next((LS_Rng99*)self));
@@ -20362,7 +20362,7 @@ static const LS_MethodInfo ls_methods_Rng99[] = {
     {"next", ls_invoke_Rng99_next, 0},
     {"range", ls_invoke_Rng99_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng99 = {"Rng99", 1, ls_fields_Rng99, 2, ls_methods_Rng99};
+static const LS_TypeInfo ls_type_Rng99 = {"Rng99", 1, ls_fields_Rng99, 2, ls_methods_Rng99, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt99_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt99_manhattan((LS_Pt99*)self, ((LS_Pt99*)ls_unbox_object(arguments[0], &ls_type_Pt99))));
 }
@@ -20377,7 +20377,7 @@ static const LS_MethodInfo ls_methods_Pt99[] = {
     {"manhattan", ls_invoke_Pt99_manhattan, 1},
     {"dot", ls_invoke_Pt99_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt99 = {"Pt99", 2, ls_fields_Pt99, 2, ls_methods_Pt99};
+static const LS_TypeInfo ls_type_Pt99 = {"Pt99", 2, ls_fields_Pt99, 2, ls_methods_Pt99, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker99_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker99_add((LS_Worker99*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20407,7 +20407,7 @@ static const LS_MethodInfo ls_methods_Worker99[] = {
     {"fib", ls_invoke_Worker99_fib, 1},
     {"text", ls_invoke_Worker99_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker99 = {"Worker99", 4, ls_fields_Worker99, 5, ls_methods_Worker99};
+static const LS_TypeInfo ls_type_Worker99 = {"Worker99", 4, ls_fields_Worker99, 5, ls_methods_Worker99, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner99_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner99_run((LS_Runner99*)self));
@@ -20415,7 +20415,7 @@ static void ls_invoke_Runner99_run(void* self, const LS_Value* arguments, LS_Val
 static const LS_MethodInfo ls_methods_Runner99[] = {
     {"run", ls_invoke_Runner99_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner99 = {"Runner99", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner99};
+static const LS_TypeInfo ls_type_Runner99 = {"Runner99", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner99, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng100_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng100_next((LS_Rng100*)self));
@@ -20430,7 +20430,7 @@ static const LS_MethodInfo ls_methods_Rng100[] = {
     {"next", ls_invoke_Rng100_next, 0},
     {"range", ls_invoke_Rng100_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng100 = {"Rng100", 1, ls_fields_Rng100, 2, ls_methods_Rng100};
+static const LS_TypeInfo ls_type_Rng100 = {"Rng100", 1, ls_fields_Rng100, 2, ls_methods_Rng100, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt100_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt100_manhattan((LS_Pt100*)self, ((LS_Pt100*)ls_unbox_object(arguments[0], &ls_type_Pt100))));
 }
@@ -20445,7 +20445,7 @@ static const LS_MethodInfo ls_methods_Pt100[] = {
     {"manhattan", ls_invoke_Pt100_manhattan, 1},
     {"dot", ls_invoke_Pt100_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt100 = {"Pt100", 2, ls_fields_Pt100, 2, ls_methods_Pt100};
+static const LS_TypeInfo ls_type_Pt100 = {"Pt100", 2, ls_fields_Pt100, 2, ls_methods_Pt100, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker100_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker100_add((LS_Worker100*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20475,7 +20475,7 @@ static const LS_MethodInfo ls_methods_Worker100[] = {
     {"fib", ls_invoke_Worker100_fib, 1},
     {"text", ls_invoke_Worker100_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker100 = {"Worker100", 4, ls_fields_Worker100, 5, ls_methods_Worker100};
+static const LS_TypeInfo ls_type_Worker100 = {"Worker100", 4, ls_fields_Worker100, 5, ls_methods_Worker100, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner100_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner100_run((LS_Runner100*)self));
@@ -20483,7 +20483,7 @@ static void ls_invoke_Runner100_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner100[] = {
     {"run", ls_invoke_Runner100_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner100 = {"Runner100", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner100};
+static const LS_TypeInfo ls_type_Runner100 = {"Runner100", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner100, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng101_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng101_next((LS_Rng101*)self));
@@ -20498,7 +20498,7 @@ static const LS_MethodInfo ls_methods_Rng101[] = {
     {"next", ls_invoke_Rng101_next, 0},
     {"range", ls_invoke_Rng101_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng101 = {"Rng101", 1, ls_fields_Rng101, 2, ls_methods_Rng101};
+static const LS_TypeInfo ls_type_Rng101 = {"Rng101", 1, ls_fields_Rng101, 2, ls_methods_Rng101, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt101_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt101_manhattan((LS_Pt101*)self, ((LS_Pt101*)ls_unbox_object(arguments[0], &ls_type_Pt101))));
 }
@@ -20513,7 +20513,7 @@ static const LS_MethodInfo ls_methods_Pt101[] = {
     {"manhattan", ls_invoke_Pt101_manhattan, 1},
     {"dot", ls_invoke_Pt101_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt101 = {"Pt101", 2, ls_fields_Pt101, 2, ls_methods_Pt101};
+static const LS_TypeInfo ls_type_Pt101 = {"Pt101", 2, ls_fields_Pt101, 2, ls_methods_Pt101, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker101_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker101_add((LS_Worker101*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20543,7 +20543,7 @@ static const LS_MethodInfo ls_methods_Worker101[] = {
     {"fib", ls_invoke_Worker101_fib, 1},
     {"text", ls_invoke_Worker101_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker101 = {"Worker101", 4, ls_fields_Worker101, 5, ls_methods_Worker101};
+static const LS_TypeInfo ls_type_Worker101 = {"Worker101", 4, ls_fields_Worker101, 5, ls_methods_Worker101, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner101_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner101_run((LS_Runner101*)self));
@@ -20551,7 +20551,7 @@ static void ls_invoke_Runner101_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner101[] = {
     {"run", ls_invoke_Runner101_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner101 = {"Runner101", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner101};
+static const LS_TypeInfo ls_type_Runner101 = {"Runner101", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner101, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng102_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng102_next((LS_Rng102*)self));
@@ -20566,7 +20566,7 @@ static const LS_MethodInfo ls_methods_Rng102[] = {
     {"next", ls_invoke_Rng102_next, 0},
     {"range", ls_invoke_Rng102_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng102 = {"Rng102", 1, ls_fields_Rng102, 2, ls_methods_Rng102};
+static const LS_TypeInfo ls_type_Rng102 = {"Rng102", 1, ls_fields_Rng102, 2, ls_methods_Rng102, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt102_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt102_manhattan((LS_Pt102*)self, ((LS_Pt102*)ls_unbox_object(arguments[0], &ls_type_Pt102))));
 }
@@ -20581,7 +20581,7 @@ static const LS_MethodInfo ls_methods_Pt102[] = {
     {"manhattan", ls_invoke_Pt102_manhattan, 1},
     {"dot", ls_invoke_Pt102_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt102 = {"Pt102", 2, ls_fields_Pt102, 2, ls_methods_Pt102};
+static const LS_TypeInfo ls_type_Pt102 = {"Pt102", 2, ls_fields_Pt102, 2, ls_methods_Pt102, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker102_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker102_add((LS_Worker102*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20611,7 +20611,7 @@ static const LS_MethodInfo ls_methods_Worker102[] = {
     {"fib", ls_invoke_Worker102_fib, 1},
     {"text", ls_invoke_Worker102_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker102 = {"Worker102", 4, ls_fields_Worker102, 5, ls_methods_Worker102};
+static const LS_TypeInfo ls_type_Worker102 = {"Worker102", 4, ls_fields_Worker102, 5, ls_methods_Worker102, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner102_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner102_run((LS_Runner102*)self));
@@ -20619,7 +20619,7 @@ static void ls_invoke_Runner102_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner102[] = {
     {"run", ls_invoke_Runner102_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner102 = {"Runner102", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner102};
+static const LS_TypeInfo ls_type_Runner102 = {"Runner102", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner102, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng103_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng103_next((LS_Rng103*)self));
@@ -20634,7 +20634,7 @@ static const LS_MethodInfo ls_methods_Rng103[] = {
     {"next", ls_invoke_Rng103_next, 0},
     {"range", ls_invoke_Rng103_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng103 = {"Rng103", 1, ls_fields_Rng103, 2, ls_methods_Rng103};
+static const LS_TypeInfo ls_type_Rng103 = {"Rng103", 1, ls_fields_Rng103, 2, ls_methods_Rng103, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt103_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt103_manhattan((LS_Pt103*)self, ((LS_Pt103*)ls_unbox_object(arguments[0], &ls_type_Pt103))));
 }
@@ -20649,7 +20649,7 @@ static const LS_MethodInfo ls_methods_Pt103[] = {
     {"manhattan", ls_invoke_Pt103_manhattan, 1},
     {"dot", ls_invoke_Pt103_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt103 = {"Pt103", 2, ls_fields_Pt103, 2, ls_methods_Pt103};
+static const LS_TypeInfo ls_type_Pt103 = {"Pt103", 2, ls_fields_Pt103, 2, ls_methods_Pt103, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker103_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker103_add((LS_Worker103*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20679,7 +20679,7 @@ static const LS_MethodInfo ls_methods_Worker103[] = {
     {"fib", ls_invoke_Worker103_fib, 1},
     {"text", ls_invoke_Worker103_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker103 = {"Worker103", 4, ls_fields_Worker103, 5, ls_methods_Worker103};
+static const LS_TypeInfo ls_type_Worker103 = {"Worker103", 4, ls_fields_Worker103, 5, ls_methods_Worker103, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner103_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner103_run((LS_Runner103*)self));
@@ -20687,7 +20687,7 @@ static void ls_invoke_Runner103_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner103[] = {
     {"run", ls_invoke_Runner103_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner103 = {"Runner103", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner103};
+static const LS_TypeInfo ls_type_Runner103 = {"Runner103", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner103, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng104_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng104_next((LS_Rng104*)self));
@@ -20702,7 +20702,7 @@ static const LS_MethodInfo ls_methods_Rng104[] = {
     {"next", ls_invoke_Rng104_next, 0},
     {"range", ls_invoke_Rng104_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng104 = {"Rng104", 1, ls_fields_Rng104, 2, ls_methods_Rng104};
+static const LS_TypeInfo ls_type_Rng104 = {"Rng104", 1, ls_fields_Rng104, 2, ls_methods_Rng104, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt104_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt104_manhattan((LS_Pt104*)self, ((LS_Pt104*)ls_unbox_object(arguments[0], &ls_type_Pt104))));
 }
@@ -20717,7 +20717,7 @@ static const LS_MethodInfo ls_methods_Pt104[] = {
     {"manhattan", ls_invoke_Pt104_manhattan, 1},
     {"dot", ls_invoke_Pt104_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt104 = {"Pt104", 2, ls_fields_Pt104, 2, ls_methods_Pt104};
+static const LS_TypeInfo ls_type_Pt104 = {"Pt104", 2, ls_fields_Pt104, 2, ls_methods_Pt104, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker104_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker104_add((LS_Worker104*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20747,7 +20747,7 @@ static const LS_MethodInfo ls_methods_Worker104[] = {
     {"fib", ls_invoke_Worker104_fib, 1},
     {"text", ls_invoke_Worker104_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker104 = {"Worker104", 4, ls_fields_Worker104, 5, ls_methods_Worker104};
+static const LS_TypeInfo ls_type_Worker104 = {"Worker104", 4, ls_fields_Worker104, 5, ls_methods_Worker104, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner104_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner104_run((LS_Runner104*)self));
@@ -20755,7 +20755,7 @@ static void ls_invoke_Runner104_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner104[] = {
     {"run", ls_invoke_Runner104_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner104 = {"Runner104", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner104};
+static const LS_TypeInfo ls_type_Runner104 = {"Runner104", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner104, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng105_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng105_next((LS_Rng105*)self));
@@ -20770,7 +20770,7 @@ static const LS_MethodInfo ls_methods_Rng105[] = {
     {"next", ls_invoke_Rng105_next, 0},
     {"range", ls_invoke_Rng105_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng105 = {"Rng105", 1, ls_fields_Rng105, 2, ls_methods_Rng105};
+static const LS_TypeInfo ls_type_Rng105 = {"Rng105", 1, ls_fields_Rng105, 2, ls_methods_Rng105, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt105_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt105_manhattan((LS_Pt105*)self, ((LS_Pt105*)ls_unbox_object(arguments[0], &ls_type_Pt105))));
 }
@@ -20785,7 +20785,7 @@ static const LS_MethodInfo ls_methods_Pt105[] = {
     {"manhattan", ls_invoke_Pt105_manhattan, 1},
     {"dot", ls_invoke_Pt105_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt105 = {"Pt105", 2, ls_fields_Pt105, 2, ls_methods_Pt105};
+static const LS_TypeInfo ls_type_Pt105 = {"Pt105", 2, ls_fields_Pt105, 2, ls_methods_Pt105, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker105_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker105_add((LS_Worker105*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20815,7 +20815,7 @@ static const LS_MethodInfo ls_methods_Worker105[] = {
     {"fib", ls_invoke_Worker105_fib, 1},
     {"text", ls_invoke_Worker105_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker105 = {"Worker105", 4, ls_fields_Worker105, 5, ls_methods_Worker105};
+static const LS_TypeInfo ls_type_Worker105 = {"Worker105", 4, ls_fields_Worker105, 5, ls_methods_Worker105, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner105_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner105_run((LS_Runner105*)self));
@@ -20823,7 +20823,7 @@ static void ls_invoke_Runner105_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner105[] = {
     {"run", ls_invoke_Runner105_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner105 = {"Runner105", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner105};
+static const LS_TypeInfo ls_type_Runner105 = {"Runner105", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner105, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng106_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng106_next((LS_Rng106*)self));
@@ -20838,7 +20838,7 @@ static const LS_MethodInfo ls_methods_Rng106[] = {
     {"next", ls_invoke_Rng106_next, 0},
     {"range", ls_invoke_Rng106_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng106 = {"Rng106", 1, ls_fields_Rng106, 2, ls_methods_Rng106};
+static const LS_TypeInfo ls_type_Rng106 = {"Rng106", 1, ls_fields_Rng106, 2, ls_methods_Rng106, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt106_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt106_manhattan((LS_Pt106*)self, ((LS_Pt106*)ls_unbox_object(arguments[0], &ls_type_Pt106))));
 }
@@ -20853,7 +20853,7 @@ static const LS_MethodInfo ls_methods_Pt106[] = {
     {"manhattan", ls_invoke_Pt106_manhattan, 1},
     {"dot", ls_invoke_Pt106_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt106 = {"Pt106", 2, ls_fields_Pt106, 2, ls_methods_Pt106};
+static const LS_TypeInfo ls_type_Pt106 = {"Pt106", 2, ls_fields_Pt106, 2, ls_methods_Pt106, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker106_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker106_add((LS_Worker106*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20883,7 +20883,7 @@ static const LS_MethodInfo ls_methods_Worker106[] = {
     {"fib", ls_invoke_Worker106_fib, 1},
     {"text", ls_invoke_Worker106_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker106 = {"Worker106", 4, ls_fields_Worker106, 5, ls_methods_Worker106};
+static const LS_TypeInfo ls_type_Worker106 = {"Worker106", 4, ls_fields_Worker106, 5, ls_methods_Worker106, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner106_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner106_run((LS_Runner106*)self));
@@ -20891,7 +20891,7 @@ static void ls_invoke_Runner106_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner106[] = {
     {"run", ls_invoke_Runner106_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner106 = {"Runner106", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner106};
+static const LS_TypeInfo ls_type_Runner106 = {"Runner106", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner106, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng107_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng107_next((LS_Rng107*)self));
@@ -20906,7 +20906,7 @@ static const LS_MethodInfo ls_methods_Rng107[] = {
     {"next", ls_invoke_Rng107_next, 0},
     {"range", ls_invoke_Rng107_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng107 = {"Rng107", 1, ls_fields_Rng107, 2, ls_methods_Rng107};
+static const LS_TypeInfo ls_type_Rng107 = {"Rng107", 1, ls_fields_Rng107, 2, ls_methods_Rng107, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt107_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt107_manhattan((LS_Pt107*)self, ((LS_Pt107*)ls_unbox_object(arguments[0], &ls_type_Pt107))));
 }
@@ -20921,7 +20921,7 @@ static const LS_MethodInfo ls_methods_Pt107[] = {
     {"manhattan", ls_invoke_Pt107_manhattan, 1},
     {"dot", ls_invoke_Pt107_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt107 = {"Pt107", 2, ls_fields_Pt107, 2, ls_methods_Pt107};
+static const LS_TypeInfo ls_type_Pt107 = {"Pt107", 2, ls_fields_Pt107, 2, ls_methods_Pt107, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker107_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker107_add((LS_Worker107*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -20951,7 +20951,7 @@ static const LS_MethodInfo ls_methods_Worker107[] = {
     {"fib", ls_invoke_Worker107_fib, 1},
     {"text", ls_invoke_Worker107_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker107 = {"Worker107", 4, ls_fields_Worker107, 5, ls_methods_Worker107};
+static const LS_TypeInfo ls_type_Worker107 = {"Worker107", 4, ls_fields_Worker107, 5, ls_methods_Worker107, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner107_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner107_run((LS_Runner107*)self));
@@ -20959,7 +20959,7 @@ static void ls_invoke_Runner107_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner107[] = {
     {"run", ls_invoke_Runner107_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner107 = {"Runner107", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner107};
+static const LS_TypeInfo ls_type_Runner107 = {"Runner107", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner107, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng108_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng108_next((LS_Rng108*)self));
@@ -20974,7 +20974,7 @@ static const LS_MethodInfo ls_methods_Rng108[] = {
     {"next", ls_invoke_Rng108_next, 0},
     {"range", ls_invoke_Rng108_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng108 = {"Rng108", 1, ls_fields_Rng108, 2, ls_methods_Rng108};
+static const LS_TypeInfo ls_type_Rng108 = {"Rng108", 1, ls_fields_Rng108, 2, ls_methods_Rng108, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt108_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt108_manhattan((LS_Pt108*)self, ((LS_Pt108*)ls_unbox_object(arguments[0], &ls_type_Pt108))));
 }
@@ -20989,7 +20989,7 @@ static const LS_MethodInfo ls_methods_Pt108[] = {
     {"manhattan", ls_invoke_Pt108_manhattan, 1},
     {"dot", ls_invoke_Pt108_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt108 = {"Pt108", 2, ls_fields_Pt108, 2, ls_methods_Pt108};
+static const LS_TypeInfo ls_type_Pt108 = {"Pt108", 2, ls_fields_Pt108, 2, ls_methods_Pt108, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker108_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker108_add((LS_Worker108*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21019,7 +21019,7 @@ static const LS_MethodInfo ls_methods_Worker108[] = {
     {"fib", ls_invoke_Worker108_fib, 1},
     {"text", ls_invoke_Worker108_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker108 = {"Worker108", 4, ls_fields_Worker108, 5, ls_methods_Worker108};
+static const LS_TypeInfo ls_type_Worker108 = {"Worker108", 4, ls_fields_Worker108, 5, ls_methods_Worker108, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner108_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner108_run((LS_Runner108*)self));
@@ -21027,7 +21027,7 @@ static void ls_invoke_Runner108_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner108[] = {
     {"run", ls_invoke_Runner108_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner108 = {"Runner108", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner108};
+static const LS_TypeInfo ls_type_Runner108 = {"Runner108", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner108, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng109_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng109_next((LS_Rng109*)self));
@@ -21042,7 +21042,7 @@ static const LS_MethodInfo ls_methods_Rng109[] = {
     {"next", ls_invoke_Rng109_next, 0},
     {"range", ls_invoke_Rng109_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng109 = {"Rng109", 1, ls_fields_Rng109, 2, ls_methods_Rng109};
+static const LS_TypeInfo ls_type_Rng109 = {"Rng109", 1, ls_fields_Rng109, 2, ls_methods_Rng109, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt109_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt109_manhattan((LS_Pt109*)self, ((LS_Pt109*)ls_unbox_object(arguments[0], &ls_type_Pt109))));
 }
@@ -21057,7 +21057,7 @@ static const LS_MethodInfo ls_methods_Pt109[] = {
     {"manhattan", ls_invoke_Pt109_manhattan, 1},
     {"dot", ls_invoke_Pt109_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt109 = {"Pt109", 2, ls_fields_Pt109, 2, ls_methods_Pt109};
+static const LS_TypeInfo ls_type_Pt109 = {"Pt109", 2, ls_fields_Pt109, 2, ls_methods_Pt109, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker109_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker109_add((LS_Worker109*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21087,7 +21087,7 @@ static const LS_MethodInfo ls_methods_Worker109[] = {
     {"fib", ls_invoke_Worker109_fib, 1},
     {"text", ls_invoke_Worker109_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker109 = {"Worker109", 4, ls_fields_Worker109, 5, ls_methods_Worker109};
+static const LS_TypeInfo ls_type_Worker109 = {"Worker109", 4, ls_fields_Worker109, 5, ls_methods_Worker109, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner109_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner109_run((LS_Runner109*)self));
@@ -21095,7 +21095,7 @@ static void ls_invoke_Runner109_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner109[] = {
     {"run", ls_invoke_Runner109_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner109 = {"Runner109", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner109};
+static const LS_TypeInfo ls_type_Runner109 = {"Runner109", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner109, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng110_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng110_next((LS_Rng110*)self));
@@ -21110,7 +21110,7 @@ static const LS_MethodInfo ls_methods_Rng110[] = {
     {"next", ls_invoke_Rng110_next, 0},
     {"range", ls_invoke_Rng110_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng110 = {"Rng110", 1, ls_fields_Rng110, 2, ls_methods_Rng110};
+static const LS_TypeInfo ls_type_Rng110 = {"Rng110", 1, ls_fields_Rng110, 2, ls_methods_Rng110, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt110_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt110_manhattan((LS_Pt110*)self, ((LS_Pt110*)ls_unbox_object(arguments[0], &ls_type_Pt110))));
 }
@@ -21125,7 +21125,7 @@ static const LS_MethodInfo ls_methods_Pt110[] = {
     {"manhattan", ls_invoke_Pt110_manhattan, 1},
     {"dot", ls_invoke_Pt110_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt110 = {"Pt110", 2, ls_fields_Pt110, 2, ls_methods_Pt110};
+static const LS_TypeInfo ls_type_Pt110 = {"Pt110", 2, ls_fields_Pt110, 2, ls_methods_Pt110, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker110_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker110_add((LS_Worker110*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21155,7 +21155,7 @@ static const LS_MethodInfo ls_methods_Worker110[] = {
     {"fib", ls_invoke_Worker110_fib, 1},
     {"text", ls_invoke_Worker110_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker110 = {"Worker110", 4, ls_fields_Worker110, 5, ls_methods_Worker110};
+static const LS_TypeInfo ls_type_Worker110 = {"Worker110", 4, ls_fields_Worker110, 5, ls_methods_Worker110, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner110_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner110_run((LS_Runner110*)self));
@@ -21163,7 +21163,7 @@ static void ls_invoke_Runner110_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner110[] = {
     {"run", ls_invoke_Runner110_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner110 = {"Runner110", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner110};
+static const LS_TypeInfo ls_type_Runner110 = {"Runner110", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner110, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng111_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng111_next((LS_Rng111*)self));
@@ -21178,7 +21178,7 @@ static const LS_MethodInfo ls_methods_Rng111[] = {
     {"next", ls_invoke_Rng111_next, 0},
     {"range", ls_invoke_Rng111_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng111 = {"Rng111", 1, ls_fields_Rng111, 2, ls_methods_Rng111};
+static const LS_TypeInfo ls_type_Rng111 = {"Rng111", 1, ls_fields_Rng111, 2, ls_methods_Rng111, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt111_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt111_manhattan((LS_Pt111*)self, ((LS_Pt111*)ls_unbox_object(arguments[0], &ls_type_Pt111))));
 }
@@ -21193,7 +21193,7 @@ static const LS_MethodInfo ls_methods_Pt111[] = {
     {"manhattan", ls_invoke_Pt111_manhattan, 1},
     {"dot", ls_invoke_Pt111_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt111 = {"Pt111", 2, ls_fields_Pt111, 2, ls_methods_Pt111};
+static const LS_TypeInfo ls_type_Pt111 = {"Pt111", 2, ls_fields_Pt111, 2, ls_methods_Pt111, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker111_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker111_add((LS_Worker111*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21223,7 +21223,7 @@ static const LS_MethodInfo ls_methods_Worker111[] = {
     {"fib", ls_invoke_Worker111_fib, 1},
     {"text", ls_invoke_Worker111_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker111 = {"Worker111", 4, ls_fields_Worker111, 5, ls_methods_Worker111};
+static const LS_TypeInfo ls_type_Worker111 = {"Worker111", 4, ls_fields_Worker111, 5, ls_methods_Worker111, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner111_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner111_run((LS_Runner111*)self));
@@ -21231,7 +21231,7 @@ static void ls_invoke_Runner111_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner111[] = {
     {"run", ls_invoke_Runner111_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner111 = {"Runner111", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner111};
+static const LS_TypeInfo ls_type_Runner111 = {"Runner111", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner111, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng112_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng112_next((LS_Rng112*)self));
@@ -21246,7 +21246,7 @@ static const LS_MethodInfo ls_methods_Rng112[] = {
     {"next", ls_invoke_Rng112_next, 0},
     {"range", ls_invoke_Rng112_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng112 = {"Rng112", 1, ls_fields_Rng112, 2, ls_methods_Rng112};
+static const LS_TypeInfo ls_type_Rng112 = {"Rng112", 1, ls_fields_Rng112, 2, ls_methods_Rng112, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt112_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt112_manhattan((LS_Pt112*)self, ((LS_Pt112*)ls_unbox_object(arguments[0], &ls_type_Pt112))));
 }
@@ -21261,7 +21261,7 @@ static const LS_MethodInfo ls_methods_Pt112[] = {
     {"manhattan", ls_invoke_Pt112_manhattan, 1},
     {"dot", ls_invoke_Pt112_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt112 = {"Pt112", 2, ls_fields_Pt112, 2, ls_methods_Pt112};
+static const LS_TypeInfo ls_type_Pt112 = {"Pt112", 2, ls_fields_Pt112, 2, ls_methods_Pt112, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker112_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker112_add((LS_Worker112*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21291,7 +21291,7 @@ static const LS_MethodInfo ls_methods_Worker112[] = {
     {"fib", ls_invoke_Worker112_fib, 1},
     {"text", ls_invoke_Worker112_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker112 = {"Worker112", 4, ls_fields_Worker112, 5, ls_methods_Worker112};
+static const LS_TypeInfo ls_type_Worker112 = {"Worker112", 4, ls_fields_Worker112, 5, ls_methods_Worker112, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner112_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner112_run((LS_Runner112*)self));
@@ -21299,7 +21299,7 @@ static void ls_invoke_Runner112_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner112[] = {
     {"run", ls_invoke_Runner112_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner112 = {"Runner112", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner112};
+static const LS_TypeInfo ls_type_Runner112 = {"Runner112", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner112, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng113_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng113_next((LS_Rng113*)self));
@@ -21314,7 +21314,7 @@ static const LS_MethodInfo ls_methods_Rng113[] = {
     {"next", ls_invoke_Rng113_next, 0},
     {"range", ls_invoke_Rng113_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng113 = {"Rng113", 1, ls_fields_Rng113, 2, ls_methods_Rng113};
+static const LS_TypeInfo ls_type_Rng113 = {"Rng113", 1, ls_fields_Rng113, 2, ls_methods_Rng113, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt113_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt113_manhattan((LS_Pt113*)self, ((LS_Pt113*)ls_unbox_object(arguments[0], &ls_type_Pt113))));
 }
@@ -21329,7 +21329,7 @@ static const LS_MethodInfo ls_methods_Pt113[] = {
     {"manhattan", ls_invoke_Pt113_manhattan, 1},
     {"dot", ls_invoke_Pt113_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt113 = {"Pt113", 2, ls_fields_Pt113, 2, ls_methods_Pt113};
+static const LS_TypeInfo ls_type_Pt113 = {"Pt113", 2, ls_fields_Pt113, 2, ls_methods_Pt113, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker113_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker113_add((LS_Worker113*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21359,7 +21359,7 @@ static const LS_MethodInfo ls_methods_Worker113[] = {
     {"fib", ls_invoke_Worker113_fib, 1},
     {"text", ls_invoke_Worker113_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker113 = {"Worker113", 4, ls_fields_Worker113, 5, ls_methods_Worker113};
+static const LS_TypeInfo ls_type_Worker113 = {"Worker113", 4, ls_fields_Worker113, 5, ls_methods_Worker113, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner113_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner113_run((LS_Runner113*)self));
@@ -21367,7 +21367,7 @@ static void ls_invoke_Runner113_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner113[] = {
     {"run", ls_invoke_Runner113_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner113 = {"Runner113", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner113};
+static const LS_TypeInfo ls_type_Runner113 = {"Runner113", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner113, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng114_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng114_next((LS_Rng114*)self));
@@ -21382,7 +21382,7 @@ static const LS_MethodInfo ls_methods_Rng114[] = {
     {"next", ls_invoke_Rng114_next, 0},
     {"range", ls_invoke_Rng114_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng114 = {"Rng114", 1, ls_fields_Rng114, 2, ls_methods_Rng114};
+static const LS_TypeInfo ls_type_Rng114 = {"Rng114", 1, ls_fields_Rng114, 2, ls_methods_Rng114, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt114_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt114_manhattan((LS_Pt114*)self, ((LS_Pt114*)ls_unbox_object(arguments[0], &ls_type_Pt114))));
 }
@@ -21397,7 +21397,7 @@ static const LS_MethodInfo ls_methods_Pt114[] = {
     {"manhattan", ls_invoke_Pt114_manhattan, 1},
     {"dot", ls_invoke_Pt114_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt114 = {"Pt114", 2, ls_fields_Pt114, 2, ls_methods_Pt114};
+static const LS_TypeInfo ls_type_Pt114 = {"Pt114", 2, ls_fields_Pt114, 2, ls_methods_Pt114, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker114_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker114_add((LS_Worker114*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21427,7 +21427,7 @@ static const LS_MethodInfo ls_methods_Worker114[] = {
     {"fib", ls_invoke_Worker114_fib, 1},
     {"text", ls_invoke_Worker114_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker114 = {"Worker114", 4, ls_fields_Worker114, 5, ls_methods_Worker114};
+static const LS_TypeInfo ls_type_Worker114 = {"Worker114", 4, ls_fields_Worker114, 5, ls_methods_Worker114, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner114_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner114_run((LS_Runner114*)self));
@@ -21435,7 +21435,7 @@ static void ls_invoke_Runner114_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner114[] = {
     {"run", ls_invoke_Runner114_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner114 = {"Runner114", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner114};
+static const LS_TypeInfo ls_type_Runner114 = {"Runner114", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner114, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng115_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng115_next((LS_Rng115*)self));
@@ -21450,7 +21450,7 @@ static const LS_MethodInfo ls_methods_Rng115[] = {
     {"next", ls_invoke_Rng115_next, 0},
     {"range", ls_invoke_Rng115_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng115 = {"Rng115", 1, ls_fields_Rng115, 2, ls_methods_Rng115};
+static const LS_TypeInfo ls_type_Rng115 = {"Rng115", 1, ls_fields_Rng115, 2, ls_methods_Rng115, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt115_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt115_manhattan((LS_Pt115*)self, ((LS_Pt115*)ls_unbox_object(arguments[0], &ls_type_Pt115))));
 }
@@ -21465,7 +21465,7 @@ static const LS_MethodInfo ls_methods_Pt115[] = {
     {"manhattan", ls_invoke_Pt115_manhattan, 1},
     {"dot", ls_invoke_Pt115_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt115 = {"Pt115", 2, ls_fields_Pt115, 2, ls_methods_Pt115};
+static const LS_TypeInfo ls_type_Pt115 = {"Pt115", 2, ls_fields_Pt115, 2, ls_methods_Pt115, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker115_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker115_add((LS_Worker115*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21495,7 +21495,7 @@ static const LS_MethodInfo ls_methods_Worker115[] = {
     {"fib", ls_invoke_Worker115_fib, 1},
     {"text", ls_invoke_Worker115_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker115 = {"Worker115", 4, ls_fields_Worker115, 5, ls_methods_Worker115};
+static const LS_TypeInfo ls_type_Worker115 = {"Worker115", 4, ls_fields_Worker115, 5, ls_methods_Worker115, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner115_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner115_run((LS_Runner115*)self));
@@ -21503,7 +21503,7 @@ static void ls_invoke_Runner115_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner115[] = {
     {"run", ls_invoke_Runner115_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner115 = {"Runner115", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner115};
+static const LS_TypeInfo ls_type_Runner115 = {"Runner115", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner115, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng116_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng116_next((LS_Rng116*)self));
@@ -21518,7 +21518,7 @@ static const LS_MethodInfo ls_methods_Rng116[] = {
     {"next", ls_invoke_Rng116_next, 0},
     {"range", ls_invoke_Rng116_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng116 = {"Rng116", 1, ls_fields_Rng116, 2, ls_methods_Rng116};
+static const LS_TypeInfo ls_type_Rng116 = {"Rng116", 1, ls_fields_Rng116, 2, ls_methods_Rng116, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt116_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt116_manhattan((LS_Pt116*)self, ((LS_Pt116*)ls_unbox_object(arguments[0], &ls_type_Pt116))));
 }
@@ -21533,7 +21533,7 @@ static const LS_MethodInfo ls_methods_Pt116[] = {
     {"manhattan", ls_invoke_Pt116_manhattan, 1},
     {"dot", ls_invoke_Pt116_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt116 = {"Pt116", 2, ls_fields_Pt116, 2, ls_methods_Pt116};
+static const LS_TypeInfo ls_type_Pt116 = {"Pt116", 2, ls_fields_Pt116, 2, ls_methods_Pt116, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker116_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker116_add((LS_Worker116*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21563,7 +21563,7 @@ static const LS_MethodInfo ls_methods_Worker116[] = {
     {"fib", ls_invoke_Worker116_fib, 1},
     {"text", ls_invoke_Worker116_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker116 = {"Worker116", 4, ls_fields_Worker116, 5, ls_methods_Worker116};
+static const LS_TypeInfo ls_type_Worker116 = {"Worker116", 4, ls_fields_Worker116, 5, ls_methods_Worker116, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner116_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner116_run((LS_Runner116*)self));
@@ -21571,7 +21571,7 @@ static void ls_invoke_Runner116_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner116[] = {
     {"run", ls_invoke_Runner116_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner116 = {"Runner116", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner116};
+static const LS_TypeInfo ls_type_Runner116 = {"Runner116", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner116, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng117_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng117_next((LS_Rng117*)self));
@@ -21586,7 +21586,7 @@ static const LS_MethodInfo ls_methods_Rng117[] = {
     {"next", ls_invoke_Rng117_next, 0},
     {"range", ls_invoke_Rng117_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng117 = {"Rng117", 1, ls_fields_Rng117, 2, ls_methods_Rng117};
+static const LS_TypeInfo ls_type_Rng117 = {"Rng117", 1, ls_fields_Rng117, 2, ls_methods_Rng117, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt117_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt117_manhattan((LS_Pt117*)self, ((LS_Pt117*)ls_unbox_object(arguments[0], &ls_type_Pt117))));
 }
@@ -21601,7 +21601,7 @@ static const LS_MethodInfo ls_methods_Pt117[] = {
     {"manhattan", ls_invoke_Pt117_manhattan, 1},
     {"dot", ls_invoke_Pt117_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt117 = {"Pt117", 2, ls_fields_Pt117, 2, ls_methods_Pt117};
+static const LS_TypeInfo ls_type_Pt117 = {"Pt117", 2, ls_fields_Pt117, 2, ls_methods_Pt117, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker117_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker117_add((LS_Worker117*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21631,7 +21631,7 @@ static const LS_MethodInfo ls_methods_Worker117[] = {
     {"fib", ls_invoke_Worker117_fib, 1},
     {"text", ls_invoke_Worker117_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker117 = {"Worker117", 4, ls_fields_Worker117, 5, ls_methods_Worker117};
+static const LS_TypeInfo ls_type_Worker117 = {"Worker117", 4, ls_fields_Worker117, 5, ls_methods_Worker117, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner117_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner117_run((LS_Runner117*)self));
@@ -21639,7 +21639,7 @@ static void ls_invoke_Runner117_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner117[] = {
     {"run", ls_invoke_Runner117_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner117 = {"Runner117", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner117};
+static const LS_TypeInfo ls_type_Runner117 = {"Runner117", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner117, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng118_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng118_next((LS_Rng118*)self));
@@ -21654,7 +21654,7 @@ static const LS_MethodInfo ls_methods_Rng118[] = {
     {"next", ls_invoke_Rng118_next, 0},
     {"range", ls_invoke_Rng118_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng118 = {"Rng118", 1, ls_fields_Rng118, 2, ls_methods_Rng118};
+static const LS_TypeInfo ls_type_Rng118 = {"Rng118", 1, ls_fields_Rng118, 2, ls_methods_Rng118, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt118_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt118_manhattan((LS_Pt118*)self, ((LS_Pt118*)ls_unbox_object(arguments[0], &ls_type_Pt118))));
 }
@@ -21669,7 +21669,7 @@ static const LS_MethodInfo ls_methods_Pt118[] = {
     {"manhattan", ls_invoke_Pt118_manhattan, 1},
     {"dot", ls_invoke_Pt118_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt118 = {"Pt118", 2, ls_fields_Pt118, 2, ls_methods_Pt118};
+static const LS_TypeInfo ls_type_Pt118 = {"Pt118", 2, ls_fields_Pt118, 2, ls_methods_Pt118, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker118_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker118_add((LS_Worker118*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21699,7 +21699,7 @@ static const LS_MethodInfo ls_methods_Worker118[] = {
     {"fib", ls_invoke_Worker118_fib, 1},
     {"text", ls_invoke_Worker118_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker118 = {"Worker118", 4, ls_fields_Worker118, 5, ls_methods_Worker118};
+static const LS_TypeInfo ls_type_Worker118 = {"Worker118", 4, ls_fields_Worker118, 5, ls_methods_Worker118, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner118_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner118_run((LS_Runner118*)self));
@@ -21707,7 +21707,7 @@ static void ls_invoke_Runner118_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner118[] = {
     {"run", ls_invoke_Runner118_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner118 = {"Runner118", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner118};
+static const LS_TypeInfo ls_type_Runner118 = {"Runner118", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner118, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng119_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng119_next((LS_Rng119*)self));
@@ -21722,7 +21722,7 @@ static const LS_MethodInfo ls_methods_Rng119[] = {
     {"next", ls_invoke_Rng119_next, 0},
     {"range", ls_invoke_Rng119_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng119 = {"Rng119", 1, ls_fields_Rng119, 2, ls_methods_Rng119};
+static const LS_TypeInfo ls_type_Rng119 = {"Rng119", 1, ls_fields_Rng119, 2, ls_methods_Rng119, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt119_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt119_manhattan((LS_Pt119*)self, ((LS_Pt119*)ls_unbox_object(arguments[0], &ls_type_Pt119))));
 }
@@ -21737,7 +21737,7 @@ static const LS_MethodInfo ls_methods_Pt119[] = {
     {"manhattan", ls_invoke_Pt119_manhattan, 1},
     {"dot", ls_invoke_Pt119_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt119 = {"Pt119", 2, ls_fields_Pt119, 2, ls_methods_Pt119};
+static const LS_TypeInfo ls_type_Pt119 = {"Pt119", 2, ls_fields_Pt119, 2, ls_methods_Pt119, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker119_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker119_add((LS_Worker119*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21767,7 +21767,7 @@ static const LS_MethodInfo ls_methods_Worker119[] = {
     {"fib", ls_invoke_Worker119_fib, 1},
     {"text", ls_invoke_Worker119_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker119 = {"Worker119", 4, ls_fields_Worker119, 5, ls_methods_Worker119};
+static const LS_TypeInfo ls_type_Worker119 = {"Worker119", 4, ls_fields_Worker119, 5, ls_methods_Worker119, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner119_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner119_run((LS_Runner119*)self));
@@ -21775,7 +21775,7 @@ static void ls_invoke_Runner119_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner119[] = {
     {"run", ls_invoke_Runner119_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner119 = {"Runner119", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner119};
+static const LS_TypeInfo ls_type_Runner119 = {"Runner119", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner119, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng120_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng120_next((LS_Rng120*)self));
@@ -21790,7 +21790,7 @@ static const LS_MethodInfo ls_methods_Rng120[] = {
     {"next", ls_invoke_Rng120_next, 0},
     {"range", ls_invoke_Rng120_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng120 = {"Rng120", 1, ls_fields_Rng120, 2, ls_methods_Rng120};
+static const LS_TypeInfo ls_type_Rng120 = {"Rng120", 1, ls_fields_Rng120, 2, ls_methods_Rng120, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt120_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt120_manhattan((LS_Pt120*)self, ((LS_Pt120*)ls_unbox_object(arguments[0], &ls_type_Pt120))));
 }
@@ -21805,7 +21805,7 @@ static const LS_MethodInfo ls_methods_Pt120[] = {
     {"manhattan", ls_invoke_Pt120_manhattan, 1},
     {"dot", ls_invoke_Pt120_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt120 = {"Pt120", 2, ls_fields_Pt120, 2, ls_methods_Pt120};
+static const LS_TypeInfo ls_type_Pt120 = {"Pt120", 2, ls_fields_Pt120, 2, ls_methods_Pt120, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker120_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker120_add((LS_Worker120*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21835,7 +21835,7 @@ static const LS_MethodInfo ls_methods_Worker120[] = {
     {"fib", ls_invoke_Worker120_fib, 1},
     {"text", ls_invoke_Worker120_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker120 = {"Worker120", 4, ls_fields_Worker120, 5, ls_methods_Worker120};
+static const LS_TypeInfo ls_type_Worker120 = {"Worker120", 4, ls_fields_Worker120, 5, ls_methods_Worker120, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner120_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner120_run((LS_Runner120*)self));
@@ -21843,7 +21843,7 @@ static void ls_invoke_Runner120_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner120[] = {
     {"run", ls_invoke_Runner120_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner120 = {"Runner120", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner120};
+static const LS_TypeInfo ls_type_Runner120 = {"Runner120", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner120, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng121_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng121_next((LS_Rng121*)self));
@@ -21858,7 +21858,7 @@ static const LS_MethodInfo ls_methods_Rng121[] = {
     {"next", ls_invoke_Rng121_next, 0},
     {"range", ls_invoke_Rng121_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng121 = {"Rng121", 1, ls_fields_Rng121, 2, ls_methods_Rng121};
+static const LS_TypeInfo ls_type_Rng121 = {"Rng121", 1, ls_fields_Rng121, 2, ls_methods_Rng121, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt121_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt121_manhattan((LS_Pt121*)self, ((LS_Pt121*)ls_unbox_object(arguments[0], &ls_type_Pt121))));
 }
@@ -21873,7 +21873,7 @@ static const LS_MethodInfo ls_methods_Pt121[] = {
     {"manhattan", ls_invoke_Pt121_manhattan, 1},
     {"dot", ls_invoke_Pt121_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt121 = {"Pt121", 2, ls_fields_Pt121, 2, ls_methods_Pt121};
+static const LS_TypeInfo ls_type_Pt121 = {"Pt121", 2, ls_fields_Pt121, 2, ls_methods_Pt121, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker121_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker121_add((LS_Worker121*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21903,7 +21903,7 @@ static const LS_MethodInfo ls_methods_Worker121[] = {
     {"fib", ls_invoke_Worker121_fib, 1},
     {"text", ls_invoke_Worker121_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker121 = {"Worker121", 4, ls_fields_Worker121, 5, ls_methods_Worker121};
+static const LS_TypeInfo ls_type_Worker121 = {"Worker121", 4, ls_fields_Worker121, 5, ls_methods_Worker121, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner121_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner121_run((LS_Runner121*)self));
@@ -21911,7 +21911,7 @@ static void ls_invoke_Runner121_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner121[] = {
     {"run", ls_invoke_Runner121_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner121 = {"Runner121", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner121};
+static const LS_TypeInfo ls_type_Runner121 = {"Runner121", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner121, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng122_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng122_next((LS_Rng122*)self));
@@ -21926,7 +21926,7 @@ static const LS_MethodInfo ls_methods_Rng122[] = {
     {"next", ls_invoke_Rng122_next, 0},
     {"range", ls_invoke_Rng122_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng122 = {"Rng122", 1, ls_fields_Rng122, 2, ls_methods_Rng122};
+static const LS_TypeInfo ls_type_Rng122 = {"Rng122", 1, ls_fields_Rng122, 2, ls_methods_Rng122, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt122_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt122_manhattan((LS_Pt122*)self, ((LS_Pt122*)ls_unbox_object(arguments[0], &ls_type_Pt122))));
 }
@@ -21941,7 +21941,7 @@ static const LS_MethodInfo ls_methods_Pt122[] = {
     {"manhattan", ls_invoke_Pt122_manhattan, 1},
     {"dot", ls_invoke_Pt122_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt122 = {"Pt122", 2, ls_fields_Pt122, 2, ls_methods_Pt122};
+static const LS_TypeInfo ls_type_Pt122 = {"Pt122", 2, ls_fields_Pt122, 2, ls_methods_Pt122, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker122_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker122_add((LS_Worker122*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -21971,7 +21971,7 @@ static const LS_MethodInfo ls_methods_Worker122[] = {
     {"fib", ls_invoke_Worker122_fib, 1},
     {"text", ls_invoke_Worker122_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker122 = {"Worker122", 4, ls_fields_Worker122, 5, ls_methods_Worker122};
+static const LS_TypeInfo ls_type_Worker122 = {"Worker122", 4, ls_fields_Worker122, 5, ls_methods_Worker122, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner122_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner122_run((LS_Runner122*)self));
@@ -21979,7 +21979,7 @@ static void ls_invoke_Runner122_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner122[] = {
     {"run", ls_invoke_Runner122_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner122 = {"Runner122", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner122};
+static const LS_TypeInfo ls_type_Runner122 = {"Runner122", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner122, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng123_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng123_next((LS_Rng123*)self));
@@ -21994,7 +21994,7 @@ static const LS_MethodInfo ls_methods_Rng123[] = {
     {"next", ls_invoke_Rng123_next, 0},
     {"range", ls_invoke_Rng123_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng123 = {"Rng123", 1, ls_fields_Rng123, 2, ls_methods_Rng123};
+static const LS_TypeInfo ls_type_Rng123 = {"Rng123", 1, ls_fields_Rng123, 2, ls_methods_Rng123, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt123_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt123_manhattan((LS_Pt123*)self, ((LS_Pt123*)ls_unbox_object(arguments[0], &ls_type_Pt123))));
 }
@@ -22009,7 +22009,7 @@ static const LS_MethodInfo ls_methods_Pt123[] = {
     {"manhattan", ls_invoke_Pt123_manhattan, 1},
     {"dot", ls_invoke_Pt123_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt123 = {"Pt123", 2, ls_fields_Pt123, 2, ls_methods_Pt123};
+static const LS_TypeInfo ls_type_Pt123 = {"Pt123", 2, ls_fields_Pt123, 2, ls_methods_Pt123, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker123_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker123_add((LS_Worker123*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22039,7 +22039,7 @@ static const LS_MethodInfo ls_methods_Worker123[] = {
     {"fib", ls_invoke_Worker123_fib, 1},
     {"text", ls_invoke_Worker123_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker123 = {"Worker123", 4, ls_fields_Worker123, 5, ls_methods_Worker123};
+static const LS_TypeInfo ls_type_Worker123 = {"Worker123", 4, ls_fields_Worker123, 5, ls_methods_Worker123, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner123_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner123_run((LS_Runner123*)self));
@@ -22047,7 +22047,7 @@ static void ls_invoke_Runner123_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner123[] = {
     {"run", ls_invoke_Runner123_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner123 = {"Runner123", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner123};
+static const LS_TypeInfo ls_type_Runner123 = {"Runner123", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner123, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng124_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng124_next((LS_Rng124*)self));
@@ -22062,7 +22062,7 @@ static const LS_MethodInfo ls_methods_Rng124[] = {
     {"next", ls_invoke_Rng124_next, 0},
     {"range", ls_invoke_Rng124_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng124 = {"Rng124", 1, ls_fields_Rng124, 2, ls_methods_Rng124};
+static const LS_TypeInfo ls_type_Rng124 = {"Rng124", 1, ls_fields_Rng124, 2, ls_methods_Rng124, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt124_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt124_manhattan((LS_Pt124*)self, ((LS_Pt124*)ls_unbox_object(arguments[0], &ls_type_Pt124))));
 }
@@ -22077,7 +22077,7 @@ static const LS_MethodInfo ls_methods_Pt124[] = {
     {"manhattan", ls_invoke_Pt124_manhattan, 1},
     {"dot", ls_invoke_Pt124_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt124 = {"Pt124", 2, ls_fields_Pt124, 2, ls_methods_Pt124};
+static const LS_TypeInfo ls_type_Pt124 = {"Pt124", 2, ls_fields_Pt124, 2, ls_methods_Pt124, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker124_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker124_add((LS_Worker124*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22107,7 +22107,7 @@ static const LS_MethodInfo ls_methods_Worker124[] = {
     {"fib", ls_invoke_Worker124_fib, 1},
     {"text", ls_invoke_Worker124_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker124 = {"Worker124", 4, ls_fields_Worker124, 5, ls_methods_Worker124};
+static const LS_TypeInfo ls_type_Worker124 = {"Worker124", 4, ls_fields_Worker124, 5, ls_methods_Worker124, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner124_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner124_run((LS_Runner124*)self));
@@ -22115,7 +22115,7 @@ static void ls_invoke_Runner124_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner124[] = {
     {"run", ls_invoke_Runner124_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner124 = {"Runner124", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner124};
+static const LS_TypeInfo ls_type_Runner124 = {"Runner124", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner124, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng125_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng125_next((LS_Rng125*)self));
@@ -22130,7 +22130,7 @@ static const LS_MethodInfo ls_methods_Rng125[] = {
     {"next", ls_invoke_Rng125_next, 0},
     {"range", ls_invoke_Rng125_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng125 = {"Rng125", 1, ls_fields_Rng125, 2, ls_methods_Rng125};
+static const LS_TypeInfo ls_type_Rng125 = {"Rng125", 1, ls_fields_Rng125, 2, ls_methods_Rng125, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt125_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt125_manhattan((LS_Pt125*)self, ((LS_Pt125*)ls_unbox_object(arguments[0], &ls_type_Pt125))));
 }
@@ -22145,7 +22145,7 @@ static const LS_MethodInfo ls_methods_Pt125[] = {
     {"manhattan", ls_invoke_Pt125_manhattan, 1},
     {"dot", ls_invoke_Pt125_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt125 = {"Pt125", 2, ls_fields_Pt125, 2, ls_methods_Pt125};
+static const LS_TypeInfo ls_type_Pt125 = {"Pt125", 2, ls_fields_Pt125, 2, ls_methods_Pt125, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker125_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker125_add((LS_Worker125*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22175,7 +22175,7 @@ static const LS_MethodInfo ls_methods_Worker125[] = {
     {"fib", ls_invoke_Worker125_fib, 1},
     {"text", ls_invoke_Worker125_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker125 = {"Worker125", 4, ls_fields_Worker125, 5, ls_methods_Worker125};
+static const LS_TypeInfo ls_type_Worker125 = {"Worker125", 4, ls_fields_Worker125, 5, ls_methods_Worker125, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner125_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner125_run((LS_Runner125*)self));
@@ -22183,7 +22183,7 @@ static void ls_invoke_Runner125_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner125[] = {
     {"run", ls_invoke_Runner125_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner125 = {"Runner125", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner125};
+static const LS_TypeInfo ls_type_Runner125 = {"Runner125", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner125, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng126_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng126_next((LS_Rng126*)self));
@@ -22198,7 +22198,7 @@ static const LS_MethodInfo ls_methods_Rng126[] = {
     {"next", ls_invoke_Rng126_next, 0},
     {"range", ls_invoke_Rng126_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng126 = {"Rng126", 1, ls_fields_Rng126, 2, ls_methods_Rng126};
+static const LS_TypeInfo ls_type_Rng126 = {"Rng126", 1, ls_fields_Rng126, 2, ls_methods_Rng126, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt126_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt126_manhattan((LS_Pt126*)self, ((LS_Pt126*)ls_unbox_object(arguments[0], &ls_type_Pt126))));
 }
@@ -22213,7 +22213,7 @@ static const LS_MethodInfo ls_methods_Pt126[] = {
     {"manhattan", ls_invoke_Pt126_manhattan, 1},
     {"dot", ls_invoke_Pt126_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt126 = {"Pt126", 2, ls_fields_Pt126, 2, ls_methods_Pt126};
+static const LS_TypeInfo ls_type_Pt126 = {"Pt126", 2, ls_fields_Pt126, 2, ls_methods_Pt126, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker126_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker126_add((LS_Worker126*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22243,7 +22243,7 @@ static const LS_MethodInfo ls_methods_Worker126[] = {
     {"fib", ls_invoke_Worker126_fib, 1},
     {"text", ls_invoke_Worker126_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker126 = {"Worker126", 4, ls_fields_Worker126, 5, ls_methods_Worker126};
+static const LS_TypeInfo ls_type_Worker126 = {"Worker126", 4, ls_fields_Worker126, 5, ls_methods_Worker126, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner126_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner126_run((LS_Runner126*)self));
@@ -22251,7 +22251,7 @@ static void ls_invoke_Runner126_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner126[] = {
     {"run", ls_invoke_Runner126_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner126 = {"Runner126", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner126};
+static const LS_TypeInfo ls_type_Runner126 = {"Runner126", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner126, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng127_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng127_next((LS_Rng127*)self));
@@ -22266,7 +22266,7 @@ static const LS_MethodInfo ls_methods_Rng127[] = {
     {"next", ls_invoke_Rng127_next, 0},
     {"range", ls_invoke_Rng127_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng127 = {"Rng127", 1, ls_fields_Rng127, 2, ls_methods_Rng127};
+static const LS_TypeInfo ls_type_Rng127 = {"Rng127", 1, ls_fields_Rng127, 2, ls_methods_Rng127, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt127_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt127_manhattan((LS_Pt127*)self, ((LS_Pt127*)ls_unbox_object(arguments[0], &ls_type_Pt127))));
 }
@@ -22281,7 +22281,7 @@ static const LS_MethodInfo ls_methods_Pt127[] = {
     {"manhattan", ls_invoke_Pt127_manhattan, 1},
     {"dot", ls_invoke_Pt127_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt127 = {"Pt127", 2, ls_fields_Pt127, 2, ls_methods_Pt127};
+static const LS_TypeInfo ls_type_Pt127 = {"Pt127", 2, ls_fields_Pt127, 2, ls_methods_Pt127, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker127_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker127_add((LS_Worker127*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22311,7 +22311,7 @@ static const LS_MethodInfo ls_methods_Worker127[] = {
     {"fib", ls_invoke_Worker127_fib, 1},
     {"text", ls_invoke_Worker127_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker127 = {"Worker127", 4, ls_fields_Worker127, 5, ls_methods_Worker127};
+static const LS_TypeInfo ls_type_Worker127 = {"Worker127", 4, ls_fields_Worker127, 5, ls_methods_Worker127, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner127_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner127_run((LS_Runner127*)self));
@@ -22319,7 +22319,7 @@ static void ls_invoke_Runner127_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner127[] = {
     {"run", ls_invoke_Runner127_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner127 = {"Runner127", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner127};
+static const LS_TypeInfo ls_type_Runner127 = {"Runner127", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner127, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng128_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng128_next((LS_Rng128*)self));
@@ -22334,7 +22334,7 @@ static const LS_MethodInfo ls_methods_Rng128[] = {
     {"next", ls_invoke_Rng128_next, 0},
     {"range", ls_invoke_Rng128_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng128 = {"Rng128", 1, ls_fields_Rng128, 2, ls_methods_Rng128};
+static const LS_TypeInfo ls_type_Rng128 = {"Rng128", 1, ls_fields_Rng128, 2, ls_methods_Rng128, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt128_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt128_manhattan((LS_Pt128*)self, ((LS_Pt128*)ls_unbox_object(arguments[0], &ls_type_Pt128))));
 }
@@ -22349,7 +22349,7 @@ static const LS_MethodInfo ls_methods_Pt128[] = {
     {"manhattan", ls_invoke_Pt128_manhattan, 1},
     {"dot", ls_invoke_Pt128_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt128 = {"Pt128", 2, ls_fields_Pt128, 2, ls_methods_Pt128};
+static const LS_TypeInfo ls_type_Pt128 = {"Pt128", 2, ls_fields_Pt128, 2, ls_methods_Pt128, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker128_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker128_add((LS_Worker128*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22379,7 +22379,7 @@ static const LS_MethodInfo ls_methods_Worker128[] = {
     {"fib", ls_invoke_Worker128_fib, 1},
     {"text", ls_invoke_Worker128_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker128 = {"Worker128", 4, ls_fields_Worker128, 5, ls_methods_Worker128};
+static const LS_TypeInfo ls_type_Worker128 = {"Worker128", 4, ls_fields_Worker128, 5, ls_methods_Worker128, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner128_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner128_run((LS_Runner128*)self));
@@ -22387,7 +22387,7 @@ static void ls_invoke_Runner128_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner128[] = {
     {"run", ls_invoke_Runner128_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner128 = {"Runner128", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner128};
+static const LS_TypeInfo ls_type_Runner128 = {"Runner128", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner128, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng129_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng129_next((LS_Rng129*)self));
@@ -22402,7 +22402,7 @@ static const LS_MethodInfo ls_methods_Rng129[] = {
     {"next", ls_invoke_Rng129_next, 0},
     {"range", ls_invoke_Rng129_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng129 = {"Rng129", 1, ls_fields_Rng129, 2, ls_methods_Rng129};
+static const LS_TypeInfo ls_type_Rng129 = {"Rng129", 1, ls_fields_Rng129, 2, ls_methods_Rng129, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt129_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt129_manhattan((LS_Pt129*)self, ((LS_Pt129*)ls_unbox_object(arguments[0], &ls_type_Pt129))));
 }
@@ -22417,7 +22417,7 @@ static const LS_MethodInfo ls_methods_Pt129[] = {
     {"manhattan", ls_invoke_Pt129_manhattan, 1},
     {"dot", ls_invoke_Pt129_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt129 = {"Pt129", 2, ls_fields_Pt129, 2, ls_methods_Pt129};
+static const LS_TypeInfo ls_type_Pt129 = {"Pt129", 2, ls_fields_Pt129, 2, ls_methods_Pt129, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker129_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker129_add((LS_Worker129*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22447,7 +22447,7 @@ static const LS_MethodInfo ls_methods_Worker129[] = {
     {"fib", ls_invoke_Worker129_fib, 1},
     {"text", ls_invoke_Worker129_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker129 = {"Worker129", 4, ls_fields_Worker129, 5, ls_methods_Worker129};
+static const LS_TypeInfo ls_type_Worker129 = {"Worker129", 4, ls_fields_Worker129, 5, ls_methods_Worker129, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner129_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner129_run((LS_Runner129*)self));
@@ -22455,7 +22455,7 @@ static void ls_invoke_Runner129_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner129[] = {
     {"run", ls_invoke_Runner129_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner129 = {"Runner129", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner129};
+static const LS_TypeInfo ls_type_Runner129 = {"Runner129", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner129, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng130_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng130_next((LS_Rng130*)self));
@@ -22470,7 +22470,7 @@ static const LS_MethodInfo ls_methods_Rng130[] = {
     {"next", ls_invoke_Rng130_next, 0},
     {"range", ls_invoke_Rng130_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng130 = {"Rng130", 1, ls_fields_Rng130, 2, ls_methods_Rng130};
+static const LS_TypeInfo ls_type_Rng130 = {"Rng130", 1, ls_fields_Rng130, 2, ls_methods_Rng130, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt130_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt130_manhattan((LS_Pt130*)self, ((LS_Pt130*)ls_unbox_object(arguments[0], &ls_type_Pt130))));
 }
@@ -22485,7 +22485,7 @@ static const LS_MethodInfo ls_methods_Pt130[] = {
     {"manhattan", ls_invoke_Pt130_manhattan, 1},
     {"dot", ls_invoke_Pt130_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt130 = {"Pt130", 2, ls_fields_Pt130, 2, ls_methods_Pt130};
+static const LS_TypeInfo ls_type_Pt130 = {"Pt130", 2, ls_fields_Pt130, 2, ls_methods_Pt130, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker130_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker130_add((LS_Worker130*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22515,7 +22515,7 @@ static const LS_MethodInfo ls_methods_Worker130[] = {
     {"fib", ls_invoke_Worker130_fib, 1},
     {"text", ls_invoke_Worker130_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker130 = {"Worker130", 4, ls_fields_Worker130, 5, ls_methods_Worker130};
+static const LS_TypeInfo ls_type_Worker130 = {"Worker130", 4, ls_fields_Worker130, 5, ls_methods_Worker130, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner130_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner130_run((LS_Runner130*)self));
@@ -22523,7 +22523,7 @@ static void ls_invoke_Runner130_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner130[] = {
     {"run", ls_invoke_Runner130_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner130 = {"Runner130", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner130};
+static const LS_TypeInfo ls_type_Runner130 = {"Runner130", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner130, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng131_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng131_next((LS_Rng131*)self));
@@ -22538,7 +22538,7 @@ static const LS_MethodInfo ls_methods_Rng131[] = {
     {"next", ls_invoke_Rng131_next, 0},
     {"range", ls_invoke_Rng131_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng131 = {"Rng131", 1, ls_fields_Rng131, 2, ls_methods_Rng131};
+static const LS_TypeInfo ls_type_Rng131 = {"Rng131", 1, ls_fields_Rng131, 2, ls_methods_Rng131, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt131_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt131_manhattan((LS_Pt131*)self, ((LS_Pt131*)ls_unbox_object(arguments[0], &ls_type_Pt131))));
 }
@@ -22553,7 +22553,7 @@ static const LS_MethodInfo ls_methods_Pt131[] = {
     {"manhattan", ls_invoke_Pt131_manhattan, 1},
     {"dot", ls_invoke_Pt131_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt131 = {"Pt131", 2, ls_fields_Pt131, 2, ls_methods_Pt131};
+static const LS_TypeInfo ls_type_Pt131 = {"Pt131", 2, ls_fields_Pt131, 2, ls_methods_Pt131, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker131_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker131_add((LS_Worker131*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22583,7 +22583,7 @@ static const LS_MethodInfo ls_methods_Worker131[] = {
     {"fib", ls_invoke_Worker131_fib, 1},
     {"text", ls_invoke_Worker131_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker131 = {"Worker131", 4, ls_fields_Worker131, 5, ls_methods_Worker131};
+static const LS_TypeInfo ls_type_Worker131 = {"Worker131", 4, ls_fields_Worker131, 5, ls_methods_Worker131, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner131_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner131_run((LS_Runner131*)self));
@@ -22591,7 +22591,7 @@ static void ls_invoke_Runner131_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner131[] = {
     {"run", ls_invoke_Runner131_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner131 = {"Runner131", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner131};
+static const LS_TypeInfo ls_type_Runner131 = {"Runner131", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner131, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng132_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng132_next((LS_Rng132*)self));
@@ -22606,7 +22606,7 @@ static const LS_MethodInfo ls_methods_Rng132[] = {
     {"next", ls_invoke_Rng132_next, 0},
     {"range", ls_invoke_Rng132_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng132 = {"Rng132", 1, ls_fields_Rng132, 2, ls_methods_Rng132};
+static const LS_TypeInfo ls_type_Rng132 = {"Rng132", 1, ls_fields_Rng132, 2, ls_methods_Rng132, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt132_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt132_manhattan((LS_Pt132*)self, ((LS_Pt132*)ls_unbox_object(arguments[0], &ls_type_Pt132))));
 }
@@ -22621,7 +22621,7 @@ static const LS_MethodInfo ls_methods_Pt132[] = {
     {"manhattan", ls_invoke_Pt132_manhattan, 1},
     {"dot", ls_invoke_Pt132_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt132 = {"Pt132", 2, ls_fields_Pt132, 2, ls_methods_Pt132};
+static const LS_TypeInfo ls_type_Pt132 = {"Pt132", 2, ls_fields_Pt132, 2, ls_methods_Pt132, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker132_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker132_add((LS_Worker132*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22651,7 +22651,7 @@ static const LS_MethodInfo ls_methods_Worker132[] = {
     {"fib", ls_invoke_Worker132_fib, 1},
     {"text", ls_invoke_Worker132_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker132 = {"Worker132", 4, ls_fields_Worker132, 5, ls_methods_Worker132};
+static const LS_TypeInfo ls_type_Worker132 = {"Worker132", 4, ls_fields_Worker132, 5, ls_methods_Worker132, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner132_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner132_run((LS_Runner132*)self));
@@ -22659,7 +22659,7 @@ static void ls_invoke_Runner132_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner132[] = {
     {"run", ls_invoke_Runner132_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner132 = {"Runner132", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner132};
+static const LS_TypeInfo ls_type_Runner132 = {"Runner132", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner132, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng133_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng133_next((LS_Rng133*)self));
@@ -22674,7 +22674,7 @@ static const LS_MethodInfo ls_methods_Rng133[] = {
     {"next", ls_invoke_Rng133_next, 0},
     {"range", ls_invoke_Rng133_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng133 = {"Rng133", 1, ls_fields_Rng133, 2, ls_methods_Rng133};
+static const LS_TypeInfo ls_type_Rng133 = {"Rng133", 1, ls_fields_Rng133, 2, ls_methods_Rng133, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt133_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt133_manhattan((LS_Pt133*)self, ((LS_Pt133*)ls_unbox_object(arguments[0], &ls_type_Pt133))));
 }
@@ -22689,7 +22689,7 @@ static const LS_MethodInfo ls_methods_Pt133[] = {
     {"manhattan", ls_invoke_Pt133_manhattan, 1},
     {"dot", ls_invoke_Pt133_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt133 = {"Pt133", 2, ls_fields_Pt133, 2, ls_methods_Pt133};
+static const LS_TypeInfo ls_type_Pt133 = {"Pt133", 2, ls_fields_Pt133, 2, ls_methods_Pt133, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker133_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker133_add((LS_Worker133*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22719,7 +22719,7 @@ static const LS_MethodInfo ls_methods_Worker133[] = {
     {"fib", ls_invoke_Worker133_fib, 1},
     {"text", ls_invoke_Worker133_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker133 = {"Worker133", 4, ls_fields_Worker133, 5, ls_methods_Worker133};
+static const LS_TypeInfo ls_type_Worker133 = {"Worker133", 4, ls_fields_Worker133, 5, ls_methods_Worker133, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner133_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner133_run((LS_Runner133*)self));
@@ -22727,7 +22727,7 @@ static void ls_invoke_Runner133_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner133[] = {
     {"run", ls_invoke_Runner133_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner133 = {"Runner133", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner133};
+static const LS_TypeInfo ls_type_Runner133 = {"Runner133", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner133, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng134_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng134_next((LS_Rng134*)self));
@@ -22742,7 +22742,7 @@ static const LS_MethodInfo ls_methods_Rng134[] = {
     {"next", ls_invoke_Rng134_next, 0},
     {"range", ls_invoke_Rng134_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng134 = {"Rng134", 1, ls_fields_Rng134, 2, ls_methods_Rng134};
+static const LS_TypeInfo ls_type_Rng134 = {"Rng134", 1, ls_fields_Rng134, 2, ls_methods_Rng134, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt134_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt134_manhattan((LS_Pt134*)self, ((LS_Pt134*)ls_unbox_object(arguments[0], &ls_type_Pt134))));
 }
@@ -22757,7 +22757,7 @@ static const LS_MethodInfo ls_methods_Pt134[] = {
     {"manhattan", ls_invoke_Pt134_manhattan, 1},
     {"dot", ls_invoke_Pt134_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt134 = {"Pt134", 2, ls_fields_Pt134, 2, ls_methods_Pt134};
+static const LS_TypeInfo ls_type_Pt134 = {"Pt134", 2, ls_fields_Pt134, 2, ls_methods_Pt134, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker134_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker134_add((LS_Worker134*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22787,7 +22787,7 @@ static const LS_MethodInfo ls_methods_Worker134[] = {
     {"fib", ls_invoke_Worker134_fib, 1},
     {"text", ls_invoke_Worker134_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker134 = {"Worker134", 4, ls_fields_Worker134, 5, ls_methods_Worker134};
+static const LS_TypeInfo ls_type_Worker134 = {"Worker134", 4, ls_fields_Worker134, 5, ls_methods_Worker134, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner134_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner134_run((LS_Runner134*)self));
@@ -22795,7 +22795,7 @@ static void ls_invoke_Runner134_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner134[] = {
     {"run", ls_invoke_Runner134_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner134 = {"Runner134", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner134};
+static const LS_TypeInfo ls_type_Runner134 = {"Runner134", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner134, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng135_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng135_next((LS_Rng135*)self));
@@ -22810,7 +22810,7 @@ static const LS_MethodInfo ls_methods_Rng135[] = {
     {"next", ls_invoke_Rng135_next, 0},
     {"range", ls_invoke_Rng135_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng135 = {"Rng135", 1, ls_fields_Rng135, 2, ls_methods_Rng135};
+static const LS_TypeInfo ls_type_Rng135 = {"Rng135", 1, ls_fields_Rng135, 2, ls_methods_Rng135, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt135_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt135_manhattan((LS_Pt135*)self, ((LS_Pt135*)ls_unbox_object(arguments[0], &ls_type_Pt135))));
 }
@@ -22825,7 +22825,7 @@ static const LS_MethodInfo ls_methods_Pt135[] = {
     {"manhattan", ls_invoke_Pt135_manhattan, 1},
     {"dot", ls_invoke_Pt135_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt135 = {"Pt135", 2, ls_fields_Pt135, 2, ls_methods_Pt135};
+static const LS_TypeInfo ls_type_Pt135 = {"Pt135", 2, ls_fields_Pt135, 2, ls_methods_Pt135, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker135_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker135_add((LS_Worker135*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22855,7 +22855,7 @@ static const LS_MethodInfo ls_methods_Worker135[] = {
     {"fib", ls_invoke_Worker135_fib, 1},
     {"text", ls_invoke_Worker135_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker135 = {"Worker135", 4, ls_fields_Worker135, 5, ls_methods_Worker135};
+static const LS_TypeInfo ls_type_Worker135 = {"Worker135", 4, ls_fields_Worker135, 5, ls_methods_Worker135, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner135_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner135_run((LS_Runner135*)self));
@@ -22863,7 +22863,7 @@ static void ls_invoke_Runner135_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner135[] = {
     {"run", ls_invoke_Runner135_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner135 = {"Runner135", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner135};
+static const LS_TypeInfo ls_type_Runner135 = {"Runner135", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner135, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng136_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng136_next((LS_Rng136*)self));
@@ -22878,7 +22878,7 @@ static const LS_MethodInfo ls_methods_Rng136[] = {
     {"next", ls_invoke_Rng136_next, 0},
     {"range", ls_invoke_Rng136_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng136 = {"Rng136", 1, ls_fields_Rng136, 2, ls_methods_Rng136};
+static const LS_TypeInfo ls_type_Rng136 = {"Rng136", 1, ls_fields_Rng136, 2, ls_methods_Rng136, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt136_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt136_manhattan((LS_Pt136*)self, ((LS_Pt136*)ls_unbox_object(arguments[0], &ls_type_Pt136))));
 }
@@ -22893,7 +22893,7 @@ static const LS_MethodInfo ls_methods_Pt136[] = {
     {"manhattan", ls_invoke_Pt136_manhattan, 1},
     {"dot", ls_invoke_Pt136_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt136 = {"Pt136", 2, ls_fields_Pt136, 2, ls_methods_Pt136};
+static const LS_TypeInfo ls_type_Pt136 = {"Pt136", 2, ls_fields_Pt136, 2, ls_methods_Pt136, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker136_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker136_add((LS_Worker136*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22923,7 +22923,7 @@ static const LS_MethodInfo ls_methods_Worker136[] = {
     {"fib", ls_invoke_Worker136_fib, 1},
     {"text", ls_invoke_Worker136_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker136 = {"Worker136", 4, ls_fields_Worker136, 5, ls_methods_Worker136};
+static const LS_TypeInfo ls_type_Worker136 = {"Worker136", 4, ls_fields_Worker136, 5, ls_methods_Worker136, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner136_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner136_run((LS_Runner136*)self));
@@ -22931,7 +22931,7 @@ static void ls_invoke_Runner136_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner136[] = {
     {"run", ls_invoke_Runner136_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner136 = {"Runner136", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner136};
+static const LS_TypeInfo ls_type_Runner136 = {"Runner136", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner136, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng137_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng137_next((LS_Rng137*)self));
@@ -22946,7 +22946,7 @@ static const LS_MethodInfo ls_methods_Rng137[] = {
     {"next", ls_invoke_Rng137_next, 0},
     {"range", ls_invoke_Rng137_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng137 = {"Rng137", 1, ls_fields_Rng137, 2, ls_methods_Rng137};
+static const LS_TypeInfo ls_type_Rng137 = {"Rng137", 1, ls_fields_Rng137, 2, ls_methods_Rng137, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt137_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt137_manhattan((LS_Pt137*)self, ((LS_Pt137*)ls_unbox_object(arguments[0], &ls_type_Pt137))));
 }
@@ -22961,7 +22961,7 @@ static const LS_MethodInfo ls_methods_Pt137[] = {
     {"manhattan", ls_invoke_Pt137_manhattan, 1},
     {"dot", ls_invoke_Pt137_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt137 = {"Pt137", 2, ls_fields_Pt137, 2, ls_methods_Pt137};
+static const LS_TypeInfo ls_type_Pt137 = {"Pt137", 2, ls_fields_Pt137, 2, ls_methods_Pt137, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker137_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker137_add((LS_Worker137*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -22991,7 +22991,7 @@ static const LS_MethodInfo ls_methods_Worker137[] = {
     {"fib", ls_invoke_Worker137_fib, 1},
     {"text", ls_invoke_Worker137_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker137 = {"Worker137", 4, ls_fields_Worker137, 5, ls_methods_Worker137};
+static const LS_TypeInfo ls_type_Worker137 = {"Worker137", 4, ls_fields_Worker137, 5, ls_methods_Worker137, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner137_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner137_run((LS_Runner137*)self));
@@ -22999,7 +22999,7 @@ static void ls_invoke_Runner137_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner137[] = {
     {"run", ls_invoke_Runner137_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner137 = {"Runner137", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner137};
+static const LS_TypeInfo ls_type_Runner137 = {"Runner137", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner137, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng138_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng138_next((LS_Rng138*)self));
@@ -23014,7 +23014,7 @@ static const LS_MethodInfo ls_methods_Rng138[] = {
     {"next", ls_invoke_Rng138_next, 0},
     {"range", ls_invoke_Rng138_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng138 = {"Rng138", 1, ls_fields_Rng138, 2, ls_methods_Rng138};
+static const LS_TypeInfo ls_type_Rng138 = {"Rng138", 1, ls_fields_Rng138, 2, ls_methods_Rng138, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt138_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt138_manhattan((LS_Pt138*)self, ((LS_Pt138*)ls_unbox_object(arguments[0], &ls_type_Pt138))));
 }
@@ -23029,7 +23029,7 @@ static const LS_MethodInfo ls_methods_Pt138[] = {
     {"manhattan", ls_invoke_Pt138_manhattan, 1},
     {"dot", ls_invoke_Pt138_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt138 = {"Pt138", 2, ls_fields_Pt138, 2, ls_methods_Pt138};
+static const LS_TypeInfo ls_type_Pt138 = {"Pt138", 2, ls_fields_Pt138, 2, ls_methods_Pt138, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker138_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker138_add((LS_Worker138*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23059,7 +23059,7 @@ static const LS_MethodInfo ls_methods_Worker138[] = {
     {"fib", ls_invoke_Worker138_fib, 1},
     {"text", ls_invoke_Worker138_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker138 = {"Worker138", 4, ls_fields_Worker138, 5, ls_methods_Worker138};
+static const LS_TypeInfo ls_type_Worker138 = {"Worker138", 4, ls_fields_Worker138, 5, ls_methods_Worker138, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner138_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner138_run((LS_Runner138*)self));
@@ -23067,7 +23067,7 @@ static void ls_invoke_Runner138_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner138[] = {
     {"run", ls_invoke_Runner138_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner138 = {"Runner138", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner138};
+static const LS_TypeInfo ls_type_Runner138 = {"Runner138", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner138, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng139_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng139_next((LS_Rng139*)self));
@@ -23082,7 +23082,7 @@ static const LS_MethodInfo ls_methods_Rng139[] = {
     {"next", ls_invoke_Rng139_next, 0},
     {"range", ls_invoke_Rng139_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng139 = {"Rng139", 1, ls_fields_Rng139, 2, ls_methods_Rng139};
+static const LS_TypeInfo ls_type_Rng139 = {"Rng139", 1, ls_fields_Rng139, 2, ls_methods_Rng139, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt139_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt139_manhattan((LS_Pt139*)self, ((LS_Pt139*)ls_unbox_object(arguments[0], &ls_type_Pt139))));
 }
@@ -23097,7 +23097,7 @@ static const LS_MethodInfo ls_methods_Pt139[] = {
     {"manhattan", ls_invoke_Pt139_manhattan, 1},
     {"dot", ls_invoke_Pt139_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt139 = {"Pt139", 2, ls_fields_Pt139, 2, ls_methods_Pt139};
+static const LS_TypeInfo ls_type_Pt139 = {"Pt139", 2, ls_fields_Pt139, 2, ls_methods_Pt139, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker139_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker139_add((LS_Worker139*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23127,7 +23127,7 @@ static const LS_MethodInfo ls_methods_Worker139[] = {
     {"fib", ls_invoke_Worker139_fib, 1},
     {"text", ls_invoke_Worker139_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker139 = {"Worker139", 4, ls_fields_Worker139, 5, ls_methods_Worker139};
+static const LS_TypeInfo ls_type_Worker139 = {"Worker139", 4, ls_fields_Worker139, 5, ls_methods_Worker139, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner139_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner139_run((LS_Runner139*)self));
@@ -23135,7 +23135,7 @@ static void ls_invoke_Runner139_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner139[] = {
     {"run", ls_invoke_Runner139_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner139 = {"Runner139", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner139};
+static const LS_TypeInfo ls_type_Runner139 = {"Runner139", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner139, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng140_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng140_next((LS_Rng140*)self));
@@ -23150,7 +23150,7 @@ static const LS_MethodInfo ls_methods_Rng140[] = {
     {"next", ls_invoke_Rng140_next, 0},
     {"range", ls_invoke_Rng140_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng140 = {"Rng140", 1, ls_fields_Rng140, 2, ls_methods_Rng140};
+static const LS_TypeInfo ls_type_Rng140 = {"Rng140", 1, ls_fields_Rng140, 2, ls_methods_Rng140, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt140_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt140_manhattan((LS_Pt140*)self, ((LS_Pt140*)ls_unbox_object(arguments[0], &ls_type_Pt140))));
 }
@@ -23165,7 +23165,7 @@ static const LS_MethodInfo ls_methods_Pt140[] = {
     {"manhattan", ls_invoke_Pt140_manhattan, 1},
     {"dot", ls_invoke_Pt140_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt140 = {"Pt140", 2, ls_fields_Pt140, 2, ls_methods_Pt140};
+static const LS_TypeInfo ls_type_Pt140 = {"Pt140", 2, ls_fields_Pt140, 2, ls_methods_Pt140, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker140_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker140_add((LS_Worker140*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23195,7 +23195,7 @@ static const LS_MethodInfo ls_methods_Worker140[] = {
     {"fib", ls_invoke_Worker140_fib, 1},
     {"text", ls_invoke_Worker140_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker140 = {"Worker140", 4, ls_fields_Worker140, 5, ls_methods_Worker140};
+static const LS_TypeInfo ls_type_Worker140 = {"Worker140", 4, ls_fields_Worker140, 5, ls_methods_Worker140, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner140_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner140_run((LS_Runner140*)self));
@@ -23203,7 +23203,7 @@ static void ls_invoke_Runner140_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner140[] = {
     {"run", ls_invoke_Runner140_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner140 = {"Runner140", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner140};
+static const LS_TypeInfo ls_type_Runner140 = {"Runner140", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner140, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng141_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng141_next((LS_Rng141*)self));
@@ -23218,7 +23218,7 @@ static const LS_MethodInfo ls_methods_Rng141[] = {
     {"next", ls_invoke_Rng141_next, 0},
     {"range", ls_invoke_Rng141_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng141 = {"Rng141", 1, ls_fields_Rng141, 2, ls_methods_Rng141};
+static const LS_TypeInfo ls_type_Rng141 = {"Rng141", 1, ls_fields_Rng141, 2, ls_methods_Rng141, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt141_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt141_manhattan((LS_Pt141*)self, ((LS_Pt141*)ls_unbox_object(arguments[0], &ls_type_Pt141))));
 }
@@ -23233,7 +23233,7 @@ static const LS_MethodInfo ls_methods_Pt141[] = {
     {"manhattan", ls_invoke_Pt141_manhattan, 1},
     {"dot", ls_invoke_Pt141_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt141 = {"Pt141", 2, ls_fields_Pt141, 2, ls_methods_Pt141};
+static const LS_TypeInfo ls_type_Pt141 = {"Pt141", 2, ls_fields_Pt141, 2, ls_methods_Pt141, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker141_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker141_add((LS_Worker141*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23263,7 +23263,7 @@ static const LS_MethodInfo ls_methods_Worker141[] = {
     {"fib", ls_invoke_Worker141_fib, 1},
     {"text", ls_invoke_Worker141_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker141 = {"Worker141", 4, ls_fields_Worker141, 5, ls_methods_Worker141};
+static const LS_TypeInfo ls_type_Worker141 = {"Worker141", 4, ls_fields_Worker141, 5, ls_methods_Worker141, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner141_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner141_run((LS_Runner141*)self));
@@ -23271,7 +23271,7 @@ static void ls_invoke_Runner141_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner141[] = {
     {"run", ls_invoke_Runner141_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner141 = {"Runner141", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner141};
+static const LS_TypeInfo ls_type_Runner141 = {"Runner141", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner141, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng142_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng142_next((LS_Rng142*)self));
@@ -23286,7 +23286,7 @@ static const LS_MethodInfo ls_methods_Rng142[] = {
     {"next", ls_invoke_Rng142_next, 0},
     {"range", ls_invoke_Rng142_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng142 = {"Rng142", 1, ls_fields_Rng142, 2, ls_methods_Rng142};
+static const LS_TypeInfo ls_type_Rng142 = {"Rng142", 1, ls_fields_Rng142, 2, ls_methods_Rng142, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt142_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt142_manhattan((LS_Pt142*)self, ((LS_Pt142*)ls_unbox_object(arguments[0], &ls_type_Pt142))));
 }
@@ -23301,7 +23301,7 @@ static const LS_MethodInfo ls_methods_Pt142[] = {
     {"manhattan", ls_invoke_Pt142_manhattan, 1},
     {"dot", ls_invoke_Pt142_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt142 = {"Pt142", 2, ls_fields_Pt142, 2, ls_methods_Pt142};
+static const LS_TypeInfo ls_type_Pt142 = {"Pt142", 2, ls_fields_Pt142, 2, ls_methods_Pt142, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker142_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker142_add((LS_Worker142*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23331,7 +23331,7 @@ static const LS_MethodInfo ls_methods_Worker142[] = {
     {"fib", ls_invoke_Worker142_fib, 1},
     {"text", ls_invoke_Worker142_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker142 = {"Worker142", 4, ls_fields_Worker142, 5, ls_methods_Worker142};
+static const LS_TypeInfo ls_type_Worker142 = {"Worker142", 4, ls_fields_Worker142, 5, ls_methods_Worker142, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner142_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner142_run((LS_Runner142*)self));
@@ -23339,7 +23339,7 @@ static void ls_invoke_Runner142_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner142[] = {
     {"run", ls_invoke_Runner142_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner142 = {"Runner142", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner142};
+static const LS_TypeInfo ls_type_Runner142 = {"Runner142", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner142, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng143_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng143_next((LS_Rng143*)self));
@@ -23354,7 +23354,7 @@ static const LS_MethodInfo ls_methods_Rng143[] = {
     {"next", ls_invoke_Rng143_next, 0},
     {"range", ls_invoke_Rng143_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng143 = {"Rng143", 1, ls_fields_Rng143, 2, ls_methods_Rng143};
+static const LS_TypeInfo ls_type_Rng143 = {"Rng143", 1, ls_fields_Rng143, 2, ls_methods_Rng143, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt143_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt143_manhattan((LS_Pt143*)self, ((LS_Pt143*)ls_unbox_object(arguments[0], &ls_type_Pt143))));
 }
@@ -23369,7 +23369,7 @@ static const LS_MethodInfo ls_methods_Pt143[] = {
     {"manhattan", ls_invoke_Pt143_manhattan, 1},
     {"dot", ls_invoke_Pt143_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt143 = {"Pt143", 2, ls_fields_Pt143, 2, ls_methods_Pt143};
+static const LS_TypeInfo ls_type_Pt143 = {"Pt143", 2, ls_fields_Pt143, 2, ls_methods_Pt143, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker143_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker143_add((LS_Worker143*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23399,7 +23399,7 @@ static const LS_MethodInfo ls_methods_Worker143[] = {
     {"fib", ls_invoke_Worker143_fib, 1},
     {"text", ls_invoke_Worker143_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker143 = {"Worker143", 4, ls_fields_Worker143, 5, ls_methods_Worker143};
+static const LS_TypeInfo ls_type_Worker143 = {"Worker143", 4, ls_fields_Worker143, 5, ls_methods_Worker143, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner143_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner143_run((LS_Runner143*)self));
@@ -23407,7 +23407,7 @@ static void ls_invoke_Runner143_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner143[] = {
     {"run", ls_invoke_Runner143_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner143 = {"Runner143", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner143};
+static const LS_TypeInfo ls_type_Runner143 = {"Runner143", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner143, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng144_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng144_next((LS_Rng144*)self));
@@ -23422,7 +23422,7 @@ static const LS_MethodInfo ls_methods_Rng144[] = {
     {"next", ls_invoke_Rng144_next, 0},
     {"range", ls_invoke_Rng144_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng144 = {"Rng144", 1, ls_fields_Rng144, 2, ls_methods_Rng144};
+static const LS_TypeInfo ls_type_Rng144 = {"Rng144", 1, ls_fields_Rng144, 2, ls_methods_Rng144, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt144_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt144_manhattan((LS_Pt144*)self, ((LS_Pt144*)ls_unbox_object(arguments[0], &ls_type_Pt144))));
 }
@@ -23437,7 +23437,7 @@ static const LS_MethodInfo ls_methods_Pt144[] = {
     {"manhattan", ls_invoke_Pt144_manhattan, 1},
     {"dot", ls_invoke_Pt144_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt144 = {"Pt144", 2, ls_fields_Pt144, 2, ls_methods_Pt144};
+static const LS_TypeInfo ls_type_Pt144 = {"Pt144", 2, ls_fields_Pt144, 2, ls_methods_Pt144, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker144_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker144_add((LS_Worker144*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23467,7 +23467,7 @@ static const LS_MethodInfo ls_methods_Worker144[] = {
     {"fib", ls_invoke_Worker144_fib, 1},
     {"text", ls_invoke_Worker144_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker144 = {"Worker144", 4, ls_fields_Worker144, 5, ls_methods_Worker144};
+static const LS_TypeInfo ls_type_Worker144 = {"Worker144", 4, ls_fields_Worker144, 5, ls_methods_Worker144, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner144_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner144_run((LS_Runner144*)self));
@@ -23475,7 +23475,7 @@ static void ls_invoke_Runner144_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner144[] = {
     {"run", ls_invoke_Runner144_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner144 = {"Runner144", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner144};
+static const LS_TypeInfo ls_type_Runner144 = {"Runner144", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner144, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng145_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng145_next((LS_Rng145*)self));
@@ -23490,7 +23490,7 @@ static const LS_MethodInfo ls_methods_Rng145[] = {
     {"next", ls_invoke_Rng145_next, 0},
     {"range", ls_invoke_Rng145_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng145 = {"Rng145", 1, ls_fields_Rng145, 2, ls_methods_Rng145};
+static const LS_TypeInfo ls_type_Rng145 = {"Rng145", 1, ls_fields_Rng145, 2, ls_methods_Rng145, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt145_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt145_manhattan((LS_Pt145*)self, ((LS_Pt145*)ls_unbox_object(arguments[0], &ls_type_Pt145))));
 }
@@ -23505,7 +23505,7 @@ static const LS_MethodInfo ls_methods_Pt145[] = {
     {"manhattan", ls_invoke_Pt145_manhattan, 1},
     {"dot", ls_invoke_Pt145_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt145 = {"Pt145", 2, ls_fields_Pt145, 2, ls_methods_Pt145};
+static const LS_TypeInfo ls_type_Pt145 = {"Pt145", 2, ls_fields_Pt145, 2, ls_methods_Pt145, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker145_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker145_add((LS_Worker145*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23535,7 +23535,7 @@ static const LS_MethodInfo ls_methods_Worker145[] = {
     {"fib", ls_invoke_Worker145_fib, 1},
     {"text", ls_invoke_Worker145_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker145 = {"Worker145", 4, ls_fields_Worker145, 5, ls_methods_Worker145};
+static const LS_TypeInfo ls_type_Worker145 = {"Worker145", 4, ls_fields_Worker145, 5, ls_methods_Worker145, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner145_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner145_run((LS_Runner145*)self));
@@ -23543,7 +23543,7 @@ static void ls_invoke_Runner145_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner145[] = {
     {"run", ls_invoke_Runner145_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner145 = {"Runner145", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner145};
+static const LS_TypeInfo ls_type_Runner145 = {"Runner145", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner145, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng146_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng146_next((LS_Rng146*)self));
@@ -23558,7 +23558,7 @@ static const LS_MethodInfo ls_methods_Rng146[] = {
     {"next", ls_invoke_Rng146_next, 0},
     {"range", ls_invoke_Rng146_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng146 = {"Rng146", 1, ls_fields_Rng146, 2, ls_methods_Rng146};
+static const LS_TypeInfo ls_type_Rng146 = {"Rng146", 1, ls_fields_Rng146, 2, ls_methods_Rng146, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt146_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt146_manhattan((LS_Pt146*)self, ((LS_Pt146*)ls_unbox_object(arguments[0], &ls_type_Pt146))));
 }
@@ -23573,7 +23573,7 @@ static const LS_MethodInfo ls_methods_Pt146[] = {
     {"manhattan", ls_invoke_Pt146_manhattan, 1},
     {"dot", ls_invoke_Pt146_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt146 = {"Pt146", 2, ls_fields_Pt146, 2, ls_methods_Pt146};
+static const LS_TypeInfo ls_type_Pt146 = {"Pt146", 2, ls_fields_Pt146, 2, ls_methods_Pt146, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker146_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker146_add((LS_Worker146*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23603,7 +23603,7 @@ static const LS_MethodInfo ls_methods_Worker146[] = {
     {"fib", ls_invoke_Worker146_fib, 1},
     {"text", ls_invoke_Worker146_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker146 = {"Worker146", 4, ls_fields_Worker146, 5, ls_methods_Worker146};
+static const LS_TypeInfo ls_type_Worker146 = {"Worker146", 4, ls_fields_Worker146, 5, ls_methods_Worker146, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner146_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner146_run((LS_Runner146*)self));
@@ -23611,7 +23611,7 @@ static void ls_invoke_Runner146_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner146[] = {
     {"run", ls_invoke_Runner146_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner146 = {"Runner146", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner146};
+static const LS_TypeInfo ls_type_Runner146 = {"Runner146", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner146, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng147_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng147_next((LS_Rng147*)self));
@@ -23626,7 +23626,7 @@ static const LS_MethodInfo ls_methods_Rng147[] = {
     {"next", ls_invoke_Rng147_next, 0},
     {"range", ls_invoke_Rng147_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng147 = {"Rng147", 1, ls_fields_Rng147, 2, ls_methods_Rng147};
+static const LS_TypeInfo ls_type_Rng147 = {"Rng147", 1, ls_fields_Rng147, 2, ls_methods_Rng147, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt147_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt147_manhattan((LS_Pt147*)self, ((LS_Pt147*)ls_unbox_object(arguments[0], &ls_type_Pt147))));
 }
@@ -23641,7 +23641,7 @@ static const LS_MethodInfo ls_methods_Pt147[] = {
     {"manhattan", ls_invoke_Pt147_manhattan, 1},
     {"dot", ls_invoke_Pt147_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt147 = {"Pt147", 2, ls_fields_Pt147, 2, ls_methods_Pt147};
+static const LS_TypeInfo ls_type_Pt147 = {"Pt147", 2, ls_fields_Pt147, 2, ls_methods_Pt147, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker147_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker147_add((LS_Worker147*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23671,7 +23671,7 @@ static const LS_MethodInfo ls_methods_Worker147[] = {
     {"fib", ls_invoke_Worker147_fib, 1},
     {"text", ls_invoke_Worker147_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker147 = {"Worker147", 4, ls_fields_Worker147, 5, ls_methods_Worker147};
+static const LS_TypeInfo ls_type_Worker147 = {"Worker147", 4, ls_fields_Worker147, 5, ls_methods_Worker147, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner147_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner147_run((LS_Runner147*)self));
@@ -23679,7 +23679,7 @@ static void ls_invoke_Runner147_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner147[] = {
     {"run", ls_invoke_Runner147_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner147 = {"Runner147", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner147};
+static const LS_TypeInfo ls_type_Runner147 = {"Runner147", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner147, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng148_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng148_next((LS_Rng148*)self));
@@ -23694,7 +23694,7 @@ static const LS_MethodInfo ls_methods_Rng148[] = {
     {"next", ls_invoke_Rng148_next, 0},
     {"range", ls_invoke_Rng148_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng148 = {"Rng148", 1, ls_fields_Rng148, 2, ls_methods_Rng148};
+static const LS_TypeInfo ls_type_Rng148 = {"Rng148", 1, ls_fields_Rng148, 2, ls_methods_Rng148, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt148_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt148_manhattan((LS_Pt148*)self, ((LS_Pt148*)ls_unbox_object(arguments[0], &ls_type_Pt148))));
 }
@@ -23709,7 +23709,7 @@ static const LS_MethodInfo ls_methods_Pt148[] = {
     {"manhattan", ls_invoke_Pt148_manhattan, 1},
     {"dot", ls_invoke_Pt148_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt148 = {"Pt148", 2, ls_fields_Pt148, 2, ls_methods_Pt148};
+static const LS_TypeInfo ls_type_Pt148 = {"Pt148", 2, ls_fields_Pt148, 2, ls_methods_Pt148, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker148_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker148_add((LS_Worker148*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23739,7 +23739,7 @@ static const LS_MethodInfo ls_methods_Worker148[] = {
     {"fib", ls_invoke_Worker148_fib, 1},
     {"text", ls_invoke_Worker148_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker148 = {"Worker148", 4, ls_fields_Worker148, 5, ls_methods_Worker148};
+static const LS_TypeInfo ls_type_Worker148 = {"Worker148", 4, ls_fields_Worker148, 5, ls_methods_Worker148, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner148_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner148_run((LS_Runner148*)self));
@@ -23747,7 +23747,7 @@ static void ls_invoke_Runner148_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner148[] = {
     {"run", ls_invoke_Runner148_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner148 = {"Runner148", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner148};
+static const LS_TypeInfo ls_type_Runner148 = {"Runner148", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner148, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng149_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng149_next((LS_Rng149*)self));
@@ -23762,7 +23762,7 @@ static const LS_MethodInfo ls_methods_Rng149[] = {
     {"next", ls_invoke_Rng149_next, 0},
     {"range", ls_invoke_Rng149_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng149 = {"Rng149", 1, ls_fields_Rng149, 2, ls_methods_Rng149};
+static const LS_TypeInfo ls_type_Rng149 = {"Rng149", 1, ls_fields_Rng149, 2, ls_methods_Rng149, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt149_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt149_manhattan((LS_Pt149*)self, ((LS_Pt149*)ls_unbox_object(arguments[0], &ls_type_Pt149))));
 }
@@ -23777,7 +23777,7 @@ static const LS_MethodInfo ls_methods_Pt149[] = {
     {"manhattan", ls_invoke_Pt149_manhattan, 1},
     {"dot", ls_invoke_Pt149_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt149 = {"Pt149", 2, ls_fields_Pt149, 2, ls_methods_Pt149};
+static const LS_TypeInfo ls_type_Pt149 = {"Pt149", 2, ls_fields_Pt149, 2, ls_methods_Pt149, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker149_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker149_add((LS_Worker149*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23807,7 +23807,7 @@ static const LS_MethodInfo ls_methods_Worker149[] = {
     {"fib", ls_invoke_Worker149_fib, 1},
     {"text", ls_invoke_Worker149_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker149 = {"Worker149", 4, ls_fields_Worker149, 5, ls_methods_Worker149};
+static const LS_TypeInfo ls_type_Worker149 = {"Worker149", 4, ls_fields_Worker149, 5, ls_methods_Worker149, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner149_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner149_run((LS_Runner149*)self));
@@ -23815,7 +23815,7 @@ static void ls_invoke_Runner149_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner149[] = {
     {"run", ls_invoke_Runner149_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner149 = {"Runner149", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner149};
+static const LS_TypeInfo ls_type_Runner149 = {"Runner149", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner149, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng150_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng150_next((LS_Rng150*)self));
@@ -23830,7 +23830,7 @@ static const LS_MethodInfo ls_methods_Rng150[] = {
     {"next", ls_invoke_Rng150_next, 0},
     {"range", ls_invoke_Rng150_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng150 = {"Rng150", 1, ls_fields_Rng150, 2, ls_methods_Rng150};
+static const LS_TypeInfo ls_type_Rng150 = {"Rng150", 1, ls_fields_Rng150, 2, ls_methods_Rng150, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt150_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt150_manhattan((LS_Pt150*)self, ((LS_Pt150*)ls_unbox_object(arguments[0], &ls_type_Pt150))));
 }
@@ -23845,7 +23845,7 @@ static const LS_MethodInfo ls_methods_Pt150[] = {
     {"manhattan", ls_invoke_Pt150_manhattan, 1},
     {"dot", ls_invoke_Pt150_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt150 = {"Pt150", 2, ls_fields_Pt150, 2, ls_methods_Pt150};
+static const LS_TypeInfo ls_type_Pt150 = {"Pt150", 2, ls_fields_Pt150, 2, ls_methods_Pt150, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker150_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker150_add((LS_Worker150*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23875,7 +23875,7 @@ static const LS_MethodInfo ls_methods_Worker150[] = {
     {"fib", ls_invoke_Worker150_fib, 1},
     {"text", ls_invoke_Worker150_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker150 = {"Worker150", 4, ls_fields_Worker150, 5, ls_methods_Worker150};
+static const LS_TypeInfo ls_type_Worker150 = {"Worker150", 4, ls_fields_Worker150, 5, ls_methods_Worker150, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner150_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner150_run((LS_Runner150*)self));
@@ -23883,7 +23883,7 @@ static void ls_invoke_Runner150_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner150[] = {
     {"run", ls_invoke_Runner150_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner150 = {"Runner150", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner150};
+static const LS_TypeInfo ls_type_Runner150 = {"Runner150", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner150, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng151_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng151_next((LS_Rng151*)self));
@@ -23898,7 +23898,7 @@ static const LS_MethodInfo ls_methods_Rng151[] = {
     {"next", ls_invoke_Rng151_next, 0},
     {"range", ls_invoke_Rng151_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng151 = {"Rng151", 1, ls_fields_Rng151, 2, ls_methods_Rng151};
+static const LS_TypeInfo ls_type_Rng151 = {"Rng151", 1, ls_fields_Rng151, 2, ls_methods_Rng151, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt151_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt151_manhattan((LS_Pt151*)self, ((LS_Pt151*)ls_unbox_object(arguments[0], &ls_type_Pt151))));
 }
@@ -23913,7 +23913,7 @@ static const LS_MethodInfo ls_methods_Pt151[] = {
     {"manhattan", ls_invoke_Pt151_manhattan, 1},
     {"dot", ls_invoke_Pt151_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt151 = {"Pt151", 2, ls_fields_Pt151, 2, ls_methods_Pt151};
+static const LS_TypeInfo ls_type_Pt151 = {"Pt151", 2, ls_fields_Pt151, 2, ls_methods_Pt151, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker151_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker151_add((LS_Worker151*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -23943,7 +23943,7 @@ static const LS_MethodInfo ls_methods_Worker151[] = {
     {"fib", ls_invoke_Worker151_fib, 1},
     {"text", ls_invoke_Worker151_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker151 = {"Worker151", 4, ls_fields_Worker151, 5, ls_methods_Worker151};
+static const LS_TypeInfo ls_type_Worker151 = {"Worker151", 4, ls_fields_Worker151, 5, ls_methods_Worker151, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner151_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner151_run((LS_Runner151*)self));
@@ -23951,7 +23951,7 @@ static void ls_invoke_Runner151_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner151[] = {
     {"run", ls_invoke_Runner151_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner151 = {"Runner151", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner151};
+static const LS_TypeInfo ls_type_Runner151 = {"Runner151", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner151, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng152_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng152_next((LS_Rng152*)self));
@@ -23966,7 +23966,7 @@ static const LS_MethodInfo ls_methods_Rng152[] = {
     {"next", ls_invoke_Rng152_next, 0},
     {"range", ls_invoke_Rng152_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng152 = {"Rng152", 1, ls_fields_Rng152, 2, ls_methods_Rng152};
+static const LS_TypeInfo ls_type_Rng152 = {"Rng152", 1, ls_fields_Rng152, 2, ls_methods_Rng152, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt152_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt152_manhattan((LS_Pt152*)self, ((LS_Pt152*)ls_unbox_object(arguments[0], &ls_type_Pt152))));
 }
@@ -23981,7 +23981,7 @@ static const LS_MethodInfo ls_methods_Pt152[] = {
     {"manhattan", ls_invoke_Pt152_manhattan, 1},
     {"dot", ls_invoke_Pt152_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt152 = {"Pt152", 2, ls_fields_Pt152, 2, ls_methods_Pt152};
+static const LS_TypeInfo ls_type_Pt152 = {"Pt152", 2, ls_fields_Pt152, 2, ls_methods_Pt152, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker152_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker152_add((LS_Worker152*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24011,7 +24011,7 @@ static const LS_MethodInfo ls_methods_Worker152[] = {
     {"fib", ls_invoke_Worker152_fib, 1},
     {"text", ls_invoke_Worker152_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker152 = {"Worker152", 4, ls_fields_Worker152, 5, ls_methods_Worker152};
+static const LS_TypeInfo ls_type_Worker152 = {"Worker152", 4, ls_fields_Worker152, 5, ls_methods_Worker152, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner152_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner152_run((LS_Runner152*)self));
@@ -24019,7 +24019,7 @@ static void ls_invoke_Runner152_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner152[] = {
     {"run", ls_invoke_Runner152_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner152 = {"Runner152", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner152};
+static const LS_TypeInfo ls_type_Runner152 = {"Runner152", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner152, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng153_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng153_next((LS_Rng153*)self));
@@ -24034,7 +24034,7 @@ static const LS_MethodInfo ls_methods_Rng153[] = {
     {"next", ls_invoke_Rng153_next, 0},
     {"range", ls_invoke_Rng153_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng153 = {"Rng153", 1, ls_fields_Rng153, 2, ls_methods_Rng153};
+static const LS_TypeInfo ls_type_Rng153 = {"Rng153", 1, ls_fields_Rng153, 2, ls_methods_Rng153, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt153_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt153_manhattan((LS_Pt153*)self, ((LS_Pt153*)ls_unbox_object(arguments[0], &ls_type_Pt153))));
 }
@@ -24049,7 +24049,7 @@ static const LS_MethodInfo ls_methods_Pt153[] = {
     {"manhattan", ls_invoke_Pt153_manhattan, 1},
     {"dot", ls_invoke_Pt153_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt153 = {"Pt153", 2, ls_fields_Pt153, 2, ls_methods_Pt153};
+static const LS_TypeInfo ls_type_Pt153 = {"Pt153", 2, ls_fields_Pt153, 2, ls_methods_Pt153, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker153_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker153_add((LS_Worker153*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24079,7 +24079,7 @@ static const LS_MethodInfo ls_methods_Worker153[] = {
     {"fib", ls_invoke_Worker153_fib, 1},
     {"text", ls_invoke_Worker153_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker153 = {"Worker153", 4, ls_fields_Worker153, 5, ls_methods_Worker153};
+static const LS_TypeInfo ls_type_Worker153 = {"Worker153", 4, ls_fields_Worker153, 5, ls_methods_Worker153, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner153_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner153_run((LS_Runner153*)self));
@@ -24087,7 +24087,7 @@ static void ls_invoke_Runner153_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner153[] = {
     {"run", ls_invoke_Runner153_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner153 = {"Runner153", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner153};
+static const LS_TypeInfo ls_type_Runner153 = {"Runner153", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner153, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng154_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng154_next((LS_Rng154*)self));
@@ -24102,7 +24102,7 @@ static const LS_MethodInfo ls_methods_Rng154[] = {
     {"next", ls_invoke_Rng154_next, 0},
     {"range", ls_invoke_Rng154_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng154 = {"Rng154", 1, ls_fields_Rng154, 2, ls_methods_Rng154};
+static const LS_TypeInfo ls_type_Rng154 = {"Rng154", 1, ls_fields_Rng154, 2, ls_methods_Rng154, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt154_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt154_manhattan((LS_Pt154*)self, ((LS_Pt154*)ls_unbox_object(arguments[0], &ls_type_Pt154))));
 }
@@ -24117,7 +24117,7 @@ static const LS_MethodInfo ls_methods_Pt154[] = {
     {"manhattan", ls_invoke_Pt154_manhattan, 1},
     {"dot", ls_invoke_Pt154_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt154 = {"Pt154", 2, ls_fields_Pt154, 2, ls_methods_Pt154};
+static const LS_TypeInfo ls_type_Pt154 = {"Pt154", 2, ls_fields_Pt154, 2, ls_methods_Pt154, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker154_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker154_add((LS_Worker154*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24147,7 +24147,7 @@ static const LS_MethodInfo ls_methods_Worker154[] = {
     {"fib", ls_invoke_Worker154_fib, 1},
     {"text", ls_invoke_Worker154_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker154 = {"Worker154", 4, ls_fields_Worker154, 5, ls_methods_Worker154};
+static const LS_TypeInfo ls_type_Worker154 = {"Worker154", 4, ls_fields_Worker154, 5, ls_methods_Worker154, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner154_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner154_run((LS_Runner154*)self));
@@ -24155,7 +24155,7 @@ static void ls_invoke_Runner154_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner154[] = {
     {"run", ls_invoke_Runner154_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner154 = {"Runner154", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner154};
+static const LS_TypeInfo ls_type_Runner154 = {"Runner154", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner154, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng155_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng155_next((LS_Rng155*)self));
@@ -24170,7 +24170,7 @@ static const LS_MethodInfo ls_methods_Rng155[] = {
     {"next", ls_invoke_Rng155_next, 0},
     {"range", ls_invoke_Rng155_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng155 = {"Rng155", 1, ls_fields_Rng155, 2, ls_methods_Rng155};
+static const LS_TypeInfo ls_type_Rng155 = {"Rng155", 1, ls_fields_Rng155, 2, ls_methods_Rng155, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt155_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt155_manhattan((LS_Pt155*)self, ((LS_Pt155*)ls_unbox_object(arguments[0], &ls_type_Pt155))));
 }
@@ -24185,7 +24185,7 @@ static const LS_MethodInfo ls_methods_Pt155[] = {
     {"manhattan", ls_invoke_Pt155_manhattan, 1},
     {"dot", ls_invoke_Pt155_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt155 = {"Pt155", 2, ls_fields_Pt155, 2, ls_methods_Pt155};
+static const LS_TypeInfo ls_type_Pt155 = {"Pt155", 2, ls_fields_Pt155, 2, ls_methods_Pt155, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker155_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker155_add((LS_Worker155*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24215,7 +24215,7 @@ static const LS_MethodInfo ls_methods_Worker155[] = {
     {"fib", ls_invoke_Worker155_fib, 1},
     {"text", ls_invoke_Worker155_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker155 = {"Worker155", 4, ls_fields_Worker155, 5, ls_methods_Worker155};
+static const LS_TypeInfo ls_type_Worker155 = {"Worker155", 4, ls_fields_Worker155, 5, ls_methods_Worker155, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner155_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner155_run((LS_Runner155*)self));
@@ -24223,7 +24223,7 @@ static void ls_invoke_Runner155_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner155[] = {
     {"run", ls_invoke_Runner155_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner155 = {"Runner155", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner155};
+static const LS_TypeInfo ls_type_Runner155 = {"Runner155", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner155, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng156_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng156_next((LS_Rng156*)self));
@@ -24238,7 +24238,7 @@ static const LS_MethodInfo ls_methods_Rng156[] = {
     {"next", ls_invoke_Rng156_next, 0},
     {"range", ls_invoke_Rng156_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng156 = {"Rng156", 1, ls_fields_Rng156, 2, ls_methods_Rng156};
+static const LS_TypeInfo ls_type_Rng156 = {"Rng156", 1, ls_fields_Rng156, 2, ls_methods_Rng156, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt156_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt156_manhattan((LS_Pt156*)self, ((LS_Pt156*)ls_unbox_object(arguments[0], &ls_type_Pt156))));
 }
@@ -24253,7 +24253,7 @@ static const LS_MethodInfo ls_methods_Pt156[] = {
     {"manhattan", ls_invoke_Pt156_manhattan, 1},
     {"dot", ls_invoke_Pt156_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt156 = {"Pt156", 2, ls_fields_Pt156, 2, ls_methods_Pt156};
+static const LS_TypeInfo ls_type_Pt156 = {"Pt156", 2, ls_fields_Pt156, 2, ls_methods_Pt156, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker156_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker156_add((LS_Worker156*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24283,7 +24283,7 @@ static const LS_MethodInfo ls_methods_Worker156[] = {
     {"fib", ls_invoke_Worker156_fib, 1},
     {"text", ls_invoke_Worker156_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker156 = {"Worker156", 4, ls_fields_Worker156, 5, ls_methods_Worker156};
+static const LS_TypeInfo ls_type_Worker156 = {"Worker156", 4, ls_fields_Worker156, 5, ls_methods_Worker156, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner156_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner156_run((LS_Runner156*)self));
@@ -24291,7 +24291,7 @@ static void ls_invoke_Runner156_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner156[] = {
     {"run", ls_invoke_Runner156_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner156 = {"Runner156", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner156};
+static const LS_TypeInfo ls_type_Runner156 = {"Runner156", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner156, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng157_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng157_next((LS_Rng157*)self));
@@ -24306,7 +24306,7 @@ static const LS_MethodInfo ls_methods_Rng157[] = {
     {"next", ls_invoke_Rng157_next, 0},
     {"range", ls_invoke_Rng157_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng157 = {"Rng157", 1, ls_fields_Rng157, 2, ls_methods_Rng157};
+static const LS_TypeInfo ls_type_Rng157 = {"Rng157", 1, ls_fields_Rng157, 2, ls_methods_Rng157, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt157_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt157_manhattan((LS_Pt157*)self, ((LS_Pt157*)ls_unbox_object(arguments[0], &ls_type_Pt157))));
 }
@@ -24321,7 +24321,7 @@ static const LS_MethodInfo ls_methods_Pt157[] = {
     {"manhattan", ls_invoke_Pt157_manhattan, 1},
     {"dot", ls_invoke_Pt157_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt157 = {"Pt157", 2, ls_fields_Pt157, 2, ls_methods_Pt157};
+static const LS_TypeInfo ls_type_Pt157 = {"Pt157", 2, ls_fields_Pt157, 2, ls_methods_Pt157, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker157_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker157_add((LS_Worker157*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24351,7 +24351,7 @@ static const LS_MethodInfo ls_methods_Worker157[] = {
     {"fib", ls_invoke_Worker157_fib, 1},
     {"text", ls_invoke_Worker157_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker157 = {"Worker157", 4, ls_fields_Worker157, 5, ls_methods_Worker157};
+static const LS_TypeInfo ls_type_Worker157 = {"Worker157", 4, ls_fields_Worker157, 5, ls_methods_Worker157, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner157_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner157_run((LS_Runner157*)self));
@@ -24359,7 +24359,7 @@ static void ls_invoke_Runner157_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner157[] = {
     {"run", ls_invoke_Runner157_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner157 = {"Runner157", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner157};
+static const LS_TypeInfo ls_type_Runner157 = {"Runner157", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner157, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng158_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng158_next((LS_Rng158*)self));
@@ -24374,7 +24374,7 @@ static const LS_MethodInfo ls_methods_Rng158[] = {
     {"next", ls_invoke_Rng158_next, 0},
     {"range", ls_invoke_Rng158_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng158 = {"Rng158", 1, ls_fields_Rng158, 2, ls_methods_Rng158};
+static const LS_TypeInfo ls_type_Rng158 = {"Rng158", 1, ls_fields_Rng158, 2, ls_methods_Rng158, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt158_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt158_manhattan((LS_Pt158*)self, ((LS_Pt158*)ls_unbox_object(arguments[0], &ls_type_Pt158))));
 }
@@ -24389,7 +24389,7 @@ static const LS_MethodInfo ls_methods_Pt158[] = {
     {"manhattan", ls_invoke_Pt158_manhattan, 1},
     {"dot", ls_invoke_Pt158_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt158 = {"Pt158", 2, ls_fields_Pt158, 2, ls_methods_Pt158};
+static const LS_TypeInfo ls_type_Pt158 = {"Pt158", 2, ls_fields_Pt158, 2, ls_methods_Pt158, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker158_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker158_add((LS_Worker158*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24419,7 +24419,7 @@ static const LS_MethodInfo ls_methods_Worker158[] = {
     {"fib", ls_invoke_Worker158_fib, 1},
     {"text", ls_invoke_Worker158_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker158 = {"Worker158", 4, ls_fields_Worker158, 5, ls_methods_Worker158};
+static const LS_TypeInfo ls_type_Worker158 = {"Worker158", 4, ls_fields_Worker158, 5, ls_methods_Worker158, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner158_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner158_run((LS_Runner158*)self));
@@ -24427,7 +24427,7 @@ static void ls_invoke_Runner158_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner158[] = {
     {"run", ls_invoke_Runner158_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner158 = {"Runner158", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner158};
+static const LS_TypeInfo ls_type_Runner158 = {"Runner158", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner158, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng159_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng159_next((LS_Rng159*)self));
@@ -24442,7 +24442,7 @@ static const LS_MethodInfo ls_methods_Rng159[] = {
     {"next", ls_invoke_Rng159_next, 0},
     {"range", ls_invoke_Rng159_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng159 = {"Rng159", 1, ls_fields_Rng159, 2, ls_methods_Rng159};
+static const LS_TypeInfo ls_type_Rng159 = {"Rng159", 1, ls_fields_Rng159, 2, ls_methods_Rng159, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt159_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt159_manhattan((LS_Pt159*)self, ((LS_Pt159*)ls_unbox_object(arguments[0], &ls_type_Pt159))));
 }
@@ -24457,7 +24457,7 @@ static const LS_MethodInfo ls_methods_Pt159[] = {
     {"manhattan", ls_invoke_Pt159_manhattan, 1},
     {"dot", ls_invoke_Pt159_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt159 = {"Pt159", 2, ls_fields_Pt159, 2, ls_methods_Pt159};
+static const LS_TypeInfo ls_type_Pt159 = {"Pt159", 2, ls_fields_Pt159, 2, ls_methods_Pt159, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker159_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker159_add((LS_Worker159*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24487,7 +24487,7 @@ static const LS_MethodInfo ls_methods_Worker159[] = {
     {"fib", ls_invoke_Worker159_fib, 1},
     {"text", ls_invoke_Worker159_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker159 = {"Worker159", 4, ls_fields_Worker159, 5, ls_methods_Worker159};
+static const LS_TypeInfo ls_type_Worker159 = {"Worker159", 4, ls_fields_Worker159, 5, ls_methods_Worker159, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner159_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner159_run((LS_Runner159*)self));
@@ -24495,7 +24495,7 @@ static void ls_invoke_Runner159_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner159[] = {
     {"run", ls_invoke_Runner159_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner159 = {"Runner159", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner159};
+static const LS_TypeInfo ls_type_Runner159 = {"Runner159", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner159, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng160_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng160_next((LS_Rng160*)self));
@@ -24510,7 +24510,7 @@ static const LS_MethodInfo ls_methods_Rng160[] = {
     {"next", ls_invoke_Rng160_next, 0},
     {"range", ls_invoke_Rng160_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng160 = {"Rng160", 1, ls_fields_Rng160, 2, ls_methods_Rng160};
+static const LS_TypeInfo ls_type_Rng160 = {"Rng160", 1, ls_fields_Rng160, 2, ls_methods_Rng160, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt160_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt160_manhattan((LS_Pt160*)self, ((LS_Pt160*)ls_unbox_object(arguments[0], &ls_type_Pt160))));
 }
@@ -24525,7 +24525,7 @@ static const LS_MethodInfo ls_methods_Pt160[] = {
     {"manhattan", ls_invoke_Pt160_manhattan, 1},
     {"dot", ls_invoke_Pt160_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt160 = {"Pt160", 2, ls_fields_Pt160, 2, ls_methods_Pt160};
+static const LS_TypeInfo ls_type_Pt160 = {"Pt160", 2, ls_fields_Pt160, 2, ls_methods_Pt160, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker160_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker160_add((LS_Worker160*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24555,7 +24555,7 @@ static const LS_MethodInfo ls_methods_Worker160[] = {
     {"fib", ls_invoke_Worker160_fib, 1},
     {"text", ls_invoke_Worker160_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker160 = {"Worker160", 4, ls_fields_Worker160, 5, ls_methods_Worker160};
+static const LS_TypeInfo ls_type_Worker160 = {"Worker160", 4, ls_fields_Worker160, 5, ls_methods_Worker160, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner160_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner160_run((LS_Runner160*)self));
@@ -24563,7 +24563,7 @@ static void ls_invoke_Runner160_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner160[] = {
     {"run", ls_invoke_Runner160_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner160 = {"Runner160", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner160};
+static const LS_TypeInfo ls_type_Runner160 = {"Runner160", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner160, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng161_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng161_next((LS_Rng161*)self));
@@ -24578,7 +24578,7 @@ static const LS_MethodInfo ls_methods_Rng161[] = {
     {"next", ls_invoke_Rng161_next, 0},
     {"range", ls_invoke_Rng161_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng161 = {"Rng161", 1, ls_fields_Rng161, 2, ls_methods_Rng161};
+static const LS_TypeInfo ls_type_Rng161 = {"Rng161", 1, ls_fields_Rng161, 2, ls_methods_Rng161, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt161_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt161_manhattan((LS_Pt161*)self, ((LS_Pt161*)ls_unbox_object(arguments[0], &ls_type_Pt161))));
 }
@@ -24593,7 +24593,7 @@ static const LS_MethodInfo ls_methods_Pt161[] = {
     {"manhattan", ls_invoke_Pt161_manhattan, 1},
     {"dot", ls_invoke_Pt161_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt161 = {"Pt161", 2, ls_fields_Pt161, 2, ls_methods_Pt161};
+static const LS_TypeInfo ls_type_Pt161 = {"Pt161", 2, ls_fields_Pt161, 2, ls_methods_Pt161, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker161_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker161_add((LS_Worker161*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24623,7 +24623,7 @@ static const LS_MethodInfo ls_methods_Worker161[] = {
     {"fib", ls_invoke_Worker161_fib, 1},
     {"text", ls_invoke_Worker161_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker161 = {"Worker161", 4, ls_fields_Worker161, 5, ls_methods_Worker161};
+static const LS_TypeInfo ls_type_Worker161 = {"Worker161", 4, ls_fields_Worker161, 5, ls_methods_Worker161, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner161_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner161_run((LS_Runner161*)self));
@@ -24631,7 +24631,7 @@ static void ls_invoke_Runner161_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner161[] = {
     {"run", ls_invoke_Runner161_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner161 = {"Runner161", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner161};
+static const LS_TypeInfo ls_type_Runner161 = {"Runner161", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner161, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng162_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng162_next((LS_Rng162*)self));
@@ -24646,7 +24646,7 @@ static const LS_MethodInfo ls_methods_Rng162[] = {
     {"next", ls_invoke_Rng162_next, 0},
     {"range", ls_invoke_Rng162_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng162 = {"Rng162", 1, ls_fields_Rng162, 2, ls_methods_Rng162};
+static const LS_TypeInfo ls_type_Rng162 = {"Rng162", 1, ls_fields_Rng162, 2, ls_methods_Rng162, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt162_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt162_manhattan((LS_Pt162*)self, ((LS_Pt162*)ls_unbox_object(arguments[0], &ls_type_Pt162))));
 }
@@ -24661,7 +24661,7 @@ static const LS_MethodInfo ls_methods_Pt162[] = {
     {"manhattan", ls_invoke_Pt162_manhattan, 1},
     {"dot", ls_invoke_Pt162_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt162 = {"Pt162", 2, ls_fields_Pt162, 2, ls_methods_Pt162};
+static const LS_TypeInfo ls_type_Pt162 = {"Pt162", 2, ls_fields_Pt162, 2, ls_methods_Pt162, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker162_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker162_add((LS_Worker162*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24691,7 +24691,7 @@ static const LS_MethodInfo ls_methods_Worker162[] = {
     {"fib", ls_invoke_Worker162_fib, 1},
     {"text", ls_invoke_Worker162_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker162 = {"Worker162", 4, ls_fields_Worker162, 5, ls_methods_Worker162};
+static const LS_TypeInfo ls_type_Worker162 = {"Worker162", 4, ls_fields_Worker162, 5, ls_methods_Worker162, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner162_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner162_run((LS_Runner162*)self));
@@ -24699,7 +24699,7 @@ static void ls_invoke_Runner162_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner162[] = {
     {"run", ls_invoke_Runner162_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner162 = {"Runner162", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner162};
+static const LS_TypeInfo ls_type_Runner162 = {"Runner162", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner162, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng163_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng163_next((LS_Rng163*)self));
@@ -24714,7 +24714,7 @@ static const LS_MethodInfo ls_methods_Rng163[] = {
     {"next", ls_invoke_Rng163_next, 0},
     {"range", ls_invoke_Rng163_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng163 = {"Rng163", 1, ls_fields_Rng163, 2, ls_methods_Rng163};
+static const LS_TypeInfo ls_type_Rng163 = {"Rng163", 1, ls_fields_Rng163, 2, ls_methods_Rng163, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt163_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt163_manhattan((LS_Pt163*)self, ((LS_Pt163*)ls_unbox_object(arguments[0], &ls_type_Pt163))));
 }
@@ -24729,7 +24729,7 @@ static const LS_MethodInfo ls_methods_Pt163[] = {
     {"manhattan", ls_invoke_Pt163_manhattan, 1},
     {"dot", ls_invoke_Pt163_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt163 = {"Pt163", 2, ls_fields_Pt163, 2, ls_methods_Pt163};
+static const LS_TypeInfo ls_type_Pt163 = {"Pt163", 2, ls_fields_Pt163, 2, ls_methods_Pt163, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker163_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker163_add((LS_Worker163*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24759,7 +24759,7 @@ static const LS_MethodInfo ls_methods_Worker163[] = {
     {"fib", ls_invoke_Worker163_fib, 1},
     {"text", ls_invoke_Worker163_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker163 = {"Worker163", 4, ls_fields_Worker163, 5, ls_methods_Worker163};
+static const LS_TypeInfo ls_type_Worker163 = {"Worker163", 4, ls_fields_Worker163, 5, ls_methods_Worker163, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner163_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner163_run((LS_Runner163*)self));
@@ -24767,7 +24767,7 @@ static void ls_invoke_Runner163_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner163[] = {
     {"run", ls_invoke_Runner163_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner163 = {"Runner163", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner163};
+static const LS_TypeInfo ls_type_Runner163 = {"Runner163", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner163, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng164_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng164_next((LS_Rng164*)self));
@@ -24782,7 +24782,7 @@ static const LS_MethodInfo ls_methods_Rng164[] = {
     {"next", ls_invoke_Rng164_next, 0},
     {"range", ls_invoke_Rng164_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng164 = {"Rng164", 1, ls_fields_Rng164, 2, ls_methods_Rng164};
+static const LS_TypeInfo ls_type_Rng164 = {"Rng164", 1, ls_fields_Rng164, 2, ls_methods_Rng164, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt164_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt164_manhattan((LS_Pt164*)self, ((LS_Pt164*)ls_unbox_object(arguments[0], &ls_type_Pt164))));
 }
@@ -24797,7 +24797,7 @@ static const LS_MethodInfo ls_methods_Pt164[] = {
     {"manhattan", ls_invoke_Pt164_manhattan, 1},
     {"dot", ls_invoke_Pt164_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt164 = {"Pt164", 2, ls_fields_Pt164, 2, ls_methods_Pt164};
+static const LS_TypeInfo ls_type_Pt164 = {"Pt164", 2, ls_fields_Pt164, 2, ls_methods_Pt164, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker164_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker164_add((LS_Worker164*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24827,7 +24827,7 @@ static const LS_MethodInfo ls_methods_Worker164[] = {
     {"fib", ls_invoke_Worker164_fib, 1},
     {"text", ls_invoke_Worker164_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker164 = {"Worker164", 4, ls_fields_Worker164, 5, ls_methods_Worker164};
+static const LS_TypeInfo ls_type_Worker164 = {"Worker164", 4, ls_fields_Worker164, 5, ls_methods_Worker164, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner164_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner164_run((LS_Runner164*)self));
@@ -24835,7 +24835,7 @@ static void ls_invoke_Runner164_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner164[] = {
     {"run", ls_invoke_Runner164_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner164 = {"Runner164", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner164};
+static const LS_TypeInfo ls_type_Runner164 = {"Runner164", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner164, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng165_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng165_next((LS_Rng165*)self));
@@ -24850,7 +24850,7 @@ static const LS_MethodInfo ls_methods_Rng165[] = {
     {"next", ls_invoke_Rng165_next, 0},
     {"range", ls_invoke_Rng165_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng165 = {"Rng165", 1, ls_fields_Rng165, 2, ls_methods_Rng165};
+static const LS_TypeInfo ls_type_Rng165 = {"Rng165", 1, ls_fields_Rng165, 2, ls_methods_Rng165, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt165_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt165_manhattan((LS_Pt165*)self, ((LS_Pt165*)ls_unbox_object(arguments[0], &ls_type_Pt165))));
 }
@@ -24865,7 +24865,7 @@ static const LS_MethodInfo ls_methods_Pt165[] = {
     {"manhattan", ls_invoke_Pt165_manhattan, 1},
     {"dot", ls_invoke_Pt165_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt165 = {"Pt165", 2, ls_fields_Pt165, 2, ls_methods_Pt165};
+static const LS_TypeInfo ls_type_Pt165 = {"Pt165", 2, ls_fields_Pt165, 2, ls_methods_Pt165, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker165_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker165_add((LS_Worker165*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24895,7 +24895,7 @@ static const LS_MethodInfo ls_methods_Worker165[] = {
     {"fib", ls_invoke_Worker165_fib, 1},
     {"text", ls_invoke_Worker165_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker165 = {"Worker165", 4, ls_fields_Worker165, 5, ls_methods_Worker165};
+static const LS_TypeInfo ls_type_Worker165 = {"Worker165", 4, ls_fields_Worker165, 5, ls_methods_Worker165, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner165_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner165_run((LS_Runner165*)self));
@@ -24903,7 +24903,7 @@ static void ls_invoke_Runner165_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner165[] = {
     {"run", ls_invoke_Runner165_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner165 = {"Runner165", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner165};
+static const LS_TypeInfo ls_type_Runner165 = {"Runner165", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner165, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng166_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng166_next((LS_Rng166*)self));
@@ -24918,7 +24918,7 @@ static const LS_MethodInfo ls_methods_Rng166[] = {
     {"next", ls_invoke_Rng166_next, 0},
     {"range", ls_invoke_Rng166_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng166 = {"Rng166", 1, ls_fields_Rng166, 2, ls_methods_Rng166};
+static const LS_TypeInfo ls_type_Rng166 = {"Rng166", 1, ls_fields_Rng166, 2, ls_methods_Rng166, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt166_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt166_manhattan((LS_Pt166*)self, ((LS_Pt166*)ls_unbox_object(arguments[0], &ls_type_Pt166))));
 }
@@ -24933,7 +24933,7 @@ static const LS_MethodInfo ls_methods_Pt166[] = {
     {"manhattan", ls_invoke_Pt166_manhattan, 1},
     {"dot", ls_invoke_Pt166_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt166 = {"Pt166", 2, ls_fields_Pt166, 2, ls_methods_Pt166};
+static const LS_TypeInfo ls_type_Pt166 = {"Pt166", 2, ls_fields_Pt166, 2, ls_methods_Pt166, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker166_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker166_add((LS_Worker166*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -24963,7 +24963,7 @@ static const LS_MethodInfo ls_methods_Worker166[] = {
     {"fib", ls_invoke_Worker166_fib, 1},
     {"text", ls_invoke_Worker166_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker166 = {"Worker166", 4, ls_fields_Worker166, 5, ls_methods_Worker166};
+static const LS_TypeInfo ls_type_Worker166 = {"Worker166", 4, ls_fields_Worker166, 5, ls_methods_Worker166, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner166_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner166_run((LS_Runner166*)self));
@@ -24971,7 +24971,7 @@ static void ls_invoke_Runner166_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner166[] = {
     {"run", ls_invoke_Runner166_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner166 = {"Runner166", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner166};
+static const LS_TypeInfo ls_type_Runner166 = {"Runner166", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner166, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng167_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng167_next((LS_Rng167*)self));
@@ -24986,7 +24986,7 @@ static const LS_MethodInfo ls_methods_Rng167[] = {
     {"next", ls_invoke_Rng167_next, 0},
     {"range", ls_invoke_Rng167_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng167 = {"Rng167", 1, ls_fields_Rng167, 2, ls_methods_Rng167};
+static const LS_TypeInfo ls_type_Rng167 = {"Rng167", 1, ls_fields_Rng167, 2, ls_methods_Rng167, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt167_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt167_manhattan((LS_Pt167*)self, ((LS_Pt167*)ls_unbox_object(arguments[0], &ls_type_Pt167))));
 }
@@ -25001,7 +25001,7 @@ static const LS_MethodInfo ls_methods_Pt167[] = {
     {"manhattan", ls_invoke_Pt167_manhattan, 1},
     {"dot", ls_invoke_Pt167_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt167 = {"Pt167", 2, ls_fields_Pt167, 2, ls_methods_Pt167};
+static const LS_TypeInfo ls_type_Pt167 = {"Pt167", 2, ls_fields_Pt167, 2, ls_methods_Pt167, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker167_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker167_add((LS_Worker167*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25031,7 +25031,7 @@ static const LS_MethodInfo ls_methods_Worker167[] = {
     {"fib", ls_invoke_Worker167_fib, 1},
     {"text", ls_invoke_Worker167_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker167 = {"Worker167", 4, ls_fields_Worker167, 5, ls_methods_Worker167};
+static const LS_TypeInfo ls_type_Worker167 = {"Worker167", 4, ls_fields_Worker167, 5, ls_methods_Worker167, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner167_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner167_run((LS_Runner167*)self));
@@ -25039,7 +25039,7 @@ static void ls_invoke_Runner167_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner167[] = {
     {"run", ls_invoke_Runner167_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner167 = {"Runner167", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner167};
+static const LS_TypeInfo ls_type_Runner167 = {"Runner167", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner167, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng168_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng168_next((LS_Rng168*)self));
@@ -25054,7 +25054,7 @@ static const LS_MethodInfo ls_methods_Rng168[] = {
     {"next", ls_invoke_Rng168_next, 0},
     {"range", ls_invoke_Rng168_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng168 = {"Rng168", 1, ls_fields_Rng168, 2, ls_methods_Rng168};
+static const LS_TypeInfo ls_type_Rng168 = {"Rng168", 1, ls_fields_Rng168, 2, ls_methods_Rng168, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt168_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt168_manhattan((LS_Pt168*)self, ((LS_Pt168*)ls_unbox_object(arguments[0], &ls_type_Pt168))));
 }
@@ -25069,7 +25069,7 @@ static const LS_MethodInfo ls_methods_Pt168[] = {
     {"manhattan", ls_invoke_Pt168_manhattan, 1},
     {"dot", ls_invoke_Pt168_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt168 = {"Pt168", 2, ls_fields_Pt168, 2, ls_methods_Pt168};
+static const LS_TypeInfo ls_type_Pt168 = {"Pt168", 2, ls_fields_Pt168, 2, ls_methods_Pt168, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker168_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker168_add((LS_Worker168*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25099,7 +25099,7 @@ static const LS_MethodInfo ls_methods_Worker168[] = {
     {"fib", ls_invoke_Worker168_fib, 1},
     {"text", ls_invoke_Worker168_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker168 = {"Worker168", 4, ls_fields_Worker168, 5, ls_methods_Worker168};
+static const LS_TypeInfo ls_type_Worker168 = {"Worker168", 4, ls_fields_Worker168, 5, ls_methods_Worker168, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner168_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner168_run((LS_Runner168*)self));
@@ -25107,7 +25107,7 @@ static void ls_invoke_Runner168_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner168[] = {
     {"run", ls_invoke_Runner168_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner168 = {"Runner168", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner168};
+static const LS_TypeInfo ls_type_Runner168 = {"Runner168", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner168, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng169_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng169_next((LS_Rng169*)self));
@@ -25122,7 +25122,7 @@ static const LS_MethodInfo ls_methods_Rng169[] = {
     {"next", ls_invoke_Rng169_next, 0},
     {"range", ls_invoke_Rng169_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng169 = {"Rng169", 1, ls_fields_Rng169, 2, ls_methods_Rng169};
+static const LS_TypeInfo ls_type_Rng169 = {"Rng169", 1, ls_fields_Rng169, 2, ls_methods_Rng169, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt169_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt169_manhattan((LS_Pt169*)self, ((LS_Pt169*)ls_unbox_object(arguments[0], &ls_type_Pt169))));
 }
@@ -25137,7 +25137,7 @@ static const LS_MethodInfo ls_methods_Pt169[] = {
     {"manhattan", ls_invoke_Pt169_manhattan, 1},
     {"dot", ls_invoke_Pt169_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt169 = {"Pt169", 2, ls_fields_Pt169, 2, ls_methods_Pt169};
+static const LS_TypeInfo ls_type_Pt169 = {"Pt169", 2, ls_fields_Pt169, 2, ls_methods_Pt169, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker169_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker169_add((LS_Worker169*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25167,7 +25167,7 @@ static const LS_MethodInfo ls_methods_Worker169[] = {
     {"fib", ls_invoke_Worker169_fib, 1},
     {"text", ls_invoke_Worker169_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker169 = {"Worker169", 4, ls_fields_Worker169, 5, ls_methods_Worker169};
+static const LS_TypeInfo ls_type_Worker169 = {"Worker169", 4, ls_fields_Worker169, 5, ls_methods_Worker169, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner169_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner169_run((LS_Runner169*)self));
@@ -25175,7 +25175,7 @@ static void ls_invoke_Runner169_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner169[] = {
     {"run", ls_invoke_Runner169_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner169 = {"Runner169", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner169};
+static const LS_TypeInfo ls_type_Runner169 = {"Runner169", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner169, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng170_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng170_next((LS_Rng170*)self));
@@ -25190,7 +25190,7 @@ static const LS_MethodInfo ls_methods_Rng170[] = {
     {"next", ls_invoke_Rng170_next, 0},
     {"range", ls_invoke_Rng170_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng170 = {"Rng170", 1, ls_fields_Rng170, 2, ls_methods_Rng170};
+static const LS_TypeInfo ls_type_Rng170 = {"Rng170", 1, ls_fields_Rng170, 2, ls_methods_Rng170, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt170_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt170_manhattan((LS_Pt170*)self, ((LS_Pt170*)ls_unbox_object(arguments[0], &ls_type_Pt170))));
 }
@@ -25205,7 +25205,7 @@ static const LS_MethodInfo ls_methods_Pt170[] = {
     {"manhattan", ls_invoke_Pt170_manhattan, 1},
     {"dot", ls_invoke_Pt170_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt170 = {"Pt170", 2, ls_fields_Pt170, 2, ls_methods_Pt170};
+static const LS_TypeInfo ls_type_Pt170 = {"Pt170", 2, ls_fields_Pt170, 2, ls_methods_Pt170, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker170_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker170_add((LS_Worker170*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25235,7 +25235,7 @@ static const LS_MethodInfo ls_methods_Worker170[] = {
     {"fib", ls_invoke_Worker170_fib, 1},
     {"text", ls_invoke_Worker170_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker170 = {"Worker170", 4, ls_fields_Worker170, 5, ls_methods_Worker170};
+static const LS_TypeInfo ls_type_Worker170 = {"Worker170", 4, ls_fields_Worker170, 5, ls_methods_Worker170, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner170_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner170_run((LS_Runner170*)self));
@@ -25243,7 +25243,7 @@ static void ls_invoke_Runner170_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner170[] = {
     {"run", ls_invoke_Runner170_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner170 = {"Runner170", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner170};
+static const LS_TypeInfo ls_type_Runner170 = {"Runner170", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner170, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng171_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng171_next((LS_Rng171*)self));
@@ -25258,7 +25258,7 @@ static const LS_MethodInfo ls_methods_Rng171[] = {
     {"next", ls_invoke_Rng171_next, 0},
     {"range", ls_invoke_Rng171_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng171 = {"Rng171", 1, ls_fields_Rng171, 2, ls_methods_Rng171};
+static const LS_TypeInfo ls_type_Rng171 = {"Rng171", 1, ls_fields_Rng171, 2, ls_methods_Rng171, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt171_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt171_manhattan((LS_Pt171*)self, ((LS_Pt171*)ls_unbox_object(arguments[0], &ls_type_Pt171))));
 }
@@ -25273,7 +25273,7 @@ static const LS_MethodInfo ls_methods_Pt171[] = {
     {"manhattan", ls_invoke_Pt171_manhattan, 1},
     {"dot", ls_invoke_Pt171_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt171 = {"Pt171", 2, ls_fields_Pt171, 2, ls_methods_Pt171};
+static const LS_TypeInfo ls_type_Pt171 = {"Pt171", 2, ls_fields_Pt171, 2, ls_methods_Pt171, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker171_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker171_add((LS_Worker171*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25303,7 +25303,7 @@ static const LS_MethodInfo ls_methods_Worker171[] = {
     {"fib", ls_invoke_Worker171_fib, 1},
     {"text", ls_invoke_Worker171_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker171 = {"Worker171", 4, ls_fields_Worker171, 5, ls_methods_Worker171};
+static const LS_TypeInfo ls_type_Worker171 = {"Worker171", 4, ls_fields_Worker171, 5, ls_methods_Worker171, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner171_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner171_run((LS_Runner171*)self));
@@ -25311,7 +25311,7 @@ static void ls_invoke_Runner171_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner171[] = {
     {"run", ls_invoke_Runner171_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner171 = {"Runner171", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner171};
+static const LS_TypeInfo ls_type_Runner171 = {"Runner171", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner171, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng172_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng172_next((LS_Rng172*)self));
@@ -25326,7 +25326,7 @@ static const LS_MethodInfo ls_methods_Rng172[] = {
     {"next", ls_invoke_Rng172_next, 0},
     {"range", ls_invoke_Rng172_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng172 = {"Rng172", 1, ls_fields_Rng172, 2, ls_methods_Rng172};
+static const LS_TypeInfo ls_type_Rng172 = {"Rng172", 1, ls_fields_Rng172, 2, ls_methods_Rng172, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt172_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt172_manhattan((LS_Pt172*)self, ((LS_Pt172*)ls_unbox_object(arguments[0], &ls_type_Pt172))));
 }
@@ -25341,7 +25341,7 @@ static const LS_MethodInfo ls_methods_Pt172[] = {
     {"manhattan", ls_invoke_Pt172_manhattan, 1},
     {"dot", ls_invoke_Pt172_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt172 = {"Pt172", 2, ls_fields_Pt172, 2, ls_methods_Pt172};
+static const LS_TypeInfo ls_type_Pt172 = {"Pt172", 2, ls_fields_Pt172, 2, ls_methods_Pt172, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker172_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker172_add((LS_Worker172*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25371,7 +25371,7 @@ static const LS_MethodInfo ls_methods_Worker172[] = {
     {"fib", ls_invoke_Worker172_fib, 1},
     {"text", ls_invoke_Worker172_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker172 = {"Worker172", 4, ls_fields_Worker172, 5, ls_methods_Worker172};
+static const LS_TypeInfo ls_type_Worker172 = {"Worker172", 4, ls_fields_Worker172, 5, ls_methods_Worker172, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner172_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner172_run((LS_Runner172*)self));
@@ -25379,7 +25379,7 @@ static void ls_invoke_Runner172_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner172[] = {
     {"run", ls_invoke_Runner172_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner172 = {"Runner172", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner172};
+static const LS_TypeInfo ls_type_Runner172 = {"Runner172", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner172, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng173_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng173_next((LS_Rng173*)self));
@@ -25394,7 +25394,7 @@ static const LS_MethodInfo ls_methods_Rng173[] = {
     {"next", ls_invoke_Rng173_next, 0},
     {"range", ls_invoke_Rng173_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng173 = {"Rng173", 1, ls_fields_Rng173, 2, ls_methods_Rng173};
+static const LS_TypeInfo ls_type_Rng173 = {"Rng173", 1, ls_fields_Rng173, 2, ls_methods_Rng173, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt173_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt173_manhattan((LS_Pt173*)self, ((LS_Pt173*)ls_unbox_object(arguments[0], &ls_type_Pt173))));
 }
@@ -25409,7 +25409,7 @@ static const LS_MethodInfo ls_methods_Pt173[] = {
     {"manhattan", ls_invoke_Pt173_manhattan, 1},
     {"dot", ls_invoke_Pt173_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt173 = {"Pt173", 2, ls_fields_Pt173, 2, ls_methods_Pt173};
+static const LS_TypeInfo ls_type_Pt173 = {"Pt173", 2, ls_fields_Pt173, 2, ls_methods_Pt173, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker173_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker173_add((LS_Worker173*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25439,7 +25439,7 @@ static const LS_MethodInfo ls_methods_Worker173[] = {
     {"fib", ls_invoke_Worker173_fib, 1},
     {"text", ls_invoke_Worker173_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker173 = {"Worker173", 4, ls_fields_Worker173, 5, ls_methods_Worker173};
+static const LS_TypeInfo ls_type_Worker173 = {"Worker173", 4, ls_fields_Worker173, 5, ls_methods_Worker173, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner173_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner173_run((LS_Runner173*)self));
@@ -25447,7 +25447,7 @@ static void ls_invoke_Runner173_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner173[] = {
     {"run", ls_invoke_Runner173_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner173 = {"Runner173", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner173};
+static const LS_TypeInfo ls_type_Runner173 = {"Runner173", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner173, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng174_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng174_next((LS_Rng174*)self));
@@ -25462,7 +25462,7 @@ static const LS_MethodInfo ls_methods_Rng174[] = {
     {"next", ls_invoke_Rng174_next, 0},
     {"range", ls_invoke_Rng174_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng174 = {"Rng174", 1, ls_fields_Rng174, 2, ls_methods_Rng174};
+static const LS_TypeInfo ls_type_Rng174 = {"Rng174", 1, ls_fields_Rng174, 2, ls_methods_Rng174, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt174_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt174_manhattan((LS_Pt174*)self, ((LS_Pt174*)ls_unbox_object(arguments[0], &ls_type_Pt174))));
 }
@@ -25477,7 +25477,7 @@ static const LS_MethodInfo ls_methods_Pt174[] = {
     {"manhattan", ls_invoke_Pt174_manhattan, 1},
     {"dot", ls_invoke_Pt174_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt174 = {"Pt174", 2, ls_fields_Pt174, 2, ls_methods_Pt174};
+static const LS_TypeInfo ls_type_Pt174 = {"Pt174", 2, ls_fields_Pt174, 2, ls_methods_Pt174, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker174_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker174_add((LS_Worker174*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25507,7 +25507,7 @@ static const LS_MethodInfo ls_methods_Worker174[] = {
     {"fib", ls_invoke_Worker174_fib, 1},
     {"text", ls_invoke_Worker174_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker174 = {"Worker174", 4, ls_fields_Worker174, 5, ls_methods_Worker174};
+static const LS_TypeInfo ls_type_Worker174 = {"Worker174", 4, ls_fields_Worker174, 5, ls_methods_Worker174, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner174_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner174_run((LS_Runner174*)self));
@@ -25515,7 +25515,7 @@ static void ls_invoke_Runner174_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner174[] = {
     {"run", ls_invoke_Runner174_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner174 = {"Runner174", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner174};
+static const LS_TypeInfo ls_type_Runner174 = {"Runner174", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner174, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng175_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng175_next((LS_Rng175*)self));
@@ -25530,7 +25530,7 @@ static const LS_MethodInfo ls_methods_Rng175[] = {
     {"next", ls_invoke_Rng175_next, 0},
     {"range", ls_invoke_Rng175_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng175 = {"Rng175", 1, ls_fields_Rng175, 2, ls_methods_Rng175};
+static const LS_TypeInfo ls_type_Rng175 = {"Rng175", 1, ls_fields_Rng175, 2, ls_methods_Rng175, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt175_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt175_manhattan((LS_Pt175*)self, ((LS_Pt175*)ls_unbox_object(arguments[0], &ls_type_Pt175))));
 }
@@ -25545,7 +25545,7 @@ static const LS_MethodInfo ls_methods_Pt175[] = {
     {"manhattan", ls_invoke_Pt175_manhattan, 1},
     {"dot", ls_invoke_Pt175_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt175 = {"Pt175", 2, ls_fields_Pt175, 2, ls_methods_Pt175};
+static const LS_TypeInfo ls_type_Pt175 = {"Pt175", 2, ls_fields_Pt175, 2, ls_methods_Pt175, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker175_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker175_add((LS_Worker175*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25575,7 +25575,7 @@ static const LS_MethodInfo ls_methods_Worker175[] = {
     {"fib", ls_invoke_Worker175_fib, 1},
     {"text", ls_invoke_Worker175_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker175 = {"Worker175", 4, ls_fields_Worker175, 5, ls_methods_Worker175};
+static const LS_TypeInfo ls_type_Worker175 = {"Worker175", 4, ls_fields_Worker175, 5, ls_methods_Worker175, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner175_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner175_run((LS_Runner175*)self));
@@ -25583,7 +25583,7 @@ static void ls_invoke_Runner175_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner175[] = {
     {"run", ls_invoke_Runner175_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner175 = {"Runner175", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner175};
+static const LS_TypeInfo ls_type_Runner175 = {"Runner175", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner175, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng176_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng176_next((LS_Rng176*)self));
@@ -25598,7 +25598,7 @@ static const LS_MethodInfo ls_methods_Rng176[] = {
     {"next", ls_invoke_Rng176_next, 0},
     {"range", ls_invoke_Rng176_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng176 = {"Rng176", 1, ls_fields_Rng176, 2, ls_methods_Rng176};
+static const LS_TypeInfo ls_type_Rng176 = {"Rng176", 1, ls_fields_Rng176, 2, ls_methods_Rng176, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt176_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt176_manhattan((LS_Pt176*)self, ((LS_Pt176*)ls_unbox_object(arguments[0], &ls_type_Pt176))));
 }
@@ -25613,7 +25613,7 @@ static const LS_MethodInfo ls_methods_Pt176[] = {
     {"manhattan", ls_invoke_Pt176_manhattan, 1},
     {"dot", ls_invoke_Pt176_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt176 = {"Pt176", 2, ls_fields_Pt176, 2, ls_methods_Pt176};
+static const LS_TypeInfo ls_type_Pt176 = {"Pt176", 2, ls_fields_Pt176, 2, ls_methods_Pt176, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker176_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker176_add((LS_Worker176*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25643,7 +25643,7 @@ static const LS_MethodInfo ls_methods_Worker176[] = {
     {"fib", ls_invoke_Worker176_fib, 1},
     {"text", ls_invoke_Worker176_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker176 = {"Worker176", 4, ls_fields_Worker176, 5, ls_methods_Worker176};
+static const LS_TypeInfo ls_type_Worker176 = {"Worker176", 4, ls_fields_Worker176, 5, ls_methods_Worker176, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner176_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner176_run((LS_Runner176*)self));
@@ -25651,7 +25651,7 @@ static void ls_invoke_Runner176_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner176[] = {
     {"run", ls_invoke_Runner176_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner176 = {"Runner176", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner176};
+static const LS_TypeInfo ls_type_Runner176 = {"Runner176", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner176, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng177_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng177_next((LS_Rng177*)self));
@@ -25666,7 +25666,7 @@ static const LS_MethodInfo ls_methods_Rng177[] = {
     {"next", ls_invoke_Rng177_next, 0},
     {"range", ls_invoke_Rng177_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng177 = {"Rng177", 1, ls_fields_Rng177, 2, ls_methods_Rng177};
+static const LS_TypeInfo ls_type_Rng177 = {"Rng177", 1, ls_fields_Rng177, 2, ls_methods_Rng177, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt177_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt177_manhattan((LS_Pt177*)self, ((LS_Pt177*)ls_unbox_object(arguments[0], &ls_type_Pt177))));
 }
@@ -25681,7 +25681,7 @@ static const LS_MethodInfo ls_methods_Pt177[] = {
     {"manhattan", ls_invoke_Pt177_manhattan, 1},
     {"dot", ls_invoke_Pt177_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt177 = {"Pt177", 2, ls_fields_Pt177, 2, ls_methods_Pt177};
+static const LS_TypeInfo ls_type_Pt177 = {"Pt177", 2, ls_fields_Pt177, 2, ls_methods_Pt177, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker177_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker177_add((LS_Worker177*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25711,7 +25711,7 @@ static const LS_MethodInfo ls_methods_Worker177[] = {
     {"fib", ls_invoke_Worker177_fib, 1},
     {"text", ls_invoke_Worker177_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker177 = {"Worker177", 4, ls_fields_Worker177, 5, ls_methods_Worker177};
+static const LS_TypeInfo ls_type_Worker177 = {"Worker177", 4, ls_fields_Worker177, 5, ls_methods_Worker177, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner177_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner177_run((LS_Runner177*)self));
@@ -25719,7 +25719,7 @@ static void ls_invoke_Runner177_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner177[] = {
     {"run", ls_invoke_Runner177_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner177 = {"Runner177", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner177};
+static const LS_TypeInfo ls_type_Runner177 = {"Runner177", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner177, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng178_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng178_next((LS_Rng178*)self));
@@ -25734,7 +25734,7 @@ static const LS_MethodInfo ls_methods_Rng178[] = {
     {"next", ls_invoke_Rng178_next, 0},
     {"range", ls_invoke_Rng178_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng178 = {"Rng178", 1, ls_fields_Rng178, 2, ls_methods_Rng178};
+static const LS_TypeInfo ls_type_Rng178 = {"Rng178", 1, ls_fields_Rng178, 2, ls_methods_Rng178, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt178_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt178_manhattan((LS_Pt178*)self, ((LS_Pt178*)ls_unbox_object(arguments[0], &ls_type_Pt178))));
 }
@@ -25749,7 +25749,7 @@ static const LS_MethodInfo ls_methods_Pt178[] = {
     {"manhattan", ls_invoke_Pt178_manhattan, 1},
     {"dot", ls_invoke_Pt178_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt178 = {"Pt178", 2, ls_fields_Pt178, 2, ls_methods_Pt178};
+static const LS_TypeInfo ls_type_Pt178 = {"Pt178", 2, ls_fields_Pt178, 2, ls_methods_Pt178, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker178_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker178_add((LS_Worker178*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25779,7 +25779,7 @@ static const LS_MethodInfo ls_methods_Worker178[] = {
     {"fib", ls_invoke_Worker178_fib, 1},
     {"text", ls_invoke_Worker178_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker178 = {"Worker178", 4, ls_fields_Worker178, 5, ls_methods_Worker178};
+static const LS_TypeInfo ls_type_Worker178 = {"Worker178", 4, ls_fields_Worker178, 5, ls_methods_Worker178, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner178_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner178_run((LS_Runner178*)self));
@@ -25787,7 +25787,7 @@ static void ls_invoke_Runner178_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner178[] = {
     {"run", ls_invoke_Runner178_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner178 = {"Runner178", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner178};
+static const LS_TypeInfo ls_type_Runner178 = {"Runner178", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner178, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng179_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng179_next((LS_Rng179*)self));
@@ -25802,7 +25802,7 @@ static const LS_MethodInfo ls_methods_Rng179[] = {
     {"next", ls_invoke_Rng179_next, 0},
     {"range", ls_invoke_Rng179_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng179 = {"Rng179", 1, ls_fields_Rng179, 2, ls_methods_Rng179};
+static const LS_TypeInfo ls_type_Rng179 = {"Rng179", 1, ls_fields_Rng179, 2, ls_methods_Rng179, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt179_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt179_manhattan((LS_Pt179*)self, ((LS_Pt179*)ls_unbox_object(arguments[0], &ls_type_Pt179))));
 }
@@ -25817,7 +25817,7 @@ static const LS_MethodInfo ls_methods_Pt179[] = {
     {"manhattan", ls_invoke_Pt179_manhattan, 1},
     {"dot", ls_invoke_Pt179_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt179 = {"Pt179", 2, ls_fields_Pt179, 2, ls_methods_Pt179};
+static const LS_TypeInfo ls_type_Pt179 = {"Pt179", 2, ls_fields_Pt179, 2, ls_methods_Pt179, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker179_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker179_add((LS_Worker179*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25847,7 +25847,7 @@ static const LS_MethodInfo ls_methods_Worker179[] = {
     {"fib", ls_invoke_Worker179_fib, 1},
     {"text", ls_invoke_Worker179_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker179 = {"Worker179", 4, ls_fields_Worker179, 5, ls_methods_Worker179};
+static const LS_TypeInfo ls_type_Worker179 = {"Worker179", 4, ls_fields_Worker179, 5, ls_methods_Worker179, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner179_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner179_run((LS_Runner179*)self));
@@ -25855,7 +25855,7 @@ static void ls_invoke_Runner179_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner179[] = {
     {"run", ls_invoke_Runner179_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner179 = {"Runner179", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner179};
+static const LS_TypeInfo ls_type_Runner179 = {"Runner179", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner179, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng180_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng180_next((LS_Rng180*)self));
@@ -25870,7 +25870,7 @@ static const LS_MethodInfo ls_methods_Rng180[] = {
     {"next", ls_invoke_Rng180_next, 0},
     {"range", ls_invoke_Rng180_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng180 = {"Rng180", 1, ls_fields_Rng180, 2, ls_methods_Rng180};
+static const LS_TypeInfo ls_type_Rng180 = {"Rng180", 1, ls_fields_Rng180, 2, ls_methods_Rng180, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt180_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt180_manhattan((LS_Pt180*)self, ((LS_Pt180*)ls_unbox_object(arguments[0], &ls_type_Pt180))));
 }
@@ -25885,7 +25885,7 @@ static const LS_MethodInfo ls_methods_Pt180[] = {
     {"manhattan", ls_invoke_Pt180_manhattan, 1},
     {"dot", ls_invoke_Pt180_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt180 = {"Pt180", 2, ls_fields_Pt180, 2, ls_methods_Pt180};
+static const LS_TypeInfo ls_type_Pt180 = {"Pt180", 2, ls_fields_Pt180, 2, ls_methods_Pt180, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker180_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker180_add((LS_Worker180*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25915,7 +25915,7 @@ static const LS_MethodInfo ls_methods_Worker180[] = {
     {"fib", ls_invoke_Worker180_fib, 1},
     {"text", ls_invoke_Worker180_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker180 = {"Worker180", 4, ls_fields_Worker180, 5, ls_methods_Worker180};
+static const LS_TypeInfo ls_type_Worker180 = {"Worker180", 4, ls_fields_Worker180, 5, ls_methods_Worker180, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner180_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner180_run((LS_Runner180*)self));
@@ -25923,7 +25923,7 @@ static void ls_invoke_Runner180_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner180[] = {
     {"run", ls_invoke_Runner180_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner180 = {"Runner180", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner180};
+static const LS_TypeInfo ls_type_Runner180 = {"Runner180", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner180, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng181_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng181_next((LS_Rng181*)self));
@@ -25938,7 +25938,7 @@ static const LS_MethodInfo ls_methods_Rng181[] = {
     {"next", ls_invoke_Rng181_next, 0},
     {"range", ls_invoke_Rng181_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng181 = {"Rng181", 1, ls_fields_Rng181, 2, ls_methods_Rng181};
+static const LS_TypeInfo ls_type_Rng181 = {"Rng181", 1, ls_fields_Rng181, 2, ls_methods_Rng181, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt181_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt181_manhattan((LS_Pt181*)self, ((LS_Pt181*)ls_unbox_object(arguments[0], &ls_type_Pt181))));
 }
@@ -25953,7 +25953,7 @@ static const LS_MethodInfo ls_methods_Pt181[] = {
     {"manhattan", ls_invoke_Pt181_manhattan, 1},
     {"dot", ls_invoke_Pt181_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt181 = {"Pt181", 2, ls_fields_Pt181, 2, ls_methods_Pt181};
+static const LS_TypeInfo ls_type_Pt181 = {"Pt181", 2, ls_fields_Pt181, 2, ls_methods_Pt181, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker181_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker181_add((LS_Worker181*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -25983,7 +25983,7 @@ static const LS_MethodInfo ls_methods_Worker181[] = {
     {"fib", ls_invoke_Worker181_fib, 1},
     {"text", ls_invoke_Worker181_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker181 = {"Worker181", 4, ls_fields_Worker181, 5, ls_methods_Worker181};
+static const LS_TypeInfo ls_type_Worker181 = {"Worker181", 4, ls_fields_Worker181, 5, ls_methods_Worker181, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner181_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner181_run((LS_Runner181*)self));
@@ -25991,7 +25991,7 @@ static void ls_invoke_Runner181_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner181[] = {
     {"run", ls_invoke_Runner181_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner181 = {"Runner181", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner181};
+static const LS_TypeInfo ls_type_Runner181 = {"Runner181", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner181, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng182_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng182_next((LS_Rng182*)self));
@@ -26006,7 +26006,7 @@ static const LS_MethodInfo ls_methods_Rng182[] = {
     {"next", ls_invoke_Rng182_next, 0},
     {"range", ls_invoke_Rng182_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng182 = {"Rng182", 1, ls_fields_Rng182, 2, ls_methods_Rng182};
+static const LS_TypeInfo ls_type_Rng182 = {"Rng182", 1, ls_fields_Rng182, 2, ls_methods_Rng182, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt182_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt182_manhattan((LS_Pt182*)self, ((LS_Pt182*)ls_unbox_object(arguments[0], &ls_type_Pt182))));
 }
@@ -26021,7 +26021,7 @@ static const LS_MethodInfo ls_methods_Pt182[] = {
     {"manhattan", ls_invoke_Pt182_manhattan, 1},
     {"dot", ls_invoke_Pt182_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt182 = {"Pt182", 2, ls_fields_Pt182, 2, ls_methods_Pt182};
+static const LS_TypeInfo ls_type_Pt182 = {"Pt182", 2, ls_fields_Pt182, 2, ls_methods_Pt182, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker182_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker182_add((LS_Worker182*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26051,7 +26051,7 @@ static const LS_MethodInfo ls_methods_Worker182[] = {
     {"fib", ls_invoke_Worker182_fib, 1},
     {"text", ls_invoke_Worker182_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker182 = {"Worker182", 4, ls_fields_Worker182, 5, ls_methods_Worker182};
+static const LS_TypeInfo ls_type_Worker182 = {"Worker182", 4, ls_fields_Worker182, 5, ls_methods_Worker182, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner182_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner182_run((LS_Runner182*)self));
@@ -26059,7 +26059,7 @@ static void ls_invoke_Runner182_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner182[] = {
     {"run", ls_invoke_Runner182_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner182 = {"Runner182", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner182};
+static const LS_TypeInfo ls_type_Runner182 = {"Runner182", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner182, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng183_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng183_next((LS_Rng183*)self));
@@ -26074,7 +26074,7 @@ static const LS_MethodInfo ls_methods_Rng183[] = {
     {"next", ls_invoke_Rng183_next, 0},
     {"range", ls_invoke_Rng183_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng183 = {"Rng183", 1, ls_fields_Rng183, 2, ls_methods_Rng183};
+static const LS_TypeInfo ls_type_Rng183 = {"Rng183", 1, ls_fields_Rng183, 2, ls_methods_Rng183, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt183_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt183_manhattan((LS_Pt183*)self, ((LS_Pt183*)ls_unbox_object(arguments[0], &ls_type_Pt183))));
 }
@@ -26089,7 +26089,7 @@ static const LS_MethodInfo ls_methods_Pt183[] = {
     {"manhattan", ls_invoke_Pt183_manhattan, 1},
     {"dot", ls_invoke_Pt183_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt183 = {"Pt183", 2, ls_fields_Pt183, 2, ls_methods_Pt183};
+static const LS_TypeInfo ls_type_Pt183 = {"Pt183", 2, ls_fields_Pt183, 2, ls_methods_Pt183, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker183_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker183_add((LS_Worker183*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26119,7 +26119,7 @@ static const LS_MethodInfo ls_methods_Worker183[] = {
     {"fib", ls_invoke_Worker183_fib, 1},
     {"text", ls_invoke_Worker183_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker183 = {"Worker183", 4, ls_fields_Worker183, 5, ls_methods_Worker183};
+static const LS_TypeInfo ls_type_Worker183 = {"Worker183", 4, ls_fields_Worker183, 5, ls_methods_Worker183, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner183_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner183_run((LS_Runner183*)self));
@@ -26127,7 +26127,7 @@ static void ls_invoke_Runner183_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner183[] = {
     {"run", ls_invoke_Runner183_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner183 = {"Runner183", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner183};
+static const LS_TypeInfo ls_type_Runner183 = {"Runner183", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner183, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng184_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng184_next((LS_Rng184*)self));
@@ -26142,7 +26142,7 @@ static const LS_MethodInfo ls_methods_Rng184[] = {
     {"next", ls_invoke_Rng184_next, 0},
     {"range", ls_invoke_Rng184_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng184 = {"Rng184", 1, ls_fields_Rng184, 2, ls_methods_Rng184};
+static const LS_TypeInfo ls_type_Rng184 = {"Rng184", 1, ls_fields_Rng184, 2, ls_methods_Rng184, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt184_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt184_manhattan((LS_Pt184*)self, ((LS_Pt184*)ls_unbox_object(arguments[0], &ls_type_Pt184))));
 }
@@ -26157,7 +26157,7 @@ static const LS_MethodInfo ls_methods_Pt184[] = {
     {"manhattan", ls_invoke_Pt184_manhattan, 1},
     {"dot", ls_invoke_Pt184_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt184 = {"Pt184", 2, ls_fields_Pt184, 2, ls_methods_Pt184};
+static const LS_TypeInfo ls_type_Pt184 = {"Pt184", 2, ls_fields_Pt184, 2, ls_methods_Pt184, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker184_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker184_add((LS_Worker184*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26187,7 +26187,7 @@ static const LS_MethodInfo ls_methods_Worker184[] = {
     {"fib", ls_invoke_Worker184_fib, 1},
     {"text", ls_invoke_Worker184_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker184 = {"Worker184", 4, ls_fields_Worker184, 5, ls_methods_Worker184};
+static const LS_TypeInfo ls_type_Worker184 = {"Worker184", 4, ls_fields_Worker184, 5, ls_methods_Worker184, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner184_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner184_run((LS_Runner184*)self));
@@ -26195,7 +26195,7 @@ static void ls_invoke_Runner184_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner184[] = {
     {"run", ls_invoke_Runner184_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner184 = {"Runner184", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner184};
+static const LS_TypeInfo ls_type_Runner184 = {"Runner184", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner184, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng185_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng185_next((LS_Rng185*)self));
@@ -26210,7 +26210,7 @@ static const LS_MethodInfo ls_methods_Rng185[] = {
     {"next", ls_invoke_Rng185_next, 0},
     {"range", ls_invoke_Rng185_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng185 = {"Rng185", 1, ls_fields_Rng185, 2, ls_methods_Rng185};
+static const LS_TypeInfo ls_type_Rng185 = {"Rng185", 1, ls_fields_Rng185, 2, ls_methods_Rng185, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt185_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt185_manhattan((LS_Pt185*)self, ((LS_Pt185*)ls_unbox_object(arguments[0], &ls_type_Pt185))));
 }
@@ -26225,7 +26225,7 @@ static const LS_MethodInfo ls_methods_Pt185[] = {
     {"manhattan", ls_invoke_Pt185_manhattan, 1},
     {"dot", ls_invoke_Pt185_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt185 = {"Pt185", 2, ls_fields_Pt185, 2, ls_methods_Pt185};
+static const LS_TypeInfo ls_type_Pt185 = {"Pt185", 2, ls_fields_Pt185, 2, ls_methods_Pt185, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker185_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker185_add((LS_Worker185*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26255,7 +26255,7 @@ static const LS_MethodInfo ls_methods_Worker185[] = {
     {"fib", ls_invoke_Worker185_fib, 1},
     {"text", ls_invoke_Worker185_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker185 = {"Worker185", 4, ls_fields_Worker185, 5, ls_methods_Worker185};
+static const LS_TypeInfo ls_type_Worker185 = {"Worker185", 4, ls_fields_Worker185, 5, ls_methods_Worker185, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner185_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner185_run((LS_Runner185*)self));
@@ -26263,7 +26263,7 @@ static void ls_invoke_Runner185_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner185[] = {
     {"run", ls_invoke_Runner185_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner185 = {"Runner185", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner185};
+static const LS_TypeInfo ls_type_Runner185 = {"Runner185", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner185, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng186_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng186_next((LS_Rng186*)self));
@@ -26278,7 +26278,7 @@ static const LS_MethodInfo ls_methods_Rng186[] = {
     {"next", ls_invoke_Rng186_next, 0},
     {"range", ls_invoke_Rng186_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng186 = {"Rng186", 1, ls_fields_Rng186, 2, ls_methods_Rng186};
+static const LS_TypeInfo ls_type_Rng186 = {"Rng186", 1, ls_fields_Rng186, 2, ls_methods_Rng186, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt186_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt186_manhattan((LS_Pt186*)self, ((LS_Pt186*)ls_unbox_object(arguments[0], &ls_type_Pt186))));
 }
@@ -26293,7 +26293,7 @@ static const LS_MethodInfo ls_methods_Pt186[] = {
     {"manhattan", ls_invoke_Pt186_manhattan, 1},
     {"dot", ls_invoke_Pt186_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt186 = {"Pt186", 2, ls_fields_Pt186, 2, ls_methods_Pt186};
+static const LS_TypeInfo ls_type_Pt186 = {"Pt186", 2, ls_fields_Pt186, 2, ls_methods_Pt186, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker186_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker186_add((LS_Worker186*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26323,7 +26323,7 @@ static const LS_MethodInfo ls_methods_Worker186[] = {
     {"fib", ls_invoke_Worker186_fib, 1},
     {"text", ls_invoke_Worker186_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker186 = {"Worker186", 4, ls_fields_Worker186, 5, ls_methods_Worker186};
+static const LS_TypeInfo ls_type_Worker186 = {"Worker186", 4, ls_fields_Worker186, 5, ls_methods_Worker186, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner186_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner186_run((LS_Runner186*)self));
@@ -26331,7 +26331,7 @@ static void ls_invoke_Runner186_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner186[] = {
     {"run", ls_invoke_Runner186_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner186 = {"Runner186", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner186};
+static const LS_TypeInfo ls_type_Runner186 = {"Runner186", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner186, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng187_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng187_next((LS_Rng187*)self));
@@ -26346,7 +26346,7 @@ static const LS_MethodInfo ls_methods_Rng187[] = {
     {"next", ls_invoke_Rng187_next, 0},
     {"range", ls_invoke_Rng187_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng187 = {"Rng187", 1, ls_fields_Rng187, 2, ls_methods_Rng187};
+static const LS_TypeInfo ls_type_Rng187 = {"Rng187", 1, ls_fields_Rng187, 2, ls_methods_Rng187, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt187_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt187_manhattan((LS_Pt187*)self, ((LS_Pt187*)ls_unbox_object(arguments[0], &ls_type_Pt187))));
 }
@@ -26361,7 +26361,7 @@ static const LS_MethodInfo ls_methods_Pt187[] = {
     {"manhattan", ls_invoke_Pt187_manhattan, 1},
     {"dot", ls_invoke_Pt187_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt187 = {"Pt187", 2, ls_fields_Pt187, 2, ls_methods_Pt187};
+static const LS_TypeInfo ls_type_Pt187 = {"Pt187", 2, ls_fields_Pt187, 2, ls_methods_Pt187, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker187_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker187_add((LS_Worker187*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26391,7 +26391,7 @@ static const LS_MethodInfo ls_methods_Worker187[] = {
     {"fib", ls_invoke_Worker187_fib, 1},
     {"text", ls_invoke_Worker187_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker187 = {"Worker187", 4, ls_fields_Worker187, 5, ls_methods_Worker187};
+static const LS_TypeInfo ls_type_Worker187 = {"Worker187", 4, ls_fields_Worker187, 5, ls_methods_Worker187, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner187_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner187_run((LS_Runner187*)self));
@@ -26399,7 +26399,7 @@ static void ls_invoke_Runner187_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner187[] = {
     {"run", ls_invoke_Runner187_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner187 = {"Runner187", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner187};
+static const LS_TypeInfo ls_type_Runner187 = {"Runner187", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner187, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng188_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng188_next((LS_Rng188*)self));
@@ -26414,7 +26414,7 @@ static const LS_MethodInfo ls_methods_Rng188[] = {
     {"next", ls_invoke_Rng188_next, 0},
     {"range", ls_invoke_Rng188_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng188 = {"Rng188", 1, ls_fields_Rng188, 2, ls_methods_Rng188};
+static const LS_TypeInfo ls_type_Rng188 = {"Rng188", 1, ls_fields_Rng188, 2, ls_methods_Rng188, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt188_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt188_manhattan((LS_Pt188*)self, ((LS_Pt188*)ls_unbox_object(arguments[0], &ls_type_Pt188))));
 }
@@ -26429,7 +26429,7 @@ static const LS_MethodInfo ls_methods_Pt188[] = {
     {"manhattan", ls_invoke_Pt188_manhattan, 1},
     {"dot", ls_invoke_Pt188_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt188 = {"Pt188", 2, ls_fields_Pt188, 2, ls_methods_Pt188};
+static const LS_TypeInfo ls_type_Pt188 = {"Pt188", 2, ls_fields_Pt188, 2, ls_methods_Pt188, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker188_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker188_add((LS_Worker188*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26459,7 +26459,7 @@ static const LS_MethodInfo ls_methods_Worker188[] = {
     {"fib", ls_invoke_Worker188_fib, 1},
     {"text", ls_invoke_Worker188_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker188 = {"Worker188", 4, ls_fields_Worker188, 5, ls_methods_Worker188};
+static const LS_TypeInfo ls_type_Worker188 = {"Worker188", 4, ls_fields_Worker188, 5, ls_methods_Worker188, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner188_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner188_run((LS_Runner188*)self));
@@ -26467,7 +26467,7 @@ static void ls_invoke_Runner188_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner188[] = {
     {"run", ls_invoke_Runner188_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner188 = {"Runner188", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner188};
+static const LS_TypeInfo ls_type_Runner188 = {"Runner188", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner188, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng189_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng189_next((LS_Rng189*)self));
@@ -26482,7 +26482,7 @@ static const LS_MethodInfo ls_methods_Rng189[] = {
     {"next", ls_invoke_Rng189_next, 0},
     {"range", ls_invoke_Rng189_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng189 = {"Rng189", 1, ls_fields_Rng189, 2, ls_methods_Rng189};
+static const LS_TypeInfo ls_type_Rng189 = {"Rng189", 1, ls_fields_Rng189, 2, ls_methods_Rng189, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt189_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt189_manhattan((LS_Pt189*)self, ((LS_Pt189*)ls_unbox_object(arguments[0], &ls_type_Pt189))));
 }
@@ -26497,7 +26497,7 @@ static const LS_MethodInfo ls_methods_Pt189[] = {
     {"manhattan", ls_invoke_Pt189_manhattan, 1},
     {"dot", ls_invoke_Pt189_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt189 = {"Pt189", 2, ls_fields_Pt189, 2, ls_methods_Pt189};
+static const LS_TypeInfo ls_type_Pt189 = {"Pt189", 2, ls_fields_Pt189, 2, ls_methods_Pt189, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker189_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker189_add((LS_Worker189*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26527,7 +26527,7 @@ static const LS_MethodInfo ls_methods_Worker189[] = {
     {"fib", ls_invoke_Worker189_fib, 1},
     {"text", ls_invoke_Worker189_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker189 = {"Worker189", 4, ls_fields_Worker189, 5, ls_methods_Worker189};
+static const LS_TypeInfo ls_type_Worker189 = {"Worker189", 4, ls_fields_Worker189, 5, ls_methods_Worker189, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner189_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner189_run((LS_Runner189*)self));
@@ -26535,7 +26535,7 @@ static void ls_invoke_Runner189_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner189[] = {
     {"run", ls_invoke_Runner189_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner189 = {"Runner189", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner189};
+static const LS_TypeInfo ls_type_Runner189 = {"Runner189", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner189, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng190_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng190_next((LS_Rng190*)self));
@@ -26550,7 +26550,7 @@ static const LS_MethodInfo ls_methods_Rng190[] = {
     {"next", ls_invoke_Rng190_next, 0},
     {"range", ls_invoke_Rng190_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng190 = {"Rng190", 1, ls_fields_Rng190, 2, ls_methods_Rng190};
+static const LS_TypeInfo ls_type_Rng190 = {"Rng190", 1, ls_fields_Rng190, 2, ls_methods_Rng190, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt190_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt190_manhattan((LS_Pt190*)self, ((LS_Pt190*)ls_unbox_object(arguments[0], &ls_type_Pt190))));
 }
@@ -26565,7 +26565,7 @@ static const LS_MethodInfo ls_methods_Pt190[] = {
     {"manhattan", ls_invoke_Pt190_manhattan, 1},
     {"dot", ls_invoke_Pt190_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt190 = {"Pt190", 2, ls_fields_Pt190, 2, ls_methods_Pt190};
+static const LS_TypeInfo ls_type_Pt190 = {"Pt190", 2, ls_fields_Pt190, 2, ls_methods_Pt190, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker190_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker190_add((LS_Worker190*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26595,7 +26595,7 @@ static const LS_MethodInfo ls_methods_Worker190[] = {
     {"fib", ls_invoke_Worker190_fib, 1},
     {"text", ls_invoke_Worker190_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker190 = {"Worker190", 4, ls_fields_Worker190, 5, ls_methods_Worker190};
+static const LS_TypeInfo ls_type_Worker190 = {"Worker190", 4, ls_fields_Worker190, 5, ls_methods_Worker190, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner190_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner190_run((LS_Runner190*)self));
@@ -26603,7 +26603,7 @@ static void ls_invoke_Runner190_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner190[] = {
     {"run", ls_invoke_Runner190_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner190 = {"Runner190", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner190};
+static const LS_TypeInfo ls_type_Runner190 = {"Runner190", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner190, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng191_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng191_next((LS_Rng191*)self));
@@ -26618,7 +26618,7 @@ static const LS_MethodInfo ls_methods_Rng191[] = {
     {"next", ls_invoke_Rng191_next, 0},
     {"range", ls_invoke_Rng191_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng191 = {"Rng191", 1, ls_fields_Rng191, 2, ls_methods_Rng191};
+static const LS_TypeInfo ls_type_Rng191 = {"Rng191", 1, ls_fields_Rng191, 2, ls_methods_Rng191, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt191_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt191_manhattan((LS_Pt191*)self, ((LS_Pt191*)ls_unbox_object(arguments[0], &ls_type_Pt191))));
 }
@@ -26633,7 +26633,7 @@ static const LS_MethodInfo ls_methods_Pt191[] = {
     {"manhattan", ls_invoke_Pt191_manhattan, 1},
     {"dot", ls_invoke_Pt191_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt191 = {"Pt191", 2, ls_fields_Pt191, 2, ls_methods_Pt191};
+static const LS_TypeInfo ls_type_Pt191 = {"Pt191", 2, ls_fields_Pt191, 2, ls_methods_Pt191, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker191_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker191_add((LS_Worker191*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26663,7 +26663,7 @@ static const LS_MethodInfo ls_methods_Worker191[] = {
     {"fib", ls_invoke_Worker191_fib, 1},
     {"text", ls_invoke_Worker191_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker191 = {"Worker191", 4, ls_fields_Worker191, 5, ls_methods_Worker191};
+static const LS_TypeInfo ls_type_Worker191 = {"Worker191", 4, ls_fields_Worker191, 5, ls_methods_Worker191, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner191_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner191_run((LS_Runner191*)self));
@@ -26671,7 +26671,7 @@ static void ls_invoke_Runner191_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner191[] = {
     {"run", ls_invoke_Runner191_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner191 = {"Runner191", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner191};
+static const LS_TypeInfo ls_type_Runner191 = {"Runner191", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner191, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng192_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng192_next((LS_Rng192*)self));
@@ -26686,7 +26686,7 @@ static const LS_MethodInfo ls_methods_Rng192[] = {
     {"next", ls_invoke_Rng192_next, 0},
     {"range", ls_invoke_Rng192_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng192 = {"Rng192", 1, ls_fields_Rng192, 2, ls_methods_Rng192};
+static const LS_TypeInfo ls_type_Rng192 = {"Rng192", 1, ls_fields_Rng192, 2, ls_methods_Rng192, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt192_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt192_manhattan((LS_Pt192*)self, ((LS_Pt192*)ls_unbox_object(arguments[0], &ls_type_Pt192))));
 }
@@ -26701,7 +26701,7 @@ static const LS_MethodInfo ls_methods_Pt192[] = {
     {"manhattan", ls_invoke_Pt192_manhattan, 1},
     {"dot", ls_invoke_Pt192_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt192 = {"Pt192", 2, ls_fields_Pt192, 2, ls_methods_Pt192};
+static const LS_TypeInfo ls_type_Pt192 = {"Pt192", 2, ls_fields_Pt192, 2, ls_methods_Pt192, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker192_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker192_add((LS_Worker192*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26731,7 +26731,7 @@ static const LS_MethodInfo ls_methods_Worker192[] = {
     {"fib", ls_invoke_Worker192_fib, 1},
     {"text", ls_invoke_Worker192_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker192 = {"Worker192", 4, ls_fields_Worker192, 5, ls_methods_Worker192};
+static const LS_TypeInfo ls_type_Worker192 = {"Worker192", 4, ls_fields_Worker192, 5, ls_methods_Worker192, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner192_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner192_run((LS_Runner192*)self));
@@ -26739,7 +26739,7 @@ static void ls_invoke_Runner192_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner192[] = {
     {"run", ls_invoke_Runner192_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner192 = {"Runner192", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner192};
+static const LS_TypeInfo ls_type_Runner192 = {"Runner192", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner192, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng193_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng193_next((LS_Rng193*)self));
@@ -26754,7 +26754,7 @@ static const LS_MethodInfo ls_methods_Rng193[] = {
     {"next", ls_invoke_Rng193_next, 0},
     {"range", ls_invoke_Rng193_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng193 = {"Rng193", 1, ls_fields_Rng193, 2, ls_methods_Rng193};
+static const LS_TypeInfo ls_type_Rng193 = {"Rng193", 1, ls_fields_Rng193, 2, ls_methods_Rng193, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt193_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt193_manhattan((LS_Pt193*)self, ((LS_Pt193*)ls_unbox_object(arguments[0], &ls_type_Pt193))));
 }
@@ -26769,7 +26769,7 @@ static const LS_MethodInfo ls_methods_Pt193[] = {
     {"manhattan", ls_invoke_Pt193_manhattan, 1},
     {"dot", ls_invoke_Pt193_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt193 = {"Pt193", 2, ls_fields_Pt193, 2, ls_methods_Pt193};
+static const LS_TypeInfo ls_type_Pt193 = {"Pt193", 2, ls_fields_Pt193, 2, ls_methods_Pt193, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker193_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker193_add((LS_Worker193*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26799,7 +26799,7 @@ static const LS_MethodInfo ls_methods_Worker193[] = {
     {"fib", ls_invoke_Worker193_fib, 1},
     {"text", ls_invoke_Worker193_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker193 = {"Worker193", 4, ls_fields_Worker193, 5, ls_methods_Worker193};
+static const LS_TypeInfo ls_type_Worker193 = {"Worker193", 4, ls_fields_Worker193, 5, ls_methods_Worker193, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner193_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner193_run((LS_Runner193*)self));
@@ -26807,7 +26807,7 @@ static void ls_invoke_Runner193_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner193[] = {
     {"run", ls_invoke_Runner193_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner193 = {"Runner193", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner193};
+static const LS_TypeInfo ls_type_Runner193 = {"Runner193", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner193, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng194_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng194_next((LS_Rng194*)self));
@@ -26822,7 +26822,7 @@ static const LS_MethodInfo ls_methods_Rng194[] = {
     {"next", ls_invoke_Rng194_next, 0},
     {"range", ls_invoke_Rng194_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng194 = {"Rng194", 1, ls_fields_Rng194, 2, ls_methods_Rng194};
+static const LS_TypeInfo ls_type_Rng194 = {"Rng194", 1, ls_fields_Rng194, 2, ls_methods_Rng194, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt194_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt194_manhattan((LS_Pt194*)self, ((LS_Pt194*)ls_unbox_object(arguments[0], &ls_type_Pt194))));
 }
@@ -26837,7 +26837,7 @@ static const LS_MethodInfo ls_methods_Pt194[] = {
     {"manhattan", ls_invoke_Pt194_manhattan, 1},
     {"dot", ls_invoke_Pt194_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt194 = {"Pt194", 2, ls_fields_Pt194, 2, ls_methods_Pt194};
+static const LS_TypeInfo ls_type_Pt194 = {"Pt194", 2, ls_fields_Pt194, 2, ls_methods_Pt194, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker194_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker194_add((LS_Worker194*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26867,7 +26867,7 @@ static const LS_MethodInfo ls_methods_Worker194[] = {
     {"fib", ls_invoke_Worker194_fib, 1},
     {"text", ls_invoke_Worker194_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker194 = {"Worker194", 4, ls_fields_Worker194, 5, ls_methods_Worker194};
+static const LS_TypeInfo ls_type_Worker194 = {"Worker194", 4, ls_fields_Worker194, 5, ls_methods_Worker194, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner194_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner194_run((LS_Runner194*)self));
@@ -26875,7 +26875,7 @@ static void ls_invoke_Runner194_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner194[] = {
     {"run", ls_invoke_Runner194_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner194 = {"Runner194", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner194};
+static const LS_TypeInfo ls_type_Runner194 = {"Runner194", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner194, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng195_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng195_next((LS_Rng195*)self));
@@ -26890,7 +26890,7 @@ static const LS_MethodInfo ls_methods_Rng195[] = {
     {"next", ls_invoke_Rng195_next, 0},
     {"range", ls_invoke_Rng195_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng195 = {"Rng195", 1, ls_fields_Rng195, 2, ls_methods_Rng195};
+static const LS_TypeInfo ls_type_Rng195 = {"Rng195", 1, ls_fields_Rng195, 2, ls_methods_Rng195, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt195_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt195_manhattan((LS_Pt195*)self, ((LS_Pt195*)ls_unbox_object(arguments[0], &ls_type_Pt195))));
 }
@@ -26905,7 +26905,7 @@ static const LS_MethodInfo ls_methods_Pt195[] = {
     {"manhattan", ls_invoke_Pt195_manhattan, 1},
     {"dot", ls_invoke_Pt195_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt195 = {"Pt195", 2, ls_fields_Pt195, 2, ls_methods_Pt195};
+static const LS_TypeInfo ls_type_Pt195 = {"Pt195", 2, ls_fields_Pt195, 2, ls_methods_Pt195, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker195_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker195_add((LS_Worker195*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -26935,7 +26935,7 @@ static const LS_MethodInfo ls_methods_Worker195[] = {
     {"fib", ls_invoke_Worker195_fib, 1},
     {"text", ls_invoke_Worker195_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker195 = {"Worker195", 4, ls_fields_Worker195, 5, ls_methods_Worker195};
+static const LS_TypeInfo ls_type_Worker195 = {"Worker195", 4, ls_fields_Worker195, 5, ls_methods_Worker195, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner195_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner195_run((LS_Runner195*)self));
@@ -26943,7 +26943,7 @@ static void ls_invoke_Runner195_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner195[] = {
     {"run", ls_invoke_Runner195_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner195 = {"Runner195", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner195};
+static const LS_TypeInfo ls_type_Runner195 = {"Runner195", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner195, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng196_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng196_next((LS_Rng196*)self));
@@ -26958,7 +26958,7 @@ static const LS_MethodInfo ls_methods_Rng196[] = {
     {"next", ls_invoke_Rng196_next, 0},
     {"range", ls_invoke_Rng196_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng196 = {"Rng196", 1, ls_fields_Rng196, 2, ls_methods_Rng196};
+static const LS_TypeInfo ls_type_Rng196 = {"Rng196", 1, ls_fields_Rng196, 2, ls_methods_Rng196, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt196_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt196_manhattan((LS_Pt196*)self, ((LS_Pt196*)ls_unbox_object(arguments[0], &ls_type_Pt196))));
 }
@@ -26973,7 +26973,7 @@ static const LS_MethodInfo ls_methods_Pt196[] = {
     {"manhattan", ls_invoke_Pt196_manhattan, 1},
     {"dot", ls_invoke_Pt196_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt196 = {"Pt196", 2, ls_fields_Pt196, 2, ls_methods_Pt196};
+static const LS_TypeInfo ls_type_Pt196 = {"Pt196", 2, ls_fields_Pt196, 2, ls_methods_Pt196, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker196_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker196_add((LS_Worker196*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -27003,7 +27003,7 @@ static const LS_MethodInfo ls_methods_Worker196[] = {
     {"fib", ls_invoke_Worker196_fib, 1},
     {"text", ls_invoke_Worker196_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker196 = {"Worker196", 4, ls_fields_Worker196, 5, ls_methods_Worker196};
+static const LS_TypeInfo ls_type_Worker196 = {"Worker196", 4, ls_fields_Worker196, 5, ls_methods_Worker196, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner196_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner196_run((LS_Runner196*)self));
@@ -27011,7 +27011,7 @@ static void ls_invoke_Runner196_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner196[] = {
     {"run", ls_invoke_Runner196_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner196 = {"Runner196", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner196};
+static const LS_TypeInfo ls_type_Runner196 = {"Runner196", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner196, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng197_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng197_next((LS_Rng197*)self));
@@ -27026,7 +27026,7 @@ static const LS_MethodInfo ls_methods_Rng197[] = {
     {"next", ls_invoke_Rng197_next, 0},
     {"range", ls_invoke_Rng197_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng197 = {"Rng197", 1, ls_fields_Rng197, 2, ls_methods_Rng197};
+static const LS_TypeInfo ls_type_Rng197 = {"Rng197", 1, ls_fields_Rng197, 2, ls_methods_Rng197, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt197_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt197_manhattan((LS_Pt197*)self, ((LS_Pt197*)ls_unbox_object(arguments[0], &ls_type_Pt197))));
 }
@@ -27041,7 +27041,7 @@ static const LS_MethodInfo ls_methods_Pt197[] = {
     {"manhattan", ls_invoke_Pt197_manhattan, 1},
     {"dot", ls_invoke_Pt197_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt197 = {"Pt197", 2, ls_fields_Pt197, 2, ls_methods_Pt197};
+static const LS_TypeInfo ls_type_Pt197 = {"Pt197", 2, ls_fields_Pt197, 2, ls_methods_Pt197, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker197_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker197_add((LS_Worker197*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -27071,7 +27071,7 @@ static const LS_MethodInfo ls_methods_Worker197[] = {
     {"fib", ls_invoke_Worker197_fib, 1},
     {"text", ls_invoke_Worker197_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker197 = {"Worker197", 4, ls_fields_Worker197, 5, ls_methods_Worker197};
+static const LS_TypeInfo ls_type_Worker197 = {"Worker197", 4, ls_fields_Worker197, 5, ls_methods_Worker197, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner197_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner197_run((LS_Runner197*)self));
@@ -27079,7 +27079,7 @@ static void ls_invoke_Runner197_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner197[] = {
     {"run", ls_invoke_Runner197_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner197 = {"Runner197", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner197};
+static const LS_TypeInfo ls_type_Runner197 = {"Runner197", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner197, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng198_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng198_next((LS_Rng198*)self));
@@ -27094,7 +27094,7 @@ static const LS_MethodInfo ls_methods_Rng198[] = {
     {"next", ls_invoke_Rng198_next, 0},
     {"range", ls_invoke_Rng198_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng198 = {"Rng198", 1, ls_fields_Rng198, 2, ls_methods_Rng198};
+static const LS_TypeInfo ls_type_Rng198 = {"Rng198", 1, ls_fields_Rng198, 2, ls_methods_Rng198, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt198_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt198_manhattan((LS_Pt198*)self, ((LS_Pt198*)ls_unbox_object(arguments[0], &ls_type_Pt198))));
 }
@@ -27109,7 +27109,7 @@ static const LS_MethodInfo ls_methods_Pt198[] = {
     {"manhattan", ls_invoke_Pt198_manhattan, 1},
     {"dot", ls_invoke_Pt198_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt198 = {"Pt198", 2, ls_fields_Pt198, 2, ls_methods_Pt198};
+static const LS_TypeInfo ls_type_Pt198 = {"Pt198", 2, ls_fields_Pt198, 2, ls_methods_Pt198, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker198_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker198_add((LS_Worker198*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -27139,7 +27139,7 @@ static const LS_MethodInfo ls_methods_Worker198[] = {
     {"fib", ls_invoke_Worker198_fib, 1},
     {"text", ls_invoke_Worker198_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker198 = {"Worker198", 4, ls_fields_Worker198, 5, ls_methods_Worker198};
+static const LS_TypeInfo ls_type_Worker198 = {"Worker198", 4, ls_fields_Worker198, 5, ls_methods_Worker198, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner198_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner198_run((LS_Runner198*)self));
@@ -27147,7 +27147,7 @@ static void ls_invoke_Runner198_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner198[] = {
     {"run", ls_invoke_Runner198_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner198 = {"Runner198", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner198};
+static const LS_TypeInfo ls_type_Runner198 = {"Runner198", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner198, 0, LS_KIND_OBJECT};
 static void ls_invoke_Rng199_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Rng199_next((LS_Rng199*)self));
@@ -27162,7 +27162,7 @@ static const LS_MethodInfo ls_methods_Rng199[] = {
     {"next", ls_invoke_Rng199_next, 0},
     {"range", ls_invoke_Rng199_range, 2},
 };
-static const LS_TypeInfo ls_type_Rng199 = {"Rng199", 1, ls_fields_Rng199, 2, ls_methods_Rng199};
+static const LS_TypeInfo ls_type_Rng199 = {"Rng199", 1, ls_fields_Rng199, 2, ls_methods_Rng199, 0, LS_KIND_OBJECT};
 static void ls_invoke_Pt199_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Pt199_manhattan((LS_Pt199*)self, ((LS_Pt199*)ls_unbox_object(arguments[0], &ls_type_Pt199))));
 }
@@ -27177,7 +27177,7 @@ static const LS_MethodInfo ls_methods_Pt199[] = {
     {"manhattan", ls_invoke_Pt199_manhattan, 1},
     {"dot", ls_invoke_Pt199_dot, 1},
 };
-static const LS_TypeInfo ls_type_Pt199 = {"Pt199", 2, ls_fields_Pt199, 2, ls_methods_Pt199};
+static const LS_TypeInfo ls_type_Pt199 = {"Pt199", 2, ls_fields_Pt199, 2, ls_methods_Pt199, 0, LS_KIND_OBJECT};
 static void ls_invoke_Worker199_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Worker199_add((LS_Worker199*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -27207,7 +27207,7 @@ static const LS_MethodInfo ls_methods_Worker199[] = {
     {"fib", ls_invoke_Worker199_fib, 1},
     {"text", ls_invoke_Worker199_text, 1},
 };
-static const LS_TypeInfo ls_type_Worker199 = {"Worker199", 4, ls_fields_Worker199, 5, ls_methods_Worker199};
+static const LS_TypeInfo ls_type_Worker199 = {"Worker199", 4, ls_fields_Worker199, 5, ls_methods_Worker199, 0, LS_KIND_OBJECT};
 static void ls_invoke_Runner199_run(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Runner199_run((LS_Runner199*)self));
@@ -27215,7 +27215,7 @@ static void ls_invoke_Runner199_run(void* self, const LS_Value* arguments, LS_Va
 static const LS_MethodInfo ls_methods_Runner199[] = {
     {"run", ls_invoke_Runner199_run, 0},
 };
-static const LS_TypeInfo ls_type_Runner199 = {"Runner199", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner199};
+static const LS_TypeInfo ls_type_Runner199 = {"Runner199", 0, (const LS_FieldInfo*)0, 1, ls_methods_Runner199, 0, LS_KIND_OBJECT};
 
 LS_Rng0* ls_Rng0_new(ls_int seed) {
     LS_Rng0* self = (LS_Rng0*)ls_alloc(sizeof(LS_Rng0), ls_trace_Rng0);

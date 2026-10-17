@@ -12,6 +12,7 @@ typedef struct LS_Text LS_Text;
 typedef struct LS_Player LS_Player;
 typedef struct LS_Application LS_Application;
 typedef struct LS_Board LS_Board;
+typedef struct LS_Mystruct LS_Mystruct;
 static const LS_TypeInfo ls_type_Random;
 static const LS_TypeInfo ls_type_Point;
 static const LS_TypeInfo ls_type_Calculator;
@@ -23,13 +24,14 @@ static const LS_TypeInfo ls_type_Text;
 static const LS_TypeInfo ls_type_Player;
 static const LS_TypeInfo ls_type_Application;
 static const LS_TypeInfo ls_type_Board;
+static const LS_TypeInfo ls_type_Mystruct;
 
-static const LS_TypeInfo ls_listtype_29;
 static const LS_TypeInfo ls_listtype_30;
-static const LS_FieldInfo ls_listfields_29[] = {{"element", 0, LS_KIND_OBJECT, 0, &ls_type_Player}};
-static const LS_TypeInfo ls_listtype_29 = {"Player[]", 1, ls_listfields_29, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
-static const LS_FieldInfo ls_listfields_30[] = {{"element", 0, LS_KIND_INT, 0, (const LS_TypeInfo*)0}};
-static const LS_TypeInfo ls_listtype_30 = {"int[]", 1, ls_listfields_30, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
+static const LS_TypeInfo ls_listtype_31;
+static const LS_FieldInfo ls_listfields_30[] = {{"element", 0, LS_KIND_OBJECT, 0, &ls_type_Player}};
+static const LS_TypeInfo ls_listtype_30 = {"Player[]", 1, ls_listfields_30, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
+static const LS_FieldInfo ls_listfields_31[] = {{"element", 0, LS_KIND_INT, 0, (const LS_TypeInfo*)0}};
+static const LS_TypeInfo ls_listtype_31 = {"int[]", 1, ls_listfields_31, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
 
 #define LS_Shape_Circle ((ls_int)0)
 #define LS_Shape_Square ((ls_int)1)
@@ -39,6 +41,10 @@ static const LS_TypeInfo ls_listtype_30 = {"int[]", 1, ls_listfields_30, 0, (con
 #define LS_Op_Mul ((ls_int)2)
 #define LS_Op_Div ((ls_int)3)
 
+struct LS_Mystruct {
+    ls_string s;
+    LS_Mat4x4 matrix;
+};
 struct LS_Random {
     const LS_TypeInfo* ls_type;
     ls_int state;
@@ -131,6 +137,7 @@ static void ls_trace_Board(void* runtime_context, void* object) {
     LS_Board* self = (LS_Board*)object;
     ls_runtime->mark(runtime_context, self->positions);
 }
+static void ls_trace_cell_Mystruct(void* runtime_context, void* object) { ls_trace_struct_value(runtime_context, &ls_type_Mystruct, (const char*)object); }
 static ls_string ls_name_name;
 static ls_string ls_name_key1;
 static ls_string ls_name_key2;
@@ -164,6 +171,7 @@ typedef struct LS_ModuleState {
     LS_Vec3i v3;
     LS_Board* theboard;
     LS_Mat4x4 m;
+    ls_int ls_static_Board__HELLO;
 } LS_ModuleState;
 static LS_ModuleState ls_state;
 void ls_module_trace_roots(void* runtime_context) {
@@ -228,6 +236,7 @@ void* ls_global_vi(void) { return &ls_state.vi; }
 void* ls_global_v3(void) { return &ls_state.v3; }
 void* ls_global_theboard(void) { return &ls_state.theboard; }
 void* ls_global_m(void) { return &ls_state.m; }
+void* ls_global_static_Board__HELLO(void) { return &ls_state.ls_static_Board__HELLO; }
 LS_Random* ls_Random_new(ls_int seed);
 ls_int ls_Random_next(LS_Random* self);
 ls_int ls_Random_range(LS_Random* self, ls_int low, ls_int high);
@@ -259,6 +268,8 @@ LS_Board* ls_Board_new(void);
 ls_int ls_Board_get_board(LS_Board* self, LS_Vec2i vec);
 void ls_Board_set_board(LS_Board* self, LS_Vec2i vec, ls_int i);
 void ls_Board_clear_board(LS_Board* self, LS_Vec2i newsize, ls_int value);
+LS_Mystruct ls_Mystruct_default(void);
+ls_bool ls_Mystruct_eq(LS_Mystruct a, LS_Mystruct b);
 
 static void ls_invoke_Random_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
@@ -397,6 +408,11 @@ static const LS_MethodInfo ls_methods_Board[] = {
     {"clear_board", ls_invoke_Board_clear_board, 2},
 };
 static const LS_TypeInfo ls_type_Board = {"Board", 2, ls_fields_Board, 3, ls_methods_Board, 0, LS_KIND_OBJECT};
+static const LS_FieldInfo ls_fields_Mystruct[] = {
+    {"s", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, s), LS_KIND_STRING, 0, (const LS_TypeInfo*)0},
+    {"matrix", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, matrix), LS_KIND_STRUCT, 0, &ls_type_Mat4x4},
+};
+static const LS_TypeInfo ls_type_Mystruct = {"Mystruct", 2, ls_fields_Mystruct, 0, (const LS_MethodInfo*)0, sizeof(LS_Mystruct), LS_KIND_STRUCT};
 
 LS_Random* ls_Random_new(ls_int seed) {
     LS_Random* self = (LS_Random*)ls_alloc(sizeof(LS_Random), ls_trace_Random);
@@ -660,6 +676,15 @@ void ls_Board_clear_board(LS_Board* self, LS_Vec2i newsize, ls_int value) {
         }
     }
 }
+LS_Mystruct ls_Mystruct_default(void) {
+    LS_Mystruct ls_value = {0}; LS_Mystruct* self = &ls_value; (void)self;
+    self->s = ls_intern("");
+    self->matrix = ls_Mat4x4_default();
+    return ls_value;
+}
+ls_bool ls_Mystruct_eq(LS_Mystruct a, LS_Mystruct b) {
+    return 1 && a.s == b.s && ls_Mat4x4_eq(a.matrix, b.matrix);
+}
 static void ls_lambda_0(void* environment, const LS_Value* arguments, LS_Value* result) {
     (void)environment;
     (void)arguments; (void)result;
@@ -686,6 +711,7 @@ static void ls_lambda_3(void* environment, const LS_Value* arguments, LS_Value* 
 }
 
 int ls_module_init(void) {
+    ls_state.ls_static_Board__HELLO = 0;
     ({ ls_printf(ls_intern("hello world\n"), 0, (const LS_Value*)0); });
     ls_state.rng = ls_Random_new(1234);
     ls_state.stats = ls_Stats_new();

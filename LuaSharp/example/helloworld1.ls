@@ -237,6 +237,12 @@ for(i in subintegers) {
 printf("%d\n",integers[0]);
 
 class Player {
+    Player(int x) {
+
+    }
+    Player(string s) {
+        name = s;
+    }
     string player_func() {
         return "Player name:"+name;
     }
@@ -249,7 +255,7 @@ class Player {
 
 
 }
-auto p = new Player();
+auto p = new Player("asdf");
 p.set_name("charlie");
 printf(p.player_func());
 p.otherplayers.push_back(p);
@@ -279,6 +285,8 @@ vi +=Vec2i(v3.x,v3.z);
 printf("%s",string(vi));
 
 class Board {
+    static int HELLO = 0;
+
     int get_board(Vec2i vec) {
         return positions[vec.x + vec.y*size.x];
     }
@@ -306,7 +314,23 @@ Mat4x4 m = Mat4x4.identity();
 m = m * Mat4x4.from_pos_rot(Vec3(), Quat());
 m = m.inverse();
 
+struct Mystruct {
+    string s;
+    Mat4x4 matrix;
+    void function() {
 
+    }
+}
+auto ms = Mystruct();
+ms.function();
+
+
+
+class Util {
+    static bool contains(string s, string b) {
+        return s.contains(b);
+    }
+}
 
 /*
 Wants:
