@@ -76,7 +76,8 @@ Milestone 4 found these items:
 
 ### Declarations
 
-- The C++ codegen writes `engine.ls`. It declares each reflected class as `extern class`, with its `REF` fields and functions. The checker and the LSP read it like other source.
+- The C++ codegen makes the engine declarations and puts them into the binary. They declare each reflected class as `extern class`, with its `REF` fields and functions.
+- The editor writes them to `<scripts>/.luasharp/engine.ls` for the tools. The checker and the LSP find that file through `luasharp.json`.
 - An `extern` method has no body. The C backend calls a generated C thunk for it.
 
 ### Calls from script to C++

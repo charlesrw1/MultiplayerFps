@@ -10,6 +10,7 @@
 #include "External/ImGuizmo.h"
 #include "Framework/MeshBuilder.h"
 #include "Framework/Files.h"
+#include "Scripting/LuaSharpDeclarations.h"
 #include "Framework/MyImguiLib.h"
 #include "Framework/DictWriter.h"
 #include "Physics/Physics2.h"
@@ -518,6 +519,8 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 
 EditorDoc::EditorDoc() : vis_filter(*this) {
 	assert(eng->get_level());
+	// The LuaSharp tools of this project read the declarations of the running engine.
+	write_luasharp_declarations(FileSys::get_full_path_from_game_path("scripts"));
 }
 
 EditorDoc::~EditorDoc() {

@@ -41,8 +41,8 @@ public:
 	// by name, and its [Editable] fields are its PropertyInfos (PROP_SCRIPT_FIELD).
 	// Throws std::runtime_error when the source does not compile or a class cannot be registered.
 	const luasharp::NativeModule& load(const std::string& name, std::string_view source);
-	// Loads each .ls file in the game folder `dir` and its subfolders, except generated declarations (*engine.ls)
-	// and files in a subfolder named in skip_dirs. The module name is the game path. Errors are logged.
+	// Loads each .ls file in the game folder `dir` and its subfolders, except the declarations for tools
+	// (.luasharp/) and files in a subfolder named in skip_dirs. The module name is the game path. Errors are logged.
 	// Returns the number of modules loaded.
 	int load_script_files(const std::string& dir, std::span<const std::string_view> skip_dirs = {});
 	const luasharp::NativeModule* find_module(const std::string& name) const;

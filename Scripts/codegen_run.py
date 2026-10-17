@@ -60,9 +60,8 @@ def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuil
         mega_output.additional_includes.append(f'"{o.root}/{o.filename}"')
 
     luasharp_types = codegen_luasharp.parse_all_classes(typename_skip_dirs if typename_skip_dirs is not None else skip_dirs)
+    # The declarations go into the C++ only; the engine writes them for the tools (write_luasharp_declarations).
     luasharp = codegen_luasharp.generate(mega_output.classes, luasharp_types, mega_name)
-    luasharp_filename = "engine.ls" if mega_name == "MEGA" else mega_name.lower() + "_engine.ls"
-    generate.write_if_changed(lua_output_path + "/" + luasharp_filename, luasharp.declarations, "LuaSharp declarations")
     if luasharp.cpp:
         mega_output.additional_includes.append('"Scripting/LuaSharpBinding.h"') # ScriptImpl_* slot calls use it
 

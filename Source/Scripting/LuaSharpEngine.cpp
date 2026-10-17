@@ -186,6 +186,13 @@ Registrar::Registrar(const char* pass, std::span<const char* const> declarations
 	bindings_registry().push_back(&bindings);
 }
 std::span<const Bindings* const> all_bindings() { return bindings_registry(); }
+std::string declaration_source() {
+	std::string source;
+	for (const Bindings* b : all_bindings())
+		for (const char* chunk : b->declarations)
+			source.append(chunk).append("\n");
+	return source;
+}
 
 std::string_view view(const void* string) {
 	if (!string)
@@ -246,8 +253,6 @@ LuaSharpEngine::LuaSharpEngine() : runtime_(luasharp::NativeRuntime::Create()) {
 			[[maybe_unused]] const bool added = bases.emplace(c.name, c.base).second;
 			ASSERT(added); // one codegen pass owns each class
 		}
-		for (const char* chunk : b->declarations)
-			declarations_.append(chunk).append("\n");
 		for (const lsbind::Symbol& s : b->symbols)
 			symbols_.push_back({s.name, s.address});
 		for (const lsbind::Scriptable& s : b->scriptables) {
@@ -266,6 +271,7 @@ LuaSharpEngine::LuaSharpEngine() : runtime_(luasharp::NativeRuntime::Create()) {
 	};
 	for (const auto& [name, base] : bases)
 		register_class(register_class, name);
+	declarations_ = lsbind::declaration_source();
 	types_ = luasharp::DeclarationTypes({declarations_});
 	inst = this;
 }
@@ -387,7 +393,7 @@ int LuaSharpEngine::load_script_files(const std::string& dir, std::span<const st
 		for (std::string_view skip : skip_dirs)
 			if (path.find("/" + std::string(skip) + "/") != std::string::npos)
 				return true;
-		return path.ends_with("engine.ls"); // generated declarations; compile() adds them to each module
+		return path.find("/.luasharp/") != std::string::npos; // declarations for tools; compile() has them already
 	};
 	int loaded = 0;
 	for (const std::string& full_path : FileSys::find_game_files_path(dir)) {

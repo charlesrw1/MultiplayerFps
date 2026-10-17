@@ -1,5 +1,6 @@
 #include "Compiler.h"
 #include "CBackend.h"
+#include "Project.h"
 #include "Semantic.h"
 
 #include <chrono>
@@ -7,6 +8,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 
 namespace {
@@ -21,6 +23,22 @@ void WriteOutput(const std::filesystem::path& output, std::string_view contents)
     if (!file) throw std::runtime_error("Cannot write " + output.string());
     file.write(contents.data(), static_cast<std::streamsize>(contents.size()));
     if (!file) throw std::runtime_error("Failed while writing " + output.string());
+}
+
+// The host types declared by the luasharp.json project of input, if any. Cached per project.
+const std::vector<luasharp::ExternalType>& ProjectTypes(const std::filesystem::path& input) {
+    static std::map<std::string, std::vector<luasharp::ExternalType>> cache;
+    static const std::vector<luasharp::ExternalType> none;
+    const auto projectFile = luasharp::FindProjectFile(input);
+    if (!projectFile) return none;
+    const auto key = luasharp::PathKey(*projectFile);
+    if (const auto found = cache.find(key); found != cache.end()) return found->second;
+    const auto project = luasharp::LoadProject(*projectFile);
+    for (const auto& entry : project.missing)
+        std::cerr << projectFile->string() << ": warning: declaration path '" << entry << "' does not exist\n";
+    std::vector<std::string> sources;
+    for (const auto& file : project.declarationFiles) sources.push_back(ReadSource(file));
+    return cache.emplace(key, luasharp::DeclarationTypes(sources)).first->second;
 }
 
 bool ReportDiagnostics(const std::filesystem::path& input, const luasharp::Analysis& analysis) {
@@ -43,9 +61,12 @@ int CompileNative(const std::filesystem::path& input, const std::filesystem::pat
     using Clock = std::chrono::steady_clock;
     const auto milliseconds = [](Clock::time_point from, Clock::time_point to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
     const auto source = ReadSource(input);
-    const auto analysis = luasharp::Analyze(source);
+    // A standalone run has no host to give the declared functions.
+    static const std::vector<luasharp::ExternalType> none;
+    const auto& types = execute ? none : ProjectTypes(input);
+    const auto analysis = luasharp::Analyze(source, types);
     if (ReportDiagnostics(input, analysis)) return 1;
-    auto generated = luasharp::CompileToC(analysis);
+    auto generated = luasharp::CompileToC(analysis, types);
     const auto frontendEnd = Clock::now();
     WriteOutput(output, generated.c);
     const auto writeEnd = Clock::now();
@@ -68,7 +89,8 @@ void Usage() {
               << "  luasharp <file.ls> [-o generated.c]       Emit C, compile, and run\n"
               << "  luasharp run <file.ls> [-o generated.c]   Emit C, compile, and run\n"
               << "  luasharp emit-c <file.ls> [-o output.c]   Emit C only\n"
-              << "  luasharp check <file.ls> [more files]\n";
+              << "  luasharp check <file.ls> [more files]\n"
+              << "check and emit-c use the declarations of the nearest luasharp.json above each file.\n";
 }
 }
 
@@ -81,7 +103,7 @@ int main(int argc, char** argv) {
             bool failed = false;
             for (int index = 2; index < argc; ++index) {
                 const std::filesystem::path input = argv[index];
-                try { failed = ReportDiagnostics(input, luasharp::Analyze(ReadSource(input))) || failed; }
+                try { failed = ReportDiagnostics(input, luasharp::Analyze(ReadSource(input), ProjectTypes(input))) || failed; }
                 catch (const std::exception& error) { std::cerr << "luasharp: " << error.what() << '\n'; failed = true; }
             }
             return failed ? 1 : 0;

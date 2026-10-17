@@ -30,7 +30,27 @@ try {
     assert.match(failed.stderr, /invalid\.ls\(1,\d+\): error: Cannot assign/);
     assert.equal(fs.existsSync(invalidOutput), false, "CLI emitted C despite semantic errors");
 
-    console.log("PASS LuaSharp CLI: diagnostics, C emission, native compilation, execution, and printf");
+    // check and emit-c see the declarations of luasharp.json; a missing declaration path is a warning.
+    const project = path.join(directory, "project");
+    fs.mkdirSync(path.join(project, ".luasharp"), { recursive: true });
+    fs.mkdirSync(path.join(project, "game"));
+    fs.writeFileSync(path.join(project, "luasharp.json"), JSON.stringify({ declarations: [".luasharp", "missing.ls"] }));
+    fs.writeFileSync(path.join(project, ".luasharp", "engine.ls"), "extern class Engine { static int Frame(); }");
+    const user = path.join(project, "game", "user.ls");
+    fs.writeFileSync(user, "int frame = Engine.Frame();\n");
+    const checked = spawnSync(executable, ["check", user], { encoding: "utf8" });
+    assert.equal(checked.status, 0, `check did not use the project declarations:\n${checked.stderr}`);
+    assert.match(checked.stderr, /declaration path 'missing\.ls' does not exist/);
+    const outside = path.join(directory, "outside.ls");
+    fs.copyFileSync(user, outside);
+    assert.equal(spawnSync(executable, ["check", outside], { encoding: "utf8" }).status, 1, "a file outside the project saw its declarations");
+    const plain = path.join(project, "game", "plain.ls");
+    fs.writeFileSync(plain, 'printf("plain=%d\\n", 7);\n');
+    const plainRun = spawnSync(executable, ["run", plain], { encoding: "utf8" });
+    assert.equal(plainRun.status, 0, `run in a project must not link the host declarations:\n${plainRun.stderr}`);
+    assert.match(plainRun.stdout, /plain=7/);
+
+    console.log("PASS LuaSharp CLI: diagnostics, C emission, native compilation, execution, printf, and luasharp.json projects");
 } finally {
     fs.rmSync(directory, { recursive: true, force: true });
 }

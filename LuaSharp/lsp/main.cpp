@@ -1,5 +1,6 @@
 #include "Compiler.h"
 #include "Builtins.h"
+#include "Project.h"
 #include "Semantic.h"
 
 #include <windows.h>
@@ -8,14 +9,18 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 
 using json = nlohmann::json;
+namespace fs = std::filesystem;
 
 namespace {
 // Analyses are cached per document. A text change drops only that document's
@@ -26,6 +31,10 @@ struct Document {
     std::vector<luasharp::ExternalType> exports;    // types this file offers the others
     std::unique_ptr<luasharp::Analysis> editor;     // with the other files' exports
     uint64_t editorRevision{};                      // exportsRevision the editor analysis was built against
+    std::string pathKey;                            // luasharp::PathKey of its file; empty for a non-file uri
+    std::string project;                            // PathKey of its luasharp.json; empty outside a project
+    bool declaration{};                             // one of its project's declaration files
+    fs::file_time_type stamp{};                     // declaration files: write time of the text read from disk
 
     void SetText(std::string value) { text = std::move(value); standalone.reset(); editor.reset(); }
 };
@@ -33,9 +42,93 @@ std::unordered_map<std::string, Document> documents;        // open in the edito
 std::unordered_map<std::string, Document> indexedDocuments; // workspace files; open documents win
 uint64_t exportsRevision = 1;                               // advances when the set of exported types changes
 
+struct ProjectEntry {
+    fs::path file;                         // luasharp.json
+    fs::file_time_type stamp{(fs::file_time_type::min)()};
+    std::vector<std::string> declarationUris;
+};
+std::unordered_map<std::string, ProjectEntry> projects;          // by PathKey of luasharp.json
+std::unordered_map<std::string, Document> declarationDocuments; // read from disk, by uri
+
 template <typename Visit> void ForEachDocument(Visit&& visit) {
     for (auto& [uri, document] : documents) visit(uri, document);
     for (auto& [uri, document] : indexedDocuments) if (!documents.contains(uri)) visit(uri, document);
+}
+
+std::string PercentDecode(std::string_view text) {
+    std::string result;
+    for (size_t i{}; i < text.size(); ++i) {
+        if (text[i] == '%' && i + 2 < text.size() && std::isxdigit(static_cast<unsigned char>(text[i + 1])) && std::isxdigit(static_cast<unsigned char>(text[i + 2]))) {
+            result += static_cast<char>(std::stoi(std::string(text.substr(i + 1, 2)), nullptr, 16)); i += 2;
+        } else result += text[i];
+    }
+    return result;
+}
+std::optional<fs::path> UriToPath(const std::string& uri) {
+    if (!uri.starts_with("file://")) return std::nullopt;
+    auto path = PercentDecode(std::string_view(uri).substr(7));
+    if (path.size() > 2 && path[0] == '/' && path[2] == ':') path.erase(0, 1); // file:///c:/x
+    return fs::path(std::u8string(path.begin(), path.end()));
+}
+std::string PathToUri(const fs::path& path) {
+    static const char* hex = "0123456789ABCDEF";
+    std::string result = "file:///";
+    for (const char8_t c : fs::absolute(path).generic_u8string()) {
+        if (std::isalnum(c) || std::string_view("/:-._~").find(static_cast<char>(c)) != std::string_view::npos) result += static_cast<char>(c);
+        else { result += '%'; result += hex[c >> 4]; result += hex[c & 15]; }
+    }
+    return result;
+}
+fs::file_time_type WriteTime(const fs::path& path) {
+    std::error_code ec; const auto time = fs::last_write_time(path, ec);
+    return ec ? (fs::file_time_type::min)() : time;
+}
+std::string ReadText(const fs::path& path) {
+    std::ifstream file(path, std::ios::binary); std::ostringstream text; text << file.rdbuf(); return text.str();
+}
+
+// Reloads the declaration list of a project and the declaration files changed on disk. Errors are logged when
+// luasharp.json changes; on a malformed file the previous declarations stay.
+void SyncProject(const std::string& key, ProjectEntry& entry) {
+    const auto stamp = WriteTime(entry.file);
+    const bool changed = stamp != entry.stamp; entry.stamp = stamp;
+    luasharp::Project project;
+    try { project = luasharp::LoadProject(entry.file); }
+    catch (const std::exception& error) { if (changed) std::cerr << "luasharp: " << error.what() << '\n'; return; }
+    if (changed) for (const auto& missing : project.missing) std::cerr << "luasharp: " << entry.file.string() << ": declaration path '" << missing << "' does not exist\n";
+    std::vector<std::string> uris;
+    for (const auto& file : project.declarationFiles) {
+        auto& document = declarationDocuments[uris.emplace_back(PathToUri(file))];
+        const auto fileStamp = WriteTime(file);
+        if (!document.pathKey.empty() && document.stamp == fileStamp) continue;
+        document.SetText(ReadText(file)); // Standalone() advances exportsRevision if the types differ
+        document.stamp = fileStamp; document.pathKey = luasharp::PathKey(file); document.project = key; document.declaration = true;
+    }
+    for (const auto& uri : entry.declarationUris)
+        if (std::find(uris.begin(), uris.end(), uri) == uris.end()) { declarationDocuments.erase(uri); ++exportsRevision; }
+    entry.declarationUris = std::move(uris);
+}
+void SyncProjects() { for (auto& [key, entry] : projects) SyncProject(key, entry); }
+
+// Finds the project of a document, and whether the document is one of its declaration files.
+void Place(const std::string& uri, Document& document) {
+    document.pathKey.clear(); document.project.clear(); document.declaration = false;
+    const auto path = UriToPath(uri); if (!path) return;
+    document.pathKey = luasharp::PathKey(*path);
+    const auto projectFile = luasharp::FindProjectFile(*path); if (!projectFile) return;
+    document.project = luasharp::PathKey(*projectFile);
+    const auto [entry, added] = projects.try_emplace(document.project, ProjectEntry{*projectFile});
+    if (added) SyncProject(document.project, entry->second);
+    for (const auto& declarationUri : entry->second.declarationUris) document.declaration = document.declaration || declarationDocuments[declarationUri].pathKey == document.pathKey;
+}
+
+// Calls visit(uri, document) for each document whose types `from` sees: the declaration files of its project, then
+// (unless `from` is one of them) the other files of that project. Files outside a project see each other.
+template <typename Visit> void ForEachVisible(const Document& from, Visit&& visit) {
+    if (!from.project.empty())
+        for (const auto& uri : projects[from.project].declarationUris) if (auto& document = declarationDocuments[uri]; document.pathKey != from.pathKey) visit(uri, document);
+    if (from.declaration) return;
+    ForEachDocument([&](const std::string& uri, Document& document) { if (&document != &from && !document.declaration && document.project == from.project) visit(uri, document); });
 }
 
 // Positions are ignored: moving a declaration does not change what other files see.
@@ -53,16 +146,17 @@ const luasharp::Analysis& Standalone(Document& document) {
 }
 // Refreshes every document's exports first, so exportsRevision is stable for the
 // rest of the request and earlier references from Editor() stay valid.
-const luasharp::Analysis& Editor(const std::string& uri, Document& document) {
+const luasharp::Analysis& Editor(Document& document) {
     ForEachDocument([](const std::string&, Document& value) { Standalone(value); });
+    for (auto& [uri, value] : declarationDocuments) Standalone(value);
     if (document.editor && document.editorRevision == exportsRevision) return *document.editor;
     std::vector<luasharp::ExternalType> external;
-    ForEachDocument([&](const std::string& other, Document& value) { if (other != uri) external.insert(external.end(), value.exports.begin(), value.exports.end()); });
+    ForEachVisible(document, [&](const std::string&, Document& value) { external.insert(external.end(), value.exports.begin(), value.exports.end()); });
     document.editor = std::make_unique<luasharp::Analysis>(luasharp::Analyze(document.text, external));
     document.editorRevision = exportsRevision;
     return *document.editor;
 }
-const luasharp::Analysis& Editor(const std::string& uri) { return Editor(uri, documents[uri]); }
+const luasharp::Analysis& Editor(const std::string& uri) { return Editor(documents[uri]); }
 
 bool ReadExact(char* buffer, DWORD count) {
     while (count != 0) { DWORD read{}; if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), buffer, count, &read, nullptr) || read == 0) return false; buffer += read; count -= read; }
@@ -98,7 +192,7 @@ json PositionAt(const std::string& text, size_t offset) {
 void UpdateDocument(const json& params, bool opened) {
     const auto& document = params["textDocument"]; const auto uri = document.value("uri", "");
     // Opening shadows any indexed copy, so the exported types may change.
-    if (opened) { documents[uri].SetText(document.value("text", "")); ++exportsRevision; return; }
+    if (opened) { documents[uri].SetText(document.value("text", "")); Place(uri, documents[uri]); ++exportsRevision; return; }
     auto text = std::move(documents[uri].text);
     for (const auto& change : params.value("contentChanges", json::array())) {
         if (!change.contains("range")) { text = change.value("text", ""); continue; }
@@ -173,10 +267,10 @@ json SpanRange(const std::string& text, luasharp::TextSpan span) { return {{"sta
 json Location(const std::string& uri, const std::string& text, const luasharp::Symbol& symbol) {
     return {{"uri", uri}, {"range", SpanRange(text, symbol.span)}};
 }
-std::optional<json> ExternalLocation(const std::string& currentUri, const luasharp::Symbol& wanted) {
+std::optional<json> ExternalLocation(const Document& from, const luasharp::Symbol& wanted) {
     std::optional<json> result;
-    ForEachDocument([&](const std::string& uri, Document& document) {
-        if (result || uri == currentUri) return; const auto& analysis = Standalone(document);
+    ForEachVisible(from, [&](const std::string& uri, Document& document) {
+        if (result) return; const auto& analysis = Standalone(document);
         const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) {
             if (!candidate.span.length || candidate.kind != wanted.kind || candidate.name != wanted.name) return false;
             return wanted.kind == luasharp::SymbolKind::Class || wanted.kind == luasharp::SymbolKind::Enum || candidate.owner == wanted.owner;
@@ -195,12 +289,15 @@ std::vector<luasharp::TextSpan> ReferenceSpans(const luasharp::Analysis& analysi
     }
     return result;
 }
-// Calls visit(uri, text, spans) for each document with references to wanted.
+// Calls visit(uri, text, spans) for each document of the same project with references to wanted. Declaration files
+// are generated, so they are not visited.
 template <typename Visit> void ForEachReference(const std::string& uri, const luasharp::Symbol& wanted, bool workspaceWide, Visit&& visit) {
+    const auto& project = documents[uri].project;
     ForEachDocument([&](const std::string& documentUri, Document& document) {
         if (!workspaceWide && documentUri != uri) return;
+        if (document.project != project || (document.declaration && documentUri != uri)) return;
         if (document.text.find(wanted.name) == std::string::npos) return; // a reference token spells the name
-        const auto spans = ReferenceSpans(Editor(documentUri, document), wanted);
+        const auto spans = ReferenceSpans(Editor(document), wanted);
         if (!spans.empty()) visit(documentUri, document.text, spans);
     });
 }
@@ -376,10 +473,11 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
 int main() {
     while (auto message = ReadMessage()) {
         const auto method = message->value("method", "");
+        SyncProjects(); // luasharp.json and the declaration files change outside the editor
         if (method == "initialize") Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", {{"capabilities", {{"textDocumentSync", 2}, {"completionProvider", {{"triggerCharacters", json::array({"."})}}}, {"signatureHelpProvider", {{"triggerCharacters", json::array({"(", ","})}}}, {"hoverProvider", true}, {"definitionProvider", true}, {"referencesProvider", true}, {"renameProvider", true}, {"documentSymbolProvider", true}, {"workspaceSymbolProvider", true}, {"semanticTokensProvider", {{"legend", {{"tokenTypes", json::array({"class", "type", "function", "method", "property", "variable", "parameter", "struct"})}, {"tokenModifiers", json::array()}}}, {"full", true}}}}}}}});
-        else if (method == "luasharp/indexWorkspace") { indexedDocuments.clear(); for (const auto& document : (*message)["params"].value("documents", json::array())) indexedDocuments[document.value("uri", "")].SetText(document.value("text", "")); ++exportsRevision; PublishOpenDiagnostics(); }
+        else if (method == "luasharp/indexWorkspace") { indexedDocuments.clear(); for (const auto& document : (*message)["params"].value("documents", json::array())) { const auto uri = document.value("uri", ""); indexedDocuments[uri].SetText(document.value("text", "")); Place(uri, indexedDocuments[uri]); } ++exportsRevision; PublishOpenDiagnostics(); }
         // One file changed on disk. Standalone() advances exportsRevision only if its exported types differ, so other files stay cached otherwise.
-        else if (method == "luasharp/indexDocument") { const auto& p = (*message)["params"]; indexedDocuments[p.value("uri", "")].SetText(p.value("text", "")); PublishOpenDiagnostics(); }
+        else if (method == "luasharp/indexDocument") { const auto& p = (*message)["params"]; const auto uri = p.value("uri", ""); indexedDocuments[uri].SetText(p.value("text", "")); Place(uri, indexedDocuments[uri]); PublishOpenDiagnostics(); }
         else if (method == "luasharp/removeDocument") { if (indexedDocuments.erase((*message)["params"].value("uri", ""))) { ++exportsRevision; PublishOpenDiagnostics(); } }
         else if (method == "textDocument/didOpen") { UpdateDocument((*message)["params"], true); PublishDiagnostics((*message)["params"]["textDocument"].value("uri", "")); }
         else if (method == "textDocument/didChange") { UpdateDocument((*message)["params"], false); PublishDiagnostics((*message)["params"]["textDocument"].value("uri", "")); }
@@ -414,7 +512,7 @@ int main() {
             const luasharp::Symbol* symbol = MemberAt(analysis, offset);
             if (const auto* expression = luasharp::FindExpression(analysis, offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) symbol = &analysis.symbols[*expression->symbolIndex];
             if (!symbol) { const auto word = WordAt(text, p["position"]); const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) { return !candidate.implicit && candidate.name == word; }); if (found != analysis.symbols.end()) symbol = &*found; }
-            if (method == "textDocument/definition") { json locations = json::array(); if (symbol && symbol->span.length) locations.push_back(Location(uri, text, *symbol)); else if (symbol) if (const auto external = ExternalLocation(uri, *symbol)) locations.push_back(*external); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", locations}}); }
+            if (method == "textDocument/definition") { json locations = json::array(); if (symbol && symbol->span.length) locations.push_back(Location(uri, text, *symbol)); else if (symbol) if (const auto external = ExternalLocation(documents[uri], *symbol)) locations.push_back(*external); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", locations}}); }
             else Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", symbol ? json{{"contents", {{"kind", "markdown"}, {"value", "```luasharp\n" + HoverLabel(*symbol) + "\n```"}}}} : json(nullptr)}});
         } else if (method == "shutdown") Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", nullptr}});
         else if (method == "exit") break;

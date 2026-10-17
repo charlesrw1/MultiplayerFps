@@ -20,7 +20,7 @@
     <Link><SubSystem>Console</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="test\CompilerTests.cpp" />
+    <ClCompile Include="test\CompilerTests.cpp" /><ClCompile Include="src\Project.cpp" /><ClInclude Include="src\Project.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="LuaSharpLib.vcxproj"><Project>{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}</Project></ProjectReference>

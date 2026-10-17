@@ -199,6 +199,7 @@
     <ClCompile Include="Scripting\LuaVecQuat.cpp" />
     <ClCompile Include="Scripting\ScriptingStdLib.cpp" />
     <ClCompile Include="Scripting\LuaSharpEngine.cpp" />
+    <ClCompile Include="Scripting\LuaSharpDeclarations.cpp" />
     <ClCompile Include="Scripting\ScriptManager.cpp" />
     <ClCompile Include="Scripting\ScriptLoadingUtil.cpp" />
     <ClCompile Include="Scripting\LuaClassTypeInfo.cpp" />
@@ -418,6 +419,7 @@
     <ClInclude Include="Scripting\ScriptingStdLib.h" />
     <ClInclude Include="Scripting\LuaSharpBinding.h" />
     <ClInclude Include="Scripting\LuaSharpEngine.h" />
+    <ClInclude Include="Scripting\LuaSharpDeclarations.h" />
     <ClInclude Include="Scripting\ScriptManager.h" />
     <ClInclude Include="Sound\SoundComponent.h" />
     <ClInclude Include="Testheader.h" />

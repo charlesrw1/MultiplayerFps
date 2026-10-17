@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -219,5 +220,31 @@ try {
     assert.ok(builtinNames.includes("Vec3") && builtinNames.includes("math"), "completion did not list the built-in names the grammar check needs");
     const hardcoded = builtinNames.filter(name => grammarWords.has(name));
     assert.deepEqual(hardcoded, [], `grammar hardcodes built-in names: ${hardcoded.join(", ")}`);
-    console.log("PASS native LSP: cross-file indexing, per-file index updates, built-in type tokens and completions, grammar has no built-in names, UTF-16 diagnostics, definitions, references, rename, symbols, tokens, signatures, hovers, and partial completions");
+    // A file under luasharp.json sees the declarations it names (read from disk) and the files of its project only.
+    const project = path.join(os.tmpdir(), "luasharp-lsp-project-test");
+    rmSync(project, { recursive: true, force: true });
+    mkdirSync(path.join(project, ".luasharp"), { recursive: true });
+    writeFileSync(path.join(project, "luasharp.json"), JSON.stringify({ declarations: [".luasharp", "missing.ls"] }));
+    const engineFile = path.join(project, ".luasharp", "engine.ls");
+    writeFileSync(engineFile, "extern class Engine { static int Frame(); }");
+    const gameUri = pathToFileURL(path.join(project, "game", "main.ls")).toString();
+    const gameSource = "int frame = Engine.Frame();\nShared outside = null;";
+    messages.splice(0);
+    send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri: gameUri, languageId: "luasharp", version: 1, text: gameSource } } });
+    const gameDiagnostics = (await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === gameUri, "project diagnostics")).params.diagnostics;
+    assert.equal(gameDiagnostics.some(d => /Engine/.test(d.message)), false, `project declarations were not used: ${JSON.stringify(gameDiagnostics)}`);
+    assert.ok(gameDiagnostics.some(d => /Unknown type 'Shared'/.test(d.message)), "a file outside the project leaked its types into the project");
+    assert.match(stderr, /missing\.ls/, "a missing declaration path was not reported");
+    send({ jsonrpc: "2.0", id: 24, method: "textDocument/definition", params: { textDocument: { uri: gameUri }, position: { line: 0, character: 14 } } });
+    const engineDefinition = (await waitFor(m => m.id === 24, "declaration definition")).result;
+    assert.equal(path.resolve(fileURLToPath(engineDefinition[0].uri)).toLowerCase(), path.resolve(engineFile).toLowerCase(), "definition did not open the declaration file");
+    const sharedDiagnostics = async () => { messages.splice(0); send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri: sharedUri, version: 9 }, contentChanges: [{ text: "Engine e = null;" }] } }); return (await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === sharedUri, "outside diagnostics")).params.diagnostics; };
+    assert.ok((await sharedDiagnostics()).some(d => /Unknown type 'Engine'/.test(d.message)), "project declarations leaked to a file outside the project");
+    writeFileSync(engineFile, "extern class Engine { static int Frame(); static int Tick(); }");
+    messages.splice(0);
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri: gameUri, version: 2 }, contentChanges: [{ text: "int tick = Engine.Tick();" }] } });
+    const reloaded = (await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.uri === gameUri, "diagnostics after declaration change")).params.diagnostics;
+    assert.deepEqual(reloaded, [], "a changed declaration file was not reloaded");
+    rmSync(project, { recursive: true, force: true });
+    console.log("PASS native LSP: luasharp.json projects, cross-file indexing, per-file index updates, built-in type tokens and completions, grammar has no built-in names, UTF-16 diagnostics, definitions, references, rename, symbols, tokens, signatures, hovers, and partial completions");
 } finally { child.kill(); }

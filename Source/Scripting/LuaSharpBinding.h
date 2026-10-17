@@ -90,6 +90,8 @@ struct Bindings
 	std::span<const Scriptable> scriptables;
 };
 std::span<const Bindings* const> all_bindings();
+// The declarations of all passes as one source, in registration order.
+std::string declaration_source();
 
 // Static registration from each generated file.
 struct Registrar

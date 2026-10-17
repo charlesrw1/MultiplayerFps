@@ -4,6 +4,7 @@
 
 #include "EngineMain.h"
 #include "Framework/Util.h"
+#include "Scripting/LuaSharpDeclarations.h"
 #include <Windows.h>
 #include <filesystem>
 #include <fstream>
@@ -73,9 +74,25 @@ bool append_external_project_launch_args(int argc, char** argv, std::vector<std:
 		return false;
 	}
 }
+
+// --dump-luasharp-decls <scripts dir>: writes the LuaSharp declarations for the tools and exits.
+int dump_luasharp_declarations(int argc, char** argv) {
+	for (int i = 1; i < argc; ++i) {
+		if (std::string(argv[i]) != "--dump-luasharp-decls")
+			continue;
+		if (i + 1 >= argc) {
+			printf("usage: App.exe --dump-luasharp-decls <scripts dir>\n");
+			return 2;
+		}
+		return write_luasharp_declarations(argv[i + 1]) ? 0 : 1;
+	}
+	return -1;
+}
 } // namespace
 
 int main(int argc, char** argv) {
+	if (const int dumped = dump_luasharp_declarations(argc, argv); dumped >= 0)
+		return dumped;
 	MainConfigurationOptions options;
 	std::vector<std::string> launch_args;
 	if (append_external_project_launch_args(argc, argv, launch_args)) {

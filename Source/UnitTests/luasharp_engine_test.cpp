@@ -3,8 +3,12 @@
 #include "Framework/SerializerJson2.h"
 #include "Scripting/LuaSharpEngine.h"
 #include "Scripting/LuaSharpBinding.h"
+#include "Scripting/LuaSharpDeclarations.h"
 #include "../../LuaSharp/src/CBackend.h"
 #include "Testheader.h"
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 // LuaSharp modules calling reflected engine classes through the generated thunks (LsTestThing in Testheader.h).
 
@@ -31,6 +35,31 @@ luasharp::NativeValue call(const luasharp::NativeModule& module, std::string_vie
 	return result;
 }
 } // namespace
+
+// The tools read the declarations from <scripts>/.luasharp/engine.ls through luasharp.json.
+TEST(LuaSharpDeclarations, WritesDeclarationsAndKeepsProjectFile) {
+	namespace fs = std::filesystem;
+	const auto read = [](const fs::path& path) {
+		std::ifstream file(path, std::ios::binary);
+		return std::string(std::istreambuf_iterator<char>(file), {});
+	};
+	const fs::path scripts = fs::temp_directory_path() / "luasharp-declarations-test";
+	fs::remove_all(scripts);
+
+	ASSERT_TRUE(write_luasharp_declarations(scripts));
+	const std::string declarations = read(scripts / ".luasharp" / "engine.ls");
+	EXPECT_NE(declarations.find(lsbind::declaration_source()), std::string::npos);
+	EXPECT_NE(declarations.find("extern class Entity : BaseUpdater"), std::string::npos);
+	EXPECT_NE(read(scripts / "luasharp.json").find("\".luasharp\""), std::string::npos);
+
+	const std::string custom = "{ \"declarations\": [\".luasharp\", \"extra.ls\"] }";
+	std::ofstream(scripts / "luasharp.json", std::ios::binary) << custom;
+	std::ofstream(scripts / ".luasharp" / "engine.ls", std::ios::binary) << "stale";
+	ASSERT_TRUE(write_luasharp_declarations(scripts));
+	EXPECT_EQ(read(scripts / ".luasharp" / "engine.ls"), declarations);
+	EXPECT_EQ(read(scripts / "luasharp.json"), custom); // the user owns the project file
+	fs::remove_all(scripts);
+}
 
 class LuaSharpEngineTest : public ::testing::Test
 {

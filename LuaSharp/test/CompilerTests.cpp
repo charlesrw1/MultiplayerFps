@@ -2,8 +2,11 @@
 #include "CBackend.h"
 #include "Semantic.h"
 #include "Builtins.h"
+#include "Project.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <sstream>
@@ -1943,6 +1946,44 @@ void TestStructEmission() {
     Require(overloads.c.find("ls_A_f(LS_A* self, ls_int x)") != std::string::npos && overloads.c.find("ls_A_f__1(LS_A* self, ls_float x)") != std::string::npos, "overloaded functions did not get distinct C names");
     Require(std::any_of(overloads.exports.begin(), overloads.exports.end(), [](const auto& item) { return item.sourceName == "A.f(float)" && item.symbolName == "ls_A_f__1"; }), "overload export name is wrong");
 }
+void WriteFile(const std::filesystem::path& path, std::string_view text) {
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream(path, std::ios::binary) << text;
+}
+
+void TestProjectFiles() {
+    namespace fs = std::filesystem;
+    const auto root = fs::temp_directory_path() / "luasharp-project-test";
+    fs::remove_all(root);
+    WriteFile(root / "luasharp.json", R"({ "declarations": [".luasharp", "extra.ls", "missing.ls"] })");
+    WriteFile(root / ".luasharp" / "engine.ls", "extern class Engine { static int Frame(); }");
+    WriteFile(root / ".luasharp" / "nested" / "more.ls", "");
+    WriteFile(root / ".luasharp" / "notes.txt", "");
+    WriteFile(root / "extra.ls", "");
+    WriteFile(root / "game" / "player.ls", "");
+
+    const auto found = luasharp::FindProjectFile(root / "game" / "player.ls");
+    Require(found && luasharp::PathKey(*found) == luasharp::PathKey(root / "luasharp.json"), "nearest luasharp.json above a source file");
+
+    const auto project = luasharp::LoadProject(*found);
+    Require(project.declarationFiles.size() == 3, "folders give their .ls files, recursively, and files give themselves");
+    Require(project.missing == std::vector<std::string>{"missing.ls"}, "missing declaration paths are reported");
+    std::vector<std::string> sources;
+    for (const auto& file : project.declarationFiles) { std::ostringstream text; text << std::ifstream(file, std::ios::binary).rdbuf(); sources.push_back(text.str()); }
+    const auto types = luasharp::DeclarationTypes(sources);
+    Require(luasharp::Analyze("int frame = Engine.Frame();", types).diagnostics.empty(), "project declarations give the host types");
+
+    Require(luasharp::IsInside(root / "game" / "player.ls", root) && !luasharp::IsInside(root, root / "game"), "IsInside");
+    Require(!luasharp::IsInside(fs::path(root.string() + "-other") / "a.ls", root), "a sibling folder with a longer name is not inside");
+    Require(luasharp::PathKey(root / "GAME" / ".." / "game") == luasharp::PathKey(root / "game"), "path keys ignore case and dot segments");
+
+    WriteFile(root / "luasharp.json", R"({ "declarations": ".luasharp" })");
+    bool rejected = false;
+    try { static_cast<void>(luasharp::LoadProject(root / "luasharp.json")); } catch (const std::runtime_error&) { rejected = true; }
+    Require(rejected, "declarations must be an array");
+    fs::remove_all(root);
+}
+
 int main() {
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests{
         {"invalid syntax", TestInvalidSyntax},
@@ -2009,6 +2050,7 @@ int main() {
         {"native derived extern classes", TestNativeDerivedExternClasses},
         {"native value type thunks", TestNativeValueTypeThunks},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
+        {"project files", TestProjectFiles},
     };
 
     for (const auto& [name, test] : tests) {

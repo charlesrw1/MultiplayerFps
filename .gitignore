@@ -58,3 +58,6 @@ TestFiles/coverage/*.html
 TestFilesData/
 
 docs_site/
+
+# LuaSharp declarations written by the engine (write_luasharp_declarations)
+.luasharp/

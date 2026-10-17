@@ -226,7 +226,8 @@ Editable fields:
 
 The engine binds its reflected classes with generated code (`Scripts/codegen_luasharp.py`):
 
-- Each codegen pass writes `engine.ls` (or `<pass>_engine.ls`) to the scripts folder. The same text goes into the generated C++ file.
+- Each codegen pass puts its declarations into the generated C++ file. The engine compiles against these declarations.
+- For the tools, the editor writes all declarations to `<scripts>/.luasharp/engine.ls` at startup (`write_luasharp_declarations`, `Source/Scripting/LuaSharpDeclarations.h`). `App.exe --dump-luasharp-decls <scripts folder>` does the same without the editor. The tools find the file through `luasharp.json` (see the [README](../README.md#projects-luasharpjson)).
 - The generated C++ file has one thunk for each bound member, and it registers the declarations and the thunks with `lsbind::Registrar` (`Source/Scripting/LuaSharpBinding.h`).
 - `LuaSharpEngine` collects all registrations. It owns the `NativeRuntime`, registers each class base first, and compiles modules with all declarations and thunks.
 - `LuaSharpEngine::proxy_of` makes one proxy for each `ClassBase` and keeps it in `ClassBase::script_proxy`, which is a root slot. The type of the proxy is the nearest bound class of the object.

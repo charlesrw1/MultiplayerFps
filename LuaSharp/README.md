@@ -161,6 +161,24 @@ int dealt = e.damage(3);
 - The host supplies one C function for each member. See [native-abi.md](docs/native-abi.md#extern-classes).
 - The CsRemake engine links `LuaSharpLib.vcxproj` and generates its declarations and thunks. See [native-abi.md](docs/native-abi.md#engine-binding).
 
+## Projects (`luasharp.json`)
+
+A `luasharp.json` file marks the root of a script project. It names the declaration files of the host:
+
+```json
+{
+	"declarations": [".luasharp"]
+}
+```
+
+- Each entry is a `.ls` file or a folder of `.ls` files. A path is relative to `luasharp.json`.
+- A `.ls` file belongs to the nearest `luasharp.json` in its folder or above it.
+- The LSP gives each file the declarations of its project and the types of the other files in that project. Files in different projects do not see each other. Files outside a project see the other files outside a project.
+- The LSP reads the declaration files from disk and reads them again when they change. Go to definition opens them.
+- `check` and `emit-c` use the declarations of the project. `run` does not, because a standalone run has no host to supply the declared functions.
+- A missing declaration path is a warning.
+- The CsRemake editor writes `<scripts>/.luasharp/engine.ls` at startup, and `luasharp.json` if it is missing. Without the editor, use `App.exe --dump-luasharp-decls <scripts folder>`. `.luasharp/` is in `.gitignore`.
+
 ## Native math types and the `math` library
 
 `Vec2`, `Vec3` (float32 components), `Vec2i`, `Vec3i` (int32 components), `Quat` and `Mat4x4` are native structs with the layouts in [`runtime/luasharp/vecmath.h`](runtime/luasharp/vecmath.h). `Mat4x4` is column-major like glm: element (row r, column c) is `m[c * 4 + r]`. `Quat` stores `x, y, z, w` like glm, but `Quat.new` takes `(w, x, y, z)`. Euler angles are the glm convention (`pitch, yaw, roll` in `x, y, z`). The reference is in [`docs/math-library.md`](docs/math-library.md).

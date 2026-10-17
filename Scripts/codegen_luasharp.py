@@ -326,7 +326,7 @@ def parse_all_classes(skip_dirs: list[str]) -> dict[str, ClassDef]:
 
 @dataclass
 class Output:
-    declarations: str                   # LuaSharp source (engine.ls)
+    declarations: str                   # LuaSharp source, embedded in the C++
     cpp: str                            # appended to the pass's generated C++ file; empty when the pass binds nothing
     slots: dict[str, dict[str, str]]    # scriptable class -> method -> slot call for ScriptImpl_<class> (see slot_call)
 
