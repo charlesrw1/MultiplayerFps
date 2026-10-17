@@ -88,6 +88,8 @@ and what the runtime allows scripts to do. See [[scripting_system]].
 - **Parser:** `Scripts/codegen_lib.py` — `parse_reflect_macro` (~L250-313). Adding a new flag means adding a branch here.
 - **Property struct:** `Source/Framework/ReflectionProp.h` — `PropertyInfo`, `PropertyAttributes`.
 - **Values:** `Source/Framework/PropertyValue.h` — `PropValue`, `PropertyAccess`. Editors and the serializer use `PropertyInfo::get_value/set_value` and `get<T>/set<T>`, not storage pointers.
+- **Lists and structs:** `ListAccess` (`PropertyValue.h`) gives the size, resize, move, get and set of list elements. Each index is checked. Struct values and struct elements are lent only for one call (`with_struct`, `with_element`). Lists of numbers also have `with_span`. Lists of lists are a compile error.
+- **Paths:** `Source/Framework/PropertyPath.h` — `PropertyPath` ("items[3].tint") and `PropertyRef` (an owner object and a path). Keep a path, not a pointer: each access walks the path again and checks the indices. The property grid editors use `PropertyRef`. `for_each_value` visits each value under a property list.
 - **Generated properties:** `Source/Framework/PropertyMake.h` — `make_property<&T::field, offset>()` deduces the type infos and the accessor from the member type. `apply_attrs()` is in `Source/Framework/ReflectionMacros.h`.
 - **Attr consumers:**
   - Widget clamping/disabled state: `Source/Framework/PropertyEdWidgets.cpp`.

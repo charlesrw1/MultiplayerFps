@@ -43,11 +43,8 @@ struct Serializer
 	template <typename T> void serialize_class_ar(T*& ptr);			  // owning
 	template <typename T> void serialize_class_reference_ar(T*& ptr); // non owning
 
-	// Handles both loading and saving
+	// Handles both loading and saving. Lists, structs and values.
 	void serialize_property(PropertyPtr ptr);
-	void serialize_property_ar(PropertyPtr ptr);
-	// A value property (PropertyInfo::has_value), in a dict (tag) or an array (null tag). False when not found.
-	bool serialize_value(const char* tag, const PropertyInfo& prop, void* inst);
 
 	virtual bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) = 0;
 	virtual void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) = 0;
@@ -65,7 +62,12 @@ struct Serializer
 	virtual const char* get_debug_tag() = 0;
 
 private:
-	void serialize_property_shared(const char* tag, PropertyPtr ptr);
+	// tag is null for array elements. A renamed property reads its former name when tag is missing.
+	void serialize_field(const char* tag, const PropertyInfo& prop, void* inst);
+	void serialize_element(const PropertyInfo& list, void* inst, int index);
+	void serialize_struct_members(StructRef s);
+	// The wire form of a domain value; prop gives the storage type. False when not found.
+	bool serialize_domain(const char* tag, const PropertyInfo& prop, PropValue& value);
 	template <typename T> bool serialize_tagged(const char* tag, T& value);
 };
 

@@ -6,6 +6,7 @@
 #include <memory>
 #include "Framework/Util.h"
 #include "Framework/ReflectionProp.h"
+#include "Framework/PropertyPath.h"
 #include "Framework/StringName.h"
 
 // Property editor system, took some of the code structure from https://github.com/BobbyAnguelov/Esoterica
@@ -35,9 +36,15 @@ public:
 	IPropertyEditor() {}
 	virtual ~IPropertyEditor() {}
 
-	void post_construct_for_custom_type(void* instance, PropertyInfo* prop, IGridRow* parent) {
-		this->instance = instance;
-		this->prop = prop;
+	void post_construct(const PropertyRef& target, IGridRow* parent) {
+		ASSERT(target.root && !target.path.empty());
+		instance = target.root;
+		path = target.path;
+		prop = const_cast<PropertyInfo*>(&target.info());
+	}
+	// A property of root itself (no struct or list on the way).
+	void post_construct_for_custom_type(void* root, PropertyInfo* p, IGridRow* parent) {
+		post_construct(PropertyRef{root, PropertyPath(p)}, parent);
 	}
 
 	bool update();
@@ -48,30 +55,14 @@ public:
 	virtual bool can_reset() { return false; }
 	virtual void reset_value() {}
 
-	void* instance = nullptr;
-	PropertyInfo* prop = nullptr;
-};
+	// The edited value, through the path.
+	PropertyRef target() const { return PropertyRef{instance, path}; }
+	template <typename T> T get() const { return target().get<T>(); }
+	template <typename T> void set(const T& value) const { target().set(value); }
 
-// optional: gets the string to use for an array header for a given index and what to draw when the item is closed
-class IArrayHeader
-{
-public:
-	static Factory<std::string, IArrayHeader>& get_factory();
-
-	IArrayHeader() {}
-	void post_construct(void* instance, PropertyInfo* prop) {
-		ASSERT(prop->type == core_type_id::List && prop->list_ptr);
-		this->instance = instance;
-		this->prop = prop;
-	}
-
-	virtual bool imgui_draw_header(int index) = 0;
-	virtual void imgui_draw_closed_body(int index) = 0;
-	virtual bool has_delete_all() { return true; }
-	virtual bool can_edit_array() { return true; }
-
-	void* instance = nullptr;
-	PropertyInfo* prop = nullptr;
+	void* instance = nullptr;	 // the owner object at the start of path
+	PropertyInfo* prop = nullptr; // describes the edited value
+	PropertyPath path;
 };
 
 class PropertyGrid;
@@ -107,8 +98,8 @@ public:
 
 template <typename T> class FnFactory;
 // The editor of a value property: the factory editor named by custom_type_str, else the one for its type.
-std::unique_ptr<IPropertyEditor> create_ipropertyed(const FnFactory<IPropertyEditor>& factory, PropertyInfo* prop,
-													void* instance, IGridRow* parent);
+std::unique_ptr<IPropertyEditor> create_ipropertyed(const FnFactory<IPropertyEditor>& factory, const PropertyRef& target,
+													IGridRow* parent);
 
 enum PropertyGridFlags
 { PG_LIST_PASSTHROUGH = 1 };
@@ -141,13 +132,14 @@ public:
 	const FnFactory<IPropertyEditor>& factory;
 };
 
+// The properties of an object (base is empty) or of the struct that base reaches.
 class GroupRow : public IGridRow
 {
 public:
-	GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfoList* info,
+	GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* root, const PropertyInfoList* list,
 			 int row_idx, uint32_t property_flag_mask);
-	GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfo* info,
-			 int row_idx, uint32_t property_flag_mask);
+	GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, const PropertyRef& base, int row_idx,
+			 uint32_t property_flag_mask);
 
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
@@ -159,18 +151,19 @@ public:
 
 	virtual bool passthrough_to_child() override { return parent && parent->is_array() && proplist->count == 1; }
 
-	void* inst = nullptr;
-	const PropertyInfo* property = nullptr;
+	const PropertyInfo* property = nullptr; // the struct property, null for an object
 	const PropertyInfoList* proplist = nullptr;
 	std::string name;
-	bool passthrough_to_list_if_possible = false;
+
+private:
+	void add_rows(const FnFactory<IPropertyEditor>& factory, const PropertyRef& base, uint32_t property_flag_mask);
 };
 
 class ArrayRow : public IGridRow
 {
 public:
-	ArrayRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop,
-			 int row_idx, uint32_t property_flag_mask);
+	ArrayRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, const PropertyRef& list, int row_idx,
+			 uint32_t property_flag_mask);
 
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
@@ -186,7 +179,6 @@ public:
 	void delete_index(int index) { commands.push_back({Delete, index}); }
 	void reorder_index(int from, int to) { commands.push_back({Reorder, from, to}); }
 
-	std::unique_ptr<IArrayHeader> header = nullptr; /* can be nullptr */
 	bool pending_add = false;
 	bool pending_clear = false;
 private:
@@ -212,24 +204,22 @@ private:
 
 	const FnFactory<IPropertyEditor>& factory;
 	std::vector<CommandData> commands;
-	void* instance = nullptr;
-	PropertyInfo* prop = nullptr;
+	PropertyRef list;
+	const PropertyInfo* prop = nullptr;
 	uint32_t property_flag_mask = UINT32_MAX;
 };
 class PropertyRow : public IGridRow
 {
 public:
-	PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop,
-				int row_idx);
-	PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
+	PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, const PropertyRef& target, int row_idx);
+	PropertyRow(IPropertyEditor* editor, IGridRow* parent, int row_idx);
 
 	bool internal_update() override;
 	void draw_header(float header_ofs) override;
 	bool has_reset_button() override { return prop_editor->can_reset(); }
 	void on_reset() override { prop_editor->reset_value(); }
 
-	void* instance = nullptr;
-	PropertyInfo* prop = nullptr;
+	const PropertyInfo* prop = nullptr;
 
 	std::unique_ptr<IPropertyEditor> prop_editor = nullptr;
 };

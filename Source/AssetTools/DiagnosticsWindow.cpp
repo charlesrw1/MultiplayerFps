@@ -244,7 +244,7 @@ void DiagnosticsWindow::draw_map_tab() {
 					if (!(pi.flags & PROP_LUA_BACKED)) continue;
 					if (std::string_view(pi.custom_type_str) != "EntityTarget") continue;
 					// Only flag non-empty names that don't resolve.
-					const std::string& val = *(const std::string*)pi.get_ptr(comp);
+					const std::string val = pi.get<std::string>(comp);
 					if (!val.empty() && entity_names.find(val) == entity_names.end())
 						missing_targets.push_back({entity, comp->get_type().classname, pi.name, val});
 				}

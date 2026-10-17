@@ -64,9 +64,8 @@ enum SerializedPropFlags
 	PROP_IS_ENTITY_COMPONENT_TRANSFORM = 16,
 	PROP_READ_ONLY_IF_NATIVE = 32, // marks a prop as being read-only only if its from native component
 
-	// Storage lives in the owning ClassBase's lua_field_shadow buffer (offset is index into that buffer),
-	// not at (inst + offset). Set on synthesized PropertyInfo for Lua-defined Component subclasses so the
-	// reflection-backed editor + serializer can read/write Lua-authored fields with no code changes.
+	// Storage is in the owning ClassBase's lua_field_shadow buffer (offset is from its start). Only the accessor
+	// (LuaClassTypeInfo) reaches it; get_ptr asserts. Set on the fields of Lua-defined Component subclasses.
 	PROP_LUA_BACKED = 64,
 
 	// Storage is in the LuaSharp script object of the owning ClassBase (offset is from its start). Only the
@@ -105,14 +104,8 @@ template <size_t Offset> constexpr uint16_t checked_offset() {
 	return static_cast<uint16_t>(Offset);
 }
 
-typedef std::string (*SerializePropFunc_t)(DictWriter& out, const PropertyInfo& info, const void* inst,
-										   ClassBase* user);
-typedef void (*UnSerializePropFunc_t)(DictParser& in, const PropertyInfo& info, void* inst, StringView token,
-									  ClassBase* user);
-
 class StructTypeInfo;
 struct multicast_funcs;
-class IListCallback;
 struct PropertyInfoList;
 struct PropertyInfo
 {
@@ -124,7 +117,7 @@ struct PropertyInfo
 	core_type_id type = core_type_id::Int32;
 	uint32_t flags = PROP_DEFAULT;
 	const char* range_hint = "";
-	IListCallback* list_ptr = nullptr;
+	const ListAccess* list_access = nullptr; // lists only
 	const char* custom_type_str = "";
 	const char* tooltip = "";
 	const EnumTypeInfo* enum_type = nullptr;
@@ -138,14 +131,10 @@ struct PropertyInfo
 	// The previous name (REFLECT(former=...), LuaSharp [Former("...")]): readers use it when name is missing.
 	const char* former_name = nullptr;
 
-	// SerializePropFunc_t serialize_func = nullptr;
-	// UnSerializePropFunc_t unserialize_func = nullptr;
-	// int(*call_function)(lua_State* L) = nullptr;
-	// const multicast_funcs* multicast = nullptr;
-
+	// The storage of a C++ field, for code that has not moved to values. Asserts for script fields.
 	uint8_t* get_ptr(const void* inst) const;
 
-	// False for lists, structs and unique_ptrs: they have no single value.
+	// False for lists and structs: they have no single value.
 	bool has_value() const;
 	void get_value(const void* inst, PropValue& out) const;
 	PropValue get_value(const void* inst) const;
@@ -159,13 +148,13 @@ struct PropertyInfo
 		else
 			set_value(inst, to_prop_value(value), mode);
 	}
-
-	float get_float(const void* ptr) const;
-	void set_float(void* ptr, float f) const;
-
-	uint64_t get_int(const void* ptr) const;
-	void set_int(void* ptr, uint64_t i) const;
-
+	// Struct properties: calls fn with the struct, which is valid only during the call.
+	void with_struct(void* inst, StructFn fn) const;
+	// List properties.
+	const ListAccess& list() const {
+		ASSERT(type == core_type_id::List && list_access);
+		return *list_access;
+	}
 
 	bool can_edit() const { return flags & PROP_EDITABLE; }
 	bool can_serialize() const { return flags & PROP_SERIALIZE; }
@@ -183,31 +172,13 @@ struct FunctionInfo
 	int (*lua_c_function)(lua_State* state) = nullptr;
 };
 
-PropertyInfo make_bool_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
-PropertyInfo make_integer_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const char* hint = "",
-								   const char* customtype = "");
-PropertyInfo make_float_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
-PropertyInfo make_enum_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const EnumTypeInfo* t,
-								const char* hint = "");
-PropertyInfo make_string_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype = "");
-PropertyInfo make_list_property(const char* name, uint16_t offset, uint32_t flags, IListCallback* ptr,
-								const char* customtype = "");
-PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype = "",
-								  const char* hint = "");
-PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype = "");
-PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
+// The value at ptr, by p.type: the default accessor, and accessors over raw buffers (the Lua shadow buffer).
+void read_storage(const PropertyInfo& p, const uint8_t* ptr, PropValue& out);
+void write_storage(const PropertyInfo& p, uint8_t* ptr, const PropValue& in);
 
-PropertyInfo make_stringname_property(const char* name, uint16_t offset, int flags, const char* tooltip);
-PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, const char* tooltip,
-								 IListCallback* type);
+// A property with no storage of its own, for editors that keep the value elsewhere (add_iproped_manual).
 PropertyInfo make_assetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip,
 										const ClassTypeInfo* type);
-PropertyInfo make_objhandleptr_property(const char* name, uint16_t offset, int flags, const char* tooltip,
-										const ClassTypeInfo* type);
-PropertyInfo make_classtypeinfo_property(const char* name, uint16_t offset, int flags, const char* tooltip,
-										 const ClassTypeInfo* type);
-
-FunctionInfo make_lua_function_info(const char* name, bool is_static, bool is_virtual, int (*ptr)(lua_State*));
 
 struct PropertyInfoList
 {
@@ -216,36 +187,4 @@ struct PropertyInfoList
 	const char* type_name = "Unknown";
 
 	PropertyInfo* find(const char* name) const;
-};
-
-class DictWriter;
-class DictParser;
-struct PropertyListInstancePair
-{
-	const PropertyInfoList* list = nullptr;
-	void* instance = nullptr;
-};
-
-struct Prop_Flag_Overrides;
-class BinaryReader;
-class FileWriter;
-
-class IListCallback
-{
-public:
-	IListCallback(const PropertyInfoList* struct_) : props_in_list(struct_) {}
-	IListCallback(PropertyInfo atom_prop);
-	const PropertyInfoList* props_in_list = nullptr;
-	const PropertyInfo* get_property() const;
-	bool get_is_new_list_type() const;
-	virtual uint8_t* get_index(void* inst, int index) = 0;
-	virtual int get_size(void* inst) = 0;
-	virtual void resize(void* inst, int new_size) = 0;
-	virtual void swap_elements(void* inst, int item0, int item1) = 0;
-
-private:
-	bool is_new_list_type = false;
-	// for atom types
-	PropertyInfo StaticProp;
-	PropertyInfoList StaticList;
 };

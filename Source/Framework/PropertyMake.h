@@ -1,10 +1,11 @@
 #pragma once
+#include <algorithm>
 #include <string>
 #include <type_traits>
 #include <vector>
+#include "Framework/InlineVec.h"
 #include "Framework/ReflectionProp.h"
 #include "Framework/StructReflection.h"
-#include "Framework/ArrayReflection.h"
 #include "Framework/StringName.h"
 
 // make_property<&T::field, offset>(): the PropertyInfo of a C++ field. The compiler deduces the type tag, the
@@ -24,14 +25,8 @@ template <typename O> struct object_handle<obj<O>> : std::true_type { using type
 template <typename T> struct class_type_ptr : std::false_type {};
 template <typename B> struct class_type_ptr<ClassTypePtr<B>> : std::true_type { using type = B; };
 template <typename T> struct list : std::false_type {};
-template <typename E> struct list<std::vector<E>> : std::true_type {
-	using element = E;
-	using callback = StdVectorCallback<E>;
-};
-template <typename E, uint32_t N> struct list<InlineVec<E, N>> : std::true_type {
-	using element = E;
-	using callback = InlineVectorCallback<E, N>;
-};
+template <typename E> struct list<std::vector<E>> : std::true_type { using element = E; };
+template <typename E, uint32_t N> struct list<InlineVec<E, N>> : std::true_type { using element = E; };
 template <typename T> constexpr bool is_struct = requires { T::StructType; };
 template <typename T> constexpr bool is_raw_asset = std::is_pointer_v<T> && requires { std::remove_pointer_t<T>::StaticType; };
 template <typename T> using raw_asset_t = std::remove_cv_t<std::remove_pointer_t<T>>;
@@ -100,8 +95,16 @@ template <auto Member> typename member<decltype(Member)>::type* locate_member(vo
 template <typename T> T* locate_self(void* inst) {
 	return static_cast<T*>(inst);
 }
+// The accessor of a struct at Locate(inst).
+template <typename T, auto Locate> struct StructAccess
+{
+	static void with_struct(const PropertyInfo&, void* inst, StructFn fn) { fn(StructRef{&T::StructType, Locate(inst)}); }
+	static constexpr PropertyAccess table{nullptr, nullptr, &with_struct};
+};
 template <typename T, auto Locate> const PropertyAccess* value_access() {
-	if constexpr (has_value<T>)
+	if constexpr (is_struct<T>)
+		return &StructAccess<T, Locate>::table;
+	else if constexpr (has_value<T>)
 		return &TypedAccess<T, Locate>::table;
 	else
 		return nullptr;
@@ -109,17 +112,73 @@ template <typename T, auto Locate> const PropertyAccess* value_access() {
 
 template <typename T> PropertyInfo element_property();
 
-// Type tag and type infos of T; access is the accessor for values (unused for lists and structs).
-template <typename T> void describe(PropertyInfo& p, const PropertyAccess* access) {
+// The accessor of a list at Locate(inst). Every index is checked.
+template <typename C, auto Locate> struct TypedListAccess
+{
+	using E = typename list<C>::element;
+	static_assert(!list<E>::value, "lists of lists have no property form");
+	static_assert(!std::is_same_v<E, bool>, "lists of bool have no property form");
+
+	static C& self(const void* inst) { return *Locate(const_cast<void*>(inst)); }
+	static E& at(const void* inst, int index) {
+		C& c = self(inst);
+		ASSERT(index >= 0 && index < (int)c.size() && "list index out of range");
+		return c[index];
+	}
+	static int size(const PropertyInfo&, const void* inst) { return (int)self(inst).size(); }
+	static void resize(const PropertyInfo&, void* inst, int count) {
+		ASSERT(count >= 0);
+		self(inst).resize(count);
+	}
+	static void move(const PropertyInfo&, void* inst, int from, int to) {
+		C& c = self(inst);
+		ASSERT(from >= 0 && from < (int)c.size() && to >= 0 && to < (int)c.size());
+		E* d = c.data();
+		if (from < to)
+			std::rotate(d + from, d + from + 1, d + to + 1);
+		else
+			std::rotate(d + to, d + from, d + from + 1);
+	}
+	static void get(const PropertyInfo&, const void* inst, int index, PropValue& out) {
+		if constexpr (has_value<E>)
+			out = to_domain(at(inst, index));
+		else
+			ASSERT(!"struct elements have no value; use with_element");
+	}
+	static void set(const PropertyInfo&, void* inst, int index, const PropValue& in, SetMode) {
+		if constexpr (has_value<E>)
+			from_domain(at(inst, index), in);
+		else
+			ASSERT(!"struct elements have no value; use with_element");
+	}
+	static void with_element(const PropertyInfo&, void* inst, int index, StructFn fn) {
+		if constexpr (is_struct<E>)
+			fn(StructRef{&E::StructType, &at(inst, index)});
+		else
+			ASSERT(!"value elements are not structs; use get/set");
+	}
+	static void with_span(const PropertyInfo&, void* inst, FunctionRef<void(void*, size_t)> fn) {
+		C& c = self(inst);
+		fn(c.data(), c.size() * sizeof(E));
+	}
+	static const ListAccess* table() {
+		static const PropertyInfo element = element_property<E>();
+		static const ListAccess t{&element,	   &size,		  &resize,
+								  &move,	   &get,		  &set,
+								  &with_element, std::is_arithmetic_v<E> ? &with_span : nullptr};
+		return &t;
+	}
+};
+
+// Type tag and type infos of T; access is its accessor (null for lists).
+template <typename T, auto Locate> void describe(PropertyInfo& p) {
+	p.access = value_access<T, Locate>();
 	if constexpr (list<T>::value) {
-		static typename list<T>::callback callback(element_property<typename list<T>::element>());
 		p.type = core_type_id::List;
-		p.list_ptr = &callback;
-		return;
+		p.list_access = TypedListAccess<T, Locate>::table();
 	} else if constexpr (is_struct<T>) {
 		p.type = core_type_id::ActualStruct;
 		p.struct_type = &T::StructType;
-		return;
 	} else if constexpr (std::is_same_v<T, bool>)
 		p.type = core_type_id::Bool;
 	else if constexpr (std::is_same_v<T, Color32>) {
@@ -166,12 +225,13 @@ template <typename T> void describe(PropertyInfo& p, const PropertyAccess* acces
 		p.class_type = &class_type_ptr<T>::type::StaticType;
 	} else
 		static_assert(sizeof(T) == 0, "this member type has no property form");
-	p.access = access;
 }
 
+// Describes each element of a list. The list accessor reads elements; this has no accessor of its own.
 template <typename T> PropertyInfo element_property() {
 	PropertyInfo p("", 0, PROP_DEFAULT);
-	describe<T>(p, value_access<T, &locate_self<T>>());
+	describe<T, &locate_self<T>>(p);
+	p.access = nullptr;
 	return p;
 }
 } // namespace prop_make
@@ -185,6 +245,6 @@ PropertyInfo make_property(const char* name, uint32_t flags, const char* custom_
 	p.range_hint = hint;
 	p.tooltip = tooltip;
 	p.former_name = former_name;
-	prop_make::describe<T>(p, prop_make::value_access<T, &prop_make::locate_member<Member>>());
+	prop_make::describe<T, &prop_make::locate_member<Member>>(p);
 	return p;
 }

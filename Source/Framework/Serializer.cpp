@@ -4,45 +4,58 @@
 class IAsset;
 
 void Serializer::serialize_property(PropertyPtr ptr) {
-	assert(!ptr.is_an_array_property());
-	serialize_property_shared(ptr.get_name(), ptr);
+	serialize_field(ptr.get_name(), ptr.info(), ptr.get_instance());
 }
 
-void Serializer::serialize_property_ar(PropertyPtr ptr) {
-	assert(ptr.is_an_array_property());
-	serialize_property_shared(nullptr, ptr);
-}
-
-void Serializer::serialize_property_shared(const char* tag, PropertyPtr ptr) {
-	const PropertyInfo& prop = *ptr.get_property_info();
-	// A renamed property reads its data under the former name when the current name is missing.
-	const char* former = tag && is_loading() ? prop.former_name : nullptr;
-	if (ptr.is_array()) {
-		auto arrayprp = ptr.as_array();
-		int sz = arrayprp.get_array_size();
-		const bool has_array =
-			tag ? serialize_array(tag, sz) || (former && serialize_array(former, sz)) : serialize_array_ar(sz);
-		if (has_array) {
+void Serializer::serialize_field(const char* tag, const PropertyInfo& prop, void* inst) {
+	ASSERT(tag && inst);
+	const char* former = is_loading() ? prop.former_name : nullptr;
+	if (prop.type == core_type_id::List) {
+		const ListAccess& list = prop.list();
+		int sz = list.size(prop, inst);
+		if (serialize_array(tag, sz) || (former && serialize_array(former, sz))) {
 			if (is_loading())
-				arrayprp.resize_array(sz);
-			for (auto p : arrayprp)
-				serialize_property_ar(p);
+				list.resize(prop, inst, sz);
+			for (int i = 0; i < sz; i++)
+				serialize_element(prop, inst, i);
 			end_obj();
 		}
-	} else if (ptr.is_struct()) {
-		const bool hasstruct = tag ? serialize_dict(tag) || (former && serialize_dict(former)) : serialize_dict_ar();
-		if (hasstruct) {
-			auto asstruct = ptr.as_struct();
-			asstruct.call_serialize(*this);
-			for (auto p : asstruct)
-				serialize_property(p);
+	} else if (prop.type == core_type_id::ActualStruct) {
+		if (serialize_dict(tag) || (former && serialize_dict(former))) {
+			prop.with_struct(inst, [&](StructRef s) { serialize_struct_members(s); });
 			end_obj();
 		}
 	} else if (prop.has_value()) {
-		void* inst = ptr.get_instance_ptr_unsafe();
-		if (!serialize_value(tag, prop, inst) && former)
-			serialize_value(former, prop, inst);
+		PropValue value = prop.get_value(inst);
+		const bool found = serialize_domain(tag, prop, value) || (former && serialize_domain(former, prop, value));
+		if (found && is_loading())
+			prop.set_value(inst, value, SetMode::Load);
 	}
+}
+
+void Serializer::serialize_element(const PropertyInfo& list_prop, void* inst, int index) {
+	const ListAccess& list = list_prop.list();
+	const PropertyInfo& element = *list.element;
+	if (element.type == core_type_id::ActualStruct) {
+		if (serialize_dict_ar()) {
+			list.with_element(list_prop, inst, index, [&](StructRef s) { serialize_struct_members(s); });
+			end_obj();
+		}
+	} else {
+		PropValue value;
+		list.get(list_prop, inst, index, value);
+		if (serialize_domain(nullptr, element, value) && is_loading())
+			list.set(list_prop, inst, index, value, SetMode::Load);
+	}
+}
+
+void Serializer::serialize_struct_members(StructRef s) {
+	ASSERT(s.type && s.data);
+	if (s.type->custom_serialize)
+		s.type->custom_serialize(s.data, *this);
+	if (const PropertyInfoList* props = s.type->properties)
+		for (int i = 0; i < props->count; i++)
+			serialize_field(props->list[i].name, props->list[i], s.data);
 }
 
 template <typename T> bool Serializer::serialize_tagged(const char* tag, T& value) {
@@ -52,9 +65,8 @@ template <typename T> bool Serializer::serialize_tagged(const char* tag, T& valu
 	return true;
 }
 
-// The wire format of each domain value. Float fields stay floats, colors are their uint value.
-bool Serializer::serialize_value(const char* tag, const PropertyInfo& prop, void* inst) {
-	PropValue value = prop.get_value(inst);
+// Float fields stay floats, colors are their uint value.
+bool Serializer::serialize_domain(const char* tag, const PropertyInfo& prop, PropValue& value) {
 	bool found = false;
 	if (auto* b = std::get_if<bool>(&value)) {
 		found = serialize_tagged(tag, *b);
@@ -102,7 +114,5 @@ bool Serializer::serialize_value(const char* tag, const PropertyInfo& prop, void
 	} else {
 		return false; // ClassTypeInfo properties are not serialized
 	}
-	if (found && is_loading())
-		prop.set_value(inst, value, SetMode::Load);
 	return found;
 }

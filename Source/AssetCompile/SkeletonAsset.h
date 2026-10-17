@@ -4,7 +4,6 @@
 #include "Render/MaterialPublic.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ReflectionProp.h"
-#include "Framework/ArrayReflection.h"
 #include "Framework/StructReflection.h"
 
 using std::string;

@@ -8,8 +8,7 @@
 #include "FnFactory.h"
 #include "EditorTheme.h"
 
-// Forward declarations
-IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,
+IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, const PropertyRef& target,
 					 int row_idx, uint32_t property_flag_mask);
 
 static uint32_t color32_to_uint_grp(Color32 color) {
@@ -18,53 +17,34 @@ static uint32_t color32_to_uint_grp(Color32 color) {
 
 // ---- GroupRow ----
 
-GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance,
-				   const PropertyInfo* info, int row_idx, uint32_t property_flag_mask)
-	: IGridRow(parent, row_idx), property(info), inst(instance) {
-	ASSERT(instance && info);
-	assert(info->type == core_type_id::ActualStruct);
-	proplist = info->struct_type->properties;
-	auto list = proplist;
-	for (int i = 0; i < list->count; i++) {
-		auto& prop = list->list[i];
-		if (!prop.can_edit() || prop.attrs.hidden)
-			continue;
-		bool passed_mask_check = (prop.flags & property_flag_mask) != 0;
-		if (!passed_mask_check)
-			continue;
-
-		auto row = create_row(factory, this, &prop, inst, -1, property_flag_mask);
-		if (row)
-			child_rows.push_back(std::unique_ptr<IGridRow>(row));
-	}
-	name = info->name; // the variable name
-	if (row_idx != -1) {
-		name = string_format("[ %d ]", row_idx);
-	}
+GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, const PropertyRef& base, int row_idx,
+				   uint32_t property_flag_mask)
+	: IGridRow(parent, row_idx), property(&base.info()) {
+	ASSERT(base.root && property->type == core_type_id::ActualStruct);
+	proplist = property->struct_type->properties;
+	name = row_idx != -1 ? string_format("[ %d ]", row_idx) : property->name;
+	add_rows(factory, base, property_flag_mask);
 }
 
-GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance,
+GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* root,
 				   const PropertyInfoList* list, int row_idx, uint32_t property_flag_mask)
-	: IGridRow(parent, row_idx), proplist(list), inst(instance) {
-	ASSERT(instance && list);
+	: IGridRow(parent, row_idx), proplist(list) {
+	ASSERT(root && list);
+	name = row_idx != -1 ? string_format("[ %d ]", row_idx) : list->type_name;
+	add_rows(factory, PropertyRef{root}, property_flag_mask);
+}
 
-	for (int i = 0; i < list->count; i++) {
-		auto& prop = list->list[i];
-		if (!prop.can_edit() || prop.attrs.hidden)
+void GroupRow::add_rows(const FnFactory<IPropertyEditor>& factory, const PropertyRef& base,
+						uint32_t property_flag_mask) {
+	if (!proplist)
+		return;
+	for (int i = 0; i < proplist->count; i++) {
+		const PropertyInfo& prop = proplist->list[i];
+		if (!prop.can_edit() || prop.attrs.hidden || !(prop.flags & property_flag_mask))
 			continue;
-		bool passed_mask_check = (prop.flags & property_flag_mask) != 0;
-		if (!passed_mask_check)
-			continue;
-
-		auto row = create_row(factory, this, &prop, inst, -1, property_flag_mask);
-		if (row)
+		PropertyRef member{base.root, base.path.empty() ? PropertyPath(&prop) : base.path.child(&prop)};
+		if (IGridRow* row = create_row(factory, this, member, -1, property_flag_mask))
 			child_rows.push_back(std::unique_ptr<IGridRow>(row));
-	}
-
-	name = list->type_name;
-
-	if (row_idx != -1) {
-		name = string_format("[ %d ]", row_idx);
 	}
 }
 
@@ -87,7 +67,7 @@ void GroupRow::draw_header(float ofs) {
 
 	bool is_array_item = (row_index != -1);
 	ArrayRow* array_ = is_array_item ? (ArrayRow*)parent : nullptr;
-	bool can_edit = array_ && (!array_->header || array_->header->can_edit_array());
+	bool can_edit = array_ != nullptr;
 
 	// Drag handle — all array items when editable
 	if (is_array_item && can_edit) {
@@ -127,16 +107,9 @@ void GroupRow::draw_header(float ofs) {
 	// Bold only for top-level group rows (not nested structs or array items)
 	bool is_top_level = (parent == nullptr);
 	if (is_top_level && g_prop_bold_font) ImGui::PushFont(g_prop_bold_font);
-	bool has_drawn = false;
-	if (is_array_item) {
+	if (is_array_item)
 		array_->hook_update_pre_tree_node();
-
-		if (array_->header) {
-			expanded = array_->header->imgui_draw_header(row_index);
-			has_drawn = true;
-		}
-	}
-	if (!has_drawn) {
+	{
 		uint32_t flags = (row_index == -1) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
 		expanded = ImGui::TreeNodeEx(name.c_str(), flags);
 		if (property)
@@ -182,14 +155,6 @@ bool GroupRow::internal_update() {
 		auto row = (IGridRow*)child_rows[0].get();
 
 		ret = row->internal_update();
-	}
-
-	bool is_array = row_index != -1;
-	if (!expanded && is_array) {
-		ArrayRow* array_ = (ArrayRow*)parent;
-		if (array_->header) {
-			array_->header->imgui_draw_closed_body(row_index);
-		}
 	}
 	return ret;
 }

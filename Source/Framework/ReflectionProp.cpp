@@ -4,19 +4,12 @@
 #include "Framework/DictWriter.h"
 #include "Framework/Util.h"
 #include <cassert>
-#include "Framework/ArrayReflection.h"
+#include <cstring>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
 uint8_t* PropertyInfo::get_ptr(const void* inst) const {
-	if (flags & PROP_LUA_BACKED) {
-		auto* cb = const_cast<ClassBase*>(static_cast<const ClassBase*>(inst));
-		cb->ensure_lua_shadow();
-		uint8_t* shadow = cb->get_lua_field_shadow();
-		ASSERT(shadow && "PROP_LUA_BACKED requires owner to provide a shadow buffer");
-		return shadow + offset;
-	}
-	ASSERT(!(flags & PROP_SCRIPT_FIELD) && "script fields have no C++ storage; use get_value/set_value");
+	ASSERT(!(flags & (PROP_SCRIPT_FIELD | PROP_LUA_BACKED)) && "the field is not in the object; use get_value/set_value");
 	return (uint8_t*)inst + offset;
 }
 
@@ -38,9 +31,21 @@ template <typename T> T clamp_to(const PropertyAttributes& a, T v) {
 	return v;
 }
 
-// The storage at get_ptr(), by type: properties without an accessor.
+template <typename T> void store(uint8_t* ptr, T v) {
+	*reinterpret_cast<T*>(ptr) = v;
+}
+
 void storage_get(const PropertyInfo& p, const void* inst, PropValue& out) {
-	const uint8_t* ptr = p.get_ptr(inst);
+	read_storage(p, p.get_ptr(inst), out);
+}
+void storage_set(const PropertyInfo& p, void* inst, const PropValue& in, SetMode) {
+	write_storage(p, p.get_ptr(inst), in);
+}
+const PropertyAccess storage_access{storage_get, storage_set};
+} // namespace
+
+void read_storage(const PropertyInfo& p, const uint8_t* ptr, PropValue& out) {
+	ASSERT(ptr);
 	switch (p.type) {
 	case core_type_id::Bool: out = *reinterpret_cast<const bool*>(ptr); break;
 	case core_type_id::Int8: out = int64_t(*reinterpret_cast<const int8_t*>(ptr)); break;
@@ -67,12 +72,8 @@ void storage_get(const PropertyInfo& p, const void* inst, PropValue& out) {
 	}
 }
 
-template <typename T> void store(uint8_t* ptr, T v) {
-	*reinterpret_cast<T*>(ptr) = v;
-}
-
-void storage_set(const PropertyInfo& p, void* inst, const PropValue& in, SetMode) {
-	uint8_t* ptr = p.get_ptr(inst);
+void write_storage(const PropertyInfo& p, uint8_t* ptr, const PropValue& in) {
+	ASSERT(ptr);
 	switch (p.type) {
 	case core_type_id::Bool: store(ptr, prop_value_get<bool>(in)); break;
 	case core_type_id::Int8:
@@ -97,9 +98,6 @@ void storage_set(const PropertyInfo& p, void* inst, const PropValue& in, SetMode
 	default: ASSERT(!"the property has no value");
 	}
 }
-
-const PropertyAccess storage_access{storage_get, storage_set};
-} // namespace
 
 bool PropertyInfo::has_value() const {
 	switch (type) {
@@ -139,132 +137,6 @@ void PropertyInfo::set_value(void* inst, const PropValue& in, SetMode mode) cons
 }
 
 
-inline std::string string_view_to_std_string(StringView view) {
-	return std::string(view.str_start, view.str_len);
-}
-
-static StringView delimit(const char* start, const char character = ',') {
-	StringView s;
-	s.str_start = start;
-	s.str_len = 0;
-	while (*start != 0 && *start != character) {
-		s.str_len++;
-		start++;
-	}
-	return s;
-}
-
-PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype) {
-	PropertyInfo prop(name, offset, flags);
-	prop.type = core_type_id::Vec3;
-	prop.custom_type_str = customtype;
-	return prop;
-}
-PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flags, const char* hint) {
-	PropertyInfo prop(name, offset, flags);
-	prop.type = core_type_id::Quat;
-	prop.range_hint = hint;
-	return prop;
-}
-PropertyInfo make_bool_property(const char* name, uint16_t offset, uint32_t flags, const char* hint) {
-	PropertyInfo prop(name, offset, flags);
-	prop.type = core_type_id::Bool;
-	prop.range_hint = hint;
-	return prop;
-}
-
-PropertyInfo make_integer_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const char* hint,
-								   const char* customtype) {
-	PropertyInfo prop(name, offset, flags);
-
-	if (bytes == 1)
-		prop.type = core_type_id::Int8;
-	else if (bytes == 2)
-		prop.type = core_type_id::Int16;
-	else if (bytes == 4)
-		prop.type = core_type_id::Int32;
-	else if (bytes == 8)
-		prop.type = core_type_id::Int64;
-	else
-		assert(0);
-
-	prop.range_hint = hint;
-	prop.custom_type_str = customtype;
-	return prop;
-}
-
-PropertyInfo make_float_property(const char* name, uint16_t offset, uint32_t flags, const char* hint) {
-	PropertyInfo prop(name, offset, flags);
-	prop.type = core_type_id::Float;
-	prop.range_hint = hint;
-	return prop;
-}
-
-PropertyInfo make_enum_property(const char* name, uint16_t offset, uint32_t flags, int bytes,
-								const EnumTypeInfo* enumtype, const char* hint) {
-	// ASSERT(enumtype->name);
-	PropertyInfo prop(name, offset, flags);
-	prop.range_hint = hint;
-	if (bytes == 1)
-		prop.type = core_type_id::Enum8;
-	else if (bytes == 2)
-		prop.type = core_type_id::Enum16;
-	else if (bytes == 4)
-		prop.type = core_type_id::Enum32;
-	else
-		assert(0);
-	prop.enum_type = enumtype;
-	return prop;
-}
-
-PropertyInfo make_string_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype) {
-	PropertyInfo prop(name, offset, flags);
-	prop.custom_type_str = customtype;
-	prop.type = core_type_id::StdString;
-	return prop;
-}
-
-PropertyInfo make_list_property(const char* name, uint16_t offset, uint32_t flags, IListCallback* ptr,
-								const char* customtype) {
-	PropertyInfo prop(name, offset, flags);
-	prop.type = core_type_id::List;
-	prop.list_ptr = ptr;
-	prop.custom_type_str = customtype;
-	return prop;
-}
-
-PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype,
-								  const char* hint) {
-	PropertyInfo prop(name, offset, flags);
-	prop.type = core_type_id::Struct;
-	prop.custom_type_str = customtype;
-	prop.range_hint = hint;
-	return prop;
-}
-
-PropertyInfo make_new_struct_type(const char* name, uint16_t offset, int flags, const char* tooltip,
-								  StructTypeInfo* type) {
-	PropertyInfo p(name, offset, flags);
-	p.tooltip = tooltip;
-	p.type = core_type_id::ActualStruct;
-	p.struct_type = type;
-	return p;
-}
-PropertyInfo make_stringname_property(const char* name, uint16_t offset, int flags, const char* tooltip) {
-	PropertyInfo p(name, offset, flags);
-	p.tooltip = tooltip;
-	p.type = core_type_id::StringName;
-	return p;
-}
-PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, const char* tooltip,
-								 IListCallback* type) {
-	PropertyInfo p(name, offset, flags);
-	p.tooltip = tooltip;
-	p.type = core_type_id::List;
-	p.list_ptr = type;
-	return p;
-}
-
 PropertyInfo make_assetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip,
 										const ClassTypeInfo* type) {
 	PropertyInfo p(name, offset, flags);
@@ -273,83 +145,22 @@ PropertyInfo make_assetptr_property_new(const char* name, uint16_t offset, int f
 	p.class_type = type;
 	return p;
 }
-PropertyInfo make_objhandleptr_property(const char* name, uint16_t offset, int flags, const char* tooltip,
-										const ClassTypeInfo* type) {
-	PropertyInfo p(name, offset, flags);
-	p.tooltip = tooltip;
-	p.type = core_type_id::ObjHandlePtr;
-	p.class_type = type;
-	return p;
-}
 
-PropertyInfo make_classtypeinfo_property(const char* name, uint16_t offset, int flags, const char* tooltip,
-										 const ClassTypeInfo* type) {
-	PropertyInfo p(name, offset, flags);
-	p.tooltip = tooltip;
-	p.type = core_type_id::ClassTypeInfo;
-	p.class_type = type;
-	return p;
-}
-
-IListCallback::IListCallback(PropertyInfo atom_prop) {
-	StaticList.count = 1;
-	StaticProp = atom_prop;
-	StaticList.list = &StaticProp;
-	this->props_in_list = &StaticList;
-	is_new_list_type = true;
-}
-
-const PropertyInfo* IListCallback::get_property() const {
-	if (!is_new_list_type)
-		return nullptr;
-	return &StaticProp;
-}
-
-bool IListCallback::get_is_new_list_type() const {
-	return is_new_list_type;
-}
-
-float PropertyInfo::get_float(const void* ptr) const {
-	ASSERT(type == core_type_id::Float);
-
-	return *(float*)get_ptr(ptr);
-}
-
-void PropertyInfo::set_float(void* ptr, float f) const {
-	ASSERT(type == core_type_id::Float);
-
-	*(float*)get_ptr(ptr) = f;
-}
-
-uint64_t PropertyInfo::get_int(const void* ptr) const {
-	ASSERT(is_integral_type());
-	uint8_t* p = get_ptr(ptr);
-	if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
-		return *(int8_t*)p;
-	} else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
-		return *(uint16_t*)p;
-	} else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
-		return *(uint32_t*)p;
-	} else if (type == core_type_id::Int64) {
-		return *(uint64_t*)p;
+void PropertyInfo::with_struct(void* inst, StructFn fn) const {
+	ASSERT(inst && type == core_type_id::ActualStruct && struct_type);
+	ASSERT(owns(*this, inst) && "the object is not of the property's class");
+	if (access) {
+		ASSERT(access->with_struct);
+		access->with_struct(*this, inst, fn);
 	} else {
-		ASSERT(0);
-		return 0;
+		fn(StructRef{struct_type, get_ptr(inst)});
 	}
 }
 
-void PropertyInfo::set_int(void* ptr, uint64_t i) const {
-	ASSERT(is_integral_type());
-	uint8_t* p = get_ptr(ptr);
-	if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
-		*(int8_t*)p = i;
-	} else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
-		*(uint16_t*)p = i;
-	} else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
-		*(uint32_t*)p = i;
-	} else if (type == core_type_id::Int64) {
-		*(uint64_t*)p = i; // ERROR NARROWING
-	} else {
-		ASSERT(0);
-	}
+PropertyInfo* PropertyInfoList::find(const char* name) const {
+	ASSERT(name);
+	for (int i = 0; i < count; i++)
+		if (std::strcmp(list[i].name, name) == 0)
+			return &list[i];
+	return nullptr;
 }

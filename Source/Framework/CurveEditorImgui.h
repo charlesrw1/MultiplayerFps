@@ -8,8 +8,6 @@
 
 #include "EnumDefReflection.h"
 #include "ReflectionProp.h"
-#include "ReflectionMacros.h"
-#include "ArrayReflection.h"
 
 NEWENUM(CurvePointType, uint8_t){
 	Linear,		   // linear interp
@@ -30,20 +28,6 @@ public:
 
 struct EditingCurve
 {
-	static const PropertyInfoList* get_props() {
-		static StdVectorCallback<CurvePoint> vecdef_points(get_cruve_point_prop());
-		START_PROPS(EditingCurve)
-		REG_STDSTRING(name, PROP_SERIALIZE), REG_INT(color, PROP_SERIALIZE, ""), /* reg it as a uint*/
-			REG_STDVECTOR(points, PROP_SERIALIZE) END_PROPS(EditingCurve)
-	}
-
-	static const PropertyInfoList* get_cruve_point_prop() {
-		static PropertyInfo info[] = {
-			make_struct_property("_value", 0 /* 0 offset */, PROP_DEFAULT, "CurvePointSerialize")};
-		static PropertyInfoList list = {info, 1, "_CurvePoint"};
-		return &list;
-	}
-
 	std::vector<CurvePoint> points;
 	std::string name = "";
 	bool visible = true;

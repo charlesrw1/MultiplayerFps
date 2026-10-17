@@ -12,6 +12,7 @@
 #include "Game/EntityPtr.h"
 #include "Framework/Util.h"
 #include "Framework/SavedFields.h"
+#include "Framework/StructReflection.h"
 
 // LuaSharp binding tests (luasharp_engine_test.cpp). Values are not ordinals, so the thunks must map them.
 NEWENUM(LsTestMode, uint8_t){
@@ -164,6 +165,24 @@ public:
 	REF AssetPtr<IAsset> asset;
 	REF obj<Entity> target;
 	REF Color32 tint = COLOR_RED;
+};
+
+// List and struct properties (property_list_test.cpp).
+struct PropListTestPoint
+{
+	STRUCT_BODY();
+	REF float weight = 1.f;
+	REF Color32 tint = COLOR_WHITE;
+	REF std::vector<int> tags;
+};
+class PropListTestThing : public ClassBase
+{
+public:
+	CLASS_BODY(PropListTestThing);
+	REF std::vector<PropListTestPoint> points;
+	REF std::vector<float> samples;
+	REF std::vector<std::string> names;
+	REF PropListTestPoint pivot;
 };
 
 // Saved-data renames and upgrades (property_access_test.cpp). Version 2 renamed "power" to "strength" and doubled it.

@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include "Framework/ReflectionMacros.h"
-#include "Framework/ArrayReflection.h"
 #include "Assets/IAsset.h"
 
 #include "Render/Model.h"

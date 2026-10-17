@@ -120,6 +120,7 @@
     <ClCompile Include="Framework\PropertyEdWidgets.cpp" />
     <ClCompile Include="Framework\PropertyPtr.cpp" />
     <ClCompile Include="Framework\ReflectionProp.cpp" />
+    <ClCompile Include="Framework\PropertyPath.cpp" />
     <ClCompile Include="Framework\Serializer.cpp" />
     <ClCompile Include="Framework\SerializerBinary.cpp" />
     <ClCompile Include="Framework\SerializerJson.cpp" />
@@ -319,7 +320,6 @@
     <ClInclude Include="Framework\GradientEditorImgui.h" />
     <ClInclude Include="Framework\Guid.h" />
     <ClInclude Include="Framework\ScopedBoolean.h" />
-    <ClInclude Include="Framework\UniquePtrReflection.h" />
     <ClInclude Include="Game\BaseUpdater.h" />
     <ClInclude Include="Game\Components\ArrowComponent.h" />
     <ClInclude Include="Game\Components\GroupComponent.h" />
@@ -387,9 +387,10 @@
     <ClInclude Include="Framework\ReflectionProp.h" />
     <ClInclude Include="Framework\PropertyMake.h" />
     <ClInclude Include="Framework\PropertyValue.h" />
+    <ClInclude Include="Framework\FunctionRef.h" />
+    <ClInclude Include="Framework\PropertyPath.h" />
     <ClInclude Include="Framework\SavedFields.h" />
     <ClInclude Include="Framework\ReflectionMacros.h" />
-    <ClInclude Include="Framework\ArrayReflection.h" />
     <ClInclude Include="Framework\StringName.h" />
     <ClInclude Include="Framework\StringUtil.h" />
     <ClInclude Include="Framework\Util.h" />

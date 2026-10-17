@@ -129,8 +129,8 @@ static TestTask test_sobj_edit_save_hotreload(TestContext& t) {
 	auto* floating_pi = find_field_sobj(ti, "floating");
 	t.require(num_pi && floating_pi, "both fields found on loaded instance");
 
-	num_pi->set_int(asset.get_unsafe(), 42);
-	floating_pi->set_float(asset.get_unsafe(), 3.5f);
+	num_pi->set<int64_t>(asset.get_unsafe(), 42);
+	floating_pi->set<float>(asset.get_unsafe(), 3.5f);
 	co_await t.wait_ticks(1);
 
 	static_cast<ScriptableObject*>(asset.get_unsafe())->save_to_disk();
@@ -141,8 +141,8 @@ static TestTask test_sobj_edit_save_hotreload(TestContext& t) {
 	g_assets.reload<ScriptableObject>(asset);
 	co_await t.wait_ticks(1);
 
-	t.check(num_pi->get_int(asset.get_unsafe()) == 42, "num survived edit/save/hot-reload");
-	t.check(floating_pi->get_float(asset.get_unsafe()) == 3.5f, "floating survived edit/save/hot-reload");
+	t.check(num_pi->get<int64_t>(asset.get_unsafe()) == 42, "num survived edit/save/hot-reload");
+	t.check(floating_pi->get<float>(asset.get_unsafe()) == 3.5f, "floating survived edit/save/hot-reload");
 
 	FileSys::delete_game_file(kName);
 }
@@ -183,15 +183,14 @@ static TestTask test_sobj_self_field_access_from_lua(TestContext& t) {
 	t.require(instance != nullptr, "allocated TestLuaSobjSelfAccess instance");
 	auto* obj = static_cast<ScriptableObject*>(instance.get());
 
-	floating_pi->set_float(obj, 3.5f);
+	floating_pi->set<float>(obj, 3.5f);
 
 	// Dispatches to the Lua-defined override; reads self.floating from inside Lua script code.
 	// Pre-fix this would throw "attempt to concatenate a nil value (field 'floating')".
 	obj->on_property_change();
 	co_await t.wait_ticks(1);
 
-	auto* read_back = (std::string*)read_back_pi->get_ptr(obj);
-	t.check(*read_back == "got:3.5", "self.floating was readable from Lua script code");
+	t.check(read_back_pi->get<std::string>(obj) == "got:3.5", "self.floating was readable from Lua script code");
 }
 EDITOR_TEST("editor/sobj_self_field_access_from_lua", 20.f, test_sobj_self_field_access_from_lua);
 
@@ -230,19 +229,19 @@ static TestTask test_sobj_self_field_increment_persists(TestContext& t) {
 
 	auto* num_pi = find_field_sobj(ti, "num");
 	t.require(num_pi != nullptr, "num field found on loaded instance");
-	t.check(num_pi->get_int(asset.get_unsafe()) == 0, "num starts at template default 0");
+	t.check(num_pi->get<int64_t>(asset.get_unsafe()) == 0, "num starts at template default 0");
 
 	asset.get_unsafe()->on_property_change();
 	co_await t.wait_ticks(1);
-	t.check(num_pi->get_int(asset.get_unsafe()) == 1, "num incremented to 1 after first call");
+	t.check(num_pi->get<int64_t>(asset.get_unsafe()) == 1, "num incremented to 1 after first call");
 
 	asset.get_unsafe()->on_property_change();
 	co_await t.wait_ticks(1);
-	t.check(num_pi->get_int(asset.get_unsafe()) == 2, "num incremented to 2 after second call (not reset)");
+	t.check(num_pi->get<int64_t>(asset.get_unsafe()) == 2, "num incremented to 2 after second call (not reset)");
 
 	asset.get_unsafe()->on_property_change();
 	co_await t.wait_ticks(1);
-	t.check(num_pi->get_int(asset.get_unsafe()) == 3, "num incremented to 3 after third call (not reset)");
+	t.check(num_pi->get<int64_t>(asset.get_unsafe()) == 3, "num incremented to 3 after third call (not reset)");
 
 	FileSys::delete_game_file(kName);
 }
@@ -283,14 +282,14 @@ static TestTask test_sobj_load_static_factory(TestContext& t) {
 	t.require(target_asset.get_unsafe() != nullptr, "target .sobj loaded");
 	auto* num_pi = find_field_sobj(target_ti, "num");
 	t.require(num_pi != nullptr, "num field found on target");
-	num_pi->set_int(target_asset.get_unsafe(), 7);
+	num_pi->set<int64_t>(target_asset.get_unsafe(), 7);
 	static_cast<ScriptableObject*>(target_asset.get_unsafe())->save_to_disk();
 	co_await t.wait_ticks(1);
 
 	// Direct C++ call surface.
 	auto* loaded_via_cpp = ScriptableObject::load(target_ti, kTargetName);
 	t.require(loaded_via_cpp != nullptr, "ScriptableObject::load found the target asset");
-	t.check(num_pi->get_int(loaded_via_cpp) == 7, "loaded instance has the saved value");
+	t.check(num_pi->get<int64_t>(loaded_via_cpp) == 7, "loaded instance has the saved value");
 	t.check(&loaded_via_cpp->get_type() == target_ti, "loaded instance is the concrete TestLuaSobj type");
 
 	// Lua call surface: TestLuaSobjLoader.on_property_change() calls
@@ -304,7 +303,7 @@ static TestTask test_sobj_load_static_factory(TestContext& t) {
 
 	auto* loaded_num_pi = find_field_sobj(loader_ti, "loaded_num");
 	t.require(loaded_num_pi != nullptr, "loaded_num field found");
-	t.check(loaded_num_pi->get_int(loader_obj) == 7,
+	t.check(loaded_num_pi->get<int64_t>(loader_obj) == 7,
 			"Lua-called ScriptableObject.load() returned an object whose .num field read back correctly");
 
 	FileSys::delete_game_file(kTargetName);
@@ -358,7 +357,7 @@ static TestTask test_sobj_field_read_in_game_mode(TestContext& t) {
 	t.require(target_asset.get_unsafe() != nullptr, "target .sobj loaded");
 	auto* num_pi = find_field_sobj(target_ti, "num");
 	t.require(num_pi != nullptr, "num field found on target");
-	num_pi->set_int(target_asset.get_unsafe(), 99);
+	num_pi->set<int64_t>(target_asset.get_unsafe(), 99);
 	static_cast<ScriptableObject*>(target_asset.get_unsafe())->save_to_disk();
 	co_await t.wait_ticks(1);
 
@@ -371,7 +370,7 @@ static TestTask test_sobj_field_read_in_game_mode(TestContext& t) {
 
 	auto* loaded_num_pi = find_field_sobj(loader_ti, "loaded_num");
 	t.require(loaded_num_pi != nullptr, "loaded_num field found");
-	t.check(loaded_num_pi->get_int(loader_obj) == 99,
+	t.check(loaded_num_pi->get<int64_t>(loader_obj) == 99,
 			"self.field read the loaded value (not the stale template default) outside the editor");
 
 	FileSys::delete_game_file(kTargetName);

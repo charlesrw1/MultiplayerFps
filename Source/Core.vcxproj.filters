@@ -288,6 +288,9 @@
     <ClCompile Include="Framework\ReflectionProp.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
+    <ClCompile Include="Framework\PropertyPath.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
     <ClCompile Include="Framework\Serializer.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
@@ -752,9 +755,6 @@
     <ClInclude Include="Framework\ArenaStd.h">
       <Filter>Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Framework\ArrayReflection.h">
-      <Filter>Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Framework\BinaryReadWrite.h">
       <Filter>Framework</Filter>
     </ClInclude>
@@ -941,9 +941,6 @@
     <ClInclude Include="Framework\SysPrint.h">
       <Filter>Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Framework\UniquePtrReflection.h">
-      <Filter>Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Framework\Util.h">
       <Filter>Framework</Filter>
     </ClInclude>
@@ -954,6 +951,12 @@
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\PropertyValue.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\FunctionRef.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\PropertyPath.h">
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="Game\BaseUpdater.h">

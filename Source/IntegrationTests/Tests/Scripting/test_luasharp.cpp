@@ -226,7 +226,7 @@ static TestTask test_luasharp_editor_save_reload(TestContext& t) {
 
 		// The C++ editors edit the script fields: the asset picker and the entity picker.
 		PropertyInfo* icon = const_cast<PropertyInfo*>(find_prop(type, "icon"));
-		auto icon_editor = create_ipropertyed(factory, icon, comp, nullptr);
+		auto icon_editor = create_ipropertyed(factory, PropertyRef{comp, PropertyPath(icon)}, nullptr);
 		auto* asset_editor = dynamic_cast<AssetPropertyEditor*>(icon_editor.get());
 		t.require(asset_editor != nullptr, "a Texture field gets the asset editor");
 		asset_editor->set_asset("eng/icons/undo.png");
@@ -234,7 +234,7 @@ static TestTask test_luasharp_editor_save_reload(TestContext& t) {
 		t.check(get_field<IAsset*>(comp, "icon") != nullptr, "the asset editor wrote the script field");
 
 		PropertyInfo* target = const_cast<PropertyInfo*>(find_prop(type, "target"));
-		auto target_editor = create_ipropertyed(factory, target, comp, nullptr);
+		auto target_editor = create_ipropertyed(factory, PropertyRef{comp, PropertyPath(target)}, nullptr);
 		auto* entity_editor = dynamic_cast<EntityTargetEditor*>(target_editor.get());
 		t.require(entity_editor != nullptr, "an Entity field gets the entity editor");
 		Entity* picked = doc->spawn_entity();
@@ -243,7 +243,7 @@ static TestTask test_luasharp_editor_save_reload(TestContext& t) {
 		t.check(entity_editor->find_target() == picked, "the entity editor reads the field");
 
 		PropertyInfo* bone = const_cast<PropertyInfo*>(find_prop(type, "bone"));
-		t.check(dynamic_cast<BoneNameStringEditor*>(create_ipropertyed(factory, bone, comp, nullptr).get()) != nullptr,
+		t.check(dynamic_cast<BoneNameStringEditor*>(create_ipropertyed(factory, PropertyRef{comp, PropertyPath(bone)}, nullptr).get()) != nullptr,
 				"[Editor(\"BoneNameString\")] picks the bone name editor");
 	}
 #else

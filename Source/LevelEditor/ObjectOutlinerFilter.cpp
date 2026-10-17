@@ -2,6 +2,7 @@
 #ifdef EDITOR_BUILD
 #include "EditorDocLocal.h"
 #include "Framework/MyImguiLib.h"
+#include "Framework/PropertyPath.h"
 #include "ObjectOutlineFilter.h"
 #include "Game/Components/SpawnerComponenth.h"
 #include <sstream>
@@ -45,35 +46,18 @@ bool OONameFilter::is_in_string(const string& filter, const string& match) {
 	return lowercased.find(filter) != std::string::npos;
 }
 
+// Asset names and the instance ids of referenced objects, through structs and lists.
 static bool check_props_for_assetptr_or_entityptr(const string& filter, void* inst, const PropertyInfoList* list) {
 	ASSERT(inst != nullptr);
 	ASSERT(list != nullptr);
-	for (int i = 0; i < list->count; i++) {
-		auto& prop = list->list[i];
-		if (prop.type == core_type_id::AssetPtr) {
-			IAsset** asset = (IAsset**)prop.get_ptr(inst);
-			if (*asset) {
-				if (OONameFilter::is_in_string(filter, (*asset)->get_name())) // asset name
-					return true;
-			}
-		} else if (prop.type == core_type_id::ObjHandlePtr) {
-			obj<BaseUpdater>* eptr = (obj<BaseUpdater>*)prop.get_ptr(inst);
-			BaseUpdater* what = eptr->get();
-			if (what &&
-				OONameFilter::is_in_string(filter, std::to_string(what->get_instance_id()))) // entity ptr instance id
-				return true;
-		} else if (prop.type == core_type_id::List) {
-			auto listptr = prop.get_ptr(inst);
-			auto size = prop.list_ptr->get_size(listptr);
-			for (int j = 0; j < size; j++) {
-				auto ptr = prop.list_ptr->get_index(listptr, j);
-				bool b = check_props_for_assetptr_or_entityptr(filter, ptr, prop.list_ptr->props_in_list);
-				if (b)
-					return true;
-			}
-		}
-	}
-	return false;
+	bool found = false;
+	for_each_value(list, inst, [&](const PropertyInfo&, const PropValue& v) {
+		if (auto* a = std::get_if<AssetRef>(&v); a && a->asset)
+			found |= OONameFilter::is_in_string(filter, a->asset->get_name());
+		else if (auto* e = std::get_if<EntityRef>(&v); e && e->handle && eng->get_object(e->handle))
+			found |= OONameFilter::is_in_string(filter, std::to_string(e->handle));
+	});
+	return found;
 }
 
 bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e) {

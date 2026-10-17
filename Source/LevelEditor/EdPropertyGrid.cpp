@@ -53,11 +53,10 @@ public:
 
 		instance = this; // bs
 
-		assetprop.instance = this;
-		assetprop.prop = &hacked_bullshit2;
 		hacked_bullshit2.type = core_type_id::AssetPtr;
 		hacked_bullshit2.class_type = &Model::StaticType;
 		hacked_bullshit2.offset = offsetof(SpawnerModelProp, model);
+		assetprop.post_construct_for_custom_type(this, &hacked_bullshit2, nullptr);
 
 		if (sc->obj["model"].is_string()) {
 			string str = sc->obj["model"];

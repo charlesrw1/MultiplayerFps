@@ -9,6 +9,7 @@
 #include "glad/glad.h"
 #include "External/ImGuizmo.h"
 #include "Framework/MyImguiLib.h"
+#include "Framework/PropertyPath.h"
 #include "Render/DrawPublic.h"
 #include "Render/Texture.h"
 #include "Render/RenderConfigVars.h"
@@ -879,31 +880,14 @@ void EditorDoc::draw_scene_context_menu() {
 // Asset usage search
 // ---------------------------------------------------------------------------
 
-// Recurses into a component's reflected properties looking for an AssetPtr field whose asset's
-// gamepath matches `target` exactly. Also recurses into List-typed sub-properties, since a
-// component may hold an array of asset refs. Same walk as
-// ObjectOutlinerFilter.cpp's check_props_for_assetptr_or_entityptr, but an exact-match query
-// instead of a substring search.
+// True when an asset value under the properties (through structs and lists) has the gamepath target.
 static bool component_references_asset(void* inst, const PropertyInfoList* list, const std::string& target) {
-	if (!list)
-		return false;
-	for (int i = 0; i < list->count; i++) {
-		auto& prop = list->list[i];
-		if (prop.type == core_type_id::AssetPtr) {
-			IAsset** asset = (IAsset**)prop.get_ptr(inst);
-			if (*asset && (*asset)->get_name() == target)
-				return true;
-		} else if (prop.type == core_type_id::List) {
-			auto listptr = prop.get_ptr(inst);
-			auto size = prop.list_ptr->get_size(listptr);
-			for (int j = 0; j < size; j++) {
-				auto elem_ptr = prop.list_ptr->get_index(listptr, j);
-				if (component_references_asset(elem_ptr, prop.list_ptr->props_in_list, target))
-					return true;
-			}
-		}
-	}
-	return false;
+	bool found = false;
+	for_each_value(list, inst, [&](const PropertyInfo&, const PropValue& v) {
+		if (auto* a = std::get_if<AssetRef>(&v); a && a->asset && a->asset->get_name() == target)
+			found = true;
+	});
+	return found;
 }
 
 void EditorDoc::select_entities_using_asset(const std::string& asset_gamepath) {

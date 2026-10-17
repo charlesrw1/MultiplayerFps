@@ -440,25 +440,25 @@ bool SharedAssetPropertyEditor::internal_update() {
 }
 
 std::string AssetPropertyEditor::get_str() {
-	IAsset* asset = prop->get<IAsset*>(instance);
+	IAsset* asset = get<IAsset*>();
 	return asset ? asset->get_name() : "";
 }
 
 void AssetPropertyEditor::set_asset(const std::string& str) {
 	IAsset* asset = str.empty() ? nullptr : g_assets.generic_find(str, prop->class_type).get();
-	prop->set(instance, asset);
+	set(asset);
 }
 
 bool AssetPropertyEditor::get_failed_load() const {
-	IAsset* asset = prop->get<IAsset*>(instance);
+	IAsset* asset = get<IAsset*>();
 	return asset && asset->did_load_fail();
 }
 
 bool ColorEditor::internal_update() {
-	ImVec4 col = ImGui::ColorConvertU32ToFloat4(prop->get<Color32>(instance).to_uint());
+	ImVec4 col = ImGui::ColorConvertU32ToFloat4(get<Color32>().to_uint());
 	if (!ImGui::ColorEdit3("##coloredit", &col.x))
 		return false;
-	prop->set(instance, Color32(ImGui::ColorConvertFloat4ToU32(col)));
+	set(Color32(ImGui::ColorConvertFloat4ToU32(col)));
 	return true;
 }
 
@@ -467,25 +467,20 @@ int ColorEditor::extra_row_count() {
 }
 
 bool ColorEditor::can_reset() {
-	const Color32 c = prop->get<Color32>(instance);
+	const Color32 c = get<Color32>();
 	return c.r != 255 || c.g != 255 || c.b != 255;
 }
 
 void ColorEditor::reset_value() {
-	prop->set(instance, COLOR_WHITE);
+	set(COLOR_WHITE);
 }
 
 bool ButtonPropertyEditor::internal_update() {
 	ASSERT(prop->type == core_type_id::ActualStruct && prop->struct_type == &BoolButton::StructType);
-	BoolButton* b = (BoolButton*)prop->get_ptr(instance);
-
-	bool ret = false;
-	if (ImGui::Button(prop->name)) {
-		ret = true;
-		b->b = true;
-	}
-
-	return ret;
+	if (!ImGui::Button(prop->name))
+		return false;
+	target().with_struct([](StructRef s) { struct_as<BoolButton>(s).b = true; });
+	return true;
 }
 
 bool ButtonPropertyEditor::can_reset() {
@@ -493,7 +488,7 @@ bool ButtonPropertyEditor::can_reset() {
 }
 
 bool RagdollGroupMaskEditor::internal_update() {
-	uint8_t mask = prop->get<uint8_t>(instance);
+	uint8_t mask = get<uint8_t>();
 	static const char* names[] = {"Torso", "Head", "Arm Left", "Arm Right", "Leg Left", "Leg Right"};
 	bool changed = false;
 	for (int i = 1; i <= 6; i++) {
@@ -519,7 +514,7 @@ bool RagdollGroupMaskEditor::internal_update() {
 		changed = true;
 	}
 	if (changed)
-		prop->set(instance, mask);
+		set(mask);
 	return changed;
 }
 
@@ -580,14 +575,14 @@ public:
 #include "Game/Entity.h"
 bool EntityTransformCopyEditor::internal_update() {
 	ASSERT(prop && instance);
-	glm::vec3 v = prop->get<glm::vec3>(instance);
+	glm::vec3 v = get<glm::vec3>();
 
 	// Leave room on the right for the copy button (square, one frame high).
 	const float button_w = ImGui::GetFrameHeight();
 	ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - button_w - ImGui::GetStyle().ItemSpacing.x);
 	bool ret = ImGui::DragFloat3("##vec", &v.x, 0.05f);
 	if (ret)
-		prop->set(instance, v);
+		set(v);
 
 	ImGui::SameLine();
 	auto* ent = (Entity*)instance;
@@ -633,8 +628,6 @@ void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEdi
 }
 void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFactory<IPropertyEditor>& factory) {}
 void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactory<IPropertyEditor>& factory) {}
-#include "Framework/PropertyPtr.h"
-
 void PropertyFactoryUtil::register_anim_editor2(AnimationGraphEditorNew& ed, FnFactory<IPropertyEditor>& factory) {
 	// factory.add("StateAliasStruct", [&ed]() {return new StatemachineAliasEditor(ed); });
 }
@@ -670,8 +663,10 @@ bool EntityBoneParentStringEditor::internal_update() {
 
 	// The entity's parent_bone field is authoritative — mirror it into the display every frame so an
 	// external change (ParentToCommand, remove/undo) is reflected and never clobbered by a stale str.
-	if (EntityBoneParentString* val = PropertyPtr(prop, instance).as_struct().get_struct<EntityBoneParentString>())
-		str = val->name.is_null() ? std::string() : val->name.get_c_str();
+	target().with_struct([&](StructRef s) {
+		const StringName& name = struct_as<EntityBoneParentString>(s).name;
+		str = name.is_null() ? std::string() : name.get_c_str();
+	});
 
 	if (options.empty()) {
 		ImGui::Text("No options (add a MeshComponent with a skeleton)");
@@ -726,14 +721,14 @@ bool ClassTypePtrPropertyEditor::internal_update() {
 	assert(type_of_base);
 
 	bool has_update = false;
-	const ClassTypeInfo* current = prop->get<const ClassTypeInfo*>(instance);
+	const ClassTypeInfo* current = get<const ClassTypeInfo*>();
 	const char* preview = current ? current->classname : "<empty>";
 	if (ImGui::BeginCombo("##combocalsstype", preview)) {
 		auto subclasses = ClassBase::get_subclasses(type_of_base);
 		for (; !subclasses.is_end(); subclasses.next()) {
 
 			if (ImGui::Selectable(subclasses.get_type()->classname, subclasses.get_type() == current)) {
-				prop->set(instance, subclasses.get_type());
+				set(subclasses.get_type());
 				has_update = true;
 			}
 		}
@@ -764,7 +759,7 @@ static bool level_has_name_conflict(const std::string& name, void* skip_instance
 }
 
 bool EditorNameStringEditor::internal_update() {
-	std::string name = prop->get<std::string>(instance);
+	std::string name = get<std::string>();
 	name_conflict = level_has_name_conflict(name, instance);
 
 	auto* dl = ImGui::GetWindowDrawList();
@@ -778,7 +773,7 @@ bool EditorNameStringEditor::internal_update() {
 	bool changed = ImGui::InputText("##edname", (char*)name.c_str(), name.size() + 1,
 		ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &name);
 	if (changed)
-		prop->set(instance, std::string(name.c_str()));
+		set(std::string(name.c_str()));
 
 	ImGui::SameLine(0, style.ItemSpacing.x);
 	ImVec2 icon_pos = ImGui::GetCursorScreenPos();
@@ -796,11 +791,11 @@ bool EditorNameStringEditor::internal_update() {
 }
 
 bool EditorNameStringEditor::can_reset() {
-	return !prop->get<std::string>(instance).empty();
+	return !get<std::string>().empty();
 }
 
 void EditorNameStringEditor::reset_value() {
-	prop->set(instance, std::string());
+	set(std::string());
 }
 
 // ---------------------------------------------------------------------------
@@ -848,19 +843,19 @@ bool EntityTargetEditor::by_name() const {
 }
 
 bool EntityTargetEditor::has_target() const {
-	return by_name() ? !prop->get<std::string>(instance).empty() : prop->get<EntityRef>(instance).handle != 0;
+	return by_name() ? !get<std::string>().empty() : get<EntityRef>().handle != 0;
 }
 
 Entity* EntityTargetEditor::find_target() const {
 	if (by_name())
-		return find_entity_by_name(prop->get<std::string>(instance));
-	return EntityPtr(prop->get<EntityRef>(instance).handle).get();
+		return find_entity_by_name(get<std::string>());
+	return EntityPtr(get<EntityRef>().handle).get();
 }
 
 std::string EntityTargetEditor::target_label() const {
 	if (by_name())
-		return prop->get<std::string>(instance);
-	const int64_t handle = prop->get<EntityRef>(instance).handle;
+		return get<std::string>();
+	const int64_t handle = get<EntityRef>().handle;
 	Entity* target = find_target();
 	if (target && !target->get_editor_name().empty())
 		return target->get_editor_name();
@@ -869,9 +864,9 @@ std::string EntityTargetEditor::target_label() const {
 
 void EntityTargetEditor::set_target(const Entity* target) {
 	if (by_name())
-		prop->set(instance, target ? target->get_editor_name() : std::string());
+		set(target ? target->get_editor_name() : std::string());
 	else
-		prop->set(instance, EntityRef{target ? target->get_instance_id() : 0});
+		set(EntityRef{target ? target->get_instance_id() : 0});
 }
 
 void EntityTargetEditor::rebuild_debug_line() {
@@ -1111,7 +1106,7 @@ bool BoneNameStringEditor::draw_tree_node(int bone_idx, const std::string& curre
 bool BoneNameStringEditor::internal_update() {
 	ensure_init();
 
-	std::string value = prop->get<std::string>(instance);
+	std::string value = get<std::string>();
 	std::string* str = &value;
 	if (bone_nodes.empty()) {
 		ImGui::TextDisabled("No skeleton (attach a model with bones)");
@@ -1167,16 +1162,16 @@ bool BoneNameStringEditor::internal_update() {
 	}
 
 	if (changed)
-		prop->set(instance, value);
+		set(value);
 	return changed;
 }
 
 bool BoneNameStringEditor::can_reset() {
-	return !prop->get<std::string>(instance).empty();
+	return !get<std::string>().empty();
 }
 
 void BoneNameStringEditor::reset_value() {
-	prop->set(instance, std::string());
+	set(std::string());
 }
 
 #endif

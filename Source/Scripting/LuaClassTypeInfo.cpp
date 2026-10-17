@@ -151,6 +151,22 @@ static uint32_t lua_backed_align_for_type(core_type_id t) {
 
 static uint32_t align_up(uint32_t v, uint32_t a) { return (v + a - 1) & ~(a - 1); }
 
+// A Lua-backed field: its offset in the owner's shadow buffer, which is made on first access.
+static uint8_t* lua_field_slot(const PropertyInfo& p, const void* inst) {
+	auto* cb = const_cast<ClassBase*>(static_cast<const ClassBase*>(inst));
+	cb->ensure_lua_shadow();
+	uint8_t* shadow = cb->get_lua_field_shadow();
+	ASSERT(shadow && "PROP_LUA_BACKED requires owner to provide a shadow buffer");
+	return shadow + p.offset;
+}
+static void lua_field_get(const PropertyInfo& p, const void* inst, PropValue& out) {
+	read_storage(p, lua_field_slot(p, inst), out);
+}
+static void lua_field_set(const PropertyInfo& p, void* inst, const PropValue& in, SetMode) {
+	write_storage(p, lua_field_slot(p, inst), in);
+}
+static const PropertyAccess lua_field_access{lua_field_get, lua_field_set};
+
 static void synthesize_layout_from_parsed(LuaClassTypeInfo* /*self*/,
 										  vector<PropertyInfo>& lua_props_storage,
 										  PropertyInfoList& lua_props_list,
@@ -181,6 +197,7 @@ static void synthesize_layout_from_parsed(LuaClassTypeInfo* /*self*/,
 		pi.name = parsed.name.c_str();
 		pi.offset = (uint16_t)cursor;
 		pi.flags = PROP_DEFAULT | PROP_LUA_BACKED;
+		pi.access = &lua_field_access;
 		pi.type = ctype;
 		pi.enum_type = einfo;
 		pi.custom_type_str = custom_type;
@@ -449,7 +466,7 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 	// Register every live Component instance (not just ones with PROP_LUA_BACKED fields) so
 	// check_for_reload's live-instance walk can refresh already-spawned objects' methods on
 	// reload -- see the function-recopy phase there. Shadow buffer itself is left null and
-	// lazily allocated on first PROP_LUA_BACKED get_ptr() access (e.g. serialization, editor
+	// lazily allocated on first PROP_LUA_BACKED field access (e.g. serialization, editor
 	// property panel) so runtime-spawned components pay no allocation cost regardless.
 	if (Component* comp = out->cast_to<Component>()) {
 		comp->set_lua_owner_type(luaInfo);

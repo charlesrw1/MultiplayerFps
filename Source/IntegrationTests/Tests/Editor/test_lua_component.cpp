@@ -119,17 +119,17 @@ static TestTask test_place_edit_save_reload(TestContext& t) {
 	auto* alive_pi = find_field_comp(ti, "alive");
 	auto* display_pi = find_field_comp(ti, "display");
 	t.require(hp_pi && alive_pi && display_pi, "all three reflected fields found");
-	t.check(hp_pi->get_float(comp) == 50.f, "hp defaulted to template value 50");
-	t.check(comp->get_lua_field_shadow() != nullptr, "shadow lazily created on first get_ptr");
-	t.check(alive_pi->get_int(comp) == 1, "alive defaulted to true");
+	t.check(hp_pi->get<float>(comp) == 50.f, "hp defaulted to template value 50");
+	t.check(comp->get_lua_field_shadow() != nullptr, "shadow lazily created on first access");
+	t.check(alive_pi->get<bool>(comp) == 1, "alive defaulted to true");
 
 	// Edit through the same accessors the property grid uses.
-	hp_pi->set_float(comp, 1234.5f);
-	*(std::string*)display_pi->get_ptr(comp) = "edited_value";
-	alive_pi->set_int(comp, 0);
+	hp_pi->set<float>(comp, 1234.5f);
+	display_pi->set(comp, std::string("edited_value"));
+	alive_pi->set<bool>(comp, 0);
 	co_await t.wait_ticks(1);
 
-	t.check(hp_pi->get_float(comp) == 1234.5f, "edit landed in shadow buffer (hp)");
+	t.check(hp_pi->get<float>(comp) == 1234.5f, "edit landed in shadow buffer (hp)");
 
 	// Save + reopen. The reflection-driven serializer must round-trip Lua-backed fields.
 	const char* kPath = "_temp_lua_component.tmap";
@@ -153,10 +153,9 @@ static TestTask test_place_edit_save_reload(TestContext& t) {
 	}
 	t.require(reloaded != nullptr, "found round-tripped TestLuaComp after reload");
 
-	t.check(hp_pi->get_float(reloaded) == 1234.5f, "hp survived save/reload");
-	t.check(alive_pi->get_int(reloaded) == 0, "alive survived save/reload");
-	auto* reloaded_display = (std::string*)display_pi->get_ptr(reloaded);
-	t.check(*reloaded_display == "edited_value", "display survived save/reload");
+	t.check(hp_pi->get<float>(reloaded) == 1234.5f, "hp survived save/reload");
+	t.check(alive_pi->get<bool>(reloaded) == 0, "alive survived save/reload");
+	t.check(display_pi->get<std::string>(reloaded) == "edited_value", "display survived save/reload");
 
 	FileSys::delete_game_file(kPath);
 }
@@ -182,9 +181,9 @@ static TestTask test_hotreload_field_migration(TestContext& t) {
 	auto* alive_pi_old = find_field_comp(ti, "alive");
 	auto* display_pi_old = find_field_comp(ti, "display");
 	t.require(hp_pi_old && alive_pi_old && display_pi_old, "pre-reload fields present");
-	hp_pi_old->set_float(comp, 777.f);
-	*(std::string*)display_pi_old->get_ptr(comp) = "before_reload";
-	alive_pi_old->set_int(comp, 1);
+	hp_pi_old->set<float>(comp, 777.f);
+	display_pi_old->set(comp, std::string("before_reload"));
+	alive_pi_old->set<bool>(comp, 1);
 
 	// Snapshot the shadow buffer pointer; the reload-merge path reallocates so the
 	// pointer is expected to change.
@@ -215,11 +214,11 @@ static TestTask test_hotreload_field_migration(TestContext& t) {
 	t.check(comp->get_lua_field_shadow() != nullptr, "new shadow allocated after reload");
 
 	// Migration: overlapping fields keep their old values.
-	t.check(hp_pi_new->get_float(comp) == 777.f, "hp preserved across reload merge");
-	t.check(*(std::string*)display_pi_new->get_ptr(comp) == "before_reload",
+	t.check(hp_pi_new->get<float>(comp) == 777.f, "hp preserved across reload merge");
+	t.check(display_pi_new->get<std::string>(comp) == "before_reload",
 			"display preserved across reload merge");
 	// Added field uses NEW class template default.
-	t.check(speed_pi_new->get_float(comp) == 7.f, "speed seeded from new template default");
+	t.check(speed_pi_new->get<float>(comp) == 7.f, "speed seeded from new template default");
 }
 EDITOR_TEST("editor/lua_component_hotreload_field_migration", 30.f, test_hotreload_field_migration);
 
@@ -359,7 +358,7 @@ static TestTask test_destructor_string_dtor_and_unregister(TestContext& t) {
 	auto* display_pi = find_field_comp(ti, "display");
 	t.require(display_pi != nullptr, "display field present");
 	// Force a heap allocation so a missing dtor would be visible to leak detection.
-	*(std::string*)display_pi->get_ptr(comp) = "non_empty_payload_to_force_string_alloc";
+	display_pi->set(comp, std::string("non_empty_payload_to_force_string_alloc"));
 
 	t.require(lti->get_live_instances().size() == 1, "exactly one live instance pre-destroy");
 	t.require(lti->get_live_instances().count(comp) == 1, "live set contains our component");
@@ -409,8 +408,8 @@ static TestTask test_multiple_instances_hot_reload_migration(TestContext& t) {
 		t.require(e != nullptr, "spawned entity");
 		comps[i] = attach_test_lua_component(e, ti);
 		t.require(comps[i] != nullptr, "attached TestLuaComp");
-		hp_pi_old->set_float(comps[i], kHp[i]);
-		*(std::string*)display_pi_old->get_ptr(comps[i]) = kDisp[i];
+		hp_pi_old->set<float>(comps[i], kHp[i]);
+		display_pi_old->set(comps[i], std::string(kDisp[i]));
 		old_shadows[i] = comps[i]->get_lua_field_shadow();
 		t.require(old_shadows[i] != nullptr, "pre-reload shadow allocated");
 	}
@@ -432,11 +431,11 @@ static TestTask test_multiple_instances_hot_reload_migration(TestContext& t) {
 	for (int i = 0; i < kN; ++i) {
 		t.check(comps[i]->get_lua_field_shadow() != nullptr,
 				"post-reload shadow non-null");
-		t.check(hp_pi_new->get_float(comps[i]) == kHp[i],
+		t.check(hp_pi_new->get<float>(comps[i]) == kHp[i],
 				"hp preserved per-instance across reload merge");
-		t.check(*(std::string*)display_pi_new->get_ptr(comps[i]) == kDisp[i],
+		t.check(display_pi_new->get<std::string>(comps[i]) == kDisp[i],
 				"display preserved per-instance across reload merge");
-		t.check(speed_pi_new->get_float(comps[i]) == 7.f,
+		t.check(speed_pi_new->get<float>(comps[i]) == 7.f,
 				"speed seeded from new template default on every instance");
 	}
 
@@ -470,9 +469,9 @@ static TestTask test_save_then_reload_class_drops_field(TestContext& t) {
 	Entity* e = spawn_entity_in_editor();
 	Component* comp = attach_test_lua_component(e, ti);
 	t.require(comp != nullptr, "TestLuaComp attached");
-	hp_pi_pre->set_float(comp, 555.f);
-	alive_pi_pre->set_int(comp, 1);
-	*(std::string*)display_pi_pre->get_ptr(comp) = "kept";
+	hp_pi_pre->set<float>(comp, 555.f);
+	alive_pi_pre->set<bool>(comp, 1);
+	display_pi_pre->set(comp, std::string("kept"));
 
 	const char* kPath = "_temp_lua_dropfield.tmap";
 	FileSys::delete_game_file(kPath);
@@ -518,10 +517,10 @@ static TestTask test_save_then_reload_class_drops_field(TestContext& t) {
 	}
 	t.require(reloaded != nullptr, "found restored TestLuaComp after load");
 
-	t.check(hp_pi_new->get_float(reloaded) == 555.f, "hp survived save + class-drop + load");
-	t.check(*(std::string*)display_pi_new->get_ptr(reloaded) == "kept",
+	t.check(hp_pi_new->get<float>(reloaded) == 555.f, "hp survived save + class-drop + load");
+	t.check(display_pi_new->get<std::string>(reloaded) == "kept",
 			"display survived save + class-drop + load");
-	t.check(speed_pi_new->get_float(reloaded) == 7.f,
+	t.check(speed_pi_new->get<float>(reloaded) == 7.f,
 			"speed got new template default, not garbage from dropped slot");
 
 	FileSys::delete_game_file(kPath);
@@ -574,20 +573,20 @@ static TestTask test_two_classes_one_entity_no_alias(TestContext& t) {
 	t.check(find_field_comp(ti_a, "power") == nullptr, "A does not expose B's 'power'");
 	t.check(find_field_comp(ti_b, "hp") == nullptr, "B does not expose A's 'hp'");
 
-	a_hp->set_float(comp_a, 42.f);
-	*(std::string*)a_display->get_ptr(comp_a) = "A";
-	b_power->set_float(comp_b, 99.f);
-	*(std::string*)b_tag->get_ptr(comp_b) = "B";
+	a_hp->set<float>(comp_a, 42.f);
+	a_display->set(comp_a, std::string("A"));
+	b_power->set<float>(comp_b, 99.f);
+	b_tag->set(comp_b, std::string("B"));
 
 	t.require(comp_a->get_lua_field_shadow() != nullptr, "A shadow created on first property access");
 	t.require(comp_b->get_lua_field_shadow() != nullptr, "B shadow created on first property access");
 	t.check(comp_a->get_lua_field_shadow() != comp_b->get_lua_field_shadow(),
 			"A and B own disjoint shadow buffers");
 
-	t.check(a_hp->get_float(comp_a) == 42.f, "A.hp reads back its own write");
-	t.check(*(std::string*)a_display->get_ptr(comp_a) == "A", "A.display reads back");
-	t.check(b_power->get_float(comp_b) == 99.f, "B.power reads back its own write");
-	t.check(*(std::string*)b_tag->get_ptr(comp_b) == "B", "B.tag reads back");
+	t.check(a_hp->get<float>(comp_a) == 42.f, "A.hp reads back its own write");
+	t.check(a_display->get<std::string>(comp_a) == "A", "A.display reads back");
+	t.check(b_power->get<float>(comp_b) == 99.f, "B.power reads back its own write");
+	t.check(b_tag->get<std::string>(comp_b) == "B", "B.tag reads back");
 
 	void* b_shadow_pre = comp_b->get_lua_field_shadow();
 
@@ -599,23 +598,23 @@ static TestTask test_two_classes_one_entity_no_alias(TestContext& t) {
 
 	t.check(comp_b->get_lua_field_shadow() == b_shadow_pre,
 			"B's shadow pointer untouched by A's reload");
-	t.check(b_power->get_float(comp_b) == 99.f, "B.power preserved across A's reload");
-	t.check(*(std::string*)b_tag->get_ptr(comp_b) == "B", "B.tag preserved across A's reload");
+	t.check(b_power->get<float>(comp_b) == 99.f, "B.power preserved across A's reload");
+	t.check(b_tag->get<std::string>(comp_b) == "B", "B.tag preserved across A's reload");
 
 	// A migrated correctly (sanity).
 	auto* a_hp_new = find_field_comp(ti_a, "hp");
 	auto* a_display_new = find_field_comp(ti_a, "display");
 	t.require(a_hp_new && a_display_new, "A's overlapping fields still reflected");
-	t.check(a_hp_new->get_float(comp_a) == 42.f, "A.hp preserved across its own reload");
-	t.check(*(std::string*)a_display_new->get_ptr(comp_a) == "A",
+	t.check(a_hp_new->get<float>(comp_a) == 42.f, "A.hp preserved across its own reload");
+	t.check(a_display_new->get<std::string>(comp_a) == "A",
 			"A.display preserved across its own reload");
 }
 EDITOR_TEST("editor/lua_component_two_classes_one_entity_no_alias", 30.f,
 			test_two_classes_one_entity_no_alias);
 
 // 9. Lazy shadow allocation: freshly allocated components have null shadow; first
-//    PROP_LUA_BACKED get_ptr call creates it with template defaults; components that
-//    are never accessed via get_ptr keep null shadow indefinitely.
+//    PROP_LUA_BACKED field access creates it with template defaults; components that
+//    are never accessed keep null shadow indefinitely.
 static TestTask test_lazy_shadow_allocation(TestContext& t) {
 	load_initial_lua_class();
 
@@ -637,19 +636,19 @@ static TestTask test_lazy_shadow_allocation(TestContext& t) {
 	t.require(comp->get_lua_field_shadow() == nullptr,
 			"shadow null before any property access");
 
-	// First get_ptr triggers lazy creation; value must match template default.
-	float hp = hp_pi->get_float(comp);
+	// The first access triggers lazy creation; value must match template default.
+	float hp = hp_pi->get<float>(comp);
 	t.check(comp->get_lua_field_shadow() != nullptr,
-			"shadow created on first get_ptr call");
+			"shadow created on first access");
 	t.check(hp == 50.f, "lazily-created shadow seeded with template default (hp=50)");
-	t.check(alive_pi->get_int(comp) == 1,
+	t.check(alive_pi->get<bool>(comp) == 1,
 			"lazily-created shadow seeded with template default (alive=true)");
 
-	// A second component that is never accessed via get_ptr keeps null shadow.
+	// A second component that is never accessed keeps null shadow.
 	Entity* e2 = spawn_entity_in_editor();
 	Component* comp2 = attach_test_lua_component(e2, ti);
 	t.require(comp2 != nullptr, "second TestLuaComp attached");
 	t.check(comp2->get_lua_field_shadow() == nullptr,
-			"component never touched via get_ptr has no shadow");
+			"component never touched has no shadow");
 }
 EDITOR_TEST("editor/lua_component_lazy_shadow_allocation", 30.f, test_lazy_shadow_allocation);

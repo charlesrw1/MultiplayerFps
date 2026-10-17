@@ -12,146 +12,24 @@ static uint32_t color32_to_uint(Color32 color) {
 	return *(uint32_t*)&color;
 }
 
-// Forward-declared in this TU; defined below after UniquePtrRow
-IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,
-					 int row_idx, uint32_t property_flag_mask);
-
-// ---- UniquePtrRow ----
-
-class UniquePtrRow : public IGridRow
-{
-public:
-	UniquePtrRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* info,
-				 int row_idx, uint32_t prop_flag_mask)
-		: IGridRow(parent, row_idx), factory(factory) {
-		ASSERT(info && instance);
-		assert(info->type == core_type_id::StdUniquePtr);
-		flagmask = prop_flag_mask;
-		ClassBase** uniquePtr = (ClassBase**)info->get_ptr(instance);
-
-		add_children(*uniquePtr);
-		type_of_base = info->class_type;
-		this->info = info;
-		this->inst = instance;
-	}
-	bool internal_update() override {
-		ASSERT(info && inst);
-		auto classroot = info->class_type;
-
-		if (!type_of_base) {
-			ImGui::Text("Couldnt find base class: %s\n", info->class_type->classname);
-			return false;
-		}
-		ClassBase** uniquePtr = (ClassBase**)info->get_ptr(inst);
-		bool has_update = false;
-		const ClassTypeInfo* thisType = (*uniquePtr) ? &(*uniquePtr)->get_type() : nullptr;
-		const char* preview = (thisType) ? thisType->classname : "<empty>";
-
-		if (ImGui::BeginCombo("##combocalsstype", preview)) {
-			auto subclasses = ClassBase::get_subclasses(type_of_base);
-			if (ImGui::Selectable("<empty>", !(*uniquePtr))) {
-				thisType = nullptr;
-				has_update = true;
-			}
-			for (; !subclasses.is_end(); subclasses.next()) {
-
-				if (subclasses.get_type()->has_allocate_func()) {
-					if (ImGui::Selectable(subclasses.get_type()->classname, subclasses.get_type() == thisType)) {
-						thisType = subclasses.get_type();
-						has_update = true;
-					}
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		if (has_update) {
-			delete *uniquePtr;
-			*uniquePtr = nullptr;
-			if (thisType) {
-				*uniquePtr = thisType->allocate_this_type();
-			}
-
-			add_children(*uniquePtr);
-		}
-
-		return has_update;
-	}
-	void draw_header(float header_ofs) override {
-		ASSERT(info);
-		ImGui::Dummy(ImVec2(header_ofs, 0));
-		ImGui::SameLine();
-
-		ImGui::PushStyleColor(ImGuiCol_Header, 0);
-		ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
-		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5, 1, 0.3, 1));
-		{
-
-			uint32_t flags = ImGuiTreeNodeFlags_DefaultOpen;
-
-			expanded = ImGui::TreeNodeEx(info->name, flags);
-			if (expanded)
-				ImGui::TreePop();
-		}
-		ImGui::PopStyleColor(4);
-	}
-	void add_children(ClassBase* b) {
-		ASSERT(info);
-		child_rows.clear();
-
-		if (!b)
-			return;
-
-		auto prop_list = b->get_type().props;
-		if (!prop_list)
-			return;
-
-		for (int i = 0; i < prop_list->count; i++) {
-			auto& prop = prop_list->list[i];
-			if (!prop.can_edit() || prop.attrs.hidden)
-				continue;
-			bool passed_mask_check = (prop.flags & flagmask) != 0;
-			if (!passed_mask_check)
-				continue;
-
-			auto row = create_row(factory, this, &prop, b, -1, flagmask);
-			if (row)
-				child_rows.push_back(std::unique_ptr<IGridRow>(row));
-		}
-	}
-
-	const FnFactory<IPropertyEditor>& factory;
-	uint32_t flagmask = 0;
-	void* inst = nullptr;
-	PropertyInfo* info = nullptr;
-	const ClassTypeInfo* type_of_base = nullptr;
-};
-
 // ---- create_row factory ----
 
 #include "StructReflection.h"
-IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,
+IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, const PropertyRef& target,
 					 int row_idx, uint32_t property_flag_mask) {
-	ASSERT(prop && inst);
-	if (prop->type == core_type_id::List) {
-		ArrayRow* array_ = new ArrayRow(factory, nullptr, inst, prop, row_idx, property_flag_mask);
-		return array_;
-	} else if (prop->type == core_type_id::StdUniquePtr) {
-		auto row = new UniquePtrRow(factory, nullptr, inst, prop, row_idx, property_flag_mask);
-		return row;
-	} else if (prop->type == core_type_id::ActualStruct) {
+	ASSERT(target.root);
+	const PropertyInfo& info = target.info();
+	if (info.type == core_type_id::List) {
+		return new ArrayRow(factory, parent, target, row_idx, property_flag_mask);
+	} else if (info.type == core_type_id::ActualStruct) {
 		// try finding a property editor first
-		auto create = factory.create(prop->struct_type->structname);
-		if (create) {
-			create->post_construct_for_custom_type(inst, prop, parent);
-			return new PropertyRow(create, parent, inst, prop, row_idx); // create a property row
+		if (IPropertyEditor* create = factory.create(info.struct_type->structname)) {
+			create->post_construct(target, parent);
+			return new PropertyRow(create, parent, row_idx);
 		}
-		auto row = new GroupRow(factory, parent, prop->get_ptr(inst), prop, row_idx, property_flag_mask);
-		return row;
+		return new GroupRow(factory, parent, target, row_idx, property_flag_mask);
 	} else {
-		PropertyRow* prop_ = new PropertyRow(factory, parent, inst, prop, row_idx);
-
+		PropertyRow* prop_ = new PropertyRow(factory, parent, target, row_idx);
 		if (prop_->prop_editor)
 			return prop_;
 		delete prop_;
@@ -169,7 +47,7 @@ void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void*
 	IGridRow* row = nullptr;
 
 	if (flags & PG_LIST_PASSTHROUGH && list->count == 1 && list->list[0].type == core_type_id::List) {
-		row = create_row(factory, nullptr, list->list, inst, -1, property_flag_mask);
+		row = create_row(factory, nullptr, PropertyRef{inst, PropertyPath(list->list)}, -1, property_flag_mask);
 		row->set_name_override(list->type_name);
 		ASSERT(row);
 	} else {
@@ -182,7 +60,7 @@ void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void*
 void PropertyGrid::add_iproped_manual(IPropertyEditor* editor) {
 	ASSERT(editor && editor->prop);
 	editor->post_construct_for_custom_type(editor, editor->prop, nullptr);
-	PropertyRow* prop_ = new PropertyRow(editor, nullptr, editor, editor->prop, -1);
+	PropertyRow* prop_ = new PropertyRow(editor, nullptr, -1);
 	rows.push_back(std::unique_ptr<IGridRow>(prop_));
 }
 
@@ -362,15 +240,14 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data) {
 
 // ---- PropertyRow ----
 
-PropertyRow::PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance,
-						 PropertyInfo* prop, int row_idx)
-	: IGridRow(parent, row_idx), instance(instance), prop(prop) {
-	ASSERT(prop && instance);
-	prop_editor = create_ipropertyed(factory, prop, instance, this);
+PropertyRow::PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, const PropertyRef& target,
+						 int row_idx)
+	: IGridRow(parent, row_idx), prop(&target.info()) {
+	prop_editor = create_ipropertyed(factory, target, this);
 }
-PropertyRow::PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx)
-	: IGridRow(parent, row_idx), instance(instance), prop(prop) {
-	ASSERT(editor && prop && instance);
+PropertyRow::PropertyRow(IPropertyEditor* editor, IGridRow* parent, int row_idx)
+	: IGridRow(parent, row_idx), prop(editor->prop) {
+	ASSERT(editor && editor->prop && editor->instance);
 	prop_editor.reset(editor);
 }
 
@@ -404,11 +281,8 @@ std::string property_type_name(const PropertyInfo* p) {
 	case core_type_id::ActualStruct: {
 		return p->struct_type->structname;
 	} break;
-	case core_type_id::List: {
-		if (!p->list_ptr->get_is_new_list_type())
-			return "vector";
-		return "vector<" + property_type_name(p->list_ptr->get_property()) + ">";
-	} break;
+	case core_type_id::List:
+		return "vector<" + property_type_name(p->list().element) + ">";
 	case core_type_id::StdString:
 	case core_type_id::ScriptString:
 		return "String";
@@ -448,7 +322,7 @@ void PropertyRow::draw_header(float ofs) {
 
 	bool is_array_item = (row_index != -1);
 	ArrayRow* array_ = is_array_item ? (ArrayRow*)parent : nullptr;
-	bool can_edit = array_ && (!array_->header || array_->header->can_edit_array());
+	bool can_edit = array_ != nullptr;
 
 	if (is_array_item && can_edit) {
 		ImU32 drag_col = row_hov ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 255, 255, 50);

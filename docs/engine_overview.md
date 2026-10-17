@@ -81,17 +81,17 @@ CLASS_BODY(ClassName);              // non-scriptable
 CLASS_BODY(ClassName, scriptable);  // Lua can inherit
 ```
 
-A property list looks like this:
+Codegen writes the property list of each class:
 
 ```cpp
 static const PropertyInfoList* get_props() {
     START_PROPS(ClassName)
-        // REG_FLOAT(...), REG_INT(...), REG_BOOL(...), REG_ASSETPTR(...)
+        make_property<&ClassName::speed, checked_offset<offsetof(ClassName, speed)>()>("speed", PROP_DEFAULT)
     END_PROPS(ClassName)
 }
 ```
 
-`PROP_SERIALIZE`, `PROP_DEFAULT`, and `PROP_EDITABLE` control serialization and the editor UI. See `ReflectionMacros.h` for the full set of `REG_*` macros.
+`make_property` gets the type, the accessor and the list or struct handling from the member type. `PROP_SERIALIZE`, `PROP_DEFAULT`, and `PROP_EDITABLE` control serialization and the editor UI. See [[reflection_macros]].
 
 A `REF` annotation on a method or field exposes it to Lua. Codegen produces the bindings in `MEGA.gen.cpp`. For `scriptable` classes, codegen also emits a `ScriptImpl_ClassName` class. This class overrides every virtual method to dispatch to Lua first. See [[scripting_system]].
 
