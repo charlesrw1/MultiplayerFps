@@ -13,6 +13,7 @@
 #include <unordered_set>
 #include "Level.h"
 #include "UI/OnScreenLogGui.h"
+#include "Scripting/LuaSharpEngine.h"
 
 class GUIFullscreen;
 class OnScreenLog;
@@ -118,6 +119,7 @@ public:
 	bool is_loading_editor_level = false;
 	std::unique_ptr<Level> level = nullptr;
 	std::unique_ptr<Application> app;
+	std::unique_ptr<LuaSharpEngine> luasharp; // null when libtcc is not deployed
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;
 	bool show_console = false;

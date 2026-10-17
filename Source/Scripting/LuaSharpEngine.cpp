@@ -5,6 +5,10 @@
 #include "Framework/ClassTypeInfo.h"
 #include "Framework/ReflectionProp.h"
 #include "Framework/Util.h"
+#include "Framework/Files.h"
+#include "Framework/StringUtils.h"
+#include "Scripting/ScriptManager.h"
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
@@ -302,6 +306,42 @@ const luasharp::NativeModule& LuaSharpEngine::load(const std::string& name, std:
 	return *modules_.emplace(name, std::move(loaded)).first->second.module;
 }
 
+int LuaSharpEngine::load_script_files(const std::string& dir, std::span<const std::string_view> skip_dirs) {
+	auto skipped = [&](const std::string& path) {
+		for (std::string_view skip : skip_dirs)
+			if (path.find("/" + std::string(skip) + "/") != std::string::npos)
+				return true;
+		return path.ends_with("engine.ls"); // generated declarations; compile() adds them to each module
+	};
+	int loaded = 0;
+	for (const std::string& full_path : FileSys::find_game_files_path(dir)) {
+		std::string path = FileSys::get_game_path_from_full_path(full_path);
+		std::replace(path.begin(), path.end(), '\\', '/');
+		if (StringUtils::get_extension_no_dot(path) != "ls" || skipped(path))
+			continue;
+		auto file = FileSys::open_read_game(path);
+		if (!file) {
+			sys_print(Error, "LuaSharp: cannot read %s\n", path.c_str());
+			continue;
+		}
+		std::string source(file->size(), ' ');
+		file->read(source.data(), source.size());
+		try {
+			load(path, source);
+			loaded++;
+			sys_print(Debug, "LuaSharp: loaded %s\n", path.c_str());
+		} catch (const std::exception& error) {
+			sys_print(Error, "LuaSharp: cannot load %s:\n%s\n", path.c_str(), error.what());
+		}
+	}
+	return loaded;
+}
+
+const luasharp::NativeModule* LuaSharpEngine::find_module(const std::string& name) const {
+	const auto found = modules_.find(name);
+	return found != modules_.end() ? found->second.module.get() : nullptr;
+}
+
 void LuaSharpEngine::register_classes(LoadedModule& loaded) {
 	using luasharp::NativeRuntime;
 	const luasharp::NativeModule& module = *loaded.module;
@@ -337,6 +377,13 @@ void LuaSharpEngine::register_classes(LoadedModule& loaded) {
 	for (const auto& type : loaded.classes)
 		ClassBase::register_class(type.get());
 	ClassBase::post_changes_class_init();
+	if (ScriptManager::inst) {
+		// Lua code can get these objects too (get_component and similar), so the classes need Lua prototypes.
+		for (const auto& type : loaded.classes)
+			ScriptManager::inst->init_this_class_type(type.get());
+		for (const auto& type : loaded.classes)
+			ScriptManager::inst->set_class_type_global(type.get());
+	}
 }
 
 void LuaSharpEngine::unregister_classes(LoadedModule& loaded) {
@@ -357,6 +404,14 @@ const LuaSharpClassTypeInfo* LuaSharpEngine::find_type(const luasharp::NativeMod
 }
 
 size_t LuaSharpEngine::collect() { return runtime_->Collect(); }
+
+void LuaSharpEngine::collect_if_needed() {
+	constexpr size_t MinThreshold = 4 * 1024 * 1024;
+	if (runtime_->AllocatedBytes() < std::max(collect_threshold_, MinThreshold))
+		return;
+	collect();
+	collect_threshold_ = runtime_->AllocatedBytes() * 2;
+}
 
 void LuaSharpEngine::on_object_destroyed(ClassBase* object) {
 	ASSERT(inst); // ~LuaSharpEngine releases every proxy

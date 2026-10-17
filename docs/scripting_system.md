@@ -64,7 +64,17 @@ VS Code attach via `actboy168.lua-debug` — see [[scripting/vscode_debugger]].
    - Function → pcall with `self`+args; throws `LuaRuntimeError` on failure.
    - Non-function → call C++ base.
    - LuaSharp objects (`LuaSharpEngine::create`) set `ScriptImpl_Foo::ls_slots`. Then each override calls its slot or the C++ base, and the Lua path does not run. See `LuaSharp/docs/native-abi.md` (Engine binding).
-   - `LuaSharpEngine::load` registers a `ClassTypeInfo` for each LuaSharp class with a scriptable base. Its `[Editable]` fields are `PropertyInfo`s with `PROP_SCRIPT_FIELD`.
+   - `LuaSharpEngine::load` registers a `ClassTypeInfo` for each LuaSharp class with a scriptable base. Its `[Editable]` fields are `PropertyInfo`s with `PROP_SCRIPT_FIELD`. The class also gets a Lua prototype table, so Lua code can use its objects.
+
+## LuaSharp scripts
+
+- At startup the engine makes a `LuaSharpEngine` (`GameEngineLocal::luasharp`) when `tcc/libtcc.dll` is next to the executable.
+- It loads each `.ls` file in `scripts/` and its subfolders, except `scripts/tests/`, `scripts/lib/` and the generated `*engine.ls` declaration files. In test mode it also loads `scripts/tests/`. The module name is the game path, for example `scripts/tests/luasharp_spinner.ls`.
+- A file that does not compile is logged as an error, and the engine continues.
+- Each frame, after `ScriptManager::update`, the engine calls `LuaSharpEngine::collect_if_needed`. It collects when the heap is two times its size after the last collection (minimum 4 MB).
+- `GameEngineLocal::cleanup` destroys the engine after the level and the application.
+- Class methods cannot use top-level variables. Use `static` fields. The host reads a static field as the global `Type.field`.
+- The integration tests are in `Source/IntegrationTests/Tests/Scripting/test_luasharp.cpp`.
 
 ## `lua_table_id` and `lua_prototype_index_table`
 

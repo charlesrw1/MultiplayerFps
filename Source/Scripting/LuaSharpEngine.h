@@ -2,6 +2,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -40,12 +41,19 @@ public:
 	// by name, and its [Editable] fields are its PropertyInfos (PROP_SCRIPT_FIELD).
 	// Throws std::runtime_error when the source does not compile or a class cannot be registered.
 	const luasharp::NativeModule& load(const std::string& name, std::string_view source);
+	// Loads each .ls file in the game folder `dir` and its subfolders, except generated declarations (*engine.ls)
+	// and files in a subfolder named in skip_dirs. The module name is the game path. Errors are logged.
+	// Returns the number of modules loaded.
+	int load_script_files(const std::string& dir, std::span<const std::string_view> skip_dirs = {});
+	const luasharp::NativeModule* find_module(const std::string& name) const;
 	void* proxy_of(const ClassBase* object);
 	// An object of a script class that derives from an engine class X: a ScriptImpl_X whose virtual functions
 	// call the script overrides. The script object is its proxy. The module must stay loaded while the object lives.
 	// Throws std::runtime_error when the class cannot be created.
 	std::unique_ptr<ClassBase> create(const luasharp::NativeModule& module, std::string_view script_class);
 	size_t collect();
+	// Call when no script function is on the stack (once per frame). Collects when the heap has doubled.
+	void collect_if_needed();
 	luasharp::NativeRuntime& runtime() { return *runtime_; }
 	// All generated declarations as one source, for tools.
 	const std::string& declarations() const { return declarations_; }
@@ -78,4 +86,5 @@ private:
 	std::string declarations_;
 	std::unordered_set<ClassBase*> proxied_;
 	std::map<std::string, LoadedModule> modules_;
+	size_t collect_threshold_ = 0;
 };

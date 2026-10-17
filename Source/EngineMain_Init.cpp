@@ -69,6 +69,7 @@
 #include "IntegrationTests/TestRunner.h"
 #include "IntegrationTests/StateDump.h"
 #include "Framework/Util.h"
+#include "../LuaSharp/src/CBackend.h"
 #include <mutex>
 
 #include "Logging.h"
@@ -330,6 +331,7 @@ void GameEngineLocal::cleanup() {
 		app->stop();
 		app.reset();
 	}
+	luasharp.reset(); // after the level and app: no object of a script class can outlive it
 
 	isound->cleanup();
 
@@ -497,6 +499,17 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	if (options.pending_test_runnner)
 		ScriptManager::inst->load_test_scripts();
 	print_time("script init");
+
+	if (luasharp::NativeModule::IsLibTccAvailable()) {
+		luasharp = std::make_unique<LuaSharpEngine>();
+		constexpr std::string_view skip[] = {"tests", "lib"};
+		luasharp->load_script_files("scripts", skip);
+		if (options.pending_test_runnner)
+			luasharp->load_script_files("scripts/tests");
+		print_time("luasharp init");
+	} else {
+		sys_print(Warning, "LuaSharp: libtcc.dll is not deployed; .ls scripts are not loaded\n");
+	}
 
 	// renderer init
 	idraw->init();

@@ -118,6 +118,7 @@
     <ClCompile Include="Tests\Assets\test_asset_system.cpp" />
     <ClCompile Include="Tests\Navigation\test_nav.cpp" />
     <ClCompile Include="Tests\Level\test_static_strip.cpp" />
+    <ClCompile Include="Tests\Scripting\test_luasharp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TestTask.h" />

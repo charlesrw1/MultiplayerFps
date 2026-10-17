@@ -472,6 +472,8 @@ void GameEngineLocal::loop() {
 		AssetRegistrySystem::get().update(); // update hot reloading
 #endif
 		ScriptManager::inst->update();
+		if (luasharp)
+			luasharp->collect_if_needed();
 		idraw->pre_sync_update();
 		if (get_level())
 			get_level()->sync_level_render_data();
