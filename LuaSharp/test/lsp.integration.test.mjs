@@ -207,6 +207,11 @@ try {
     send({ jsonrpc: "2.0", id: 22, method: "textDocument/completion", params: { textDocument: { uri: nativeUri }, position: { line: nativeLines.length, character: 3 } } });
     const identifierCompletion = (await waitFor(m => m.id === 22, "identifier completion")).result;
     for (const name of ["math", "Mat4x4"]) assert.ok(identifierCompletion.some(item => item.label === name), `identifier completion is missing built-in '${name}'`);
+    const staticSource = "class Counter { static int count = 0; int id; static int next() { return count + 1; } }\nCounter.";
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri: nativeUri, version: 3 }, contentChanges: [{ text: staticSource }] } });
+    send({ jsonrpc: "2.0", id: 23, method: "textDocument/completion", params: { textDocument: { uri: nativeUri }, position: { line: 1, character: "Counter.".length } } });
+    const staticLabels = (await waitFor(m => m.id === 23, "static member completion")).result.map(item => item.label);
+    assert.ok(staticLabels.includes("count") && staticLabels.some(label => label.startsWith("next(")) && !staticLabels.includes("id"), `static completion should list static members only, got: ${staticLabels.join(", ")}`);
     // The grammar must not copy built-in names; the server colors them. Primitive types are the one allowed list.
     const grammarWords = new Set(readFileSync(path.join(root, "LuaSharp", "vscode-extension", "syntaxes", "luasharp.tmLanguage.json"), "utf8").match(/[A-Za-z_][A-Za-z0-9_]*/g));
     const primitives = new Set(["int", "float", "bool", "string", "table"]);

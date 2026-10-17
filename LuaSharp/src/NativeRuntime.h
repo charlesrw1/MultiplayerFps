@@ -8,7 +8,10 @@
 
 namespace luasharp {
 
-using NativeTraceFunction = void (*)(void* runtimeContext, void* object);
+// Must equal LS_ABI_VERSION in runtime/luasharp/runtime.h.
+constexpr unsigned long long NativeAbiVersion = 8;
+
+using NativeTraceFunction =void (*)(void* runtimeContext, void* object);
 using NativeFinalizeFunction = void (*)(void* object);
 using NativeRootTraceFunction = void (*)(void* runtimeContext);
 
@@ -19,7 +22,7 @@ struct NativeValue {
 };
 
 // The NativeValueKind of a list's elements; Value means the elements are tagged NativeValues.
-// Struct elements are stored inline and hold no references.
+// Struct elements are stored inline; their references are traced through elementType.
 enum class NativeElementKind : std::uint64_t { Value, Int, Float, Bool, String, Object, Table, Closure, List, Struct };
 // GC-managed dynamic array. Generated code reads data directly; only the runtime resizes it.
 struct NativeList {
@@ -27,6 +30,7 @@ struct NativeList {
     std::int64_t capacity{};
     std::uint64_t elementSize{};
     NativeElementKind elementKind{};
+    const void* elementType{}; // LS_TypeInfo of object, struct and list elements
     std::byte* data{};
 };
 

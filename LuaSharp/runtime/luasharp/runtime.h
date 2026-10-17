@@ -3,7 +3,7 @@
 #ifndef LUASHARP_RUNTIME_H
 #define LUASHARP_RUNTIME_H
 
-#define LS_ABI_VERSION 7
+#define LS_ABI_VERSION 8
 
 typedef signed long long ls_int;          /* public LuaSharp int: signed 64-bit */
 typedef unsigned long long ls_wrap_bits;  /* internal arithmetic bits; never a LuaSharp value */
@@ -29,7 +29,7 @@ typedef LS_Table* ls_table;
 /* Field slot kinds beyond LS_KIND: packed native components. They never appear in an LS_Value. */
 #define LS_SLOT_FLOAT32 16
 #define LS_SLOT_INT32 17
-/* A boxed struct is a GC object: LS_TypeInfo pointer, then the value at this offset. Structs hold no references, so no tracing. */
+/* A boxed struct is a GC object: LS_TypeInfo pointer, then the value at this offset. Its fields are traced through that LS_TypeInfo. */
 #define LS_STRUCT_PAYLOAD 16
 /* Element kind of an `any` slot: the slot holds a whole LS_Value. Other slots use the LS_KIND of their type. */
 #define LS_ELEMENT_VALUE 0
@@ -39,8 +39,10 @@ typedef struct LS_Value {
     union { ls_int integer; ls_float number; ls_wrap_bits boolean; void* pointer; } as;
 } LS_Value;
 
-/* GC-managed dynamic array. Generated code reads data directly; only the runtime resizes it. */
-typedef struct LS_List { ls_int count; ls_int capacity; ls_wrap_bits element_size; ls_wrap_bits element_kind; char* data; } LS_List;
+struct LS_TypeInfo;
+/* GC-managed dynamic array. Generated code reads data directly; only the runtime resizes it.
+   element_type describes object, struct and list elements, and is null for the other kinds. */
+typedef struct LS_List { ls_int count; ls_int capacity; ls_wrap_bits element_size; ls_wrap_bits element_kind; const struct LS_TypeInfo* element_type; char* data; } LS_List;
 
 /* Missing trailing arguments are nil; arity lets dynamic calls pad them. */
 typedef struct LS_Closure {
@@ -50,13 +52,12 @@ typedef struct LS_Closure {
 } LS_Closure;
 
 /* Every class object starts with its LS_TypeInfo, so `any` code can check casts and reach members by name. */
-struct LS_TypeInfo;
 typedef struct LS_FieldInfo {
     const char* name;
     ls_wrap_bits offset;
     ls_wrap_bits kind;                  /* LS_KIND of the field type */
     ls_wrap_bits element_kind;          /* list fields only */
-    const struct LS_TypeInfo* type;     /* class fields only */
+    const struct LS_TypeInfo* type;     /* class and struct fields; the element type of list fields */
 } LS_FieldInfo;
 typedef struct LS_MethodInfo {
     const char* name;
@@ -70,6 +71,7 @@ typedef struct LS_TypeInfo {
     ls_wrap_bits method_count;
     const LS_MethodInfo* methods;
     ls_wrap_bits size;                  /* structs: sizeof the value, without the box header */
+    ls_wrap_bits kind;                  /* LS_KIND_OBJECT, LS_KIND_STRUCT, or LS_KIND_LIST for a list type (one "element" field) */
 } LS_TypeInfo;
 typedef struct LS_Object { const LS_TypeInfo* type; } LS_Object;
 
@@ -92,7 +94,7 @@ typedef struct LS_RuntimeApi {
     void (*print)(void* context, void* format, ls_wrap_bits count, const LS_Value* arguments);
     void (*report_error)(void* context, const char* message);
     int (*table_next)(void* context, void* table, ls_wrap_bits* cursor, LS_Value* key, LS_Value* value);
-    void* (*list_create)(void* context, ls_wrap_bits element_size, ls_wrap_bits element_kind, ls_wrap_bits capacity);
+    void* (*list_create)(void* context, ls_wrap_bits element_size, ls_wrap_bits element_kind, const LS_TypeInfo* element_type, ls_wrap_bits capacity);
     void (*list_reserve)(void* context, void* list, ls_wrap_bits capacity);
     void* (*list_slice)(void* context, void* list, ls_int start, ls_int end);
     void* (*string_concat)(void* context, void* left, void* right);
@@ -214,19 +216,83 @@ static void* ls_unbox_object(LS_Value v, const LS_TypeInfo* type) {
     return (void*)0;
 }
 
-/* Checks the element kind only; the class of object elements is not checked. */
-static LS_List* ls_unbox_list(LS_Value v, ls_wrap_bits element_kind) {
+static int ls_cstr_equal(const char* a, const char* b) {
+    while (*a && *a == *b) { ++a; ++b; }
+    return *a == *b;
+}
+
+/* True for one LS_TypeInfo, or for structs and list types that match field by field (each module emits its own).
+   Classes match only by identity. */
+static int ls_type_same(const LS_TypeInfo* a, const LS_TypeInfo* b, int depth) {
+    ls_wrap_bits i;
+    if (a == b) return 1;
+    if (!a || !b || a->kind != b->kind || a->kind == LS_KIND_OBJECT || depth > 8) return 0;
+    if (a->size != b->size || a->field_count != b->field_count || !ls_cstr_equal(a->name, b->name)) return 0;
+    for (i = 0; i < a->field_count; ++i) {
+        const LS_FieldInfo* x = &a->fields[i];
+        const LS_FieldInfo* y = &b->fields[i];
+        if (x->offset != y->offset || x->kind != y->kind || x->element_kind != y->element_kind || !ls_cstr_equal(x->name, y->name)) return 0;
+        if (!ls_type_same(x->type, y->type, depth + 1)) return 0;
+    }
+    return 1;
+}
+
+static const char* ls_element_name(ls_wrap_bits kind, const LS_TypeInfo* type) {
+    return type ? type->name : kind == LS_ELEMENT_VALUE ? "any" : ls_kind_name(kind);
+}
+
+/* Checks the element kind and, for object, struct and list elements, the element type. */
+static LS_List* ls_unbox_list(LS_Value v, ls_wrap_bits element_kind, const LS_TypeInfo* element_type) {
+    LS_List* list;
     if (v.kind == LS_KIND_NIL) return (LS_List*)0;
-    if (v.kind == LS_KIND_LIST && ((LS_List*)v.as.pointer)->element_kind == element_kind) return (LS_List*)v.as.pointer;
-    ls_report_parts(v.kind == LS_KIND_LIST ? "list element type mismatch" : "expected list, got ", v.kind == LS_KIND_LIST ? "" : ls_kind_name(v.kind), 0, 0);
+    if (v.kind != LS_KIND_LIST) { ls_report_parts("expected list, got ", ls_kind_name(v.kind), 0, 0); return (LS_List*)0; }
+    list = (LS_List*)v.as.pointer;
+    if (list->element_kind == element_kind && ls_type_same(list->element_type, element_type, 0)) return list;
+    ls_report_parts("list element type mismatch: expected ", ls_element_name(element_kind, element_type), ", got ", ls_element_name(list->element_kind, list->element_type));
     return (LS_List*)0;
 }
 
 /* ---- structs: value types boxed on the GC heap only when they become `any` ---- */
 
-static int ls_cstr_equal(const char* a, const char* b) {
-    while (*a && *a == *b) { ++a; ++b; }
-    return *a == *b;
+/* Marks the references inside a struct value. Field offsets include the box header. */
+static void ls_trace_struct_value(void* context, const LS_TypeInfo* type, const char* value) {
+    ls_wrap_bits i;
+    for (i = 0; i < type->field_count; ++i) {
+        const LS_FieldInfo* field = &type->fields[i];
+        const char* slot = value + field->offset - LS_STRUCT_PAYLOAD;
+        if (field->kind == LS_ELEMENT_VALUE) ls_mark_value(context, (const LS_Value*)slot);
+        else if (field->kind == LS_KIND_STRUCT) ls_trace_struct_value(context, field->type, slot);
+        else if (field->kind >= LS_KIND_STRING && field->kind <= LS_KIND_LIST) ls_runtime->mark(context, *(void* const*)slot);
+    }
+}
+
+static void ls_trace_struct_box(void* context, void* object) {
+    ls_trace_struct_value(context, *(const LS_TypeInfo**)object, (const char*)object + LS_STRUCT_PAYLOAD);
+}
+
+static ls_bool ls_value_equal(LS_Value a, LS_Value b);
+
+/* Field-by-field equality of two values of one struct type: numbers by value, references by identity. */
+static ls_bool ls_struct_equal(const LS_TypeInfo* type, const char* a, const char* b) {
+    ls_wrap_bits i;
+    for (i = 0; i < type->field_count; ++i) {
+        const LS_FieldInfo* field = &type->fields[i];
+        const char* x = a + field->offset - LS_STRUCT_PAYLOAD;
+        const char* y = b + field->offset - LS_STRUCT_PAYLOAD;
+        ls_bool same;
+        switch (field->kind) {
+        case LS_ELEMENT_VALUE: same = ls_value_equal(*(const LS_Value*)x, *(const LS_Value*)y); break;
+        case LS_KIND_INT: same = *(const ls_int*)x == *(const ls_int*)y; break;
+        case LS_KIND_FLOAT: same = *(const ls_float*)x == *(const ls_float*)y; break;
+        case LS_KIND_BOOL: same = !*(const ls_bool*)x == !*(const ls_bool*)y; break;
+        case LS_SLOT_FLOAT32: same = *(const float*)x == *(const float*)y; break;
+        case LS_SLOT_INT32: same = *(const int*)x == *(const int*)y; break;
+        case LS_KIND_STRUCT: same = ls_struct_equal(field->type, x, y); break;
+        default: same = *(void* const*)x == *(void* const*)y; break;
+        }
+        if (!same) return 0;
+    }
+    return 1;
 }
 
 static void ls_copy_bytes(void* to, const void* from, ls_wrap_bits size) {
@@ -237,22 +303,22 @@ static void ls_copy_bytes(void* to, const void* from, ls_wrap_bits size) {
 }
 
 static LS_Value ls_box_struct(const LS_TypeInfo* type, const void* value) {
-    char* box = (char*)ls_alloc(LS_STRUCT_PAYLOAD + type->size, (LS_TraceFunction)0);
+    char* box = (char*)ls_alloc(LS_STRUCT_PAYLOAD + type->size, ls_trace_struct_box);
     if (!box) return ls_nil();
     *(const LS_TypeInfo**)box = type;
     ls_copy_bytes(box + LS_STRUCT_PAYLOAD, value, type->size);
     return ls_box_pointer(LS_KIND_STRUCT, box);
 }
 
-/* Copies the boxed value into out (size bytes). A wrong kind or type reports an error and zeroes out. */
-static void ls_unbox_struct(LS_Value v, const LS_TypeInfo* type, void* out, ls_wrap_bits size) {
+/* Copies the boxed value into out (type->size bytes). A wrong kind or type reports an error and zeroes out. */
+static void ls_unbox_struct(LS_Value v, const LS_TypeInfo* type, void* out) {
     ls_wrap_bits i;
     if (v.kind == LS_KIND_STRUCT) {
         const LS_TypeInfo* actual = *(const LS_TypeInfo**)v.as.pointer;
-        if (actual == type || ls_cstr_equal(actual->name, type->name)) { ls_copy_bytes(out, (const char*)v.as.pointer + LS_STRUCT_PAYLOAD, size); return; }
+        if (ls_type_same(actual, type, 0)) { ls_copy_bytes(out, (const char*)v.as.pointer + LS_STRUCT_PAYLOAD, type->size); return; }
         ls_report_parts("expected ", type->name, ", got ", actual->name);
     } else ls_report_parts("expected ", type->name, ", got ", ls_kind_name(v.kind));
-    for (i = 0; i < size; ++i) ((char*)out)[i] = 0;
+    for (i = 0; i < type->size; ++i) ((char*)out)[i] = 0;
 }
 
 /* Loads a typed slot (field, list element or cell) as an LS_Value. type is for struct slots. */
@@ -272,7 +338,7 @@ static LS_Value ls_slot_load(const char* slot, ls_wrap_bits kind, const LS_TypeI
     }
 }
 
-/* Checked store into a typed slot. type is for object slots, element_kind for list slots. */
+/* Checked store into a typed slot. type is for object and struct slots, element_kind and type (the element type) for list slots. */
 static void ls_slot_store(char* slot, ls_wrap_bits kind, ls_wrap_bits element_kind, const LS_TypeInfo* type, LS_Value v) {
     switch (kind) {
     case LS_ELEMENT_VALUE: *(LS_Value*)slot = v; return;
@@ -281,9 +347,9 @@ static void ls_slot_store(char* slot, ls_wrap_bits kind, ls_wrap_bits element_ki
     case LS_KIND_BOOL: *(ls_bool*)slot = ls_unbox_bool(v); return;
     case LS_SLOT_FLOAT32: *(float*)slot = (float)ls_unbox_float(v); return;
     case LS_SLOT_INT32: *(int*)slot = (int)ls_unbox_int(v); return;
-    case LS_KIND_STRUCT: if (type) ls_unbox_struct(v, type, slot, type->size); return;
+    case LS_KIND_STRUCT: if (type) ls_unbox_struct(v, type, slot); return;
     case LS_KIND_OBJECT: *(void**)slot = ls_unbox_object(v, type); return;
-    case LS_KIND_LIST: *(void**)slot = ls_unbox_list(v, element_kind); return;
+    case LS_KIND_LIST: *(void**)slot = ls_unbox_list(v, element_kind, type); return;
     default: *(void**)slot = ls_unbox_pointer(v, kind); return;
     }
 }
@@ -376,10 +442,7 @@ static ls_bool ls_value_equal(LS_Value a, LS_Value b) {
     if (a.kind == LS_KIND_BOOL) return a.as.boolean == b.as.boolean;
     if (a.kind == LS_KIND_STRUCT) {
         const LS_TypeInfo* type = *(const LS_TypeInfo**)a.as.pointer;
-        ls_wrap_bits i;
-        if (!ls_cstr_equal(type->name, (*(const LS_TypeInfo**)b.as.pointer)->name)) return 0;
-        for (i = 0; i < type->size; ++i) if (((const char*)a.as.pointer)[LS_STRUCT_PAYLOAD + i] != ((const char*)b.as.pointer)[LS_STRUCT_PAYLOAD + i]) return 0;
-        return 1;
+        return ls_type_same(type, *(const LS_TypeInfo**)b.as.pointer, 0) && ls_struct_equal(type, (const char*)a.as.pointer + LS_STRUCT_PAYLOAD, (const char*)b.as.pointer + LS_STRUCT_PAYLOAD);
     }
     return a.as.pointer == b.as.pointer;
 }
@@ -502,8 +565,8 @@ static char* ls_list_fault(const char* message) {
     return (char*)&ls_list_scratch;
 }
 
-static LS_List* ls_list_create(ls_wrap_bits element_size, ls_wrap_bits element_kind, ls_wrap_bits capacity) {
-    return (LS_List*)ls_runtime->list_create(ls_runtime->context, element_size, element_kind, capacity);
+static LS_List* ls_list_create(ls_wrap_bits element_size, ls_wrap_bits element_kind, const LS_TypeInfo* element_type, ls_wrap_bits capacity) {
+    return (LS_List*)ls_runtime->list_create(ls_runtime->context, element_size, element_kind, element_type, capacity);
 }
 
 static ls_int ls_list_size(LS_List* list) {
@@ -579,7 +642,9 @@ static LS_Value ls_value_get(LS_Value target, LS_Value key) {
 
 static void ls_value_set(LS_Value target, LS_Value key, LS_Value value) {
     if (target.kind == LS_KIND_TABLE) { ls_table_set((ls_table)target.as.pointer, key, value); return; }
-    if ((target.kind == LS_KIND_OBJECT || target.kind == LS_KIND_STRUCT) && key.kind == LS_KIND_STRING) {
+    /* A box is a copy of a struct value; changing it would change every `any` that shares the box, and table keys. */
+    if (target.kind == LS_KIND_STRUCT) { ls_report_parts("cannot assign a field of a boxed ", (*(const LS_TypeInfo**)target.as.pointer)->name, "; unbox it first", 0); return; }
+    if (target.kind == LS_KIND_OBJECT && key.kind == LS_KIND_STRING) {
         const LS_TypeInfo* type = ((LS_Object*)target.as.pointer)->type;
         const LS_FieldInfo* field = ls_find_field(type, (ls_string)key.as.pointer);
         if (field) { ls_slot_store((char*)target.as.pointer + field->offset, field->kind, field->element_kind, field->type, value); return; }
@@ -633,7 +698,7 @@ static int ls_value_next(LS_Value iterable, int ordered, ls_wrap_bits* cursor, L
     if (iterable.kind == LS_KIND_LIST) {
         LS_List* list = (LS_List*)iterable.as.pointer;
         if ((ls_int)*cursor >= list->count) return 0;
-        *value = ls_slot_load(list->data + *cursor * list->element_size, list->element_kind, (const LS_TypeInfo*)0);
+        *value = ls_slot_load(list->data + *cursor * list->element_size, list->element_kind, list->element_type);
         *key = ls_box_int((ls_int)++*cursor);
         return 1;
     }

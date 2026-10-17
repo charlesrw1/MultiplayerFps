@@ -80,14 +80,26 @@ a.push(Vec3(1, 0, 0));   // changes a in place
 ```
 
 - Construct a struct with `T(args)`, `new T(args)` or `T.new(args)` for the native types. All three give a value. `T()` uses the field initializers.
-- Fields must be value types: `int`, `float`, `bool`, enums and other structs. A struct cannot contain itself.
+- Fields can have any type, including `string`, lists, `table` and classes. A copy of a struct shares the objects its fields refer to. A struct cannot contain itself, but it can hold a list of itself.
 - Structs have no base type. Lambdas in a struct method cannot use `this` or its members.
 - A captured struct local lives in a shared cell, so the lambda and the enclosing scope see the same value.
 - You can only assign a member of a struct that names storage (a variable, a field, or a list element). `makeParticle().mass = 1` is an error.
-- A struct that becomes `any` (or goes into a `table`) is boxed as a copy on the heap. Converting it back copies it out and checks the type.
-- `==` and `!=` compare structs member by member.
+- A struct that becomes `any` (or goes into a `table`) is boxed as a copy on the heap. Converting it back copies it out and checks the type. You cannot assign a field of a boxed struct: `t.p.x = 1` is a run-time error. Unbox it, change it and store it again.
+- `==` and `!=` compare structs member by member: numbers by value, references by identity. Strings are interned, so equal strings compare equal. Boxed structs compare the same way, and equal structs are the same `table` key.
 
-`static` methods belong to the type: `Util.twice(3)`. A static method cannot use `this` or instance members. Static fields are not supported.
+`static` methods and fields belong to the type: `Util.twice(3)`, `Counter.count += 1`. Inside the type, use the name without the type. A static method or a static field initializer cannot use `this` or instance members.
+
+```
+class Counter {
+    static int count = 0;
+    int id;
+    Counter() { count += 1; id = count; }
+}
+```
+
+- Static fields live in module state. Structs and classes can both have them. A struct's static fields are not part of its value.
+- Static fields initialize before top-level code, in declaration order.
+- The host reads a static field as the global `Type.field`.
 
 Methods, constructors and static methods can be overloaded. The compiler chooses the overload at compile time. An exact type match is best. After that it prefers `int` to `float`, a derived class to its base class, `null`, and last a conversion through `any`. If two overloads match equally well, the call is an error, unless an argument has the type `any`. The first overload of a name keeps the plain C name (`ls_Util_twice`). Later overloads get a suffix (`ls_Util_twice__1`). Their export names include the parameter types (`Util.twice(float)`). Overloaded methods are not reachable through `any`.
 

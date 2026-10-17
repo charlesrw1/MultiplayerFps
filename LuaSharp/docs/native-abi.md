@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `7`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `8`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -15,7 +15,7 @@ This document defines the native backend contract. The ABI version is currently 
 | `any` | 16-byte `LS_Value` | 64-bit kind tag (`LS_KIND_*`) plus a 64-bit scalar or managed pointer payload |
 | class reference | `LS_Type*` | Nullable, stable for the lifetime of its owning runtime heap. The first field is `const LS_TypeInfo*` |
 | enum | signed 64-bit `ls_int` | Values use the declaration's resolved integer value |
-| struct | C `LS_Name` by value | Value type. Copied on assignment, argument passing and return. Holds only value-type fields |
+| struct | C `LS_Name` by value | Value type. Copied on assignment, argument passing and return. Fields can hold references |
 
 `int / int` returns `float`. Integer remainder follows Lua floor-modulo semantics, so `-5 % 3` is `1`. Integer division by zero consequently follows floating-point division behavior. Integer remainder by zero reports a structured runtime error and returns zero so native control can unwind through an ABI-safe caller.
 
@@ -51,7 +51,7 @@ A table read gives `any`. A lambda parameter is also `any`. The native backend c
 - Unboxing checks the kind at run time. A wrong kind reports an error, for example `expected int, got string`, and gives zero or null. Nil unboxes to null for reference types.
 - A float with an integer value unboxes to `int`, as in Lua `math.tointeger`.
 - A class object unboxes only to its own class. Each object starts with a `const LS_TypeInfo*`, and the check compares that pointer.
-- A list unboxes when its element kind matches. The class of object elements is not checked.
+- A list unboxes when its element kind and element type match. Object elements must have the same class. Struct and list elements must have the same layout (see Structs).
 - An `any` condition uses Lua truthiness: only nil and false are false. `bool(x)` on `any` does the same.
 
 `LS_TypeInfo` holds the class name, a table of fields (name, offset and kind) and a table of method thunks. With it, `any` code can do these operations on class objects:
@@ -66,9 +66,11 @@ A dynamic call has a limit of 16 arguments.
 
 ## Lists
 
-A list is one GC allocation with this layout: `count`, `capacity`, `element_size`, `element_kind` and `data`. The runtime owns the element buffer and frees it when it collects the list. Generated code reads and writes elements in `data` directly, but only the runtime resizes the buffer. Push doubles the capacity when the list is full.
+A list is one GC allocation with this layout: `count`, `capacity`, `element_size`, `element_kind`, `element_type` and `data`. The runtime owns the element buffer and frees it when it collects the list. Generated code reads and writes elements in `data` directly, but only the runtime resizes the buffer. Push doubles the capacity when the list is full.
 
-`element_kind` is the `LS_KIND` of the element type, or `LS_ELEMENT_VALUE` (`0`) when the elements are `LS_Value`. The collector traces elements of kind `LS_KIND_STRING` and higher, and `any` code uses the kind to box elements.
+`element_kind` is the `LS_KIND` of the element type, or `LS_ELEMENT_VALUE` (`0`) when the elements are `LS_Value`. `element_type` is the `LS_TypeInfo` of object, struct and list elements, and null for other kinds. The collector traces reference elements, and the references inside struct elements through `element_type`. `any` code uses both fields to box elements.
+
+Each list type that can be an element has a generated `LS_TypeInfo` (`ls_listtype_<id>`) of kind `LS_KIND_LIST`. It has one field, `element`, that describes its elements. A list field in a class or struct uses the same element description.
 
 A negative index counts from the end. An index that is out of range, a `pop_back` on an empty list, or the use of a null list reports a runtime error, and the operation continues on a zeroed scratch value. Lua returns `nil` in these cases. A list boxes into `LS_Value` as kind `8`.
 
@@ -88,13 +90,13 @@ Strings are immutable and interned, so `==` compares pointers. Every operation t
 - A table foreach loop visits non-null entries in insertion order.
 - A foreach loop over `any` follows the Lua backend. With two variables it is `pairs`, and with one variable it is `ipairs`, which stops at the first nil. A list in `any` gives 1-based keys, the same as Lua.
 
-`NativeRuntime` owns zeroed, non-moving allocations and performs precise stop-the-world mark-and-sweep collection. Generated trace functions cover class reference fields, closure environments and cells; the runtime traces tagged table keys and values and list elements. Module globals are registered as roots while their module is loaded, and host code can keep returned objects alive with `Pin`/`Unpin`. Collection currently occurs only when the host calls `Collect`, so it must not run concurrently with generated code. There is consequently no write barrier or generated stack-map requirement yet.
+`NativeRuntime` owns zeroed, non-moving allocations and performs precise stop-the-world mark-and-sweep collection. Generated trace functions cover class reference fields, struct fields that hold references, closure environments, cells and static fields; the runtime traces tagged table keys and values and list elements. Module globals are registered as roots while their module is loaded, and host code can keep returned objects alive with `Pin`/`Unpin`. Collection currently occurs only when the host calls `Collect`, so it must not run concurrently with generated code. There is consequently no write barrier or generated stack-map requirement yet.
 
 Interning is weak: identical live strings share one object, but the intern table does not itself keep strings alive. Sweeping a string removes its intern-table entry. ABI changes increment `abi_version`; generated code must never guess the layout of a different version.
 
 ## Module state
 
-Top-level variables live in a generated `LS_ModuleState`, persist after `ls_module_init`, and are discoverable through generated address getters. `NativeModule::FindGlobal` resolves those getters using compiler-generated metadata.
+Top-level variables and static fields live in a generated `LS_ModuleState`, persist after `ls_module_init`, and are discoverable through generated address getters. A static field is the global `Type.field` (C getter `ls_global_static_Type__field`). Static fields initialize at the start of `ls_module_init`, in declaration order. `NativeModule::FindGlobal` resolves those getters using compiler-generated metadata.
 
 Module state remains inside the TinyCC module and therefore dies when that module is destroyed. Reload validates global types but does not migrate their values yet.
 
@@ -106,20 +108,22 @@ External object types are opaque. Generated code may pass their pointers to decl
 
 ## Structs
 
-A struct is a C `struct LS_Name` that is passed, returned and stored by value. A class field, a list element or a closure cell stores it inline. A struct holds only value-type fields, so the collector never traces one.
+A struct is a C `struct LS_Name` that is passed, returned and stored by value. A class field, a list element or a closure cell stores it inline. Its fields can hold references. The collector traces those through the struct's `LS_TypeInfo` wherever the struct is stored: class fields, list elements, boxes, cells, globals and static fields.
 
-- Constructors are `LS_S ls_S_new(...)`. `LS_S ls_S_default(void)` applies the field initializers. `ls_bool ls_S_eq(LS_S, LS_S)` compares member by member.
+- Constructors are `LS_S ls_S_new(...)`. `LS_S ls_S_default(void)` applies the field initializers. `ls_bool ls_S_eq(LS_S, LS_S)` compares member by member: numbers by value, references by identity.
 - Instance methods take `LS_S* self`. A call on a variable passes its address. A call on a temporary first copies it to a local.
-- A list of structs has `element_kind` `LS_KIND_STRUCT` and any `element_size`. Reading such a list through `any` is not supported.
-- Converting a struct to `any` allocates a box: a `const LS_TypeInfo*` followed by the value at `LS_STRUCT_PAYLOAD` (16) bytes. `ls_unbox_struct` checks the type name and copies the value out. The box kind is `LS_KIND_STRUCT`.
-- The type info lists the fields with offsets that include the box header. A field has a slot kind: the `LS_KIND_*` of its type, or `LS_SLOT_FLOAT32` and `LS_SLOT_INT32` for packed native components. A nested struct field uses `LS_KIND_STRUCT` and points to its own type info. `LS_TypeInfo.size` is the size of the value.
+- A list of structs has `element_kind` `LS_KIND_STRUCT`, any `element_size`, and the struct's `element_type`.
+- Converting a struct to `any` allocates a box: a `const LS_TypeInfo*` followed by the value at `LS_STRUCT_PAYLOAD` (16) bytes. `ls_unbox_struct` checks the type and copies the value out. The box kind is `LS_KIND_STRUCT`. Code cannot assign a field of a box, because other values and table keys can share the box.
+- Each module emits its own type info. Two struct type infos match when they have the same name, size and fields (name, offset, kind and type). Class type infos match only when they are the same pointer.
+- `ls_value_equal` and table keys compare boxed structs field by field, the same as `ls_S_eq`. A struct key with a NaN field reports a runtime error.
+- The type info lists the fields with offsets that include the box header. A field has a slot kind: the `LS_KIND_*` of its type, or `LS_SLOT_FLOAT32` and `LS_SLOT_INT32` for packed native components. A nested struct field uses `LS_KIND_STRUCT` and points to its own type info. `LS_TypeInfo.size` is the size of the value. `LS_TypeInfo.kind` is `LS_KIND_OBJECT`, `LS_KIND_STRUCT` or `LS_KIND_LIST`.
 - `string(value)` formats a boxed struct as `Name(field, ...)`.
 
 The native types in `vecmath.h` follow the same rules. `Vec2`/`Vec3` use `float` components, `Vec2i`/`Vec3i` use `int`, `Quat` is `{x, y, z, w}` and `Mat4x4` is `float m[16]`, column-major.
 
-## Overloading and static methods
+## Overloading, static methods and static fields
 
-The first declaration of a name keeps the symbol `ls_Type_name`. Each later overload gets `ls_Type_name__N`, where `N` is its declaration order. Export names of later overloads include the parameter types, for example `Type.name(float)`. A static method has no `self` parameter. Reload treats each overload as a separate function.
+The first declaration of a name keeps the symbol `ls_Type_name`. Each later overload gets `ls_Type_name__N`, where `N` is its declaration order. Export names of later overloads include the parameter types, for example `Type.name(float)`. A static method has no `self` parameter. Reload treats each overload as a separate function. A static field is the module-state member `ls_static_Type__field`, and it is not part of the instance layout.
 
 ## Closures and current limits
 

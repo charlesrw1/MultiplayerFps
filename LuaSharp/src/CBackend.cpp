@@ -98,6 +98,8 @@ struct CEmitter {
     std::vector<std::vector<const VariableBinding*>> lambdaCaptures;
     std::vector<std::string_view> lambdaOwners;  // enclosing class of each lambda, empty at top level
     std::unordered_set<size_t> cellSymbols;      // captured locals that are also assigned
+    StringMap<bool> structReferences;            // memo for HasReferences
+    std::vector<std::pair<const BoundClass*, const BoundField*>> staticFields; // declaration order
     std::vector<std::string_view> dynamicNames;  // member names used on table/any values
     std::optional<size_t> activeLambda;
     std::string_view constructorResult;         // variable a bare `return;` yields inside a constructor
@@ -112,6 +114,7 @@ struct CEmitter {
             (item.isStruct ? structs : classes)[item.name] = &item;
             if (item.isStruct) structNames.insert(item.name);
             AssignFunctionNames(item);
+            for (const auto& field : item.fields) if (field.isStatic) staticFields.emplace_back(&item, &field);
         }
         for (const auto& item : externalTypes) { externalNames.insert(item.name); if (item.isEnum) enums.insert(item.name); if (item.isStruct) externalStructs.insert(item.name); }
         bindingsBySymbol.resize(analysis.symbols.size());
@@ -252,6 +255,7 @@ struct CEmitter {
         case SyntaxExpression::Kind::Identifier: return types.Kind(value.type) != TypeKind::Meta;
         case SyntaxExpression::Kind::Parenthesized: return IsAddressable(Child(value, 0));
         case SyntaxExpression::Kind::Member:
+            if (value.lowering == Lowering::StaticField) return true;
             if (value.lowering == Lowering::NativeConstant || types.Kind(Child(value, 0).type) == TypeKind::Meta) return false;
             return IsStruct(Child(value, 0).type) ? IsAddressable(Child(value, 0)) : !IsDynamic(Child(value, 0).type);
         case SyntaxExpression::Kind::Index: return value.lowering == Lowering::ListIndex;
@@ -289,7 +293,51 @@ struct CEmitter {
         if (const auto kind = TryKindName(type)) return *kind;
         throw std::runtime_error("Native C backend cannot convert type '" + Name(type) + "' to or from 'any'");
     }
-    void NewList(TypeId element, size_t capacity) { Put("ls_list_create(sizeof(", Type(element), "), ", KindName(element), ", ", capacity, ')'); }
+    // A list type gets an LS_TypeInfo ("ls_listtype_<id>") when its elements, nested lists included, have an LS_KIND.
+    bool HasListTypeInfo(TypeId list) const {
+        assert(types.IsList(list));
+        const auto element = types.Element(list);
+        return TryKindName(element) && (!types.IsList(element) || HasListTypeInfo(element));
+    }
+    // The LS_TypeInfo of a class, struct or list type; null for other types.
+    void TypeRef(TypeId type) {
+        if (IsClass(type) || IsStruct(type)) return Put("&ls_type_", Id{Name(type)});
+        if (types.IsList(type) && HasListTypeInfo(type)) return Put("&ls_listtype_", type);
+        Put("(const LS_TypeInfo*)0");
+    }
+    // kind, element_kind, type of an LS_FieldInfo for a slot of this type. A list slot names its element type.
+    void FieldDescriptor(TypeId type) {
+        if (!types.IsList(type)) return Put(KindName(type), ", 0, ", [&] { TypeRef(type); });
+        const auto element = types.Element(type);
+        Put(KindName(type), ", ", KindName(element), ", ", [&] { TypeRef(element); });
+    }
+    void NewList(TypeId element, size_t capacity) { Put("ls_list_create(sizeof(", Type(element), "), ", KindName(element), ", ", [&] { TypeRef(element); }, ", ", capacity, ')'); }
+    // True when a value of this user struct holds GC references, directly or in nested structs.
+    bool HasReferences(std::string_view structName) {
+        if (const auto found = structReferences.find(structName); found != structReferences.end()) return found->second;
+        const auto* type = structs.at(std::string(structName));
+        const bool result = std::any_of(type->fields.begin(), type->fields.end(), [&](const BoundField& field) {
+            return !field.isStatic && (IsManagedObject(field.type) || (IsUserStruct(field.type) && HasReferences(field.type)));
+        });
+        structReferences.emplace(std::string(structName), result);
+        return result;
+    }
+    bool IsTracedStruct(std::string_view type) { return IsUserStruct(type) && HasReferences(type); }
+    // Emits the marking of the references held by a value of `type` stored at `place`, a C lvalue. False when it holds none.
+    template <typename Place> bool MarkSlot(size_t depth, std::string_view type, const Place& place) {
+        if (type == "any") Line(depth, "ls_mark_value(runtime_context, &", place, ");");
+        else if (IsManagedObject(type)) Line(depth, "ls_runtime->mark(runtime_context, ", place, ");");
+        else if (IsTracedStruct(type)) Line(depth, "ls_trace_struct_value(runtime_context, &ls_type_", Id{type}, ", (const char*)&", place, ");");
+        else return false;
+        return true;
+    }
+    // Module-state slot of a static field: "ls_state.ls_static_<Owner>__<name>".
+    auto StaticSlot(std::string_view owner, std::string_view name) { return [this, owner, name] { Put("ls_state.ls_static_", Id{owner}, "__", Id{name}); }; }
+    auto StaticSlot(const BoundExpression& value) {
+        assert(value.lowering == Lowering::StaticField && value.symbolIndex);
+        const auto& symbol = analysis.symbols[*value.symbolIndex];
+        return StaticSlot(symbol.owner, symbol.name);
+    }
 
     // Lists and tables are separate native objects, although the language lets either flow into the other.
     void CheckFlow(TypeId target, TypeId source) const {
@@ -358,10 +406,10 @@ struct CEmitter {
         if (type == TypeTable::Int || IsEnum(type)) return Put("ls_unbox_int(", part, ')');
         if (type == TypeTable::Float) return Put("ls_unbox_float(", part, ')');
         if (type == TypeTable::Bool) return Put("ls_unbox_bool(", part, ')');
-        if (types.IsList(type)) return Put("ls_unbox_list(", part, ", ", KindName(types.Element(type)), ')');
+        if (types.IsList(type)) return Put("ls_unbox_list(", part, ", ", KindName(types.Element(type)), ", ", [&] { TypeRef(types.Element(type)); }, ')');
         if (IsStruct(type)) {
             const auto temp = Temp("unbox", nextLabel++);
-            return Put("({ ", Type(type), ' ', temp, "; ls_unbox_struct(", part, ", &ls_type_", Id{Name(type)}, ", &", temp, ", sizeof(", Type(type), ")); ", temp, "; })");
+            return Put("({ ", Type(type), ' ', temp, "; ls_unbox_struct(", part, ", &ls_type_", Id{Name(type)}, ", &", temp, "); ", temp, "; })");
         }
         if (IsClass(type)) return Put("((", Type(type), ")ls_unbox_object(", part, ", &ls_type_", Id{Name(type)}, "))");
         Put("((", Type(type), ")ls_unbox_pointer(", part, ", ", KindName(type), "))");
@@ -439,7 +487,11 @@ struct CEmitter {
     // Declares a local; a cell local lives on the GC heap.
     void Declare(size_t depth, const VariableBinding* binding, TypeId type, std::string_view name, const auto& initializer) {
         if (!IsCell(binding)) return Line(depth, Type(type), ' ', Id{name}, " = ", initializer, ';');
-        Line(depth, Type(type), "* ls_cell_", Id{name}, " = (", Type(type), "*)ls_cell_create(sizeof(", Type(type), "), ", KindName(type), "); *ls_cell_", Id{name}, " = ", initializer, ';');
+        const auto create = [&] {
+            if (IsTracedStruct(Name(type))) Put("ls_alloc(sizeof(", Type(type), "), ls_trace_cell_", Id{Name(type)}, ')');
+            else Put("ls_cell_create(sizeof(", Type(type), "), ", KindName(type), ')');
+        };
+        Line(depth, Type(type), "* ls_cell_", Id{name}, " = (", Type(type), "*)", create, "; *ls_cell_", Id{name}, " = ", initializer, ';');
     }
 
     void Expression(const BoundExpression& value, std::string_view owner = {}) {
@@ -450,6 +502,7 @@ struct CEmitter {
         case SyntaxExpression::Kind::Missing: return;
         case SyntaxExpression::Kind::Identifier:
             if (text == "this") return IsUserStruct(owner) ? Put("(*self)") : Put("self");
+            if (value.lowering == Lowering::StaticField) return Put(StaticSlot(value));
             if (value.lowering == Lowering::ImplicitField) return Put("self->", Id{text});
             if (value.symbolIndex && globalSymbols.contains(*value.symbolIndex)) return Put("ls_state.", Id{text});
             if (value.symbolIndex) return Variable(*value.symbolIndex, text);
@@ -463,6 +516,7 @@ struct CEmitter {
         case SyntaxExpression::Kind::Member: {
             const auto target = Child(value, 0).type;
             if (value.lowering == Lowering::NativeConstant) return Put(value.nativeMember->cName);
+            if (value.lowering == Lowering::StaticField) return Put(StaticSlot(value));
             if (types.Kind(target) == TypeKind::Meta) return Put("LS_", Id{types.Target(target)}, '_', Id{text});
             if (IsStruct(target)) return Put('(', child(0), ").", Id{text});
             if (target == TypeTable::Table) return Put("ls_table_get(", child(0), ", ", NameValue(text), ')');
@@ -818,13 +872,18 @@ struct CEmitter {
         StringSet emitted;
         const auto define = [&](auto&& self, const BoundClass& value) -> void {
             if (!emitted.insert(value.name).second) return;
-            for (const auto& field : value.fields) if (const auto inner = structs.find(field.type); inner != structs.end()) self(self, *inner->second);
-            Line(0, "struct LS_", Id{value.name}, " {");
-            if (value.fields.empty()) Line(1, "char ls_empty;");
-            for (const auto& field : value.fields) Line(1, CTypeName{field.type}, ' ', Id{field.name}, ';');
-            Line(0, "};");
+            for (const auto& field : value.fields) if (const auto inner = structs.find(field.type); !field.isStatic && inner != structs.end()) self(self, *inner->second);
+            InstanceLayout(value);
         };
         for (const auto& value : program.classes) if (value.isStruct) define(define, value);
+    }
+    // "struct LS_T { ... };" with the instance fields; static fields live in module state.
+    void InstanceLayout(const BoundClass& value) {
+        Line(0, "struct LS_", Id{value.name}, " {");
+        if (!value.isStruct) Line(1, "const LS_TypeInfo* ls_type;");
+        else if (std::all_of(value.fields.begin(), value.fields.end(), [](const auto& field) { return field.isStatic; })) Line(1, "char ls_empty;");
+        for (const auto& field : value.fields) if (!field.isStatic) Line(1, CTypeName{field.type}, ' ', Id{field.name}, ';');
+        Line(0, "};");
     }
     void Parameters(const BoundFunction& function) {
         if (function.parameters.empty()) return Put("void");
@@ -889,16 +948,12 @@ struct CEmitter {
             else Line(1, "*result = ", [&] { BoxAs(returnType, call); }, ';');
             Line(0, '}');
         }
-        size_t fieldCount{};
-        for (const auto& field : value.fields) if (TryKindName(Find(field.type))) ++fieldCount;
+        const auto described = [&](const BoundField& field) { return !field.isStatic && TryKindName(Find(field.type)).has_value(); };
+        const auto fieldCount = static_cast<size_t>(std::count_if(value.fields.begin(), value.fields.end(), described));
         if (fieldCount) {
             Line(0, "static const LS_FieldInfo ls_fields_", name, "[] = {");
-            for (const auto& field : value.fields) {
-                const auto type = Find(field.type);
-                if (!TryKindName(type)) continue;
-                Line(1, "{\"", field.name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field.name}, "), ", KindName(type), ", ", types.IsList(type) ? KindName(types.Element(type)) : "0", ", ",
-                    [&] { if (IsClass(type) || IsStruct(type)) Put("&ls_type_", Id{field.type}); else Put("(const LS_TypeInfo*)0"); }, "},");
-            }
+            for (const auto& field : value.fields) if (described(field))
+                Line(1, "{\"", field.name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field.name}, "), ", [&] { FieldDescriptor(Find(field.type)); }, "},");
             Line(0, "};");
         }
         if (!methods.empty()) {
@@ -907,7 +962,19 @@ struct CEmitter {
             Line(0, "};");
         }
         Line(0, "static const LS_TypeInfo ls_type_", name, " = {\"", value.name, "\", ", fieldCount, ", ", [&] { if (fieldCount) Put("ls_fields_", name); else Put("(const LS_FieldInfo*)0"); }, ", ",
-            methods.size(), ", ", [&] { if (!methods.empty()) Put("ls_methods_", name); else Put("(const LS_MethodInfo*)0"); }, ", ", [&] { if (value.isStruct) Put("sizeof(LS_", name, ")"); else Put('0'); }, "};");
+            methods.size(), ", ", [&] { if (!methods.empty()) Put("ls_methods_", name); else Put("(const LS_MethodInfo*)0"); }, ", ", [&] { if (value.isStruct) Put("sizeof(LS_", name, ")"); else Put('0'); }, ", ",
+            value.isStruct ? "LS_KIND_STRUCT" : "LS_KIND_OBJECT", "};");
+    }
+    // One LS_TypeInfo per list type, so list headers and list fields can name their element type.
+    void ListTypeInfos() {
+        std::vector<TypeId> lists;
+        for (TypeId id{}; id < types.Count(); ++id) if (types.IsList(id) && HasListTypeInfo(id)) lists.push_back(id);
+        for (const auto id : lists) Line(0, "static const LS_TypeInfo ls_listtype_", id, ';');
+        for (const auto id : lists) {
+            Line(0, "static const LS_FieldInfo ls_listfields_", id, "[] = {{\"element\", 0, ", [&] { FieldDescriptor(types.Element(id)); }, "}};");
+            Line(0, "static const LS_TypeInfo ls_listtype_", id, " = {\"", Name(id), "\", 1, ls_listfields_", id, ", 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};");
+        }
+        if (!lists.empty()) Line(0);
     }
 
     // Source name of an export: overloads after the first carry their parameter types.
@@ -922,11 +989,14 @@ struct CEmitter {
     }
     // Field initializers run through `self`, a pointer to the object or to the struct's local.
     void FieldInitializers(const BoundClass& value) {
-        for (const auto& field : value.fields) {
+        for (const auto& field : value.fields) if (!field.isStatic) Line(1, "self->", Id{field.name}, " = ", FieldInitializer(value, field), ';');
+    }
+    auto FieldInitializer(const BoundClass& owner, const BoundField& field) {
+        return [this, &owner, &field] {
             const auto& initializer = program.Expression(field.initializer);
             const auto type = Find(field.type);
-            Line(1, "self->", Id{field.name}, " = ", [&] { if (initializer.kind == SyntaxExpression::Kind::Missing) Default(type); else Value(type, initializer, value.name); }, ';');
-        }
+            if (initializer.kind == SyntaxExpression::Kind::Missing) Default(type); else Value(type, initializer, owner.name);
+        };
     }
     void Definitions(const BoundClass& value, CCompilationResult& result) {
         const Id name{value.name};
@@ -959,8 +1029,11 @@ struct CEmitter {
             FieldInitializers(value);
             Line(1, "return ls_value;"); Line(0, '}');
             Line(0, "ls_bool ls_", name, "_eq(LS_", name, " a, LS_", name, " b) {");
+            // Same rule as ls_struct_equal: numbers by value, references by identity (strings are interned).
             Line(1, "return 1", [&] { for (const auto& field : value.fields) {
+                if (field.isStatic) continue;
                 if (IsStruct(Find(field.type))) Put(" && ls_", Id{field.type}, "_eq(a.", Id{field.name}, ", b.", Id{field.name}, ')');
+                else if (field.type == "any") Put(" && ls_value_equal(a.", Id{field.name}, ", b.", Id{field.name}, ')');
                 else Put(" && a.", Id{field.name}, " == b.", Id{field.name});
             } }, ';');
             Line(0, '}');
@@ -989,6 +1062,7 @@ struct CEmitter {
         for (const auto& value : externalTypes) if (!classes.contains(value.name) && !value.isEnum) Line(0, "typedef struct LS_", Id{value.name}, " LS_", Id{value.name}, ';');
         for (const auto& value : program.classes) Line(0, "static const LS_TypeInfo ls_type_", Id{value.name}, ';');
         if (!program.classes.empty() || !externalTypes.empty()) Line(0);
+        ListTypeInfos();
         for (const auto& value : externalTypes) if (!value.isEnum) for (const auto& member : value.members) if (member.kind == SymbolKind::Method) {
             const auto parameters = [&] {
                 Put("LS_", Id{value.name}, "* self");
@@ -1011,10 +1085,7 @@ struct CEmitter {
         for (const auto& value : program.classes) {
             if (value.isStruct) continue;
             if (!value.baseName.empty()) throw std::runtime_error("Native C backend does not support class inheritance yet ('" + value.name + "')");
-            Line(0, "struct LS_", Id{value.name}, " {");
-            Line(1, "const LS_TypeInfo* ls_type;");
-            for (const auto& field : value.fields) Line(1, CTypeName{field.type}, ' ', Id{field.name}, ';');
-            Line(0, "};");
+            InstanceLayout(value);
         }
         for (size_t i{}; i < lambdas.size(); ++i) if (!lambdaCaptures[i].empty()) {
             Line(0, "typedef struct LS_LambdaEnv_", i, " {");
@@ -1025,45 +1096,41 @@ struct CEmitter {
             bool traced = false;
             for (const auto* capture : lambdaCaptures[i]) {
                 if (IsCell(capture)) { traced = true; Line(1, "ls_runtime->mark(runtime_context, ls_env->", Id{capture->name}, ");"); continue; }
-                if (!IsManagedObject(Name(capture->type))) continue;
-                traced = true;
-                if (capture->type == TypeTable::Any) Line(1, "ls_mark_value(runtime_context, &ls_env->", Id{capture->name}, ");");
-                else Line(1, "ls_runtime->mark(runtime_context, ls_env->", Id{capture->name}, ");");
+                traced = MarkSlot(1, Name(capture->type), [&] { Put("ls_env->", Id{capture->name}); }) || traced;
             }
             if (!traced) Line(1, "(void)runtime_context; (void)ls_env;");
             Line(0, '}');
         }
         if (!program.classes.empty()) Line(0);
         for (const auto& value : program.classes) {
-            if (value.isStruct) continue;
+            if (value.isStruct) {
+                if (HasReferences(value.name)) Line(0, "static void ls_trace_cell_", Id{value.name}, "(void* runtime_context, void* object) { ls_trace_struct_value(runtime_context, &ls_type_", Id{value.name}, ", (const char*)object); }");
+                continue;
+            }
             Line(0, "static void ls_trace_", Id{value.name}, "(void* runtime_context, void* object) {");
             Line(1, "LS_", Id{value.name}, "* self = (LS_", Id{value.name}, "*)object;");
             bool tracesField = false;
-            for (const auto& field : value.fields) if (IsManagedObject(field.type)) {
-                tracesField = true;
-                if (field.type == "any") Line(1, "ls_mark_value(runtime_context, &self->", Id{field.name}, ");");
-                else Line(1, "ls_runtime->mark(runtime_context, self->", Id{field.name}, ");");
-            }
+            for (const auto& field : value.fields) if (!field.isStatic) tracesField = MarkSlot(1, field.type, [&] { Put("self->", Id{field.name}); }) || tracesField;
             if (!tracesField) Line(1, "(void)runtime_context; (void)self;");
             Line(0, '}');
         }
         for (const auto name : dynamicNames) Line(0, "static ls_string ls_name_", Id{name}, ';');
+        const auto globals = [&] {
+            std::vector<const BoundStatement*> result;
+            for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local) result.push_back(&statement);
+            return result;
+        }();
         Line(0, "typedef struct LS_ModuleState {");
-        bool hasGlobals = false;
-        for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local) {
-            hasGlobals = true; Line(1, Type(statement.type), ' ', Id{statement.Name()}, ';');
-        }
-        if (!hasGlobals) Line(1, "unsigned char _unused;");
+        for (const auto* statement : globals) Line(1, Type(statement->type), ' ', Id{statement->Name()}, ';');
+        for (const auto& [owner, field] : staticFields) Line(1, CTypeName{field->type}, " ls_static_", Id{owner->name}, "__", Id{field->name}, ';');
+        if (globals.empty() && staticFields.empty()) Line(1, "unsigned char _unused;");
         Line(0, "} LS_ModuleState;");
         Line(0, "static LS_ModuleState ls_state;");
         Line(0, "void ls_module_trace_roots(void* runtime_context) {");
         bool tracesGlobal = !dynamicNames.empty();
         for (const auto name : dynamicNames) Line(1, "ls_runtime->mark(runtime_context, ls_name_", Id{name}, ");");
-        for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local && IsManagedObject(Name(statement.type))) {
-            tracesGlobal = true;
-            if (statement.type == TypeTable::Any) Line(1, "ls_mark_value(runtime_context, &ls_state.", Id{statement.Name()}, ");");
-            else Line(1, "ls_runtime->mark(runtime_context, ls_state.", Id{statement.Name()}, ");");
-        }
+        for (const auto* statement : globals) tracesGlobal = MarkSlot(1, Name(statement->type), [&] { Put("ls_state.", Id{statement->Name()}); }) || tracesGlobal;
+        for (const auto& [owner, field] : staticFields) tracesGlobal = MarkSlot(1, field->type, StaticSlot(owner->name, field->name)) || tracesGlobal;
         if (!tracesGlobal) Line(1, "(void)runtime_context;");
         Line(0, '}');
         Line(0);
@@ -1072,15 +1139,21 @@ struct CEmitter {
         CCompilationResult result;
         for (const auto& value : program.classes) {
             NativeTypeLayout layout; layout.name = value.name; layout.baseName = value.baseName;
-            for (const auto& field : value.fields) layout.fields.push_back({field.name, field.type});
+            for (const auto& field : value.fields) if (!field.isStatic) layout.fields.push_back({field.name, field.type});
             result.types.push_back(std::move(layout));
         }
         result.exports.push_back({"$abi_version", "ls_module_abi_version", "int", {}});
         result.exports.push_back({"$module_bind", "ls_module_bind", "int", {"$runtime_api"}});
-        for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local) {
-            const auto symbol = "ls_global_" + Identifier(statement.Name());
-            Line(0, "void* ", symbol, "(void) { return &ls_state.", Id{statement.Name()}, "; }");
-            result.globals.push_back({statement.Name(), symbol, Name(statement.type)});
+        for (const auto* statement : globals) {
+            const auto symbol = "ls_global_" + Identifier(statement->Name());
+            Line(0, "void* ", symbol, "(void) { return &ls_state.", Id{statement->Name()}, "; }");
+            result.globals.push_back({statement->Name(), symbol, Name(statement->type)});
+        }
+        // A static field is a global named "Type.field".
+        for (const auto& [owner, field] : staticFields) {
+            const auto symbol = "ls_global_static_" + Identifier(owner->name) + "__" + Identifier(field->name);
+            Line(0, "void* ", symbol, "(void) { return &", StaticSlot(owner->name, field->name), "; }");
+            result.globals.push_back({owner->name + "." + field->name, symbol, field->type});
         }
         for (const auto& value : program.classes) Prototypes(value);
         Line(0);
@@ -1110,7 +1183,10 @@ struct CEmitter {
             Line(0, '}');
         }
         if (!lambdas.empty()) Line(0);
-        Line(0, "int ls_module_init(void) {"); Statements(program.topLevel, 1, {}, {}, true); Line(1, "return 0;"); Line(0, '}');
+        Line(0, "int ls_module_init(void) {");
+        // Static fields initialize before top-level code, in declaration order.
+        for (const auto& [owner, field] : staticFields) Line(1, StaticSlot(owner->name, field->name), " = ", FieldInitializer(*owner, *field), ';');
+        Statements(program.topLevel, 1, {}, {}, true); Line(1, "return 0;"); Line(0, '}');
         result.exports.push_back({"$module_init", "ls_module_init", "int", {}});
         result.c = std::move(output); return result;
     }

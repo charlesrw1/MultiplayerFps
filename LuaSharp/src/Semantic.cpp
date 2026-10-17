@@ -81,6 +81,7 @@ std::string_view LoweringName(Lowering lowering) {
     case Lowering::ImplicitField: return "implicit_field";
     case Lowering::ImplicitMethod: return "implicit_method";
     case Lowering::StaticCall: return "static_call";
+    case Lowering::StaticField: return "static_field";
     case Lowering::NativeMethod: return "native_method";
     case Lowering::NativeStatic: return "native_static";
     case Lowering::NativeConstant: return "native_constant";
@@ -251,13 +252,12 @@ private:
             auto& constructors = constructors_[value.name];
             for (const auto& field : value.fields) {
                 CheckType(types_.Intern(field.type), field.span);
-                if (field.isStatic) AddDiagnostic("Static fields are not supported", field.span);
-                if (value.isStruct) CheckStructField(value, field);
+                if (field.type == "void") AddDiagnostic("Field '" + field.name + "' cannot be 'void'", field.span);
                 if (std::any_of(declared.begin(), declared.end(), [&](const Declared& item) { return item.name == field.name; })) AddDiagnostic("Member '" + field.name + "' is already declared on " + value.name, field.span);
                 declared.push_back({field.name, false, {}});
                 const auto index = AddSymbol(field.name, field.type, SymbolKind::Field, field.span);
-                result_.symbols[index].owner = value.name; result_.symbols[index].access = field.access;
-                members.push_back(index);
+                result_.symbols[index].owner = value.name; result_.symbols[index].access = field.access; result_.symbols[index].isStatic = field.isStatic;
+                (field.isStatic ? statics : members).push_back(index);
             }
             for (const auto& function : value.functions) {
                 if (function.isConstructor && function.name != value.name) AddDiagnostic("Constructor name must match " + std::string(value.isStruct ? "struct" : "class") + " '" + value.name + "'", function.span);
@@ -287,20 +287,20 @@ private:
         return true;
     }
     bool IsStructType(TypeId type) const { return structTypes_.contains(Name(type)); }
-    bool IsValueType(TypeId type) const { return IsNumeric(type) || type == TypeTable::Bool || enumTypes_.contains(Name(type)) || IsStructType(type); }
-    void CheckStructField(const SyntaxClass& owner, const SyntaxField& field) {
-        const auto type = types_.Intern(field.type);
-        if (type == TypeTable::Unknown || (IsValueType(type) && !field.type.ends_with("[]")) || !knownTypes_.contains(types_.Name(types_.Base(type)))) return;
-        AddDiagnostic("Field '" + field.name + "' of struct '" + owner.name + "' must be a value type (int, float, bool, enum or struct), got '" + field.type + "'", field.span);
+    // A static field declared in this source; it lives in module state.
+    bool IsUserStaticField(size_t index) const {
+        const auto& symbol = result_.symbols[index];
+        return symbol.kind == SymbolKind::Field && symbol.isStatic && !symbol.implicit && classes_.contains(symbol.owner);
     }
-    // A struct cannot contain itself, directly or through other structs.
+    bool IsValueType(TypeId type) const { return IsNumeric(type) || type == TypeTable::Bool || enumTypes_.contains(Name(type)) || IsStructType(type); }
+    // A struct cannot contain itself, directly or through other structs. Static fields are not part of the value.
     void CheckStructCycles() {
         StringSet done;
         const auto visit = [&](auto&& self, const SyntaxClass& value, std::vector<std::string_view>& path) -> void {
             if (std::find(path.begin(), path.end(), value.name) != path.end()) { AddDiagnostic("Struct '" + value.name + "' cannot contain itself", value.span); return; }
             if (!done.insert(value.name).second) return;
             path.push_back(value.name);
-            for (const auto& field : value.fields) if (const auto* inner = FindClass(field.type); inner && inner->isStruct) self(self, *inner, path);
+            for (const auto& field : value.fields) if (const auto* inner = FindClass(field.type); !field.isStatic && inner && inner->isStruct) self(self, *inner, path);
             path.pop_back();
         };
         for (const auto& value : result_.syntax.root.classes) if (value.isStruct) { std::vector<std::string_view> path; visit(visit, value, path); }
@@ -617,8 +617,10 @@ private:
                     if (staticContext_) AddDiagnostic("Instance member '" + member.name + "' cannot be used in a static method", expression.span);
                     CheckStructLambdaCapture(owner, expression.span);
                 }
-                else if (const auto staticIndex = FindMember("$type:" + owner->name, expression.text); staticIndex && result_.symbols[*staticIndex].kind == SymbolKind::Method) {
-                    type = symbolTypes_[*staticIndex]; symbol = staticIndex; lowering = Lowering::StaticCall;
+                else if (const auto staticIndex = FindMember("$type:" + owner->name, expression.text)) {
+                    const auto& member = result_.symbols[*staticIndex];
+                    type = symbolTypes_[*staticIndex]; symbol = staticIndex; lowering = member.kind == SymbolKind::Method ? Lowering::StaticCall : IsUserStaticField(*staticIndex) ? Lowering::StaticField : Lowering::None;
+                    if (member.access == "private" && member.owner != owner->name) AddDiagnostic("Member '" + member.name + "' is private on '" + member.owner + "'", expression.span);
                 }
             }
             if (type == TypeTable::Unknown && (IsBuiltinType(expression.text) || IsBuiltinStaticClass(expression.text) || declaredTypes_.contains(expression.text))) type = types_.Meta(expression.text);
@@ -634,6 +636,7 @@ private:
                 type = symbolTypes_[*index]; symbol = index;
                 if (member.access == "private" && (!owner || member.owner != owner->name)) AddDiagnostic("Member '" + member.name + "' is private on '" + member.owner + "'", MemberNameSpan(expression));
                 if (const auto builtin = symbolBuiltins_.find(*index); builtin != symbolBuiltins_.end() && builtin->second->isStatic && builtin->second->kind == SymbolKind::Field) { nativeMember = builtin->second; lowering = Lowering::NativeConstant; }
+                else if (types_.Kind(target) == TypeKind::Meta && IsUserStaticField(*index)) lowering = Lowering::StaticField;
             }
             else if (IsOpen(target)) type = TypeTable::Any;
             else if (expression.text != "<missing>" && target != TypeTable::Unknown) AddDiagnostic("Unknown member '" + expression.text + "' on " + Name(types_.Base(target)), MemberNameSpan(expression), DiagnosticSeverity::Warning);
@@ -929,11 +932,13 @@ private:
             }
             BoundClass boundClass; boundClass.name = value.name; boundClass.baseName = value.baseName; boundClass.span = value.span; boundClass.isStruct = value.isStruct;
             for (const auto& field : value.fields) {
-                BoundField boundField; boundField.access = field.access; boundField.type = field.type; boundField.name = field.name; boundField.span = field.span;
+                BoundField boundField; boundField.access = field.access; boundField.type = field.type; boundField.name = field.name; boundField.span = field.span; boundField.isStatic = field.isStatic;
                 const auto& initializer = Syntax().Expression(field.initializer);
                 if (initializer.kind != SyntaxExpression::Kind::Missing) {
                     std::vector<Local> none; boundField.initializer = AllocateExpressions(1);
+                    staticContext_ = field.isStatic;
                     const auto actual = Infer(initializer, none, &value, boundField.initializer);
+                    staticContext_ = false;
                     if (!Accepts(types_.Intern(field.type), boundField.initializer)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + field.type + "'", initializer.span);
                 }
                 boundClass.fields.push_back(std::move(boundField));

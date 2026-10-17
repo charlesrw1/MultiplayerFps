@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <cassert>
 #include <charconv>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <mutex>
 #include <new>
+#include <span>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -31,7 +33,7 @@ struct RuntimeString {
     char data[1]{};
 };
 
-constexpr unsigned long long AbiVersion = 7;
+constexpr unsigned long long AbiVersion = NativeAbiVersion;
 
 // Field order must match LS_RuntimeApi in the generated C preamble.
 struct RuntimeAbi {
@@ -46,7 +48,7 @@ struct RuntimeAbi {
     void (*print)(void*, void*, unsigned long long, const NativeValue*){};
     void (*reportError)(void*, const char*){};
     int (*tableNext)(void*, void*, unsigned long long*, NativeValue*, NativeValue*){};
-    void* (*listCreate)(void*, unsigned long long, unsigned long long, unsigned long long){};
+    void* (*listCreate)(void*, unsigned long long, unsigned long long, const void*, unsigned long long){};
     void (*listReserve)(void*, void*, unsigned long long){};
     void* (*listSlice)(void*, void*, std::int64_t, std::int64_t){};
     void* (*stringConcat)(void*, void*, void*){};
@@ -56,6 +58,97 @@ struct RuntimeAbi {
     void (*toNumber)(void*, void*, NativeValue*){};
 };
 
+// Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.
+struct NativeTypeInfo;
+struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; };
+struct NativeTypeInfo { const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind; };
+constexpr unsigned long long SlotValue = 0, SlotFloat32 = 16, SlotInt32 = 17, StructPayload = 16;
+constexpr unsigned long long KindOf(NativeValueKind kind) { return static_cast<unsigned long long>(kind); }
+
+std::span<const NativeFieldInfo> Fields(const NativeTypeInfo& type) { return {type.fields, static_cast<size_t>(type.fieldCount)}; }
+const NativeTypeInfo& BoxType(const void* box) { return **static_cast<const NativeTypeInfo* const*>(box); }
+const std::byte* BoxValue(const void* box) { return static_cast<const std::byte*>(box) + StructPayload; }
+// Field offsets include the box header; value points at the struct itself.
+const std::byte* FieldSlot(const std::byte* value, const NativeFieldInfo& field) { return value + field.offset - StructPayload; }
+template <typename T> T Load(const std::byte* slot) { T value; std::memcpy(&value, slot, sizeof(value)); return value; }
+bool IsReferenceSlot(unsigned long long kind) { return kind >= KindOf(NativeValueKind::String) && kind <= KindOf(NativeValueKind::List); }
+
+// Same rule as ls_type_same: identity, or structs and list types that match field by field.
+bool TypeSame(const NativeTypeInfo* left, const NativeTypeInfo* right, int depth = 0) {
+    if (left == right) return true;
+    if (!left || !right || left->kind != right->kind || left->kind == KindOf(NativeValueKind::Object) || depth > 8) return false;
+    if (left->size != right->size || left->fieldCount != right->fieldCount || std::strcmp(left->name, right->name) != 0) return false;
+    for (unsigned long long i{}; i < left->fieldCount; ++i) {
+        const auto& a = left->fields[i]; const auto& b = right->fields[i];
+        if (a.offset != b.offset || a.kind != b.kind || a.elementKind != b.elementKind || std::strcmp(a.name, b.name) != 0 || !TypeSame(a.type, b.type, depth + 1)) return false;
+    }
+    return true;
+}
+
+// Lua keys: a float with an integer value is the same key as that integer.
+NativeValue NormalizeKey(NativeValue key) {
+    constexpr double limit = 9223372036854775808.0; // 2^63
+    if (key.kind == NativeValueKind::Float && key.as.number >= -limit && key.as.number < limit) {
+        const auto integer = static_cast<std::int64_t>(key.as.number);
+        if (static_cast<double>(integer) == key.as.number) { key.kind = NativeValueKind::Int; key.as.integer = integer; }
+    }
+    if (key.kind == NativeValueKind::Bool) key.as.boolean = key.as.boolean != 0;
+    return key;
+}
+
+bool ValueEqual(const NativeValue& left, const NativeValue& right);
+size_t ValueHash(const NativeValue& value);
+
+// Struct keys compare and hash by field values, like ls_struct_equal; references by identity.
+bool StructEqual(const NativeTypeInfo& type, const std::byte* left, const std::byte* right) {
+    for (const auto& field : Fields(type)) {
+        const auto* a = FieldSlot(left, field); const auto* b = FieldSlot(right, field);
+        bool same{};
+        switch (field.kind) {
+        case SlotValue: same = ValueEqual(NormalizeKey(Load<NativeValue>(a)), NormalizeKey(Load<NativeValue>(b))); break;
+        case KindOf(NativeValueKind::Int): same = Load<std::int64_t>(a) == Load<std::int64_t>(b); break;
+        case KindOf(NativeValueKind::Float): same = Load<double>(a) == Load<double>(b); break;
+        case KindOf(NativeValueKind::Bool): same = (Load<unsigned char>(a) != 0) == (Load<unsigned char>(b) != 0); break;
+        case SlotFloat32: same = Load<float>(a) == Load<float>(b); break;
+        case SlotInt32: same = Load<int>(a) == Load<int>(b); break;
+        case KindOf(NativeValueKind::Struct): same = StructEqual(*field.type, a, b); break;
+        default: same = Load<void*>(a) == Load<void*>(b); break;
+        }
+        if (!same) return false;
+    }
+    return true;
+}
+size_t HashCombine(size_t seed, size_t value) { return seed ^ (value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2)); }
+size_t FloatHash(double value) { return std::hash<double>{}(value == 0.0 ? 0.0 : value); } // -0.0 equals 0.0
+size_t StructHash(const NativeTypeInfo& type, const std::byte* value) {
+    size_t hash = std::hash<std::string_view>{}(type.name);
+    for (const auto& field : Fields(type)) {
+        const auto* slot = FieldSlot(value, field);
+        switch (field.kind) {
+        case SlotValue: hash = HashCombine(hash, ValueHash(NormalizeKey(Load<NativeValue>(slot)))); break;
+        case KindOf(NativeValueKind::Int): hash = HashCombine(hash, std::hash<std::int64_t>{}(Load<std::int64_t>(slot))); break;
+        case KindOf(NativeValueKind::Float): hash = HashCombine(hash, FloatHash(Load<double>(slot))); break;
+        case KindOf(NativeValueKind::Bool): hash = HashCombine(hash, Load<unsigned char>(slot) != 0); break;
+        case SlotFloat32: hash = HashCombine(hash, FloatHash(Load<float>(slot))); break;
+        case SlotInt32: hash = HashCombine(hash, std::hash<int>{}(Load<int>(slot))); break;
+        case KindOf(NativeValueKind::Struct): hash = HashCombine(hash, StructHash(*field.type, slot)); break;
+        default: hash = HashCombine(hash, std::hash<void*>{}(Load<void*>(slot))); break;
+        }
+    }
+    return hash;
+}
+// A NaN field makes a struct unequal to itself, so it cannot be a table key.
+bool StructHasNaN(const NativeTypeInfo& type, const std::byte* value) {
+    for (const auto& field : Fields(type)) {
+        const auto* slot = FieldSlot(value, field);
+        if (field.kind == KindOf(NativeValueKind::Float) && std::isnan(Load<double>(slot))) return true;
+        if (field.kind == SlotFloat32 && std::isnan(Load<float>(slot))) return true;
+        if (field.kind == KindOf(NativeValueKind::Struct) && StructHasNaN(*field.type, slot)) return true;
+        if (field.kind == SlotValue) { const auto item = Load<NativeValue>(slot); if (item.kind == NativeValueKind::Float && std::isnan(item.as.number)) return true; }
+    }
+    return false;
+}
+
 bool ValueEqual(const NativeValue& left, const NativeValue& right) {
     if (left.kind != right.kind) return false;
     switch (left.kind) {
@@ -63,16 +156,19 @@ bool ValueEqual(const NativeValue& left, const NativeValue& right) {
     case NativeValueKind::Int: return left.as.integer == right.as.integer;
     case NativeValueKind::Float: return left.as.number == right.as.number;
     case NativeValueKind::Bool: return left.as.boolean == right.as.boolean;
+    case NativeValueKind::Struct:
+        return left.as.pointer == right.as.pointer || (TypeSame(&BoxType(left.as.pointer), &BoxType(right.as.pointer)) && StructEqual(BoxType(left.as.pointer), BoxValue(left.as.pointer), BoxValue(right.as.pointer)));
     default: return left.as.pointer == right.as.pointer;
     }
 }
+size_t ValueHash(const NativeValue& value) {
+    if (value.kind == NativeValueKind::Struct) return StructHash(BoxType(value.as.pointer), BoxValue(value.as.pointer));
+    if (value.kind == NativeValueKind::Float) return FloatHash(value.as.number);
+    std::uint64_t bits; std::memcpy(&bits, &value.as, sizeof(bits));
+    return std::hash<std::uint64_t>{}(bits ^ (static_cast<std::uint64_t>(value.kind) << 59));
+}
 
-struct KeyHash {
-    size_t operator()(const NativeValue& key) const {
-        std::uint64_t bits; std::memcpy(&bits, &key.as, sizeof(bits));
-        return std::hash<std::uint64_t>{}(bits ^ (static_cast<std::uint64_t>(key.kind) << 59));
-    }
-};
+struct KeyHash { size_t operator()(const NativeValue& key) const { return ValueHash(key); } };
 struct KeyEqual { bool operator()(const NativeValue& left, const NativeValue& right) const { return ValueEqual(left, right); } };
 
 // Entries keep insertion order for iteration. Writing nil leaves a tombstone, so cursors stay valid.
@@ -85,17 +181,6 @@ struct RuntimeList {
     NativeList header;
     std::vector<std::byte> storage;
 };
-
-// Lua keys: a float with an integer value is the same key as that integer.
-NativeValue NormalizeKey(NativeValue key) {
-    constexpr double limit = 9223372036854775808.0; // 2^63
-    if (key.kind == NativeValueKind::Float && key.as.number >= -limit && key.as.number < limit) {
-        const auto integer = static_cast<std::int64_t>(key.as.number);
-        if (static_cast<double>(integer) == key.as.number) { key.kind = NativeValueKind::Int; key.as.integer = integer; }
-    }
-    if (key.kind == NativeValueKind::Bool) key.as.boolean = key.as.boolean != 0;
-    return key;
-}
 
 bool IsManaged(const NativeValue& value) {
     return value.kind >= NativeValueKind::String && value.kind <= NativeValueKind::Struct;
@@ -196,6 +281,7 @@ void AbiTableSet(void* context, void* object, const NativeValue* key, const Nati
     if (!object) { runtime.ReportError("attempt to index a null table"); return; }
     if (key->kind == NativeValueKind::Null) { runtime.ReportError("table index is nil"); return; }
     if (key->kind == NativeValueKind::Float && key->as.number != key->as.number) { runtime.ReportError("table index is NaN"); return; }
+    if (key->kind == NativeValueKind::Struct && StructHasNaN(BoxType(key->as.pointer), BoxValue(key->as.pointer))) { runtime.ReportError("table index is a struct with a NaN field"); return; }
     auto& table = *static_cast<RuntimeTable*>(object);
     const auto normalized = NormalizeKey(*key);
     if (const auto found = table.slots.find(normalized); found != table.slots.end()) { table.entries[found->second].second = *value; return; }
@@ -264,15 +350,27 @@ int AbiTableNext(void* context, void* object, unsigned long long* cursor, Native
     return 0;
 }
 
+// Same walk as ls_trace_struct_value.
+void TraceStructValue(NativeRuntime& runtime, const NativeTypeInfo& type, const std::byte* value) {
+    for (const auto& field : Fields(type)) {
+        const auto* slot = FieldSlot(value, field);
+        if (field.kind == SlotValue) { const auto item = Load<NativeValue>(slot); if (IsManaged(item)) runtime.Mark(item.as.pointer); }
+        else if (field.kind == KindOf(NativeValueKind::Struct)) TraceStructValue(runtime, *field.type, slot);
+        else if (IsReferenceSlot(field.kind)) runtime.Mark(Load<void*>(slot));
+    }
+}
 void TraceList(void* context, void* object) {
     auto& runtime = *static_cast<NativeRuntime*>(context);
     const auto& list = static_cast<RuntimeList*>(object)->header;
-    const bool tagged = list.elementKind == NativeElementKind::Value;
-    if (!tagged && (list.elementKind < NativeElementKind::String || list.elementKind == NativeElementKind::Struct)) return;
+    const auto kind = static_cast<unsigned long long>(list.elementKind);
+    if (kind != SlotValue && kind != KindOf(NativeValueKind::Struct) && !IsReferenceSlot(kind)) return;
+    const auto* structType = kind == KindOf(NativeValueKind::Struct) ? static_cast<const NativeTypeInfo*>(list.elementType) : nullptr;
+    assert(kind != KindOf(NativeValueKind::Struct) || structType);
     for (std::int64_t i{}; i < list.count; ++i) {
         const std::byte* slot = list.data + i * list.elementSize;
-        if (tagged) { NativeValue item; std::memcpy(&item, slot, sizeof(item)); if (IsManaged(item)) runtime.Mark(item.as.pointer); }
-        else { void* pointer; std::memcpy(&pointer, slot, sizeof(pointer)); runtime.Mark(pointer); }
+        if (kind == SlotValue) { const auto item = Load<NativeValue>(slot); if (IsManaged(item)) runtime.Mark(item.as.pointer); }
+        else if (structType) TraceStructValue(runtime, *structType, slot);
+        else runtime.Mark(Load<void*>(slot));
     }
 }
 void FinalizeList(void* object) { static_cast<RuntimeList*>(object)->~RuntimeList(); }
@@ -282,14 +380,16 @@ void ReserveList(RuntimeList& list, std::int64_t capacity) {
     list.header.data = list.storage.data();
     list.header.capacity = capacity;
 }
-void* AbiListCreate(void* context, unsigned long long elementSize, unsigned long long elementKind, unsigned long long capacity) {
+void* AbiListCreate(void* context, unsigned long long elementSize, unsigned long long elementKind, const void* elementType, unsigned long long capacity) {
     assert(elementSize > 0 && elementKind <= static_cast<unsigned long long>(NativeElementKind::Struct));
+    assert(elementKind != KindOf(NativeValueKind::Struct) || elementType);
     auto& runtime = *static_cast<NativeRuntime*>(context);
     auto* list = static_cast<RuntimeList*>(runtime.Allocate(sizeof(RuntimeList), TraceList, FinalizeList));
     if (!list) return nullptr;
     new (list) RuntimeList();
     list->header.elementSize = elementSize;
     list->header.elementKind = static_cast<NativeElementKind>(elementKind);
+    list->header.elementType = elementType;
     ReserveList(*list, static_cast<std::int64_t>(capacity));
     return list;
 }
@@ -305,7 +405,7 @@ void* AbiListSlice(void* context, void* object, std::int64_t start, std::int64_t
     if (end < 0) end += source.count;
     start = (std::max)(start, std::int64_t{}); end = (std::min)(end, source.count);
     const auto count = (std::max)(end - start, std::int64_t{});
-    auto* result = static_cast<RuntimeList*>(AbiListCreate(context, source.elementSize, static_cast<unsigned long long>(source.elementKind), static_cast<unsigned long long>(count)));
+    auto* result = static_cast<RuntimeList*>(AbiListCreate(context, source.elementSize, static_cast<unsigned long long>(source.elementKind), source.elementType, static_cast<unsigned long long>(count)));
     if (!result) return nullptr;
     if (count) std::memcpy(result->header.data, source.data + start * source.elementSize, static_cast<size_t>(count) * source.elementSize);
     result->header.count = count;
@@ -345,27 +445,42 @@ void* AbiStringCase(void* context, void* value, int upper) {
     }
     return runtime.Intern(text);
 }
-// Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.
-struct NativeTypeInfo;
-struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; };
-struct NativeTypeInfo { const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size; };
-constexpr unsigned long long SlotFloat32 = 16, SlotInt32 = 17;
+std::string FormatStruct(const NativeTypeInfo& type, const std::byte* value);
 
-// "Vec3(1, 2, 3)": fields in declaration order, nested structs recursively.
-std::string FormatStruct(const NativeTypeInfo& type, const char* data) {
+// Lua 5.4 tostring(); a struct prints as "Vec3(1.0, 2.0, 3.0)".
+std::string FormatValue(const NativeValue& value) {
+    const auto reference = [&](const char* prefix) { char buffer[64]; std::snprintf(buffer, sizeof(buffer), "%s: %p", prefix, value.as.pointer); return std::string(buffer); };
+    switch (value.kind) {
+    case NativeValueKind::Null: return "nil";
+    case NativeValueKind::Int: return std::to_string(value.as.integer);
+    case NativeValueKind::Float: return FormatFloat(value.as.number);
+    case NativeValueKind::Bool: return value.as.boolean ? "true" : "false";
+    case NativeValueKind::String: return std::string(View(value.as.pointer));
+    case NativeValueKind::Closure: return reference("function");
+    case NativeValueKind::Struct: return FormatStruct(BoxType(value.as.pointer), BoxValue(value.as.pointer));
+    default: return reference("table");
+    }
+}
+
+// Fields in declaration order, nested structs recursively.
+std::string FormatStruct(const NativeTypeInfo& type, const std::byte* value) {
     std::string text = type.name; text += '(';
     for (unsigned long long i{}; i < type.fieldCount; ++i) {
         const auto& field = type.fields[i];
-        const char* slot = data + field.offset;
+        const auto* slot = FieldSlot(value, field);
         if (i) text += ", ";
         switch (field.kind) {
-        case static_cast<unsigned long long>(NativeValueKind::Int): text += std::to_string(*reinterpret_cast<const std::int64_t*>(slot)); break;
-        case static_cast<unsigned long long>(NativeValueKind::Float): text += FormatFloat(*reinterpret_cast<const double*>(slot)); break;
-        case static_cast<unsigned long long>(NativeValueKind::Bool): text += *reinterpret_cast<const unsigned char*>(slot) ? "true" : "false"; break;
-        case SlotFloat32: text += FormatFloat(*reinterpret_cast<const float*>(slot), 7); break;
-        case SlotInt32: text += std::to_string(*reinterpret_cast<const int*>(slot)); break;
-        case static_cast<unsigned long long>(NativeValueKind::Struct): text += field.type ? FormatStruct(*field.type, slot) : "?"; break;
-        default: text += "?"; break;
+        case SlotValue: text += FormatValue(Load<NativeValue>(slot)); break;
+        case KindOf(NativeValueKind::Int): text += std::to_string(Load<std::int64_t>(slot)); break;
+        case KindOf(NativeValueKind::Float): text += FormatFloat(Load<double>(slot)); break;
+        case KindOf(NativeValueKind::Bool): text += Load<unsigned char>(slot) ? "true" : "false"; break;
+        case SlotFloat32: text += FormatFloat(Load<float>(slot), 7); break;
+        case SlotInt32: text += std::to_string(Load<int>(slot)); break;
+        case KindOf(NativeValueKind::Struct): text += FormatStruct(*field.type, slot); break;
+        default: {
+            NativeValue reference; reference.kind = Load<void*>(slot) ? static_cast<NativeValueKind>(field.kind) : NativeValueKind::Null; reference.as.pointer = Load<void*>(slot);
+            text += FormatValue(reference); break;
+        }
         }
     }
     return text + ')';
@@ -374,21 +489,8 @@ std::string FormatStruct(const NativeTypeInfo& type, const char* data) {
 void* AbiToString(void* context, const NativeValue* value) {
     assert(value);
     auto& runtime = *static_cast<NativeRuntime*>(context);
-    const auto reference = [&](const char* prefix) { char buffer[64]; std::snprintf(buffer, sizeof(buffer), "%s: %p", prefix, value->as.pointer); return runtime.Intern(buffer); };
-    switch (value->kind) {
-    case NativeValueKind::Null: return runtime.Intern("nil");
-    case NativeValueKind::Int: return runtime.Intern(std::to_string(value->as.integer));
-    case NativeValueKind::Float: return runtime.Intern(FormatFloat(value->as.number));
-    case NativeValueKind::Bool: return runtime.Intern(value->as.boolean ? "true" : "false");
-    case NativeValueKind::String: return value->as.pointer;
-    case NativeValueKind::Closure: return reference("function");
-    case NativeValueKind::Struct: {
-        const auto* box = static_cast<const char*>(value->as.pointer);
-        const auto* type = *reinterpret_cast<const NativeTypeInfo* const*>(box);
-        return runtime.Intern(FormatStruct(*type, box));
-    }
-    default: return reference("table");
-    }
+    if (value->kind == NativeValueKind::String) return value->as.pointer;
+    return runtime.Intern(FormatValue(*value));
 }
 void AbiToNumber(void* context, void* value, NativeValue* out) {
     assert(out);

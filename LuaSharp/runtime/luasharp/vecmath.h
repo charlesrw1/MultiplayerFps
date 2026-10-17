@@ -338,31 +338,31 @@ static const LS_FieldInfo ls_fields_Vec2[] = {
     {"x", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec2, x), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
     {"y", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec2, y), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
 };
-static const LS_TypeInfo ls_type_Vec2 = {"Vec2", 2, ls_fields_Vec2, 0, (const LS_MethodInfo*)0, sizeof(LS_Vec2)};
+static const LS_TypeInfo ls_type_Vec2 = {"Vec2", 2, ls_fields_Vec2, 0, (const LS_MethodInfo*)0, sizeof(LS_Vec2), LS_KIND_STRUCT};
 static const LS_FieldInfo ls_fields_Vec3[] = {
     {"x", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec3, x), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
     {"y", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec3, y), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
     {"z", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec3, z), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
 };
-static const LS_TypeInfo ls_type_Vec3 = {"Vec3", 3, ls_fields_Vec3, 0, (const LS_MethodInfo*)0, sizeof(LS_Vec3)};
+static const LS_TypeInfo ls_type_Vec3 = {"Vec3", 3, ls_fields_Vec3, 0, (const LS_MethodInfo*)0, sizeof(LS_Vec3), LS_KIND_STRUCT};
 static const LS_FieldInfo ls_fields_Vec2i[] = {
     {"x", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec2i, x), LS_SLOT_INT32, 0, (const LS_TypeInfo*)0},
     {"y", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec2i, y), LS_SLOT_INT32, 0, (const LS_TypeInfo*)0},
 };
-static const LS_TypeInfo ls_type_Vec2i = {"Vec2i", 2, ls_fields_Vec2i, 0, (const LS_MethodInfo*)0, sizeof(LS_Vec2i)};
+static const LS_TypeInfo ls_type_Vec2i = {"Vec2i", 2, ls_fields_Vec2i, 0, (const LS_MethodInfo*)0, sizeof(LS_Vec2i), LS_KIND_STRUCT};
 static const LS_FieldInfo ls_fields_Vec3i[] = {
     {"x", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec3i, x), LS_SLOT_INT32, 0, (const LS_TypeInfo*)0},
     {"y", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec3i, y), LS_SLOT_INT32, 0, (const LS_TypeInfo*)0},
     {"z", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Vec3i, z), LS_SLOT_INT32, 0, (const LS_TypeInfo*)0},
 };
-static const LS_TypeInfo ls_type_Vec3i = {"Vec3i", 3, ls_fields_Vec3i, 0, (const LS_MethodInfo*)0, sizeof(LS_Vec3i)};
+static const LS_TypeInfo ls_type_Vec3i = {"Vec3i", 3, ls_fields_Vec3i, 0, (const LS_MethodInfo*)0, sizeof(LS_Vec3i), LS_KIND_STRUCT};
 static const LS_FieldInfo ls_fields_Quat[] = {
     {"w", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Quat, w), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
     {"x", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Quat, x), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
     {"y", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Quat, y), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
     {"z", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Quat, z), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
 };
-static const LS_TypeInfo ls_type_Quat = {"Quat", 4, ls_fields_Quat, 0, (const LS_MethodInfo*)0, sizeof(LS_Quat)};
+static const LS_TypeInfo ls_type_Quat = {"Quat", 4, ls_fields_Quat, 0, (const LS_MethodInfo*)0, sizeof(LS_Quat), LS_KIND_STRUCT};
 static const LS_FieldInfo ls_fields_Mat4x4[] = {
     {"m0", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mat4x4, m[0]), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
     {"m1", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mat4x4, m[1]), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
@@ -381,7 +381,7 @@ static const LS_FieldInfo ls_fields_Mat4x4[] = {
     {"m14", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mat4x4, m[14]), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
     {"m15", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mat4x4, m[15]), LS_SLOT_FLOAT32, 0, (const LS_TypeInfo*)0},
 };
-static const LS_TypeInfo ls_type_Mat4x4 = {"Mat4x4", 16, ls_fields_Mat4x4, 0, (const LS_MethodInfo*)0, sizeof(LS_Mat4x4)};
+static const LS_TypeInfo ls_type_Mat4x4 = {"Mat4x4", 16, ls_fields_Mat4x4, 0, (const LS_MethodInfo*)0, sizeof(LS_Mat4x4), LS_KIND_STRUCT};
 
 static LS_Vec2 ls_Vec2_new(ls_float x, ls_float y) { return (LS_Vec2){ (float)x, (float)y }; }
 static LS_Vec2 ls_Vec2_splat(ls_float value) { return (LS_Vec2){ (float)value, (float)value }; }

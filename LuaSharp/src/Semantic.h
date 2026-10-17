@@ -44,6 +44,7 @@ public:
 
     [[nodiscard]] const std::string& Name(TypeId id) const { return At(id).name; }
     [[nodiscard]] TypeKind Kind(TypeId id) const { return At(id).kind; }
+    [[nodiscard]] TypeId Count() const { return static_cast<TypeId>(entries_.size()); }
     [[nodiscard]] bool IsList(TypeId id) const { return Kind(id) == TypeKind::List; }
     [[nodiscard]] bool IsFunction(TypeId id) const { return Kind(id) == TypeKind::Function; }
     // List element or function result.
@@ -66,7 +67,7 @@ private:
 };
 
 enum class Lowering : uint8_t {
-    None, ImplicitField, ImplicitMethod, StaticCall, NativeMethod, NativeStatic, NativeConstant, Construct, Printf, Concat, CompoundConcat, ListIndex, ListSet,
+    None, ImplicitField, ImplicitMethod, StaticCall, StaticField, NativeMethod, NativeStatic, NativeConstant, Construct, Printf, Concat, CompoundConcat, ListIndex, ListSet,
     ListPushBack, ListPopBack, ListSize, ListEmpty, ListClear,
     StringLength, StringContains, StringStartsWith, StringEndsWith, StringSubstring, StringLower, StringUpper,
     CastIdentity, CastString, CastBoolNumber, CastBoolString, CastIntFloat, CastNumberBool, CastNumberString, CastDynamic
@@ -160,6 +161,7 @@ struct BoundField {
     std::string access;
     std::string type;
     std::string name;
+    bool isStatic{};
     NodeId initializer{};
     TextSpan span;
 };

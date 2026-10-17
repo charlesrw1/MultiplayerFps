@@ -508,7 +508,7 @@ class Calculator {
     Require(std::any_of(generated.exports.begin(), generated.exports.end(), [](const auto& value) { return value.symbolName == "ls_Calculator_add" && value.returnType == "int"; }), "native method export metadata is missing");
 
     const auto lists = luasharp::CompileToC("int[] values = {1, 2}; int[][] grid = {{1}, {}};");
-    Require(lists.c.find("ls_list_create(sizeof(ls_int), LS_KIND_INT, 2)") != std::string::npos && lists.c.find("ls_list_create(sizeof(LS_List*), LS_KIND_LIST, 2)") != std::string::npos, "list literals were not typed from their declarations");
+    Require(lists.c.find("ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 2)") != std::string::npos && lists.c.find("ls_list_create(sizeof(LS_List*), LS_KIND_LIST, &ls_listtype_") != std::string::npos, "list literals were not typed from their declarations");
 
     const auto rejects = [](std::string_view source, std::string_view message) {
         try { static_cast<void>(luasharp::CompileToC(source)); }
@@ -1060,9 +1060,7 @@ many[0].a = 7;
 p.where.x = 4;
 int total = many[1].sum() + Pair.make().sum();
 bool same = p == q;)", "valid struct program");
-    RequireDiagnostic("class Node {} struct Bad { Node n; }", "must be a value type");
-    RequireDiagnostic("struct Bad { string s; }", "must be a value type");
-    RequireDiagnostic("struct Bad { int[] list; }", "must be a value type");
+    RequireClean("class Node {} struct Refs { Node n; string s = \"x\"; int[] list; table t; Refs[] children; static Refs empty; }", "struct reference fields");
     RequireDiagnostic("struct A { B inner; } struct B { A outer; }", "cannot contain itself");
     RequireDiagnostic("struct Bad { Bad again; }", "cannot contain itself");
     RequireDiagnostic("struct Base {} struct Derived : Base {}", "Structs cannot have a base type");
@@ -1072,7 +1070,32 @@ bool same = p == q;)", "valid struct program");
     RequireDiagnostic("class C {} C c = C();", "Use 'new'");
     RequireDiagnostic("struct Vec3 { int a; }", "built-in type");
     RequireDiagnostic("struct S { int a; void f() { auto g = () => a; } }", "Lambdas inside struct methods");
-    RequireDiagnostic("struct S { static int count = 0; }", "Static fields are not supported");
+}
+
+void TestStaticFieldSemantics() {
+    RequireClean(R"(class Counter {
+    static int count = 0;
+    static string label = "n" + string(count);
+    static int[] history;
+    int id;
+    Counter() { count += 1; id = count; history.push_back(id); }
+    static int next() { return count + 1; }
+}
+struct Grid { int w; static Grid unit = Grid(); static int made; }
+Counter a = new Counter();
+Counter.count = 5;
+Counter.count += 1;
+int n = Counter.count + Counter.next();
+Grid.unit.w = 3;
+Grid.made += 1;)", "valid static field program");
+    RequireDiagnostic("class A { int x; static int y = x; }", "Instance member 'x' cannot be used in a static method");
+    RequireDiagnostic("class A { static int y = this; }", "'this' cannot be used in a static method");
+    RequireDiagnostic("class A { private: static int hidden; } int v = A.hidden;", "is private");
+    RequireDiagnostic("class A { static int count; } A a = new A(); int v = a.count;", "Unknown member 'count'");
+    RequireDiagnostic("class A { static string count = 1; }", "Cannot assign");
+    const auto analysis = luasharp::Analyze("class A { static int count; int f() { return count; } }\nint v = A.count;");
+    const auto staticFields = std::count_if(analysis.bound.expressions.begin(), analysis.bound.expressions.end(), [](const auto& item) { return item.lowering == luasharp::Lowering::StaticField; });
+    Require(staticFields == 2, "implicit and qualified static field reads were not lowered as static fields");
 }
 
 void TestStaticMethodsAndOverloads() {
@@ -1217,6 +1240,166 @@ string quat = string(Quat.identity());
     Require(text && std::string_view(text->data, static_cast<size_t>(text->length)) == "Vec3(1.0, 2.0, 3.0)", "struct to string was wrong");
 }
 
+struct NativeClosure {
+    void (*invoke)(void* environment, const luasharp::NativeValue* arguments, luasharp::NativeValue* result);
+    void* environment;
+    unsigned long long arity;
+};
+// Calls a zero-argument closure stored in a module global.
+luasharp::NativeValue CallGlobalClosure(const luasharp::NativeModule& module, std::string_view name) {
+    const auto* closure = NativeGlobal<const NativeClosure*>(module, name);
+    Require(closure && closure->invoke, "missing native closure " + std::string(name));
+    luasharp::NativeValue result;
+    closure->invoke(closure->environment, nullptr, &result);
+    return result;
+}
+
+void TestNativeStaticFields() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        auto module = luasharp::NativeModule::Compile(R"(class Counter {
+    static int count = 10;
+    static string label = "start";
+    static int[] history;
+    int id;
+    Counter() { count += 1; id = count; history.push_back(id); }
+    static int next() { return count + 1; }
+    static void rename(string text) { label = text + "!"; }
+}
+struct Point {
+    int x;
+    void shift() { x += 1; }
+    static Point origin = Point();
+    static int made = Counter.count;
+}
+Counter first = new Counter();
+Counter second = new Counter();
+Counter.count += 100;
+int afterBump = Counter.count;
+int predicted = Counter.next();
+int historySize = Counter.history.size();
+Counter.rename("renamed");
+Point.origin.shift();
+Point.origin.shift();
+int originX = Point.origin.x;
+int madeAtInit = Point.made;
+auto readLater = () => Counter.count;
+)", options);
+        Require(NativeGlobal<long long>(module, "afterBump") == 112 && NativeGlobal<long long>(module, "predicted") == 113, "static field writes or static method reads were wrong");
+        Require(NativeGlobal<long long>(module, "historySize") == 2 && NativeGlobal<long long>(module, "second") != 0, "constructor did not update a static list");
+        Require(NativeGlobal<long long>(module, "originX") == 2, "struct method on a static struct field did not change it in place");
+        Require(NativeGlobal<long long>(module, "madeAtInit") == 10, "static initializers did not run first, in declaration order");
+        Require(NativeGlobal<long long>(module, "Counter.count") == 112, "static field is not exported as a global");
+        runtime->Collect();
+        Require(NativeText(module, "Counter.label") == "renamed!", "collection freed a string held by a static field");
+        const auto* history = NativeGlobal<const luasharp::NativeList*>(module, "Counter.history");
+        Require(history && history->count == 2 && reinterpret_cast<const long long*>(history->data)[1] == 12, "collection freed a list held by a static field");
+        const auto later = CallGlobalClosure(module, "readLater");
+        Require(later.kind == luasharp::NativeValueKind::Int && later.as.integer == 112, "lambda did not read the static field");
+    }
+    Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "static field graph was not reclaimed after module unload");
+}
+
+void TestNativeStructReferences() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        auto module = luasharp::NativeModule::Compile(R"(class Node { int value; Node(int v) { value = v; } }
+struct Entry {
+    string name;
+    Node node;
+    int[] values;
+    table bag;
+    Entry(string n, int v) { name = n; node = new Node(v); values = {v, v + 1}; bag = {key = "k" + n}; }
+    int total() { return node.value + values[1]; }
+    static Entry spare = Entry("spare", 30);
+}
+struct Outer { Entry inner; int tag; }
+class Holder { Entry entry = Entry("held", 3); }
+Entry global = Entry("global", 1);
+Entry[] list = {Entry("a", 10), Entry("b", 20)};
+Holder holder = new Holder();
+Outer outer = Outer();
+outer.inner = Entry("outer", 40);
+table boxes = {item = Entry("boxed", 5)};
+auto capture = () => { Entry local = Entry("cell", 7); auto get = () => local.total(); return get; };
+auto getter = capture();
+auto check = () => {
+    Entry boxed = boxes.item;
+    int sum = global.total() + list[0].total() + list[1].total() + holder.entry.total() + boxed.total() + int(getter()) + Entry.spare.total() + outer.inner.total();
+    if (global.name != "global" || list[1].name != "b" || boxed.name != "boxed" || string(boxed.bag.key) != "kboxed" || string(holder.entry.bag.key) != "kheld" || outer.inner.name != "outer") { return -1; }
+    return sum;
+};
+string text = string(boxes.item);
+)", options);
+        constexpr long long expected = 3 + 21 + 41 + 7 + 11 + 15 + 61 + 81;
+        const auto before = CallGlobalClosure(module, "check");
+        Require(before.kind == luasharp::NativeValueKind::Int && before.as.integer == expected, "struct reference fields were wrong before collection");
+        for (int pass{}; pass < 3; ++pass) {
+            runtime->Collect();
+            const auto after = CallGlobalClosure(module, "check");
+            Require(after.kind == luasharp::NativeValueKind::Int && after.as.integer == expected && module.LastError().empty(), "collection freed a reference held inside a struct");
+        }
+        Require(NativeText(module, "text").starts_with("Entry(boxed, table: "), "struct with references did not format: " + std::string(NativeText(module, "text")));
+    }
+    Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "struct reference graph was not reclaimed after module unload");
+}
+
+void TestNativeStructTypeChecks() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    RequireNativeError("struct A { int x; } struct B { float y; } A[] items = {A()}; table t = {v = items}; B[] other = t.v;", "list element type mismatch: expected B, got A");
+    RequireNativeError("class C {} class D {} C[] items = {new C()}; table t = {v = items}; D[] other = t.v;", "list element type mismatch: expected D, got C");
+    RequireNativeError("int[][] items = {{1}}; table t = {v = items}; float[][] other = t.v;", "list element type mismatch: expected float[], got int[]");
+    RequireNativeError("struct P { int x; } table t = {p = P()}; t.p.x = 3;", "cannot assign a field of a boxed P");
+    auto module = luasharp::NativeModule::Compile(R"(table zeros = {zero = Vec3(0, 0, 0), negative = Vec3(0, 0, 0) * -1.0};
+bool boxedEqual = zeros.zero == zeros.negative;
+bool typedEqual = Vec3(0, 0, 0) == Vec3(0, 0, 0) * -1.0;
+struct Key { int a; float b; string s; }
+Key k = Key(); k.a = 1; k.b = 2; k.s = "x";
+Key same = Key(); same.a = 1; same.b = 2; same.s = "x";
+table byKey = {};
+byKey[k] = 7;
+int found = int(byKey[same]);
+table pair = {left = k, right = same};
+bool keysEqual = pair.left == pair.right;
+struct P { float x; }
+P[] ps = {P(), P()};
+ps[0].x = 1; ps[1].x = 2;
+table holder = {items = ps};
+float sum = 0;
+for (p in holder.items) { sum += float(p.x); }
+)");
+    Require(NativeGlobal<unsigned char>(module, "boxedEqual") == 1 && NativeGlobal<unsigned char>(module, "typedEqual") == 1, "boxed and typed struct equality disagree on -0.0");
+    Require(NativeGlobal<long long>(module, "found") == 7 && NativeGlobal<unsigned char>(module, "keysEqual") == 1, "equal structs were different table keys");
+    Require(NativeGlobal<double>(module, "sum") == 3.0, "foreach over a struct list held in `any` was wrong");
+}
+
+// A struct boxed by one module unboxes in another only when both declare the same layout.
+void TestNativeStructAcrossModules() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    luasharp::NativeCompileOptions options;
+    options.runtime = runtime;
+    auto source = luasharp::NativeModule::Compile("struct P { int a; P(int v) { a = v; } }\ntable box = {value = P(4)};\nauto boxed = box.value;", options);
+    const auto boxed = NativeGlobal<luasharp::NativeValue>(source, "boxed");
+    Require(boxed.kind == luasharp::NativeValueKind::Struct, "struct was not boxed");
+    const auto read = [&](std::string_view declaration) {
+        auto reader = luasharp::NativeModule::Compile(std::string(declaration) + "\ntable none = {};\nauto input = none.missing;\nauto read = () => { P p = input; return p.a; };", options);
+        *static_cast<luasharp::NativeValue*>(reader.FindGlobal("input")) = boxed;
+        const auto result = CallGlobalClosure(reader, "read");
+        return std::pair{result.kind == luasharp::NativeValueKind::Int ? result.as.integer : -1, reader.LastError()};
+    };
+    const auto [same, sameError] = read("struct P { int a; P(int v) { a = v; } }");
+    Require(same == 4 && sameError.empty(), "a struct with the same layout did not cross modules: " + sameError);
+    const auto [wider, widerError] = read("struct P { int a; int b; }");
+    Require(wider == 0 && widerError == "expected P, got P", "a struct with a different layout crossed modules: " + widerError);
+}
+
 // Every native function the registry advertises must exist in the generated C header.
 void TestNativeRegistryMatchesHeader() {
     if (!luasharp::NativeModule::IsLibTccAvailable()) return;
@@ -1294,10 +1477,15 @@ int main() {
         {"native closures", TestNativeClosures},
         {"printf builtin", TestPrintfBuiltin},
         {"struct semantics", TestStructSemantics},
+        {"static field semantics", TestStaticFieldSemantics},
         {"static methods and overloads", TestStaticMethodsAndOverloads},
         {"struct C emission", TestStructEmission},
         {"native structs", TestNativeStructs},
         {"native struct boundaries", TestNativeStructBoundaries},
+        {"native static fields", TestNativeStaticFields},
+        {"native struct references", TestNativeStructReferences},
+        {"native struct type checks", TestNativeStructTypeChecks},
+        {"native structs across modules", TestNativeStructAcrossModules},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
     };
 

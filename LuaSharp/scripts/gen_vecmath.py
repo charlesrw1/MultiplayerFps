@@ -437,7 +437,7 @@ def type_infos():
             off = f'm[{f[0][1:]}]' if name == 'Mat4x4' else f[0]
             rows.append(f'    {{"{f[0]}", LS_STRUCT_PAYLOAD + ls_offsetof({ctype}, {off}), {f[1]}, 0, {nested}}},')
         lines.append(f'static const LS_FieldInfo ls_fields_{name}[] = {{\n' + '\n'.join(rows) + '\n};')
-        lines.append(f'static const LS_TypeInfo ls_type_{name} = {{"{name}", {len(fields)}, ls_fields_{name}, 0, (const LS_MethodInfo*)0, sizeof({ctype})}};')
+        lines.append(f'static const LS_TypeInfo ls_type_{name} = {{"{name}", {len(fields)}, ls_fields_{name}, 0, (const LS_MethodInfo*)0, sizeof({ctype}), LS_KIND_STRUCT}};')
     return '\n'.join(lines)
 
 
