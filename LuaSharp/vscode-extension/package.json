@@ -34,7 +34,13 @@
         }
       }
     },
-    "configurationDefaults": { "[luasharp]": { "editor.semanticHighlighting.enabled": true } }
+    "configurationDefaults": {
+      "[luasharp]": { "editor.semanticHighlighting.enabled": true },
+      "editor.semanticTokenColorCustomizations": {
+        "[*Dark*]": { "rules": { "struct:luasharp": "#86C691" } },
+        "[*Light*]": { "rules": { "struct:luasharp": "#2E8B57" } }
+      }
+    }
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"

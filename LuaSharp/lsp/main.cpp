@@ -131,8 +131,10 @@ std::string WordAt(const std::string& text, const json& position) {
     while (end < text.size() && (std::isalnum(static_cast<unsigned char>(text[end])) || text[end] == '_')) ++end;
     return text.substr(begin, end - begin);
 }
-int TokenKind(luasharp::SymbolKind kind) {
-    switch (kind) { case luasharp::SymbolKind::Class: return 0; case luasharp::SymbolKind::Enum: case luasharp::SymbolKind::Type: return 1; case luasharp::SymbolKind::Function: return 2; case luasharp::SymbolKind::Method: return 3; case luasharp::SymbolKind::Field: return 4; case luasharp::SymbolKind::Parameter: return 6; default: return 5; }
+// Indices into the semantic token legend sent on initialize.
+constexpr int ClassTokenKind = 0, StructTokenKind = 7;
+int TokenKind(const luasharp::Symbol& symbol) {
+    switch (symbol.kind) { case luasharp::SymbolKind::Class: return symbol.isStruct ? StructTokenKind : ClassTokenKind; case luasharp::SymbolKind::Enum: case luasharp::SymbolKind::Type: return 1; case luasharp::SymbolKind::Function: return 2; case luasharp::SymbolKind::Method: return 3; case luasharp::SymbolKind::Field: return 4; case luasharp::SymbolKind::Parameter: return 6; default: return 5; }
 }
 const luasharp::Symbol* MemberAt(const luasharp::Analysis& analysis, size_t offset) {
     const auto& tokens = analysis.syntax.tokens;
@@ -342,11 +344,16 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
     const auto& tokens = analysis.syntax.tokens;
     const auto innermost = InnermostExpressions(analysis);
     std::unordered_map<size_t, const luasharp::Symbol*> declarations; // first symbol declared at each offset
-    std::unordered_set<std::string_view> typeNames;
+    std::unordered_map<std::string_view, int> typeKinds; // declared type name -> token kind
     for (const auto& symbol : analysis.symbols) {
         declarations.try_emplace(symbol.span.offset, &symbol);
-        if (symbol.kind == luasharp::SymbolKind::Class || symbol.kind == luasharp::SymbolKind::Enum) typeNames.insert(symbol.name);
+        if (symbol.kind == luasharp::SymbolKind::Class || symbol.kind == luasharp::SymbolKind::Enum) typeKinds.try_emplace(symbol.name, TokenKind(symbol));
     }
+    const auto typeKind = [&](std::string_view name) {
+        if (const auto found = typeKinds.find(name); found != typeKinds.end()) return found->second;
+        if (luasharp::IsNativeStruct(name)) return StructTokenKind;
+        return luasharp::IsBuiltinStaticClass(name) ? ClassTokenKind : -1;
+    };
     const auto symbolOf = [&](const luasharp::BoundExpression* expression) -> const luasharp::Symbol* {
         return expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size() ? &analysis.symbols[*expression->symbolIndex] : nullptr;
     };
@@ -367,9 +374,9 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
         if (const auto declaration = declarations.find(token.span.offset); declaration != declarations.end()) symbol = declaration->second;
         else symbol = memberAt(i);
         if (!symbol) symbol = symbolOf(innermost[i]);
-        if (symbol) tokenKind = symbol->kind == luasharp::SymbolKind::Method && symbol->name == symbol->owner ? 1 : TokenKind(symbol->kind); // a constructor name is the type
-        else if (typeNames.contains(token.text) || luasharp::IsNativeStruct(token.text) || luasharp::IsBuiltinStaticClass(token.text)) tokenKind = 1;
-        else if (i + 1 < tokens.size() && tokens[i + 1].text == "(" && luasharp::FindBuiltinFunction(token.text)) tokenKind = 2;
+        if (symbol) tokenKind = symbol->kind == luasharp::SymbolKind::Method && symbol->name == symbol->owner ? typeKind(symbol->owner) : TokenKind(*symbol); // a constructor name is the type
+        else tokenKind = typeKind(token.text);
+        if (tokenKind < 0 && i + 1 < tokens.size() && tokens[i + 1].text == "(" && luasharp::FindBuiltinFunction(token.text)) tokenKind = 2;
         if (tokenKind < 0) continue;
         const auto [line, character] = cursor.Advance((std::min)(token.span.offset, text.size()));
         data.push_back(emitted ? line - previousLine : line); data.push_back(emitted && line == previousLine ? character - previousCharacter : character); data.push_back(token.span.length); data.push_back(tokenKind); data.push_back(0);
@@ -382,7 +389,7 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
 int main() {
     while (auto message = ReadMessage()) {
         const auto method = message->value("method", "");
-        if (method == "initialize") Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", {{"capabilities", {{"textDocumentSync", 2}, {"completionProvider", {{"triggerCharacters", json::array({"."})}}}, {"signatureHelpProvider", {{"triggerCharacters", json::array({"(", ","})}}}, {"hoverProvider", true}, {"definitionProvider", true}, {"referencesProvider", true}, {"renameProvider", true}, {"documentSymbolProvider", true}, {"workspaceSymbolProvider", true}, {"semanticTokensProvider", {{"legend", {{"tokenTypes", json::array({"class", "type", "function", "method", "property", "variable", "parameter"})}, {"tokenModifiers", json::array()}}}, {"full", true}}}}}}}});
+        if (method == "initialize") Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", {{"capabilities", {{"textDocumentSync", 2}, {"completionProvider", {{"triggerCharacters", json::array({"."})}}}, {"signatureHelpProvider", {{"triggerCharacters", json::array({"(", ","})}}}, {"hoverProvider", true}, {"definitionProvider", true}, {"referencesProvider", true}, {"renameProvider", true}, {"documentSymbolProvider", true}, {"workspaceSymbolProvider", true}, {"semanticTokensProvider", {{"legend", {{"tokenTypes", json::array({"class", "type", "function", "method", "property", "variable", "parameter", "struct"})}, {"tokenModifiers", json::array()}}}, {"full", true}}}}}}}});
         else if (method == "luasharp/indexWorkspace") { indexedDocuments.clear(); for (const auto& document : (*message)["params"].value("documents", json::array())) indexedDocuments[document.value("uri", "")].SetText(document.value("text", "")); ++exportsRevision; PublishOpenDiagnostics(); }
         // One file changed on disk. Standalone() advances exportsRevision only if its exported types differ, so other files stay cached otherwise.
         else if (method == "luasharp/indexDocument") { const auto& p = (*message)["params"]; indexedDocuments[p.value("uri", "")].SetText(p.value("text", "")); PublishOpenDiagnostics(); }

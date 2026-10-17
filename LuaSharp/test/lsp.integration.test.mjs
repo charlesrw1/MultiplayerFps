@@ -37,6 +37,9 @@ try {
     const initialized = await waitFor(m => m.id === 1, "initialize");
     assert.equal(initialized.result.capabilities.definitionProvider, true);
     assert.ok(initialized.result.capabilities.semanticTokensProvider, "semantic tokens capability missing");
+    const legend = initialized.result.capabilities.semanticTokensProvider.legend.tokenTypes;
+    const classToken = legend.indexOf("class"), structToken = legend.indexOf("struct");
+    assert.ok(classToken >= 0 && structToken >= 0, "semantic token legend needs class and struct");
     send({ jsonrpc: "2.0", method: "initialized", params: {} });
     const uri = pathToFileURL(fixture).toString();
     send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri, languageId: "luasharp", version: 1, text: source } } });
@@ -56,11 +59,11 @@ try {
     const sourceLines = source.split("\n");
     for (const [lineText, occurrence] of [["Entity e = null;", "field"], ["Entity[] array = null;", "list field"], ["int myfunc(Entity e) {", "parameter"], ["auto m = new MyClass();", "constructor"]]) {
         const line = sourceLines.indexOf(lineText); const name = lineText.includes("MyClass") ? "MyClass" : "Entity"; const character = lineText.indexOf(name);
-        assert.ok(decodedTokens.some(token => token.line === line && token.character === character && token.length === name.length && token.type === 1), `${occurrence} class type reference was not emitted as a semantic type token`);
+        assert.ok(decodedTokens.some(token => token.line === line && token.character === character && token.length === name.length && token.type === classToken), `${occurrence} class type reference was not emitted as a semantic class token`);
     }
     for (const lineText of ["int integer;", "float number;", "table mytable = {};"]) {
         const line = sourceLines.indexOf(lineText); const name = lineText.split(" ")[0];
-        assert.equal(decodedTokens.some(token => token.line === line && token.character === 0 && token.length === name.length && token.type === 1), false, `${name} must retain grammar-provided built-in coloring`);
+        assert.equal(decodedTokens.some(token => token.line === line && token.character === 0 && token.length === name.length), false, `${name} must retain grammar-provided built-in coloring`);
     }
     const referenceLine = source.split("\n").length;
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 3 }, contentChanges: [{ text: `${source}\nMyClass` }] } });
@@ -190,14 +193,15 @@ try {
     send({ jsonrpc: "2.0", method: "luasharp/removeDocument", params: { uri: indexedUri } });
     assert.equal(await indexedConsumerDiagnostics("diagnostics after removeDocument"), true, "removeDocument kept the deleted file's types");
     const nativeUri = pathToFileURL(path.join(root, "LuaSharp", "native-types-test.ls")).toString();
-    const nativeSource = "Vec3 v = Vec3(1, 2, 3);\nMat4x4 m = Mat4x4.identity();\nfloat a = math.sqrt(2.0);\nVec2i[] list = null;";
+    const nativeSource = "Vec3 v = Vec3(1, 2, 3);\nMat4x4 m = Mat4x4.identity();\nfloat a = math.sqrt(2.0);\nVec2i[] list = null;\nstruct Cell { int x; }\nCell c = Cell();";
     send({ jsonrpc: "2.0", method: "textDocument/didOpen", params: { textDocument: { uri: nativeUri, languageId: "luasharp", version: 1, text: nativeSource } } });
     send({ jsonrpc: "2.0", id: 21, method: "textDocument/semanticTokens/full", params: { textDocument: { uri: nativeUri } } });
     const nativeTokens = decodeSemanticTokens((await waitFor(m => m.id === 21, "native type semantic tokens")).result.data);
     const nativeLines = nativeSource.split("\n");
-    for (const [line, name, occurrence] of [[0, "Vec3", 0], [0, "Vec3", 1], [1, "Mat4x4", 0], [1, "Mat4x4", 1], [2, "math", 0], [3, "Vec2i", 0]]) {
+    for (const [line, name, occurrence, expected] of [[0, "Vec3", 0, structToken], [0, "Vec3", 1, structToken], [1, "Mat4x4", 0, structToken], [1, "Mat4x4", 1, structToken],
+        [2, "math", 0, classToken], [3, "Vec2i", 0, structToken], [4, "Cell", 0, structToken], [5, "Cell", 0, structToken], [5, "Cell", 1, structToken]]) {
         let character = -1; for (let i = 0; i <= occurrence; ++i) character = nativeLines[line].indexOf(name, character + 1);
-        assert.ok(nativeTokens.some(token => token.line === line && token.character === character && token.length === name.length && token.type === 1), `built-in type '${name}' (line ${line}, use ${occurrence + 1}) was not emitted as a semantic type token`);
+        assert.ok(nativeTokens.some(token => token.line === line && token.character === character && token.length === name.length && token.type === expected), `type '${name}' (line ${line}, use ${occurrence + 1}) was not emitted as ${legend[expected]}`);
     }
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri: nativeUri, version: 2 }, contentChanges: [{ text: `${nativeSource}\nmat` }] } });
     send({ jsonrpc: "2.0", id: 22, method: "textDocument/completion", params: { textDocument: { uri: nativeUri }, position: { line: nativeLines.length, character: 3 } } });
