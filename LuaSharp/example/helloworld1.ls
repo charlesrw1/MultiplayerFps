@@ -262,6 +262,21 @@ p.otherplayers.push_back(p);
 printf("%d\n",p.otherplayers.size());
 p.otherplayers.clear();
 
+
+
+// initialized by c++ for behavior
+// the "int main()" of luascript on startup
+class EngineScriptRuntime {
+    // register callbacks for imgi debug menus
+    // register console commands
+    // register editor stuff
+    // register timer callbacks
+    // register integration/unit tests
+    static void register_console_command() {}
+    static void register_debug_menu(string name) {}
+}
+
+// game application that can be inherited from
 class Application {
 
     static float somefunc() {
@@ -273,6 +288,16 @@ class Application {
         }
         return t;
     }
+
+    virtual void update() {}
+    virtual void start() {}
+    virtual void stop() {}
+
+    virtual void render() {}
+    virtual void on_imgui() {}
+
+    // called for a few assets
+    virtual void on_asset_load(IAsset asset) {}
 }
 auto app = new Application();
 auto anothertable = app.print_table({key1="value1",key2="value2"});
@@ -283,8 +308,26 @@ Vec2i vi = Vec2i(1,2);
 Vec3i v3 = Vec3i(3,4,5);
 vi +=Vec2i(v3.x,v3.z);
 printf("%s",string(vi));
+abstract class cShape {
+    string name;
+    cShape(string n) { name = n; }
+    abstract float area();
+    virtual string describe() { return name + ": " + string(area()); }
+}
+class cRect : cShape {
+    float w; float h;
+    cRect(float w, float h) : base("rect") { this.w = w; this.h = h; }
+    override float area() { return w * h; }
+    override string describe() { return "[" + base.describe() + "]"; }
+}
+sealed class cSquare : cRect {
+    cSquare(float s) : base(s, s) {}
+}
+cShape s = new cSquare(2);
+bool isRect = s is cRect;   // true
+cRect r = s as cRect;        // null when s is not a Rect
 
-class Board {
+class Board  {
     static int HELLO = 0;
 
     int get_board(Vec2i vec) {
@@ -314,16 +357,35 @@ Mat4x4 m = Mat4x4.identity();
 m = m * Mat4x4.from_pos_rot(Vec3(), Quat());
 m = m.inverse();
 
+auto names = {"Charlie","Jordan"};
+
+
 struct Mystruct {
     string s;
     Mat4x4 matrix;
-    void function() {
-
+    Vec3 velocity;
+    Vec3 forces;
+    float mass;
+    Vec3 get_tangent(Vec3 rotation_dir) {
+        return math.cross(velocity, rotation_dir);
+    }
+    void update(float dt) {
+        auto pos = get_position();
+        pos += this.velocity * dt;
+        this.velocity += forces/mass * dt;
+        set_position(pos);
+    }
+    void set_position(Vec3 v) {
+        this.matrix.set_translation(v);
+    }
+    Vec3 get_position() {
+        return this.matrix.translation();
     }
 }
-auto ms = Mystruct();
-ms.function();
 
+
+auto ms = Mystruct();
+ms.update(0.01);
 
 
 class Util {

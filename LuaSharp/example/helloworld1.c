@@ -10,9 +10,15 @@ typedef struct LS_Primes LS_Primes;
 typedef struct LS_Fib LS_Fib;
 typedef struct LS_Text LS_Text;
 typedef struct LS_Player LS_Player;
+typedef struct LS_IAsset LS_IAsset;
+typedef struct LS_EngineScriptRuntime LS_EngineScriptRuntime;
 typedef struct LS_Application LS_Application;
+typedef struct LS_cShape LS_cShape;
+typedef struct LS_cRect LS_cRect;
+typedef struct LS_cSquare LS_cSquare;
 typedef struct LS_Board LS_Board;
 typedef struct LS_Mystruct LS_Mystruct;
+typedef struct LS_Util LS_Util;
 static const LS_TypeInfo ls_type_Random;
 static const LS_TypeInfo ls_type_Point;
 static const LS_TypeInfo ls_type_Calculator;
@@ -22,16 +28,22 @@ static const LS_TypeInfo ls_type_Primes;
 static const LS_TypeInfo ls_type_Fib;
 static const LS_TypeInfo ls_type_Text;
 static const LS_TypeInfo ls_type_Player;
+static const LS_TypeInfo ls_type_IAsset;
+static const LS_TypeInfo ls_type_EngineScriptRuntime;
 static const LS_TypeInfo ls_type_Application;
+static const LS_TypeInfo ls_type_cShape;
+static const LS_TypeInfo ls_type_cRect;
+static const LS_TypeInfo ls_type_cSquare;
 static const LS_TypeInfo ls_type_Board;
 static const LS_TypeInfo ls_type_Mystruct;
+static const LS_TypeInfo ls_type_Util;
 
-static const LS_TypeInfo ls_listtype_30;
-static const LS_TypeInfo ls_listtype_31;
-static const LS_FieldInfo ls_listfields_30[] = {{"element", 0, LS_KIND_OBJECT, 0, &ls_type_Player}};
-static const LS_TypeInfo ls_listtype_30 = {"Player[]", 1, ls_listfields_30, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
-static const LS_FieldInfo ls_listfields_31[] = {{"element", 0, LS_KIND_INT, 0, (const LS_TypeInfo*)0}};
-static const LS_TypeInfo ls_listtype_31 = {"int[]", 1, ls_listfields_31, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
+static const LS_TypeInfo ls_listtype_36;
+static const LS_TypeInfo ls_listtype_37;
+static const LS_FieldInfo ls_listfields_36[] = {{"element", 0, LS_KIND_OBJECT, 0, &ls_type_Player}};
+static const LS_TypeInfo ls_listtype_36 = {"Player[]", 1, ls_listfields_36, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
+static const LS_FieldInfo ls_listfields_37[] = {{"element", 0, LS_KIND_INT, 0, (const LS_TypeInfo*)0}};
+static const LS_TypeInfo ls_listtype_37 = {"int[]", 1, ls_listfields_37, 0, (const LS_MethodInfo*)0, 0, LS_KIND_LIST};
 
 #define LS_Shape_Circle ((ls_int)0)
 #define LS_Shape_Square ((ls_int)1)
@@ -44,6 +56,9 @@ static const LS_TypeInfo ls_listtype_31 = {"int[]", 1, ls_listfields_31, 0, (con
 struct LS_Mystruct {
     ls_string s;
     LS_Mat4x4 matrix;
+    LS_Vec3 velocity;
+    LS_Vec3 forces;
+    ls_float mass;
 };
 struct LS_Random {
     const LS_TypeInfo* ls_type;
@@ -83,13 +98,38 @@ struct LS_Player {
     LS_List* otherplayers;
     ls_string name;
 };
+struct LS_IAsset {
+    const LS_TypeInfo* ls_type;
+};
+struct LS_EngineScriptRuntime {
+    const LS_TypeInfo* ls_type;
+};
 struct LS_Application {
     const LS_TypeInfo* ls_type;
+};
+struct LS_cShape {
+    const LS_TypeInfo* ls_type;
+    ls_string name;
+};
+struct LS_cRect {
+    const LS_TypeInfo* ls_type;
+    ls_string name;
+    ls_float w;
+    ls_float h;
+};
+struct LS_cSquare {
+    const LS_TypeInfo* ls_type;
+    ls_string name;
+    ls_float w;
+    ls_float h;
 };
 struct LS_Board {
     const LS_TypeInfo* ls_type;
     LS_Vec2i size;
     LS_List* positions;
+};
+struct LS_Util {
+    const LS_TypeInfo* ls_type;
 };
 
 static void ls_trace_Random(void* runtime_context, void* object) {
@@ -126,18 +166,42 @@ static void ls_trace_Text(void* runtime_context, void* object) {
 }
 static void ls_trace_Player(void* runtime_context, void* object) {
     LS_Player* self = (LS_Player*)object;
-    ls_runtime->mark(runtime_context, self->otherplayers);
-    ls_runtime->mark(runtime_context, self->name);
+    ls_runtime->mark(runtime_context, (void**)&self->otherplayers);
+    ls_runtime->mark(runtime_context, (void**)&self->name);
+}
+static void ls_trace_IAsset(void* runtime_context, void* object) {
+    LS_IAsset* self = (LS_IAsset*)object;
+    (void)runtime_context; (void)self;
+}
+static void ls_trace_EngineScriptRuntime(void* runtime_context, void* object) {
+    LS_EngineScriptRuntime* self = (LS_EngineScriptRuntime*)object;
+    (void)runtime_context; (void)self;
 }
 static void ls_trace_Application(void* runtime_context, void* object) {
     LS_Application* self = (LS_Application*)object;
     (void)runtime_context; (void)self;
 }
+static void ls_trace_cShape(void* runtime_context, void* object) {
+    LS_cShape* self = (LS_cShape*)object;
+    ls_runtime->mark(runtime_context, (void**)&self->name);
+}
+static void ls_trace_cRect(void* runtime_context, void* object) {
+    LS_cRect* self = (LS_cRect*)object;
+    ls_runtime->mark(runtime_context, (void**)&self->name);
+}
+static void ls_trace_cSquare(void* runtime_context, void* object) {
+    LS_cSquare* self = (LS_cSquare*)object;
+    ls_runtime->mark(runtime_context, (void**)&self->name);
+}
 static void ls_trace_Board(void* runtime_context, void* object) {
     LS_Board* self = (LS_Board*)object;
-    ls_runtime->mark(runtime_context, self->positions);
+    ls_runtime->mark(runtime_context, (void**)&self->positions);
 }
-static void ls_trace_cell_Mystruct(void* runtime_context, void* object) { ls_trace_struct_value(runtime_context, &ls_type_Mystruct, (const char*)object); }
+static void ls_trace_cell_Mystruct(void* runtime_context, void* object) { ls_trace_struct_value(runtime_context, &ls_type_Mystruct, (char*)object); }
+static void ls_trace_Util(void* runtime_context, void* object) {
+    LS_Util* self = (LS_Util*)object;
+    (void)runtime_context; (void)self;
+}
 static ls_string ls_name_name;
 static ls_string ls_name_key1;
 static ls_string ls_name_key2;
@@ -169,37 +233,46 @@ typedef struct LS_ModuleState {
     ls_table anothertable;
     LS_Vec2i vi;
     LS_Vec3i v3;
+    LS_cShape* s;
+    ls_bool isRect;
+    LS_cRect* r;
     LS_Board* theboard;
     LS_Mat4x4 m;
+    ls_table names;
+    LS_Mystruct ms;
     ls_int ls_static_Board__HELLO;
 } LS_ModuleState;
 static LS_ModuleState ls_state;
 void ls_module_trace_roots(void* runtime_context) {
-    ls_runtime->mark(runtime_context, ls_name_name);
-    ls_runtime->mark(runtime_context, ls_name_key1);
-    ls_runtime->mark(runtime_context, ls_name_key2);
-    ls_runtime->mark(runtime_context, ls_state.rng);
-    ls_runtime->mark(runtime_context, ls_state.stats);
-    ls_runtime->mark(runtime_context, ls_state.origin);
-    ls_runtime->mark(runtime_context, ls_state.target);
-    ls_runtime->mark(runtime_context, ls_state.calc);
-    ls_runtime->mark(runtime_context, ls_state.shapes);
-    ls_runtime->mark(runtime_context, ls_state.primes);
-    ls_runtime->mark(runtime_context, ls_state.fib);
-    ls_runtime->mark(runtime_context, ls_state.text);
-    ls_runtime->mark(runtime_context, ls_state.inventory);
-    ls_runtime->mark(runtime_context, ls_state.scale);
-    ls_runtime->mark(runtime_context, ls_state.hypot2);
-    ls_runtime->mark(runtime_context, ls_state.isEven);
-    ls_runtime->mark(runtime_context, ls_state.log);
-    ls_runtime->mark(runtime_context, ls_state.record);
-    ls_runtime->mark(runtime_context, ls_state.integers);
-    ls_runtime->mark(runtime_context, ls_state.somestr);
-    ls_runtime->mark(runtime_context, ls_state.subintegers);
-    ls_runtime->mark(runtime_context, ls_state.p);
-    ls_runtime->mark(runtime_context, ls_state.app);
-    ls_runtime->mark(runtime_context, ls_state.anothertable);
-    ls_runtime->mark(runtime_context, ls_state.theboard);
+    ls_runtime->mark(runtime_context, (void**)&ls_name_name);
+    ls_runtime->mark(runtime_context, (void**)&ls_name_key1);
+    ls_runtime->mark(runtime_context, (void**)&ls_name_key2);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.rng);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.stats);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.origin);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.target);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.calc);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.shapes);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.primes);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.fib);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.text);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.inventory);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.scale);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.hypot2);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.isEven);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.log);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.record);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.integers);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.somestr);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.subintegers);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.p);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.app);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.anothertable);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.s);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.r);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.theboard);
+    ls_runtime->mark(runtime_context, (void**)&ls_state.names);
+    ls_trace_struct_value(runtime_context, &ls_type_Mystruct, (char*)&ls_state.ms);
 }
 
 static void ls_lambda_0(void* environment, const LS_Value* arguments, LS_Value* result);
@@ -234,43 +307,96 @@ void* ls_global_app(void) { return &ls_state.app; }
 void* ls_global_anothertable(void) { return &ls_state.anothertable; }
 void* ls_global_vi(void) { return &ls_state.vi; }
 void* ls_global_v3(void) { return &ls_state.v3; }
+void* ls_global_s(void) { return &ls_state.s; }
+void* ls_global_isRect(void) { return &ls_state.isRect; }
+void* ls_global_r(void) { return &ls_state.r; }
 void* ls_global_theboard(void) { return &ls_state.theboard; }
 void* ls_global_m(void) { return &ls_state.m; }
+void* ls_global_names(void) { return &ls_state.names; }
+void* ls_global_ms(void) { return &ls_state.ms; }
 void* ls_global_static_Board__HELLO(void) { return &ls_state.ls_static_Board__HELLO; }
 LS_Random* ls_Random_new(ls_int seed);
+void ls_Random__init(LS_Random* self, ls_int seed);
 ls_int ls_Random_next(LS_Random* self);
 ls_int ls_Random_range(LS_Random* self, ls_int low, ls_int high);
 LS_Point* ls_Point_new(ls_int px, ls_int py);
+void ls_Point__init(LS_Point* self, ls_int px, ls_int py);
 ls_int ls_Point_manhattan(LS_Point* self, LS_Point* other);
 ls_int ls_Point_dot(LS_Point* self, LS_Point* other);
 LS_Calculator* ls_Calculator_new(ls_int initial);
+void ls_Calculator__init(LS_Calculator* self, ls_int initial);
 ls_int ls_Calculator_apply(LS_Calculator* self, ls_int op, ls_int amount);
 LS_Stats* ls_Stats_new(void);
+void ls_Stats__init(LS_Stats* self);
 void ls_Stats_add(LS_Stats* self, ls_int sample);
 ls_float ls_Stats_mean(LS_Stats* self);
 LS_Shapes* ls_Shapes_new(void);
+void ls_Shapes__init(LS_Shapes* self);
 ls_float ls_Shapes_area(LS_Shapes* self, ls_int shape, ls_float size);
 LS_Primes* ls_Primes_new(void);
+void ls_Primes__init(LS_Primes* self);
 ls_bool ls_Primes_isPrime(LS_Primes* self, ls_int n);
 ls_int ls_Primes_countBelow(LS_Primes* self, ls_int limit);
 LS_Fib* ls_Fib_new(void);
+void ls_Fib__init(LS_Fib* self);
 ls_int ls_Fib_iterative(LS_Fib* self, ls_int n);
 ls_int ls_Fib_recursive(LS_Fib* self, ls_int n);
 LS_Text* ls_Text_new(void);
+void ls_Text__init(LS_Text* self);
 ls_int ls_Text_score(LS_Text* self, ls_string word);
-LS_Player* ls_Player_new(void);
+LS_Player* ls_Player_new(ls_int x);
+void ls_Player__init(LS_Player* self, ls_int x);
+LS_Player* ls_Player_new__1(ls_string s);
+void ls_Player__init__1(LS_Player* self, ls_string s);
 ls_string ls_Player_player_func(LS_Player* self);
 void ls_Player_set_name(LS_Player* self, ls_string s);
+LS_IAsset* ls_IAsset_new(void);
+void ls_IAsset__init(LS_IAsset* self);
+LS_EngineScriptRuntime* ls_EngineScriptRuntime_new(void);
+void ls_EngineScriptRuntime__init(LS_EngineScriptRuntime* self);
+void ls_EngineScriptRuntime_register_console_command(void);
+void ls_EngineScriptRuntime_register_debug_menu(ls_string name);
 LS_Application* ls_Application_new(void);
+void ls_Application__init(LS_Application* self);
 ls_float ls_Application_somefunc(void);
 ls_table ls_Application_print_table(LS_Application* self, ls_table t);
+void ls_Application_update(LS_Application* self);
+void ls_Application_start(LS_Application* self);
+void ls_Application_stop(LS_Application* self);
+void ls_Application_render(LS_Application* self);
+void ls_Application_on_imgui(LS_Application* self);
+void ls_Application_on_asset_load(LS_Application* self, LS_IAsset* asset);
+void ls_cShape__init(LS_cShape* self, ls_string n);
+ls_string ls_cShape_describe(LS_cShape* self);
+LS_cRect* ls_cRect_new(ls_float w, ls_float h);
+void ls_cRect__init(LS_cRect* self, ls_float w, ls_float h);
+ls_float ls_cRect_area(LS_cRect* self);
+ls_string ls_cRect_describe(LS_cRect* self);
+LS_cSquare* ls_cSquare_new(ls_float s);
+void ls_cSquare__init(LS_cSquare* self, ls_float s);
 LS_Board* ls_Board_new(void);
+void ls_Board__init(LS_Board* self);
 ls_int ls_Board_get_board(LS_Board* self, LS_Vec2i vec);
 void ls_Board_set_board(LS_Board* self, LS_Vec2i vec, ls_int i);
 void ls_Board_clear_board(LS_Board* self, LS_Vec2i newsize, ls_int value);
 LS_Mystruct ls_Mystruct_default(void);
 ls_bool ls_Mystruct_eq(LS_Mystruct a, LS_Mystruct b);
+LS_Vec3 ls_Mystruct_get_tangent(LS_Mystruct* self, LS_Vec3 rotation_dir);
+void ls_Mystruct_update(LS_Mystruct* self, ls_float dt);
+void ls_Mystruct_set_position(LS_Mystruct* self, LS_Vec3 v);
+LS_Vec3 ls_Mystruct_get_position(LS_Mystruct* self);
+LS_Util* ls_Util_new(void);
+void ls_Util__init(LS_Util* self);
+ls_bool ls_Util_contains(ls_string s, ls_string b);
 
+static const LS_FieldInfo ls_fields_Mystruct[] = {
+    {"s", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, s), LS_KIND_STRING, 0, (const LS_TypeInfo*)0},
+    {"matrix", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, matrix), LS_KIND_STRUCT, 0, &ls_type_Mat4x4},
+    {"velocity", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, velocity), LS_KIND_STRUCT, 0, &ls_type_Vec3},
+    {"forces", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, forces), LS_KIND_STRUCT, 0, &ls_type_Vec3},
+    {"mass", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, mass), LS_KIND_FLOAT, 0, (const LS_TypeInfo*)0},
+};
+static const LS_TypeInfo ls_type_Mystruct = {"Mystruct", 5, ls_fields_Mystruct, 0, (const LS_MethodInfo*)0, sizeof(LS_Mystruct), LS_KIND_STRUCT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Random_next(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_int(ls_Random_next((LS_Random*)self));
@@ -285,7 +411,7 @@ static const LS_MethodInfo ls_methods_Random[] = {
     {"next", ls_invoke_Random_next, 0},
     {"range", ls_invoke_Random_range, 2},
 };
-static const LS_TypeInfo ls_type_Random = {"Random", 1, ls_fields_Random, 2, ls_methods_Random, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Random = {"Random", 1, ls_fields_Random, 2, ls_methods_Random, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Point_manhattan(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Point_manhattan((LS_Point*)self, ((LS_Point*)ls_unbox_object(arguments[0], &ls_type_Point))));
 }
@@ -300,7 +426,7 @@ static const LS_MethodInfo ls_methods_Point[] = {
     {"manhattan", ls_invoke_Point_manhattan, 1},
     {"dot", ls_invoke_Point_dot, 1},
 };
-static const LS_TypeInfo ls_type_Point = {"Point", 2, ls_fields_Point, 2, ls_methods_Point, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Point = {"Point", 2, ls_fields_Point, 2, ls_methods_Point, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Calculator_apply(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Calculator_apply((LS_Calculator*)self, ls_unbox_int(arguments[0]), ls_unbox_int(arguments[1])));
 }
@@ -311,7 +437,7 @@ static const LS_FieldInfo ls_fields_Calculator[] = {
 static const LS_MethodInfo ls_methods_Calculator[] = {
     {"apply", ls_invoke_Calculator_apply, 2},
 };
-static const LS_TypeInfo ls_type_Calculator = {"Calculator", 2, ls_fields_Calculator, 1, ls_methods_Calculator, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Calculator = {"Calculator", 2, ls_fields_Calculator, 1, ls_methods_Calculator, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Stats_add(void* self, const LS_Value* arguments, LS_Value* result) {
     ls_Stats_add((LS_Stats*)self, ls_unbox_int(arguments[0])); (void)result;
 }
@@ -329,14 +455,14 @@ static const LS_MethodInfo ls_methods_Stats[] = {
     {"add", ls_invoke_Stats_add, 1},
     {"mean", ls_invoke_Stats_mean, 0},
 };
-static const LS_TypeInfo ls_type_Stats = {"Stats", 4, ls_fields_Stats, 2, ls_methods_Stats, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Stats = {"Stats", 4, ls_fields_Stats, 2, ls_methods_Stats, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Shapes_area(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_float(ls_Shapes_area((LS_Shapes*)self, ls_unbox_int(arguments[0]), ls_unbox_float(arguments[1])));
 }
 static const LS_MethodInfo ls_methods_Shapes[] = {
     {"area", ls_invoke_Shapes_area, 2},
 };
-static const LS_TypeInfo ls_type_Shapes = {"Shapes", 0, (const LS_FieldInfo*)0, 1, ls_methods_Shapes, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Shapes = {"Shapes", 0, (const LS_FieldInfo*)0, 1, ls_methods_Shapes, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Primes_isPrime(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_bool(ls_Primes_isPrime((LS_Primes*)self, ls_unbox_int(arguments[0])));
 }
@@ -347,7 +473,7 @@ static const LS_MethodInfo ls_methods_Primes[] = {
     {"isPrime", ls_invoke_Primes_isPrime, 1},
     {"countBelow", ls_invoke_Primes_countBelow, 1},
 };
-static const LS_TypeInfo ls_type_Primes = {"Primes", 0, (const LS_FieldInfo*)0, 2, ls_methods_Primes, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Primes = {"Primes", 0, (const LS_FieldInfo*)0, 2, ls_methods_Primes, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Fib_iterative(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Fib_iterative((LS_Fib*)self, ls_unbox_int(arguments[0])));
 }
@@ -358,14 +484,14 @@ static const LS_MethodInfo ls_methods_Fib[] = {
     {"iterative", ls_invoke_Fib_iterative, 1},
     {"recursive", ls_invoke_Fib_recursive, 1},
 };
-static const LS_TypeInfo ls_type_Fib = {"Fib", 0, (const LS_FieldInfo*)0, 2, ls_methods_Fib, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Fib = {"Fib", 0, (const LS_FieldInfo*)0, 2, ls_methods_Fib, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Text_score(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Text_score((LS_Text*)self, ((ls_string)ls_unbox_pointer(arguments[0], LS_KIND_STRING))));
 }
 static const LS_MethodInfo ls_methods_Text[] = {
     {"score", ls_invoke_Text_score, 1},
 };
-static const LS_TypeInfo ls_type_Text = {"Text", 0, (const LS_FieldInfo*)0, 1, ls_methods_Text, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Text = {"Text", 0, (const LS_FieldInfo*)0, 1, ls_methods_Text, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Player_player_func(void* self, const LS_Value* arguments, LS_Value* result) {
     (void)arguments;
     *result = ls_box_pointer(LS_KIND_STRING, ls_Player_player_func((LS_Player*)self));
@@ -381,14 +507,104 @@ static const LS_MethodInfo ls_methods_Player[] = {
     {"player_func", ls_invoke_Player_player_func, 0},
     {"set_name", ls_invoke_Player_set_name, 1},
 };
-static const LS_TypeInfo ls_type_Player = {"Player", 2, ls_fields_Player, 2, ls_methods_Player, 0, LS_KIND_OBJECT};
+static const LS_TypeInfo ls_type_Player = {"Player", 2, ls_fields_Player, 2, ls_methods_Player, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
+static const LS_TypeInfo ls_type_IAsset = {"IAsset", 0, (const LS_FieldInfo*)0, 0, (const LS_MethodInfo*)0, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
+static const LS_TypeInfo ls_type_EngineScriptRuntime = {"EngineScriptRuntime", 0, (const LS_FieldInfo*)0, 0, (const LS_MethodInfo*)0, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 static void ls_invoke_Application_print_table(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_pointer(LS_KIND_TABLE, ls_Application_print_table((LS_Application*)self, ((ls_table)ls_unbox_pointer(arguments[0], LS_KIND_TABLE))));
 }
+static void ls_invoke_Application_update(void* self, const LS_Value* arguments, LS_Value* result) {
+    (void)arguments;
+    ls_Application_update((LS_Application*)self); (void)result;
+}
+static void ls_invoke_Application_start(void* self, const LS_Value* arguments, LS_Value* result) {
+    (void)arguments;
+    ls_Application_start((LS_Application*)self); (void)result;
+}
+static void ls_invoke_Application_stop(void* self, const LS_Value* arguments, LS_Value* result) {
+    (void)arguments;
+    ls_Application_stop((LS_Application*)self); (void)result;
+}
+static void ls_invoke_Application_render(void* self, const LS_Value* arguments, LS_Value* result) {
+    (void)arguments;
+    ls_Application_render((LS_Application*)self); (void)result;
+}
+static void ls_invoke_Application_on_imgui(void* self, const LS_Value* arguments, LS_Value* result) {
+    (void)arguments;
+    ls_Application_on_imgui((LS_Application*)self); (void)result;
+}
+static void ls_invoke_Application_on_asset_load(void* self, const LS_Value* arguments, LS_Value* result) {
+    ls_Application_on_asset_load((LS_Application*)self, ((LS_IAsset*)ls_unbox_object(arguments[0], &ls_type_IAsset))); (void)result;
+}
 static const LS_MethodInfo ls_methods_Application[] = {
     {"print_table", ls_invoke_Application_print_table, 1},
+    {"update", ls_invoke_Application_update, 0},
+    {"start", ls_invoke_Application_start, 0},
+    {"stop", ls_invoke_Application_stop, 0},
+    {"render", ls_invoke_Application_render, 0},
+    {"on_imgui", ls_invoke_Application_on_imgui, 0},
+    {"on_asset_load", ls_invoke_Application_on_asset_load, 1},
 };
-static const LS_TypeInfo ls_type_Application = {"Application", 0, (const LS_FieldInfo*)0, 1, ls_methods_Application, 0, LS_KIND_OBJECT};
+static void* const ls_vtable_Application[] = {
+    (void*)ls_Application_update, /* update() */
+    (void*)ls_Application_start, /* start() */
+    (void*)ls_Application_stop, /* stop() */
+    (void*)ls_Application_render, /* render() */
+    (void*)ls_Application_on_imgui, /* on_imgui() */
+    (void*)ls_Application_on_asset_load, /* on_asset_load(IAsset,) */
+};
+static const LS_TypeInfo ls_type_Application = {"Application", 0, (const LS_FieldInfo*)0, 7, ls_methods_Application, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, ls_vtable_Application};
+static void ls_invoke_cShape_describe(void* self, const LS_Value* arguments, LS_Value* result) {
+    (void)arguments;
+    *result = ls_box_pointer(LS_KIND_STRING, ls_cShape_describe((LS_cShape*)self));
+}
+static const LS_FieldInfo ls_fields_cShape[] = {
+    {"name", ls_offsetof(LS_cShape, name), LS_KIND_STRING, 0, (const LS_TypeInfo*)0},
+};
+static const LS_MethodInfo ls_methods_cShape[] = {
+    {"describe", ls_invoke_cShape_describe, 0},
+};
+static void* const ls_vtable_cShape[] = {
+    (void*)0, /* area() */
+    (void*)ls_cShape_describe, /* describe() */
+};
+static const LS_TypeInfo ls_type_cShape = {"cShape", 1, ls_fields_cShape, 1, ls_methods_cShape, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, ls_vtable_cShape};
+static void ls_invoke_cRect_area(void* self, const LS_Value* arguments, LS_Value* result) {
+    (void)arguments;
+    *result = ls_box_float(ls_cRect_area((LS_cRect*)self));
+}
+static void ls_invoke_cRect_describe(void* self, const LS_Value* arguments, LS_Value* result) {
+    (void)arguments;
+    *result = ls_box_pointer(LS_KIND_STRING, ls_cRect_describe((LS_cRect*)self));
+}
+static const LS_FieldInfo ls_fields_cRect[] = {
+    {"name", ls_offsetof(LS_cRect, name), LS_KIND_STRING, 0, (const LS_TypeInfo*)0},
+    {"w", ls_offsetof(LS_cRect, w), LS_KIND_FLOAT, 0, (const LS_TypeInfo*)0},
+    {"h", ls_offsetof(LS_cRect, h), LS_KIND_FLOAT, 0, (const LS_TypeInfo*)0},
+};
+static const LS_MethodInfo ls_methods_cRect[] = {
+    {"area", ls_invoke_cRect_area, 0},
+    {"describe", ls_invoke_cRect_describe, 0},
+};
+static void* const ls_vtable_cRect[] = {
+    (void*)ls_cRect_area, /* area() */
+    (void*)ls_cRect_describe, /* describe() */
+};
+static const LS_TypeInfo ls_type_cRect = {"cRect", 3, ls_fields_cRect, 2, ls_methods_cRect, 0, LS_KIND_OBJECT, &ls_type_cShape, ls_vtable_cRect};
+static const LS_FieldInfo ls_fields_cSquare[] = {
+    {"name", ls_offsetof(LS_cSquare, name), LS_KIND_STRING, 0, (const LS_TypeInfo*)0},
+    {"w", ls_offsetof(LS_cSquare, w), LS_KIND_FLOAT, 0, (const LS_TypeInfo*)0},
+    {"h", ls_offsetof(LS_cSquare, h), LS_KIND_FLOAT, 0, (const LS_TypeInfo*)0},
+};
+static const LS_MethodInfo ls_methods_cSquare[] = {
+    {"area", ls_invoke_cRect_area, 0},
+    {"describe", ls_invoke_cRect_describe, 0},
+};
+static void* const ls_vtable_cSquare[] = {
+    (void*)ls_cRect_area, /* area() */
+    (void*)ls_cRect_describe, /* describe() */
+};
+static const LS_TypeInfo ls_type_cSquare = {"cSquare", 3, ls_fields_cSquare, 2, ls_methods_cSquare, 0, LS_KIND_OBJECT, &ls_type_cRect, ls_vtable_cSquare};
 static void ls_invoke_Board_get_board(void* self, const LS_Value* arguments, LS_Value* result) {
     *result = ls_box_int(ls_Board_get_board((LS_Board*)self, ({ LS_Vec2i ls_unbox_0; ls_unbox_struct(arguments[0], &ls_type_Vec2i, &ls_unbox_0); ls_unbox_0; })));
 }
@@ -407,19 +623,18 @@ static const LS_MethodInfo ls_methods_Board[] = {
     {"set_board", ls_invoke_Board_set_board, 2},
     {"clear_board", ls_invoke_Board_clear_board, 2},
 };
-static const LS_TypeInfo ls_type_Board = {"Board", 2, ls_fields_Board, 3, ls_methods_Board, 0, LS_KIND_OBJECT};
-static const LS_FieldInfo ls_fields_Mystruct[] = {
-    {"s", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, s), LS_KIND_STRING, 0, (const LS_TypeInfo*)0},
-    {"matrix", LS_STRUCT_PAYLOAD + ls_offsetof(LS_Mystruct, matrix), LS_KIND_STRUCT, 0, &ls_type_Mat4x4},
-};
-static const LS_TypeInfo ls_type_Mystruct = {"Mystruct", 2, ls_fields_Mystruct, 0, (const LS_MethodInfo*)0, sizeof(LS_Mystruct), LS_KIND_STRUCT};
+static const LS_TypeInfo ls_type_Board = {"Board", 2, ls_fields_Board, 3, ls_methods_Board, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
+static const LS_TypeInfo ls_type_Util = {"Util", 0, (const LS_FieldInfo*)0, 0, (const LS_MethodInfo*)0, 0, LS_KIND_OBJECT, (const LS_TypeInfo*)0, (void* const*)0};
 
+void ls_Random__init(LS_Random* self, ls_int seed) {
+    self->state = 0;
+    (self->state = seed);
+}
 LS_Random* ls_Random_new(ls_int seed) {
     LS_Random* self = (LS_Random*)ls_alloc(sizeof(LS_Random), ls_trace_Random);
     if (!self) return (LS_Random*)0;
     self->ls_type = &ls_type_Random;
-    self->state = 0;
-    (self->state = seed);
+    ls_Random__init(self, seed);
     return self;
 }
 ls_int ls_Random_next(LS_Random* self) {
@@ -432,14 +647,17 @@ ls_int ls_Random_next(LS_Random* self) {
 ls_int ls_Random_range(LS_Random* self, ls_int low, ls_int high) {
     return ls_int_add(low, ls_int_mod(ls_Random_next(self), (ls_int_add(ls_int_sub(high, low), 1))));
 }
-LS_Point* ls_Point_new(ls_int px, ls_int py) {
-    LS_Point* self = (LS_Point*)ls_alloc(sizeof(LS_Point), ls_trace_Point);
-    if (!self) return (LS_Point*)0;
-    self->ls_type = &ls_type_Point;
+void ls_Point__init(LS_Point* self, ls_int px, ls_int py) {
     self->x = 0;
     self->y = 0;
     (self->x = px);
     (self->y = py);
+}
+LS_Point* ls_Point_new(ls_int px, ls_int py) {
+    LS_Point* self = (LS_Point*)ls_alloc(sizeof(LS_Point), ls_trace_Point);
+    if (!self) return (LS_Point*)0;
+    self->ls_type = &ls_type_Point;
+    ls_Point__init(self, px, py);
     return self;
 }
 ls_int ls_Point_manhattan(LS_Point* self, LS_Point* other) {
@@ -456,13 +674,16 @@ ls_int ls_Point_manhattan(LS_Point* self, LS_Point* other) {
 ls_int ls_Point_dot(LS_Point* self, LS_Point* other) {
     return ls_int_add(ls_int_mul(self->x, other->x), ls_int_mul(self->y, other->y));
 }
+void ls_Calculator__init(LS_Calculator* self, ls_int initial) {
+    self->value = 0;
+    self->operations = 0;
+    (self->value = initial);
+}
 LS_Calculator* ls_Calculator_new(ls_int initial) {
     LS_Calculator* self = (LS_Calculator*)ls_alloc(sizeof(LS_Calculator), ls_trace_Calculator);
     if (!self) return (LS_Calculator*)0;
     self->ls_type = &ls_type_Calculator;
-    self->value = 0;
-    self->operations = 0;
-    (self->value = initial);
+    ls_Calculator__init(self, initial);
     return self;
 }
 ls_int ls_Calculator_apply(LS_Calculator* self, ls_int op, ls_int amount) {
@@ -487,14 +708,17 @@ ls_int ls_Calculator_apply(LS_Calculator* self, ls_int op, ls_int amount) {
     }
     return self->value;
 }
-LS_Stats* ls_Stats_new(void) {
-    LS_Stats* self = (LS_Stats*)ls_alloc(sizeof(LS_Stats), ls_trace_Stats);
-    if (!self) return (LS_Stats*)0;
-    self->ls_type = &ls_type_Stats;
+void ls_Stats__init(LS_Stats* self) {
     self->count = 0;
     self->total = 0;
     self->minimum = 0;
     self->maximum = 0;
+}
+LS_Stats* ls_Stats_new(void) {
+    LS_Stats* self = (LS_Stats*)ls_alloc(sizeof(LS_Stats), ls_trace_Stats);
+    if (!self) return (LS_Stats*)0;
+    self->ls_type = &ls_type_Stats;
+    ls_Stats__init(self);
     return self;
 }
 void ls_Stats_add(LS_Stats* self, ls_int sample) {
@@ -513,10 +737,13 @@ ls_float ls_Stats_mean(LS_Stats* self) {
     }
     return ls_int_div(self->total, self->count);
 }
+void ls_Shapes__init(LS_Shapes* self) {
+}
 LS_Shapes* ls_Shapes_new(void) {
     LS_Shapes* self = (LS_Shapes*)ls_alloc(sizeof(LS_Shapes), ls_trace_Shapes);
     if (!self) return (LS_Shapes*)0;
     self->ls_type = &ls_type_Shapes;
+    ls_Shapes__init(self);
     return self;
 }
 ls_float ls_Shapes_area(LS_Shapes* self, ls_int shape, ls_float size) {
@@ -530,10 +757,13 @@ ls_float ls_Shapes_area(LS_Shapes* self, ls_int shape, ls_float size) {
     }
     return ((size * size) * 0.5);
 }
+void ls_Primes__init(LS_Primes* self) {
+}
 LS_Primes* ls_Primes_new(void) {
     LS_Primes* self = (LS_Primes*)ls_alloc(sizeof(LS_Primes), ls_trace_Primes);
     if (!self) return (LS_Primes*)0;
     self->ls_type = &ls_type_Primes;
+    ls_Primes__init(self);
     return self;
 }
 ls_bool ls_Primes_isPrime(LS_Primes* self, ls_int n) {
@@ -567,10 +797,13 @@ ls_int ls_Primes_countBelow(LS_Primes* self, ls_int limit) {
     }
     return found;
 }
+void ls_Fib__init(LS_Fib* self) {
+}
 LS_Fib* ls_Fib_new(void) {
     LS_Fib* self = (LS_Fib*)ls_alloc(sizeof(LS_Fib), ls_trace_Fib);
     if (!self) return (LS_Fib*)0;
     self->ls_type = &ls_type_Fib;
+    ls_Fib__init(self);
     return self;
 }
 ls_int ls_Fib_iterative(LS_Fib* self, ls_int n) {
@@ -594,10 +827,13 @@ ls_int ls_Fib_recursive(LS_Fib* self, ls_int n) {
     }
     return ls_int_add(ls_Fib_recursive(self, ls_int_sub(n, 1)), ls_Fib_recursive(self, ls_int_sub(n, 2)));
 }
+void ls_Text__init(LS_Text* self) {
+}
 LS_Text* ls_Text_new(void) {
     LS_Text* self = (LS_Text*)ls_alloc(sizeof(LS_Text), ls_trace_Text);
     if (!self) return (LS_Text*)0;
     self->ls_type = &ls_type_Text;
+    ls_Text__init(self);
     return self;
 }
 ls_int ls_Text_score(LS_Text* self, ls_string word) {
@@ -613,12 +849,27 @@ ls_int ls_Text_score(LS_Text* self, ls_string word) {
     }
     return result;
 }
-LS_Player* ls_Player_new(void) {
+void ls_Player__init(LS_Player* self, ls_int x) {
+    self->otherplayers = ls_list_create(sizeof(LS_Player*), LS_KIND_OBJECT, &ls_type_Player, 0);
+    self->name = ls_intern("none");
+}
+LS_Player* ls_Player_new(ls_int x) {
     LS_Player* self = (LS_Player*)ls_alloc(sizeof(LS_Player), ls_trace_Player);
     if (!self) return (LS_Player*)0;
     self->ls_type = &ls_type_Player;
+    ls_Player__init(self, x);
+    return self;
+}
+void ls_Player__init__1(LS_Player* self, ls_string s) {
     self->otherplayers = ls_list_create(sizeof(LS_Player*), LS_KIND_OBJECT, &ls_type_Player, 0);
     self->name = ls_intern("none");
+    (self->name = s);
+}
+LS_Player* ls_Player_new__1(ls_string s) {
+    LS_Player* self = (LS_Player*)ls_alloc(sizeof(LS_Player), ls_trace_Player);
+    if (!self) return (LS_Player*)0;
+    self->ls_type = &ls_type_Player;
+    ls_Player__init__1(self, s);
     return self;
 }
 ls_string ls_Player_player_func(LS_Player* self) {
@@ -627,10 +878,35 @@ ls_string ls_Player_player_func(LS_Player* self) {
 void ls_Player_set_name(LS_Player* self, ls_string s) {
     (self->name = s);
 }
+void ls_IAsset__init(LS_IAsset* self) {
+}
+LS_IAsset* ls_IAsset_new(void) {
+    LS_IAsset* self = (LS_IAsset*)ls_alloc(sizeof(LS_IAsset), ls_trace_IAsset);
+    if (!self) return (LS_IAsset*)0;
+    self->ls_type = &ls_type_IAsset;
+    ls_IAsset__init(self);
+    return self;
+}
+void ls_EngineScriptRuntime__init(LS_EngineScriptRuntime* self) {
+}
+LS_EngineScriptRuntime* ls_EngineScriptRuntime_new(void) {
+    LS_EngineScriptRuntime* self = (LS_EngineScriptRuntime*)ls_alloc(sizeof(LS_EngineScriptRuntime), ls_trace_EngineScriptRuntime);
+    if (!self) return (LS_EngineScriptRuntime*)0;
+    self->ls_type = &ls_type_EngineScriptRuntime;
+    ls_EngineScriptRuntime__init(self);
+    return self;
+}
+void ls_EngineScriptRuntime_register_console_command(void) {
+}
+void ls_EngineScriptRuntime_register_debug_menu(ls_string name) {
+}
+void ls_Application__init(LS_Application* self) {
+}
 LS_Application* ls_Application_new(void) {
     LS_Application* self = (LS_Application*)ls_alloc(sizeof(LS_Application), ls_trace_Application);
     if (!self) return (LS_Application*)0;
     self->ls_type = &ls_type_Application;
+    ls_Application__init(self);
     return self;
 }
 ls_float ls_Application_somefunc(void) {
@@ -638,41 +914,93 @@ ls_float ls_Application_somefunc(void) {
 }
 ls_table ls_Application_print_table(LS_Application* self, ls_table t) {
     {
-        LS_Value ls_iterable_32 = ls_box_pointer(LS_KIND_TABLE, t); ls_wrap_bits ls_cursor_32 = 0; LS_Value ls_key_32, ls_item_32;
-        while (ls_value_next(ls_iterable_32, 0, &ls_cursor_32, &ls_key_32, &ls_item_32)) {
-            LS_Value key = ls_key_32;
-            LS_Value value = ls_item_32;
-            ({ LS_Value ls_arguments_33[2]; ls_arguments_33[0] = key; ls_arguments_33[1] = value; ls_printf(ls_intern("%s %s\n"), 2, ls_arguments_33); });
+        LS_Value ls_iterable_33 = ls_box_pointer(LS_KIND_TABLE, t); ls_wrap_bits ls_cursor_33 = 0; LS_Value ls_key_33, ls_item_33;
+        while (ls_value_next(ls_iterable_33, 0, &ls_cursor_33, &ls_key_33, &ls_item_33)) {
+            LS_Value key = ls_key_33;
+            LS_Value value = ls_item_33;
+            ({ LS_Value ls_arguments_34[2]; ls_arguments_34[0] = key; ls_arguments_34[1] = value; ls_printf(ls_intern("%s %s\n"), 2, ls_arguments_34); });
         }
     }
     return t;
+}
+void ls_Application_update(LS_Application* self) {
+}
+void ls_Application_start(LS_Application* self) {
+}
+void ls_Application_stop(LS_Application* self) {
+}
+void ls_Application_render(LS_Application* self) {
+}
+void ls_Application_on_imgui(LS_Application* self) {
+}
+void ls_Application_on_asset_load(LS_Application* self, LS_IAsset* asset) {
+}
+void ls_cShape__init(LS_cShape* self, ls_string n) {
+    self->name = ls_intern("");
+    (self->name = n);
+}
+ls_string ls_cShape_describe(LS_cShape* self) {
+    return ls_string_concat(ls_string_concat(self->name, ls_intern(": ")), ls_to_string(ls_box_float(({ LS_cShape* ls_receiver_36 = (LS_cShape*)self; ((ls_float (*)(LS_cShape*))ls_receiver_36->ls_type->vtable[0])(ls_receiver_36); }))));
+}
+void ls_cRect__init(LS_cRect* self, ls_float w, ls_float h) {
+    ls_cShape__init((LS_cShape*)self, ls_intern("rect"));
+    self->w = 0.0;
+    self->h = 0.0;
+    (self->w = w);
+    (self->h = h);
+}
+LS_cRect* ls_cRect_new(ls_float w, ls_float h) {
+    LS_cRect* self = (LS_cRect*)ls_alloc(sizeof(LS_cRect), ls_trace_cRect);
+    if (!self) return (LS_cRect*)0;
+    self->ls_type = &ls_type_cRect;
+    ls_cRect__init(self, w, h);
+    return self;
+}
+ls_float ls_cRect_area(LS_cRect* self) {
+    return (self->w * self->h);
+}
+ls_string ls_cRect_describe(LS_cRect* self) {
+    return ls_string_concat(ls_string_concat(ls_intern("["), ls_cShape_describe(((LS_cShape*)self))), ls_intern("]"));
+}
+void ls_cSquare__init(LS_cSquare* self, ls_float s) {
+    ls_cRect__init((LS_cRect*)self, s, s);
+}
+LS_cSquare* ls_cSquare_new(ls_float s) {
+    LS_cSquare* self = (LS_cSquare*)ls_alloc(sizeof(LS_cSquare), ls_trace_cSquare);
+    if (!self) return (LS_cSquare*)0;
+    self->ls_type = &ls_type_cSquare;
+    ls_cSquare__init(self, s);
+    return self;
+}
+void ls_Board__init(LS_Board* self) {
+    self->size = ls_Vec2i_default();
+    self->positions = ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 0);
 }
 LS_Board* ls_Board_new(void) {
     LS_Board* self = (LS_Board*)ls_alloc(sizeof(LS_Board), ls_trace_Board);
     if (!self) return (LS_Board*)0;
     self->ls_type = &ls_type_Board;
-    self->size = ls_Vec2i_default();
-    self->positions = ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 0);
+    ls_Board__init(self);
     return self;
 }
 ls_int ls_Board_get_board(LS_Board* self, LS_Vec2i vec) {
     return (*(ls_int*)ls_list_at(self->positions, ls_int_add((vec).x, ls_int_mul((vec).y, (self->size).x))));
 }
 void ls_Board_set_board(LS_Board* self, LS_Vec2i vec, ls_int i) {
-    ({ LS_List* ls_list_34 = self->positions; ls_int ls_index_34 = ls_int_add((vec).x, ls_int_mul((vec).y, (self->size).x)); ls_int ls_value_34 = i; ls_int* ls_slot_34 = (ls_int*)ls_list_at(ls_list_34, ls_index_34); *ls_slot_34 = ls_value_34; });
+    ({ LS_List* ls_list_39 = self->positions; ls_int ls_index_39 = ls_int_add((vec).x, ls_int_mul((vec).y, (self->size).x)); ls_int ls_value_39 = i; ls_int* ls_slot_39 = (ls_int*)ls_list_at(ls_list_39, ls_index_39); *ls_slot_39 = ls_value_39; });
 }
 void ls_Board_clear_board(LS_Board* self, LS_Vec2i newsize, ls_int value) {
     ls_list_clear(self->positions);
     (self->size = newsize);
     ls_int total = ls_int_mul((self->size).x, (self->size).y);
     {
-        ls_int ls_counter_36 = 0, ls_last_36 = (ls_int_sub(total, 1));
-        if (ls_counter_36 <= ls_last_36) for (;;) {
-            ls_int i = ls_counter_36;
-            ({ LS_List* ls_list_37 = self->positions; ls_int ls_value_37 = value; *(ls_int*)ls_list_push(ls_list_37) = ls_value_37; });
-            ls_continue_36:;
-            if (ls_counter_36 == ls_last_36) break;
-            ++ls_counter_36;
+        ls_int ls_counter_41 = 0, ls_last_41 = (ls_int_sub(total, 1));
+        if (ls_counter_41 <= ls_last_41) for (;;) {
+            ls_int i = ls_counter_41;
+            ({ LS_List* ls_list_42 = self->positions; ls_int ls_value_42 = value; *(ls_int*)ls_list_push(ls_list_42) = ls_value_42; });
+            ls_continue_41:;
+            if (ls_counter_41 == ls_last_41) break;
+            ++ls_counter_41;
         }
     }
 }
@@ -680,10 +1008,40 @@ LS_Mystruct ls_Mystruct_default(void) {
     LS_Mystruct ls_value = {0}; LS_Mystruct* self = &ls_value; (void)self;
     self->s = ls_intern("");
     self->matrix = ls_Mat4x4_default();
+    self->velocity = ls_Vec3_default();
+    self->forces = ls_Vec3_default();
+    self->mass = 0.0;
     return ls_value;
 }
 ls_bool ls_Mystruct_eq(LS_Mystruct a, LS_Mystruct b) {
-    return 1 && a.s == b.s && ls_Mat4x4_eq(a.matrix, b.matrix);
+    return 1 && a.s == b.s && ls_Mat4x4_eq(a.matrix, b.matrix) && ls_Vec3_eq(a.velocity, b.velocity) && ls_Vec3_eq(a.forces, b.forces) && a.mass == b.mass;
+}
+LS_Vec3 ls_Mystruct_get_tangent(LS_Mystruct* self, LS_Vec3 rotation_dir) {
+    return ls_math_cross(self->velocity, rotation_dir);
+}
+void ls_Mystruct_update(LS_Mystruct* self, ls_float dt) {
+    LS_Vec3 pos = ls_Mystruct_get_position(self);
+    (pos = ls_Vec3_op_add(pos, ls_Vec3_op_mul_float(((*self)).velocity, dt)));
+    ({ LS_Vec3* ls_slot_44 = &(((*self)).velocity); LS_Vec3 ls_value_44 = ls_Vec3_op_mul_float(ls_Vec3_op_div_float(self->forces, self->mass), dt); *ls_slot_44 = ls_Vec3_op_add(*ls_slot_44, ls_value_44); });
+    ls_Mystruct_set_position(self, pos);
+}
+void ls_Mystruct_set_position(LS_Mystruct* self, LS_Vec3 v) {
+    ls_Mat4x4_set_translation(((*self)).matrix, v);
+}
+LS_Vec3 ls_Mystruct_get_position(LS_Mystruct* self) {
+    return ls_Mat4x4_translation(((*self)).matrix);
+}
+void ls_Util__init(LS_Util* self) {
+}
+LS_Util* ls_Util_new(void) {
+    LS_Util* self = (LS_Util*)ls_alloc(sizeof(LS_Util), ls_trace_Util);
+    if (!self) return (LS_Util*)0;
+    self->ls_type = &ls_type_Util;
+    ls_Util__init(self);
+    return self;
+}
+ls_bool ls_Util_contains(ls_string s, ls_string b) {
+    return ls_string_contains(s, b);
 }
 static void ls_lambda_0(void* environment, const LS_Value* arguments, LS_Value* result) {
     (void)environment;
@@ -707,7 +1065,7 @@ static void ls_lambda_2(void* environment, const LS_Value* arguments, LS_Value* 
 static void ls_lambda_3(void* environment, const LS_Value* arguments, LS_Value* result) {
     (void)environment;
     (void)arguments; (void)result;
-    ({ ls_table ls_container_38 = ls_state.log; LS_Value ls_key_38 = ls_box_pointer(LS_KIND_STRING, ls_intern("done")); LS_Value ls_value_38 = ls_box_int(1); ls_table_set(ls_container_38, ls_key_38, ls_value_38); ls_value_38; });
+    ({ ls_table ls_container_45 = ls_state.log; LS_Value ls_key_45 = ls_box_pointer(LS_KIND_STRING, ls_intern("done")); LS_Value ls_value_45 = ls_box_int(1); ls_table_set(ls_container_45, ls_key_45, ls_value_45); ls_value_45; });
 }
 
 int ls_module_init(void) {
@@ -719,31 +1077,31 @@ int ls_module_init(void) {
         ls_int i = 0;
         while ((i < 1000)) {
             ls_Stats_add(ls_state.stats, ls_Random_range(ls_state.rng, 1, 100));
-            ls_continue_40:;
+            ls_continue_47:;
             (i = ls_int_add(i, 1));
         }
     }
-    ({ LS_Value ls_arguments_42[4]; ls_arguments_42[0] = ls_box_int(ls_state.stats->count); ls_arguments_42[1] = ls_box_int(ls_state.stats->minimum); ls_arguments_42[2] = ls_box_int(ls_state.stats->maximum); ls_arguments_42[3] = ls_box_float(ls_Stats_mean(ls_state.stats)); ls_printf(ls_intern("stats: count=%d min=%d max=%d mean=%f\n"), 4, ls_arguments_42); });
+    ({ LS_Value ls_arguments_49[4]; ls_arguments_49[0] = ls_box_int(ls_state.stats->count); ls_arguments_49[1] = ls_box_int(ls_state.stats->minimum); ls_arguments_49[2] = ls_box_int(ls_state.stats->maximum); ls_arguments_49[3] = ls_box_float(ls_Stats_mean(ls_state.stats)); ls_printf(ls_intern("stats: count=%d min=%d max=%d mean=%f\n"), 4, ls_arguments_49); });
     ls_state.origin = ls_Point_new(0, 0);
     ls_state.target = ls_Point_new(7, ls_int_neg(3));
-    ({ LS_Value ls_arguments_43[2]; ls_arguments_43[0] = ls_box_int(ls_Point_manhattan(ls_state.origin, ls_state.target)); ls_arguments_43[1] = ls_box_int(ls_Point_dot(ls_state.target, ls_Point_new(2, 5))); ls_printf(ls_intern("points: manhattan=%d dot=%d\n"), 2, ls_arguments_43); });
+    ({ LS_Value ls_arguments_50[2]; ls_arguments_50[0] = ls_box_int(ls_Point_manhattan(ls_state.origin, ls_state.target)); ls_arguments_50[1] = ls_box_int(ls_Point_dot(ls_state.target, ls_Point_new(2, 5))); ls_printf(ls_intern("points: manhattan=%d dot=%d\n"), 2, ls_arguments_50); });
     ls_state.calc = ls_Calculator_new(10);
     ls_Calculator_apply(ls_state.calc, LS_Op_Add, 5);
     ls_Calculator_apply(ls_state.calc, LS_Op_Mul, 4);
     ls_Calculator_apply(ls_state.calc, LS_Op_Sub, 7);
     ls_Calculator_apply(ls_state.calc, LS_Op_Div, 9);
-    ({ LS_Value ls_arguments_44[2]; ls_arguments_44[0] = ls_box_int(ls_state.calc->value); ls_arguments_44[1] = ls_box_int(ls_state.calc->operations); ls_printf(ls_intern("calculator: value=%d ops=%d\n"), 2, ls_arguments_44); });
+    ({ LS_Value ls_arguments_51[2]; ls_arguments_51[0] = ls_box_int(ls_state.calc->value); ls_arguments_51[1] = ls_box_int(ls_state.calc->operations); ls_printf(ls_intern("calculator: value=%d ops=%d\n"), 2, ls_arguments_51); });
     ls_state.shapes = ls_Shapes_new();
-    ({ LS_Value ls_arguments_45[3]; ls_arguments_45[0] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Circle, 2.0)); ls_arguments_45[1] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Square, 3.0)); ls_arguments_45[2] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Triangle, 4.0)); ls_printf(ls_intern("areas: circle=%f square=%f triangle=%f\n"), 3, ls_arguments_45); });
+    ({ LS_Value ls_arguments_52[3]; ls_arguments_52[0] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Circle, 2.0)); ls_arguments_52[1] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Square, 3.0)); ls_arguments_52[2] = ls_box_float(ls_Shapes_area(ls_state.shapes, LS_Shape_Triangle, 4.0)); ls_printf(ls_intern("areas: circle=%f square=%f triangle=%f\n"), 3, ls_arguments_52); });
     ls_state.primes = ls_Primes_new();
-    ({ LS_Value ls_arguments_46[1]; ls_arguments_46[0] = ls_box_int(ls_Primes_countBelow(ls_state.primes, 1000)); ls_printf(ls_intern("primes below 1000: %d\n"), 1, ls_arguments_46); });
+    ({ LS_Value ls_arguments_53[1]; ls_arguments_53[0] = ls_box_int(ls_Primes_countBelow(ls_state.primes, 1000)); ls_printf(ls_intern("primes below 1000: %d\n"), 1, ls_arguments_53); });
     ls_state.fib = ls_Fib_new();
-    ({ LS_Value ls_arguments_47[2]; ls_arguments_47[0] = ls_box_int(ls_Fib_iterative(ls_state.fib, 40)); ls_arguments_47[1] = ls_box_int(ls_Fib_recursive(ls_state.fib, 20)); ls_printf(ls_intern("fib: iterative(40)=%d recursive(20)=%d\n"), 2, ls_arguments_47); });
+    ({ LS_Value ls_arguments_54[2]; ls_arguments_54[0] = ls_box_int(ls_Fib_iterative(ls_state.fib, 40)); ls_arguments_54[1] = ls_box_int(ls_Fib_recursive(ls_state.fib, 20)); ls_printf(ls_intern("fib: iterative(40)=%d recursive(20)=%d\n"), 2, ls_arguments_54); });
     ls_state.text = ls_Text_new();
-    ({ LS_Value ls_arguments_48[1]; ls_arguments_48[0] = ls_box_int(ls_Text_score(ls_state.text, ls_intern("hello world"))); ls_printf(ls_intern("text score: %d\n"), 1, ls_arguments_48); });
-    ls_state.inventory = ({ ls_table ls_literal_49 = ls_table_create(); ls_table_set(ls_literal_49, ls_box_pointer(LS_KIND_STRING, LS_NAME(name)), ls_box_pointer(LS_KIND_STRING, ls_intern("crate"))); ls_table_set(ls_literal_49, ls_box_pointer(LS_KIND_STRING, ls_intern("weight")), ls_box_int(12)); ls_table_set(ls_literal_49, ls_box_int(1), ls_box_pointer(LS_KIND_OBJECT, ls_Point_new(1, 2))); ls_literal_49; });
-    ({ ls_table ls_container_50 = ls_state.inventory; LS_Value ls_key_50 = ls_box_pointer(LS_KIND_STRING, ls_intern("opened")); LS_Value ls_value_50 = ls_box_bool(1); ls_table_set(ls_container_50, ls_key_50, ls_value_50); ls_value_50; });
-    ({ LS_Value ls_arguments_51[2]; ls_arguments_51[0] = ls_box_pointer(LS_KIND_STRING, ls_intern("crate")); ls_arguments_51[1] = ls_box_bool(1); ls_printf(ls_intern("inventory: %s opened=%b\n"), 2, ls_arguments_51); });
+    ({ LS_Value ls_arguments_55[1]; ls_arguments_55[0] = ls_box_int(ls_Text_score(ls_state.text, ls_intern("hello world"))); ls_printf(ls_intern("text score: %d\n"), 1, ls_arguments_55); });
+    ls_state.inventory = ({ ls_table ls_literal_56 = ls_table_create(); ls_table_set(ls_literal_56, ls_box_pointer(LS_KIND_STRING, LS_NAME(name)), ls_box_pointer(LS_KIND_STRING, ls_intern("crate"))); ls_table_set(ls_literal_56, ls_box_pointer(LS_KIND_STRING, ls_intern("weight")), ls_box_int(12)); ls_table_set(ls_literal_56, ls_box_int(1), ls_box_pointer(LS_KIND_OBJECT, ls_Point_new(1, 2))); ls_literal_56; });
+    ({ ls_table ls_container_57 = ls_state.inventory; LS_Value ls_key_57 = ls_box_pointer(LS_KIND_STRING, ls_intern("opened")); LS_Value ls_value_57 = ls_box_bool(1); ls_table_set(ls_container_57, ls_key_57, ls_value_57); ls_value_57; });
+    ({ LS_Value ls_arguments_58[2]; ls_arguments_58[0] = ls_box_pointer(LS_KIND_STRING, ls_intern("crate")); ls_arguments_58[1] = ls_box_bool(1); ls_printf(ls_intern("inventory: %s opened=%b\n"), 2, ls_arguments_58); });
     ls_state.base = 3;
     ls_state.scale = ls_closure_create(ls_lambda_0, (void*)0, 1);
     ls_state.hypot2 = ls_closure_create(ls_lambda_1, (void*)0, 2);
@@ -751,75 +1109,81 @@ int ls_module_init(void) {
     ls_state.log = ls_table_create();
     ls_state.record = ls_closure_create(ls_lambda_3, (void*)0, 0);
     ({ ls_closure_call(ls_state.record, (const LS_Value*)0); });
-    ({ LS_Value ls_arguments_53[3]; ls_arguments_53[0] = ({ LS_Value ls_arguments_54[1]; ls_arguments_54[0] = ls_box_int(14); ls_closure_call(ls_state.scale, ls_arguments_54); }); ls_arguments_53[1] = ({ LS_Value ls_arguments_55[2]; ls_arguments_55[0] = ls_box_int(3); ls_arguments_55[1] = ls_box_int(4); ls_closure_call(ls_state.hypot2, ls_arguments_55); }); ls_arguments_53[2] = ls_box_bool(({ LS_Value ls_arguments_56[1]; ls_arguments_56[0] = ls_box_int(10); ls_unbox_bool(ls_closure_call(ls_state.isEven, ls_arguments_56)); })); ls_printf(ls_intern("closures: scale=%d hypot2=%d even=%b\n"), 3, ls_arguments_53); });
+    ({ LS_Value ls_arguments_60[3]; ls_arguments_60[0] = ({ LS_Value ls_arguments_61[1]; ls_arguments_61[0] = ls_box_int(14); ls_closure_call(ls_state.scale, ls_arguments_61); }); ls_arguments_60[1] = ({ LS_Value ls_arguments_62[2]; ls_arguments_62[0] = ls_box_int(3); ls_arguments_62[1] = ls_box_int(4); ls_closure_call(ls_state.hypot2, ls_arguments_62); }); ls_arguments_60[2] = ls_box_bool(({ LS_Value ls_arguments_63[1]; ls_arguments_63[0] = ls_box_int(10); ls_unbox_bool(ls_closure_call(ls_state.isEven, ls_arguments_63)); })); ls_printf(ls_intern("closures: scale=%d hypot2=%d even=%b\n"), 3, ls_arguments_60); });
     ls_state.evens = 0;
     ls_state.odds = 0;
     ls_state.checksum = 0;
     {
         ls_int i = 0;
         while ((i < 500)) {
-            if (({ LS_Value ls_arguments_58[1]; ls_arguments_58[0] = ls_box_int(i); ls_unbox_bool(ls_closure_call(ls_state.isEven, ls_arguments_58)); })) {
+            if (({ LS_Value ls_arguments_65[1]; ls_arguments_65[0] = ls_box_int(i); ls_unbox_bool(ls_closure_call(ls_state.isEven, ls_arguments_65)); })) {
                 (ls_state.evens = ls_int_add(ls_state.evens, 1));
             }
             else {
                 (ls_state.odds = ls_int_add(ls_state.odds, 1));
             }
             (ls_state.checksum = ls_int_mod((ls_int_add(ls_int_mul(ls_state.checksum, 31), i)), 1000003));
-            ls_continue_57:;
+            ls_continue_64:;
             (i = ls_int_add(i, 1));
         }
     }
-    ({ LS_Value ls_arguments_63[3]; ls_arguments_63[0] = ls_box_int(ls_state.evens); ls_arguments_63[1] = ls_box_int(ls_state.odds); ls_arguments_63[2] = ls_box_int(ls_state.checksum); ls_printf(ls_intern("loop: evens=%d odds=%d checksum=%d\n"), 3, ls_arguments_63); });
+    ({ LS_Value ls_arguments_70[3]; ls_arguments_70[0] = ls_box_int(ls_state.evens); ls_arguments_70[1] = ls_box_int(ls_state.odds); ls_arguments_70[2] = ls_box_int(ls_state.checksum); ls_printf(ls_intern("loop: evens=%d odds=%d checksum=%d\n"), 3, ls_arguments_70); });
     ls_state.integers = ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 0);
     {
-        ls_int ls_counter_64 = 0, ls_last_64 = 9;
-        if (ls_counter_64 <= ls_last_64) for (;;) {
-            ls_int i = ls_counter_64;
-            ({ LS_List* ls_list_65 = ls_state.integers; ls_int ls_value_65 = i; *(ls_int*)ls_list_push(ls_list_65) = ls_value_65; });
-            ls_continue_64:;
-            if (ls_counter_64 == ls_last_64) break;
-            ++ls_counter_64;
+        ls_int ls_counter_71 = 0, ls_last_71 = 9;
+        if (ls_counter_71 <= ls_last_71) for (;;) {
+            ls_int i = ls_counter_71;
+            ({ LS_List* ls_list_72 = ls_state.integers; ls_int ls_value_72 = i; *(ls_int*)ls_list_push(ls_list_72) = ls_value_72; });
+            ls_continue_71:;
+            if (ls_counter_71 == ls_last_71) break;
+            ++ls_counter_71;
         }
     }
-    ({ LS_Value ls_arguments_66[1]; ls_arguments_66[0] = ls_box_int(ls_list_size(ls_state.integers)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_66); });
+    ({ LS_Value ls_arguments_73[1]; ls_arguments_73[0] = ls_box_int(ls_list_size(ls_state.integers)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_73); });
     {
-        LS_List* ls_list_67 = ls_state.integers; ls_int ls_index_67;
-        for (ls_index_67 = 0; ls_index_67 < ls_list_size(ls_list_67); ++ls_index_67) {
-            ls_int i = *(ls_int*)(ls_list_67->data + ls_index_67 * (ls_int)ls_list_67->element_size);
-            ({ LS_Value ls_arguments_68[1]; ls_arguments_68[0] = ls_box_int(ls_int_mul(i, 2)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_68); });
+        LS_List* ls_list_74 = ls_state.integers; ls_int ls_index_74;
+        for (ls_index_74 = 0; ls_index_74 < ls_list_size(ls_list_74); ++ls_index_74) {
+            ls_int i = *(ls_int*)(ls_list_74->data + ls_index_74 * (ls_int)ls_list_74->element_size);
+            ({ LS_Value ls_arguments_75[1]; ls_arguments_75[0] = ls_box_int(ls_int_mul(i, 2)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_75); });
         }
     }
     ls_state.somestr = ls_intern("Hello...");
     (ls_state.somestr = ls_string_concat(ls_state.somestr, ls_intern("WORLD!\n")));
     ({ ls_printf(ls_state.somestr, 0, (const LS_Value*)0); });
-    ls_state.subintegers = ({ LS_List* ls_literal_71 = ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 3); *(ls_int*)ls_list_push(ls_literal_71) = 69; *(ls_int*)ls_list_push(ls_literal_71) = 70; *(ls_int*)ls_list_push(ls_literal_71) = 71; ls_literal_71; });
+    ls_state.subintegers = ({ LS_List* ls_literal_78 = ls_list_create(sizeof(ls_int), LS_KIND_INT, (const LS_TypeInfo*)0, 3); *(ls_int*)ls_list_push(ls_literal_78) = 69; *(ls_int*)ls_list_push(ls_literal_78) = 70; *(ls_int*)ls_list_push(ls_literal_78) = 71; ls_literal_78; });
     {
-        LS_List* ls_list_72 = ls_state.subintegers; ls_int ls_index_72;
-        for (ls_index_72 = 0; ls_index_72 < ls_list_size(ls_list_72); ++ls_index_72) {
-            ls_int i = *(ls_int*)(ls_list_72->data + ls_index_72 * (ls_int)ls_list_72->element_size);
-            ({ LS_Value ls_arguments_73[1]; ls_arguments_73[0] = ls_box_int(ls_int_mul(i, 2)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_73); });
+        LS_List* ls_list_79 = ls_state.subintegers; ls_int ls_index_79;
+        for (ls_index_79 = 0; ls_index_79 < ls_list_size(ls_list_79); ++ls_index_79) {
+            ls_int i = *(ls_int*)(ls_list_79->data + ls_index_79 * (ls_int)ls_list_79->element_size);
+            ({ LS_Value ls_arguments_80[1]; ls_arguments_80[0] = ls_box_int(ls_int_mul(i, 2)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_80); });
         }
     }
-    ({ LS_Value ls_arguments_74[1]; ls_arguments_74[0] = ls_box_int((*(ls_int*)ls_list_at(ls_state.integers, 0))); ls_printf(ls_intern("%d\n"), 1, ls_arguments_74); });
-    ls_state.p = ls_Player_new();
+    ({ LS_Value ls_arguments_81[1]; ls_arguments_81[0] = ls_box_int((*(ls_int*)ls_list_at(ls_state.integers, 0))); ls_printf(ls_intern("%d\n"), 1, ls_arguments_81); });
+    ls_state.p = ls_Player_new__1(ls_intern("asdf"));
     ls_Player_set_name(ls_state.p, ls_intern("charlie"));
     ({ ls_printf(ls_Player_player_func(ls_state.p), 0, (const LS_Value*)0); });
-    ({ LS_List* ls_list_76 = ls_state.p->otherplayers; LS_Player* ls_value_76 = ls_state.p; *(LS_Player**)ls_list_push(ls_list_76) = ls_value_76; });
-    ({ LS_Value ls_arguments_77[1]; ls_arguments_77[0] = ls_box_int(ls_list_size(ls_state.p->otherplayers)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_77); });
+    ({ LS_List* ls_list_83 = ls_state.p->otherplayers; LS_Player* ls_value_83 = ls_state.p; *(LS_Player**)ls_list_push(ls_list_83) = ls_value_83; });
+    ({ LS_Value ls_arguments_84[1]; ls_arguments_84[0] = ls_box_int(ls_list_size(ls_state.p->otherplayers)); ls_printf(ls_intern("%d\n"), 1, ls_arguments_84); });
     ls_list_clear(ls_state.p->otherplayers);
     ls_state.app = ls_Application_new();
-    ls_state.anothertable = ls_Application_print_table(ls_state.app, ({ ls_table ls_literal_78 = ls_table_create(); ls_table_set(ls_literal_78, ls_box_pointer(LS_KIND_STRING, LS_NAME(key1)), ls_box_pointer(LS_KIND_STRING, ls_intern("value1"))); ls_table_set(ls_literal_78, ls_box_pointer(LS_KIND_STRING, LS_NAME(key2)), ls_box_pointer(LS_KIND_STRING, ls_intern("value2"))); ls_literal_78; }));
+    ls_state.anothertable = ls_Application_print_table(ls_state.app, ({ ls_table ls_literal_85 = ls_table_create(); ls_table_set(ls_literal_85, ls_box_pointer(LS_KIND_STRING, LS_NAME(key1)), ls_box_pointer(LS_KIND_STRING, ls_intern("value1"))); ls_table_set(ls_literal_85, ls_box_pointer(LS_KIND_STRING, LS_NAME(key2)), ls_box_pointer(LS_KIND_STRING, ls_intern("value2"))); ls_literal_85; }));
     ({ ls_printf(ls_intern("=================\n"), 0, (const LS_Value*)0); });
     ls_Application_print_table(ls_state.app, ls_state.anothertable);
     ls_state.vi = ls_Vec2i_new(1, 2);
     ls_state.v3 = ls_Vec3i_new(3, 4, 5);
     (ls_state.vi = ls_Vec2i_op_add(ls_state.vi, ls_Vec2i_new((ls_state.v3).x, (ls_state.v3).z)));
-    ({ LS_Value ls_arguments_81[1]; ls_arguments_81[0] = ls_box_pointer(LS_KIND_STRING, ls_to_string(({ LS_Vec2i ls_box_82 = ls_state.vi; ls_box_struct(&ls_type_Vec2i, &ls_box_82); }))); ls_printf(ls_intern("%s"), 1, ls_arguments_81); });
+    ({ LS_Value ls_arguments_88[1]; ls_arguments_88[0] = ls_box_pointer(LS_KIND_STRING, ls_to_string(({ LS_Vec2i ls_box_89 = ls_state.vi; ls_box_struct(&ls_type_Vec2i, &ls_box_89); }))); ls_printf(ls_intern("%s"), 1, ls_arguments_88); });
+    ls_state.s = ((LS_cShape*)ls_cSquare_new(2));
+    ls_state.isRect = ls_object_is(ls_state.s, &ls_type_cRect);
+    ls_state.r = ((LS_cRect*)ls_object_as(ls_state.s, &ls_type_cRect));
     ls_state.theboard = ls_Board_new();
     ls_Board_clear_board(ls_state.theboard, ls_Vec2i_new(5, 5), 1);
-    ({ LS_Value ls_arguments_83[1]; ls_arguments_83[0] = ls_box_int(ls_Board_get_board(ls_state.theboard, ls_Vec2i_new(0, 0))); ls_printf(ls_intern("board vavlue: %d\n"), 1, ls_arguments_83); });
+    ({ LS_Value ls_arguments_90[1]; ls_arguments_90[0] = ls_box_int(ls_Board_get_board(ls_state.theboard, ls_Vec2i_new(0, 0))); ls_printf(ls_intern("board vavlue: %d\n"), 1, ls_arguments_90); });
     ls_state.m = ls_Mat4x4_identity();
     (ls_state.m = ls_Mat4x4_op_mul(ls_state.m, ls_Mat4x4_from_pos_rot(ls_Vec3_new(0, 0, 0), ls_Quat_new(1, 0, 0, 0))));
     (ls_state.m = ls_Mat4x4_inverse(ls_state.m));
+    ls_state.names = ({ ls_table ls_literal_93 = ls_table_create(); ls_table_set(ls_literal_93, ls_box_int(1), ls_box_pointer(LS_KIND_STRING, ls_intern("Charlie"))); ls_table_set(ls_literal_93, ls_box_int(2), ls_box_pointer(LS_KIND_STRING, ls_intern("Jordan"))); ls_literal_93; });
+    ls_state.ms = ls_Mystruct_default();
+    ls_Mystruct_update(&(ls_state.ms), 0.01);
     return 0;
 }
