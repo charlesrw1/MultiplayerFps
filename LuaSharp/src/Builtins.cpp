@@ -11,6 +11,7 @@ using P = BuiltinParameter;
 using M = BuiltinMember;
 
 const std::vector<std::string> NativeStructs{"Vec2", "Vec3", "Vec2i", "Vec3i", "Quat", "Mat4x4"};
+const std::vector<std::string> StaticClasses{"math"};
 const std::vector<std::string> Types{"int", "float", "bool", "string", "table", "Vec2", "Vec3", "Vec2i", "Vec3i", "Quat", "Mat4x4"};
 
 const std::vector<M> Members{
@@ -49,7 +50,8 @@ const std::vector<std::string>& BuiltinTypes() { return Types; }
 bool IsBuiltinType(std::string_view type) { return std::find(Types.begin(), Types.end(), type) != Types.end(); }
 const std::vector<std::string>& NativeStructTypes() { return NativeStructs; }
 bool IsNativeStruct(std::string_view type) { return std::find(NativeStructs.begin(), NativeStructs.end(), type) != NativeStructs.end(); }
-bool IsBuiltinStaticClass(std::string_view type) { return type == "math"; }
+const std::vector<std::string>& BuiltinStaticClasses() { return StaticClasses; }
+bool IsBuiltinStaticClass(std::string_view type) { return std::find(StaticClasses.begin(), StaticClasses.end(), type) != StaticClasses.end(); }
 
 namespace {
 // Members of a list type, created once per list type. Never erased, so returned pointers stay valid.

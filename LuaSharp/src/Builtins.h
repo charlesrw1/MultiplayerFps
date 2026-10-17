@@ -51,6 +51,7 @@ bool IsNativeStruct(std::string_view type);
 const std::vector<std::string>& NativeStructTypes();
 // Static-only classes such as `math`; they are not types of values.
 bool IsBuiltinStaticClass(std::string_view type);
+const std::vector<std::string>& BuiltinStaticClasses();
 std::vector<const BuiltinMember*> BuiltinMembers(std::string_view type, bool staticMembers = false);
 // Lookups return pointers into static tables that live for the whole program.
 const BuiltinMember* FindBuiltinMember(std::string_view type, std::string_view name, bool staticMember = false);

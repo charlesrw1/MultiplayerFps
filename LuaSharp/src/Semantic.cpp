@@ -617,8 +617,8 @@ private:
                     if (staticContext_) AddDiagnostic("Instance member '" + member.name + "' cannot be used in a static method", expression.span);
                     CheckStructLambdaCapture(owner, expression.span);
                 }
-                else if (const auto index = FindMember("$type:" + owner->name, expression.text); index && result_.symbols[*index].kind == SymbolKind::Method) {
-                    type = symbolTypes_[*index]; symbol = index; lowering = Lowering::StaticCall;
+                else if (const auto staticIndex = FindMember("$type:" + owner->name, expression.text); staticIndex && result_.symbols[*staticIndex].kind == SymbolKind::Method) {
+                    type = symbolTypes_[*staticIndex]; symbol = staticIndex; lowering = Lowering::StaticCall;
                 }
             }
             if (type == TypeTable::Unknown && (IsBuiltinType(expression.text) || IsBuiltinStaticClass(expression.text) || declaredTypes_.contains(expression.text))) type = types_.Meta(expression.text);

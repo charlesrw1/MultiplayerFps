@@ -199,5 +199,16 @@ try {
         let character = -1; for (let i = 0; i <= occurrence; ++i) character = nativeLines[line].indexOf(name, character + 1);
         assert.ok(nativeTokens.some(token => token.line === line && token.character === character && token.length === name.length && token.type === 1), `built-in type '${name}' (line ${line}, use ${occurrence + 1}) was not emitted as a semantic type token`);
     }
-    console.log("PASS native LSP: cross-file indexing, per-file index updates, built-in type tokens, UTF-16 diagnostics, definitions, references, rename, symbols, tokens, signatures, hovers, and partial completions");
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri: nativeUri, version: 2 }, contentChanges: [{ text: `${nativeSource}\nmat` }] } });
+    send({ jsonrpc: "2.0", id: 22, method: "textDocument/completion", params: { textDocument: { uri: nativeUri }, position: { line: nativeLines.length, character: 3 } } });
+    const identifierCompletion = (await waitFor(m => m.id === 22, "identifier completion")).result;
+    for (const name of ["math", "Mat4x4"]) assert.ok(identifierCompletion.some(item => item.label === name), `identifier completion is missing built-in '${name}'`);
+    // The grammar must not copy built-in names; the server colors them. Primitive types are the one allowed list.
+    const grammarWords = new Set(readFileSync(path.join(root, "LuaSharp", "vscode-extension", "syntaxes", "luasharp.tmLanguage.json"), "utf8").match(/[A-Za-z_][A-Za-z0-9_]*/g));
+    const primitives = new Set(["int", "float", "bool", "string", "table"]);
+    const builtinNames = identifierCompletion.filter(item => /^built-in/.test(item.detail ?? "") || item.kind === 3).map(item => item.label.split("(")[0]).filter(name => !primitives.has(name));
+    assert.ok(builtinNames.includes("Vec3") && builtinNames.includes("math"), "completion did not list the built-in names the grammar check needs");
+    const hardcoded = builtinNames.filter(name => grammarWords.has(name));
+    assert.deepEqual(hardcoded, [], `grammar hardcodes built-in names: ${hardcoded.join(", ")}`);
+    console.log("PASS native LSP: cross-file indexing, per-file index updates, built-in type tokens and completions, grammar has no built-in names, UTF-16 diagnostics, definitions, references, rename, symbols, tokens, signatures, hovers, and partial completions");
 } finally { child.kill(); }
