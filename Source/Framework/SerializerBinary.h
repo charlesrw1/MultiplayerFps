@@ -29,6 +29,8 @@ public:
 
 	virtual bool serialize(const char* tag, float& f) override;
 
+	virtual bool serialize(const char* tag, double& d) override;
+
 	virtual bool serialize(const char* tag, glm::vec3& f) override;
 
 	virtual bool serialize(const char* tag, glm::vec2& f) override;
@@ -48,6 +50,8 @@ public:
 	virtual void serialize_ar(int64_t& i) override;
 
 	virtual void serialize_ar(float& f) override;
+
+	virtual void serialize_ar(double& d) override;
 
 	virtual void serialize_ar(glm::vec3& f) override;
 

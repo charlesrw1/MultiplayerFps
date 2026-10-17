@@ -17,8 +17,8 @@ IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent
 					 int row_idx, uint32_t property_flag_mask);
 
 // Defined in PropertyEdWidgets.cpp
-IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& factory, PropertyInfo* prop,
-									void* instance, IGridRow* parent);
+std::unique_ptr<IPropertyEditor> create_ipropertyed(const FnFactory<IPropertyEditor>& factory, PropertyInfo* prop,
+													void* instance, IGridRow* parent);
 
 // ---- UniquePtrRow ----
 
@@ -370,7 +370,7 @@ PropertyRow::PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* pa
 						 PropertyInfo* prop, int row_idx)
 	: IGridRow(parent, row_idx), instance(instance), prop(prop) {
 	ASSERT(prop && instance);
-	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(factory, prop, instance, this));
+	prop_editor = create_ipropertyed(factory, prop, instance, this);
 }
 PropertyRow::PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx)
 	: IGridRow(parent, row_idx), instance(instance), prop(prop) {
@@ -378,13 +378,11 @@ PropertyRow::PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instan
 	prop_editor.reset(editor);
 }
 
-static std::string type_to_string(const PropertyInfo* p);
-
-static void draw_tooltip(const PropertyInfo* prop) {
+void draw_property_tooltip(const PropertyInfo* prop) {
 	ASSERT(prop);
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
 		ImGui::BeginTooltip();
-		ImGui::Text("%s", type_to_string(prop).c_str());
+		ImGui::Text("%s", property_type_name(prop).c_str());
 		if (*prop->tooltip) {
 			ImGui::TextColored(ImVec4(0.8, 0.8, 0.8, 1), "%s", prop->tooltip);
 		}
@@ -392,7 +390,7 @@ static void draw_tooltip(const PropertyInfo* prop) {
 	}
 }
 
-static std::string type_to_string(const PropertyInfo* p) {
+std::string property_type_name(const PropertyInfo* p) {
 	ASSERT(p);
 	switch (p->type) {
 	case core_type_id::Bool:
@@ -413,12 +411,17 @@ static std::string type_to_string(const PropertyInfo* p) {
 	case core_type_id::List: {
 		if (!p->list_ptr->get_is_new_list_type())
 			return "vector";
-		return "vector<" + type_to_string(p->list_ptr->get_property()) + ">";
+		return "vector<" + property_type_name(p->list_ptr->get_property()) + ">";
 	} break;
 	case core_type_id::StdString:
+	case core_type_id::ScriptString:
 		return "String";
+	case core_type_id::Double:
+		return "Double";
 	case core_type_id::Quat:
 		return "Quat";
+	case core_type_id::Vec2:
+		return "Vec2";
 	case core_type_id::Vec3:
 		return "Vec3";
 	case core_type_id::Enum8:
@@ -497,7 +500,7 @@ void PropertyRow::draw_header(float ofs) {
 		ImGui::TextUnformatted(label);
 	}
 	if (g_prop_regular_font) ImGui::PopFont();
-	draw_tooltip(prop);
+	draw_property_tooltip(prop);
 
 	if (is_array_item && can_edit) {
 		if (ImGui::BeginDragDropTarget()) {

@@ -1200,7 +1200,7 @@ struct CEmitter {
         if (!fields.empty()) {
             Line(0, "static const LS_FieldInfo ls_fields_", name, "[] = {");
             for (const auto* field : fields)
-                Line(1, "{\"", field->name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field->name}, "), ", [&] { FieldDescriptor(Find(field->type)); }, "},");
+                Line(1, "{\"", field->name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field->name}, "), ", [&] { FieldDescriptor(Find(field->type)); }, ", ", field->isEditable ? "LS_FIELD_EDITABLE" : "0", "},");
             Line(0, "};");
         }
         if (!methods.empty()) {
@@ -1231,6 +1231,8 @@ struct CEmitter {
                 Put(", LS_TYPE_NATIVE_BASE, ", overrides.size(), ", ");
                 if (!overrides.empty()) Put("ls_host_overrides_", name); else Put("(const LS_HostOverride*)0");
             }, "};");
+        // The host reads the classes it creates (NativeModule::HostClassType).
+        if (native) Line(0, "const LS_TypeInfo* ", FunctionName(value.name, "_type"), "(void) { return &ls_type_", name, "; }");
     }
     // The most-derived script implementation of each extern virtual method that the class or its script bases override.
     std::vector<std::pair<std::string_view, const BoundFunction*>> HostOverrides(const BoundClass& value, const ExternalType& native) const {
@@ -1513,6 +1515,7 @@ struct CEmitter {
         if (!lambdas.empty()) Line(0);
         CCompilationResult result;
         for (const auto* value : orderedNatives) result.nativeClasses.push_back({value->name, value->baseType});
+        for (const auto* value : orderedClasses) if (NativeBaseOf(*value)) result.hostClasses.push_back(value->name);
         for (const auto& value : program.classes) {
             NativeTypeLayout layout; layout.name = value.name; layout.baseName = value.baseName;
             for (const auto& field : value.fields) if (!field.isStatic) layout.fields.push_back({field.name, field.type});

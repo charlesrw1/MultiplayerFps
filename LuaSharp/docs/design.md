@@ -47,7 +47,7 @@ Part 2 has these milestones (#35):
 1. `extern class` declarations, proxies and the host API (#37). Done.
 2. Engine codegen: `engine.ls`, the typed C thunks and `ClassBase::script_proxy`. The engine links LuaSharp (#38). Done.
 3. Script classes that derive from engine classes (`ScriptImpl_X` slot tables) (#39). Done.
-4. `[Editable]` fields as `PropertyInfo`. Remove `PROP_LUA_BACKED`.
+4. `[Editable]` fields as `PropertyInfo` (#40). Done.
 5. Hot reload: stable type infos, migration and relocation.
 
 Milestone 1 found that TinyCC on Windows does not resolve data symbols that `tcc_add_symbol` adds. Each module therefore emits its own type info for each extern class, and these match by name (see [native-abi.md](native-abi.md#extern-classes)). Stable script class type infos (milestone 5) must use module data that the host writes after relocation.
@@ -65,6 +65,14 @@ Milestone 3 found these items:
 - The engine makes objects only with `LuaSharpEngine::create`. Engine creation by class name (a `ClassTypeInfo` for each script class) is necessary for the editor and serialization (milestones 4 and 5).
 - C++ must not throw through script frames, so a runtime error in an override stays in `NativeRuntime::LastError`.
 - The host shares slot tables by content, not by type info address. A module that loads at the address of an unloaded module then cannot use its stale table.
+
+Milestone 4 found these items:
+
+- `PROP_LUA_BACKED` stays. Lua components still keep their fields in its shadow buffer. Remove it when Lua components move to LuaSharp.
+- A script `float` is a C `double` and a script `string` is a GC string. The engine therefore has two new core types: `Double` and `ScriptString`. The editor has an editor for each, and a new `Vec2` editor.
+- The supported `[Editable]` types are `bool`, `int`, `float`, `string`, `Vec2`, `Vec3` and `Quat`. Enums, lists and asset references are not supported yet.
+- `LuaSharpEngine::load(name, source)` registers a `ClassTypeInfo` only for a class whose nearest engine class is scriptable. An `[Editable]` field in a class with a base that is not scriptable makes `load` fail.
+- The type infos are unregistered in `~LuaSharpEngine`. No object of a script class can live longer than the engine.
 
 ### Declarations
 
@@ -124,8 +132,7 @@ void update() final { if (auto fn = script_slots->update) fn(script_proxy); else
 ### Editor fields
 
 - An attribute marks a script field as editable and serialized: `[Editable] float speed = 3;`.
-- The compiler emits a `PropertyInfo` for each such field. Its offset is in the script object. A property flag tells reflection to add the offset to the script object address.
-- This replaces the `PROP_LUA_BACKED` shadow buffer. All bound field types are supported.
+- The compiler sets `LS_FIELD_EDITABLE` on each such field. The host makes a `PropertyInfo` for it. Its offset is in the script object. The flag `PROP_SCRIPT_FIELD` tells reflection to add the offset to the script object address.
 
 ### Hot reload
 

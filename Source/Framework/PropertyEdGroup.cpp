@@ -16,62 +16,6 @@ static uint32_t color32_to_uint_grp(Color32 color) {
 	return *(uint32_t*)&color;
 }
 
-static std::string type_to_string_grp(const PropertyInfo* p);
-
-static void draw_tooltip_grp(const PropertyInfo* prop) {
-	ASSERT(prop);
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-		ImGui::BeginTooltip();
-		ImGui::Text("%s", type_to_string_grp(prop).c_str());
-		if (*prop->tooltip) {
-			ImGui::TextColored(ImVec4(0.8, 0.8, 0.8, 1), "%s", prop->tooltip);
-		}
-		ImGui::EndTooltip();
-	}
-}
-
-static std::string type_to_string_grp(const PropertyInfo* p) {
-	ASSERT(p);
-	switch (p->type) {
-	case core_type_id::Bool:
-		return "Bool";
-	case core_type_id::Int8:
-		return "Int8";
-	case core_type_id::Int16:
-		return "Int16";
-	case core_type_id::Int32:
-		return "Int32";
-	case core_type_id::Int64:
-		return "Int64";
-	case core_type_id::Float:
-		return "Float";
-	case core_type_id::ActualStruct: {
-		return p->struct_type->structname;
-	} break;
-	case core_type_id::List: {
-		if (!p->list_ptr->get_is_new_list_type())
-			return "vector";
-		return "vector<" + type_to_string_grp(p->list_ptr->get_property()) + ">";
-	} break;
-	case core_type_id::StdString:
-		return "String";
-	case core_type_id::Quat:
-		return "Quat";
-	case core_type_id::Vec3:
-		return "Vec3";
-	case core_type_id::Enum8:
-	case core_type_id::Enum16:
-	case core_type_id::Enum32:
-		return p->enum_type->name;
-	case core_type_id::Struct: {
-		return p->custom_type_str;
-	}
-	default:
-		break;
-	}
-	return "Unknown Type";
-}
-
 // ---- GroupRow ----
 
 GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance,
@@ -196,7 +140,7 @@ void GroupRow::draw_header(float ofs) {
 		uint32_t flags = (row_index == -1) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
 		expanded = ImGui::TreeNodeEx(name.c_str(), flags);
 		if (property)
-			draw_tooltip_grp(property);
+			draw_property_tooltip(property);
 		if (expanded)
 			ImGui::TreePop();
 	}

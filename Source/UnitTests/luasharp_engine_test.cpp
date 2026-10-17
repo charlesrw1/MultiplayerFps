@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "Framework/ClassBase.h"
+#include "Framework/SerializerJson2.h"
 #include "Scripting/LuaSharpEngine.h"
 #include "Scripting/LuaSharpBinding.h"
 #include "../../LuaSharp/src/CBackend.h"
@@ -267,6 +268,141 @@ TEST_F(LuaSharpEngineTest, DerivedClassOfClassThatIsNotScriptable) {
 		EXPECT_NE(std::string_view(error.what()).find("not scriptable"), std::string_view::npos) << error.what();
 	}
 	EXPECT_THROW(static_cast<void>(engine->create(module, "NoSuchClass")), std::runtime_error);
+}
+
+namespace {
+constexpr const char* EditableSource = R"(
+class Turret : LsTestScriptable {
+	[Editable] float range = 2.5;
+	[Editable] int ammo = 3;
+	[Editable] bool armed = true;
+	[Editable] string label = "turret";
+	[Editable] Vec3 aim = Vec3.new(1, 2, 3);
+	[Editable] Quat facing;
+	[Editable] Vec2 size;
+	int hidden = 4;
+	float get_range() { return range; }
+	string get_label() { return label; }
+	override int tick(int dt) { return ammo; }
+}
+class HeavyTurret : Turret { [Editable] int armor = 9; }
+abstract class Mount : LsTestScriptable { [Editable] int level = 1; }
+)";
+
+const PropertyInfo* find_prop(const ClassTypeInfo& type, std::string_view name) {
+	if (!type.props)
+		return nullptr;
+	for (int i = 0; i < type.props->count; i++)
+		if (type.props->list[i].name == name)
+			return &type.props->list[i];
+	return nullptr;
+}
+template <typename T> T& at(const ClassTypeInfo& type, ClassBase& object, std::string_view name) {
+	const PropertyInfo* prop = find_prop(type, name);
+	EXPECT_NE(prop, nullptr) << name;
+	return *reinterpret_cast<T*>(prop->get_ptr(&object));
+}
+} // namespace
+
+TEST_F(LuaSharpEngineTest, LoadRegistersScriptClasses) {
+	engine->load("turrets", EditableSource);
+	const ClassTypeInfo* turret = ClassBase::find_class("Turret");
+	const ClassTypeInfo* heavy = ClassBase::find_class("HeavyTurret");
+	const ClassTypeInfo* mount = ClassBase::find_class("Mount");
+	ASSERT_TRUE(turret && heavy && mount);
+	EXPECT_EQ(turret->super_typeinfo, &LsTestScriptable::StaticType);
+	EXPECT_EQ(heavy->super_typeinfo, turret);
+	EXPECT_TRUE(heavy->is_a(LsTestScriptable::StaticType));
+	EXPECT_FALSE(mount->has_allocate_func());
+
+	std::unique_ptr<LsTestScriptable> object(ClassBase::create_class<LsTestScriptable>("HeavyTurret"));
+	ASSERT_NE(object, nullptr);
+	EXPECT_EQ(&object->get_type(), heavy);
+	EXPECT_EQ(object->tick(1), 3); // the override reads the [Editable] field
+	EXPECT_EQ(object->hp, 100);
+
+	object.reset();
+	engine.reset(); // unregisters the classes
+	EXPECT_EQ(ClassBase::find_class("Turret"), nullptr);
+	engine = std::make_unique<LuaSharpEngine>();
+}
+
+TEST_F(LuaSharpEngineTest, EditableFieldsArePropertyInfos) {
+	const auto& module = engine->load("turrets", EditableSource);
+	std::unique_ptr<ClassBase> object = engine->create(module, "Turret");
+	const ClassTypeInfo& type = object->get_type();
+	ASSERT_EQ(&type, ClassBase::find_class("Turret")); // create() uses the registered type too
+	ASSERT_NE(type.props, nullptr);
+	EXPECT_EQ(type.props->count, 7);
+	EXPECT_EQ(find_prop(type, "hidden"), nullptr);
+	EXPECT_EQ(find_prop(type, "range")->type, core_type_id::Double);
+	EXPECT_EQ(find_prop(type, "ammo")->type, core_type_id::Int64);
+	EXPECT_EQ(find_prop(type, "label")->type, core_type_id::ScriptString);
+	EXPECT_EQ(find_prop(type, "size")->type, core_type_id::Vec2);
+	EXPECT_TRUE(find_prop(type, "aim")->flags & PROP_SCRIPT_FIELD);
+
+	// Initializers ran; writes through the PropertyInfos reach script code.
+	EXPECT_DOUBLE_EQ(at<double>(type, *object, "range"), 2.5);
+	EXPECT_EQ(at<int64_t>(type, *object, "ammo"), 3);
+	EXPECT_EQ(at<uint8_t>(type, *object, "armed"), 1);
+	EXPECT_EQ(at<glm::vec3>(type, *object, "aim"), glm::vec3(1, 2, 3));
+	EXPECT_EQ(find_prop(type, "label")->get_script_string(object.get()), "turret");
+	at<double>(type, *object, "range") = 7.5;
+	find_prop(type, "label")->set_script_string(object.get(), "renamed");
+	void* script = engine->proxy_of(object.get());
+	EXPECT_DOUBLE_EQ(reinterpret_cast<double (*)(void*)>(module.FindSymbol("ls_Turret_get_range"))(script), 7.5);
+	EXPECT_EQ(lsbind::view(reinterpret_cast<void* (*)(void*)>(module.FindSymbol("ls_Turret_get_label"))(script)), "renamed");
+	engine->collect(); // the written string is reachable from the object
+
+	EXPECT_EQ(find_prop(type, "label")->get_script_string(object.get()), "renamed");
+	// A derived class lists only its own fields; the editor walks super_typeinfo for the others.
+	const ClassTypeInfo* heavy = ClassBase::find_class("HeavyTurret");
+	ASSERT_TRUE(heavy && heavy->props);
+	EXPECT_EQ(heavy->props->count, 1);
+	EXPECT_STREQ(heavy->props->list[0].name, "armor");
+}
+
+TEST_F(LuaSharpEngineTest, EditableFieldsSerialize) {
+	const auto& module = engine->load("turrets", EditableSource);
+	std::unique_ptr<ClassBase> source = engine->create(module, "HeavyTurret");
+	const ClassTypeInfo& heavy = source->get_type();
+	const ClassTypeInfo& turret = *heavy.super_typeinfo;
+	at<double>(turret, *source, "range") = 0.1;
+	at<int64_t>(heavy, *source, "armor") = 12;
+	at<glm::vec3>(turret, *source, "aim") = glm::vec3(4, 5, 6);
+	find_prop(turret, "label")->set_script_string(source.get(), "saved");
+
+	WriteSerializerBackendJson2 writer("test", *source);
+	nlohmann::json json = writer.get_output();
+	EXPECT_EQ(json["armor"], 12);
+	EXPECT_EQ(json["label"], "saved");
+
+	std::unique_ptr<ClassBase> loaded = engine->create(module, "HeavyTurret");
+	ReadSerializerBackendJson2 reader("test", json, *loaded);
+	EXPECT_EQ(at<double>(turret, *loaded, "range"), 0.1); // double precision is kept
+	EXPECT_EQ(at<int64_t>(heavy, *loaded, "armor"), 12);
+	EXPECT_EQ(at<glm::vec3>(turret, *loaded, "aim"), glm::vec3(4, 5, 6));
+	EXPECT_EQ(find_prop(turret, "label")->get_script_string(loaded.get()), "saved");
+	EXPECT_EQ(at<int64_t>(turret, *loaded, "ammo"), 3);
+}
+
+TEST_F(LuaSharpEngineTest, LoadErrors) {
+	engine->load("turrets", EditableSource);
+	EXPECT_THROW(engine->load("turrets", "int x = 1;"), std::runtime_error); // the name is in use
+	try {
+		engine->load("again", EditableSource);
+		ADD_FAILURE() << "a second class with the same name was registered";
+	} catch (const std::runtime_error& error) {
+		EXPECT_NE(std::string_view(error.what()).find("already exists"), std::string_view::npos) << error.what();
+	}
+	try {
+		engine->load("bad", "class BadEditable : LsTestThing { [Editable] int x; }");
+		ADD_FAILURE() << "[Editable] fields of a class that is not scriptable were accepted";
+	} catch (const std::runtime_error& error) {
+		EXPECT_NE(std::string_view(error.what()).find("not scriptable"), std::string_view::npos) << error.what();
+	}
+	EXPECT_EQ(ClassBase::find_class("BadEditable"), nullptr);
+	EXPECT_NE(ClassBase::find_class("Turret"), nullptr);
 }
 
 TEST_F(LuaSharpEngineTest, CompileErrorThrows) {

@@ -16,7 +16,24 @@ uint8_t* PropertyInfo::get_ptr(const void* inst) const {
 		ASSERT(shadow && "PROP_LUA_BACKED requires owner to provide a shadow buffer");
 		return shadow + offset;
 	}
+	if (flags & PROP_SCRIPT_FIELD) {
+		auto* script = static_cast<uint8_t*>(static_cast<const ClassBase*>(inst)->get_script_proxy());
+		ASSERT(script && "PROP_SCRIPT_FIELD requires the owner to have a script object");
+		return script + offset;
+	}
 	return (uint8_t*)inst + offset;
+}
+
+ScriptStringAccess g_script_strings;
+
+std::string PropertyInfo::get_script_string(const void* inst) const {
+	ASSERT(type == core_type_id::ScriptString && g_script_strings.read);
+	return g_script_strings.read(get_ptr(inst));
+}
+
+void PropertyInfo::set_script_string(void* inst, std::string_view text) const {
+	ASSERT(type == core_type_id::ScriptString && g_script_strings.write);
+	g_script_strings.write(get_ptr(inst), text);
 }
 
 inline std::string string_view_to_std_string(StringView view) {

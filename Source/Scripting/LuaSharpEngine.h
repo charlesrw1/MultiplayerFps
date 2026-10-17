@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -8,6 +9,8 @@
 #include <vector>
 
 class ClassBase;
+class ClassTypeInfo;
+class LuaSharpClassTypeInfo;
 namespace luasharp {
 class NativeRuntime;
 class NativeModule;
@@ -32,6 +35,11 @@ public:
 
 	// Throws std::runtime_error with the diagnostics when the source does not compile.
 	luasharp::NativeModule compile(std::string_view source);
+	// Compiles a module that the engine keeps, and registers a ClassTypeInfo for each script class that derives
+	// from a scriptable engine class. ClassBase::create_class, the editor and serialization then find the class
+	// by name, and its [Editable] fields are its PropertyInfos (PROP_SCRIPT_FIELD).
+	// Throws std::runtime_error when the source does not compile or a class cannot be registered.
+	const luasharp::NativeModule& load(const std::string& name, std::string_view source);
 	void* proxy_of(const ClassBase* object);
 	// An object of a script class that derives from an engine class X: a ScriptImpl_X whose virtual functions
 	// call the script overrides. The script object is its proxy. The module must stay loaded while the object lives.
@@ -46,8 +54,21 @@ public:
 	static void on_object_destroyed(ClassBase* object);
 
 private:
+	struct LoadedModule
+	{
+		std::unique_ptr<luasharp::NativeModule> module;
+		std::vector<std::unique_ptr<LuaSharpClassTypeInfo>> classes; // base classes first
+	};
+	friend class LuaSharpClassTypeInfo;
+
+	std::unique_ptr<ClassBase> make(const luasharp::NativeModule& module, std::string_view script_class,
+									const LuaSharpClassTypeInfo* type);
+	void register_classes(LoadedModule& loaded);
+	void unregister_classes(LoadedModule& loaded);
+	const LuaSharpClassTypeInfo* find_type(const luasharp::NativeModule& module, std::string_view script_class) const;
+	const lsbind::Scriptable* scriptable_of(const ClassTypeInfo& engine_class) const;
 	void release(ClassBase* object);
-	void* const* slots_of(const void* script_object, const lsbind::Scriptable& scriptable);
+	void* const* slots_of(const void* script_type, const lsbind::Scriptable& scriptable);
 
 	std::shared_ptr<luasharp::NativeRuntime> runtime_;
 	std::unordered_map<std::string_view, const lsbind::Scriptable*> scriptables_;
@@ -56,4 +77,5 @@ private:
 	std::vector<luasharp::NativeSymbol> symbols_;
 	std::string declarations_;
 	std::unordered_set<ClassBase*> proxied_;
+	std::map<std::string, LoadedModule> modules_;
 };

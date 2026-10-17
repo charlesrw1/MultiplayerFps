@@ -2,6 +2,7 @@
 #include "Builtins.h"
 
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <unordered_set>
 #include <utility>
@@ -272,6 +273,7 @@ private:
                 declared.push_back({field.name, false, {}});
                 if (value.isExtern && field.isStatic) AddDiagnostic("Extern class '" + value.name + "' cannot declare static field '" + field.name + "'", field.span);
                 if (value.isExtern && field.initializer) AddDiagnostic("Extern field '" + field.name + "' cannot have an initializer", field.span);
+                CheckAttributes(value, field);
                 const auto index = AddSymbol(field.name, field.type, SymbolKind::Field, field.span);
                 result_.symbols[index].owner = value.name; result_.symbols[index].access = field.access; result_.symbols[index].isStatic = field.isStatic;
                 (field.isStatic ? statics : members).push_back(index);
@@ -365,6 +367,21 @@ private:
             }
         }
     }
+    static bool IsEditable(const SyntaxField& field) {
+        return std::any_of(field.attributes.begin(), field.attributes.end(), [](const SyntaxAttribute& attribute) { return attribute.name == "Editable"; });
+    }
+    // [Editable] is the only attribute. The host stores these types in place (docs/native-abi.md).
+    void CheckAttributes(const SyntaxClass& owner, const SyntaxField& field) {
+        static constexpr std::array<std::string_view, 7> editableTypes{"bool", "int", "float", "string", "Vec2", "Vec3", "Quat"};
+        StringSet seen;
+        for (const auto& attribute : field.attributes) {
+            if (attribute.name != "Editable") { AddDiagnostic("Unknown attribute '" + attribute.name + "'", attribute.span); continue; }
+            if (!seen.insert(attribute.name).second) { AddDiagnostic("Duplicate attribute '" + attribute.name + "'", attribute.span); continue; }
+            if (field.isStatic || owner.isStruct || owner.isExtern) AddDiagnostic("Only an instance field of a script class can be [Editable] (" + field.name + ")", attribute.span);
+            else if (std::find(editableTypes.begin(), editableTypes.end(), field.type) == editableTypes.end())
+                AddDiagnostic("[Editable] field '" + field.name + "' must be bool, int, float, string, Vec2, Vec3 or Quat", attribute.span);
+        }
+    }
     // The nearest extern class that a script class derives from; empty when there is none.
     std::string_view NativeAncestor(std::string_view name) const {
         std::unordered_set<std::string_view> visited;
@@ -377,7 +394,10 @@ private:
         for (const auto& value : result_.syntax.root.classes) {
             if (value.isExtern || value.isStruct) continue;
             const auto native = NativeAncestor(value.name);
-            if (native.empty()) continue;
+            if (native.empty()) {
+                for (const auto& field : value.fields) if (IsEditable(field)) AddDiagnostic("[Editable] field '" + field.name + "' needs a class that derives from an extern class: the host edits it", field.span);
+                continue;
+            }
             for (const auto& function : value.functions) {
                 if (!function.isConstructor) continue;
                 if (!function.parameters.empty()) AddDiagnostic("Constructor of '" + value.name + "' cannot have parameters: the class derives from extern class '" + std::string(native) + "', so the host creates its objects", function.span);
@@ -1089,6 +1109,7 @@ private:
             boundClass.isAbstract = value.isAbstract; boundClass.isSealed = value.isSealed;
             for (const auto& field : value.fields) {
                 BoundField boundField; boundField.access = field.access; boundField.type = field.type; boundField.name = field.name; boundField.span = field.span; boundField.isStatic = field.isStatic;
+                boundField.isEditable = IsEditable(field);
                 const auto& initializer = Syntax().Expression(field.initializer);
                 if (initializer.kind != SyntaxExpression::Kind::Missing) {
                     std::vector<Local> none; boundField.initializer = AllocateExpressions(1);

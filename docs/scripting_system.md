@@ -64,6 +64,7 @@ VS Code attach via `actboy168.lua-debug` — see [[scripting/vscode_debugger]].
    - Function → pcall with `self`+args; throws `LuaRuntimeError` on failure.
    - Non-function → call C++ base.
    - LuaSharp objects (`LuaSharpEngine::create`) set `ScriptImpl_Foo::ls_slots`. Then each override calls its slot or the C++ base, and the Lua path does not run. See `LuaSharp/docs/native-abi.md` (Engine binding).
+   - `LuaSharpEngine::load` registers a `ClassTypeInfo` for each LuaSharp class with a scriptable base. Its `[Editable]` fields are `PropertyInfo`s with `PROP_SCRIPT_FIELD`.
 
 ## `lua_table_id` and `lua_prototype_index_table`
 

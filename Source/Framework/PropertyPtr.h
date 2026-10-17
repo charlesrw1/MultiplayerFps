@@ -124,6 +124,8 @@ public:
 
 	bool is_float() const;
 	float& as_float();
+	bool is_double() const;
+	double& as_double();
 
 	bool is_numeric() const;
 	int64_t get_integer_casted();

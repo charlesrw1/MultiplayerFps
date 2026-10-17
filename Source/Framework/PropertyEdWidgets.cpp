@@ -144,6 +144,56 @@ public:
 	}
 };
 
+class Vector2Editor : public IPropertyEditor
+{
+public:
+	Vector2Editor(void* ins, PropertyInfo* inf) {
+		ASSERT(ins && inf && inf->type == core_type_id::Vec2);
+		prop = inf;
+		instance = ins;
+	}
+	bool internal_update() final { return ImGui::DragFloat2("##vec2", (float*)prop->get_ptr(instance), 0.05f); }
+};
+
+// LuaSharp float fields.
+class DoubleEditor : public IPropertyEditor
+{
+public:
+	DoubleEditor(void* ins, PropertyInfo* inf) {
+		ASSERT(ins && inf && inf->type == core_type_id::Double);
+		prop = inf;
+		instance = ins;
+	}
+	bool internal_update() final {
+		double* ptr = (double*)prop->get_ptr(instance);
+		const PropertyAttributes& a = prop->attrs;
+		const double step = a.has_step() ? a.step : 0.05;
+		return ImGui::InputDouble("##input_double", ptr, step);
+	}
+};
+
+// LuaSharp string fields: the string is immutable, so edit a copy and write it back.
+class ScriptStringEditor : public IPropertyEditor
+{
+public:
+	ScriptStringEditor(void* ins, PropertyInfo* inf) {
+		ASSERT(ins && inf && inf->type == core_type_id::ScriptString);
+		prop = inf;
+		instance = ins;
+	}
+	bool internal_update() final {
+		std::string text = prop->get_script_string(instance);
+		ImguiInputTextCallbackUserStruct user;
+		user.string = &text;
+		if (!ImGui::InputText("##input_text", text.data(), text.size() + 1, ImGuiInputTextFlags_CallbackResize,
+							  imgui_input_text_callback_function, &user))
+			return false;
+		text.resize(strlen(text.c_str())); // imgui messes with buffer size
+		prop->set_script_string(instance, text);
+		return true;
+	}
+};
+
 #include "glm/gtx/euler_angles.hpp"
 class RotationEditor : public IPropertyEditor
 {
@@ -181,12 +231,11 @@ public:
 	glm::vec3 euler{};
 };
 
-IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& factory, PropertyInfo* prop,
-									void* instance, IGridRow* parent) {
+std::unique_ptr<IPropertyEditor> create_ipropertyed(const FnFactory<IPropertyEditor>& factory, PropertyInfo* prop,
+													void* instance, IGridRow* parent) {
 	ASSERT(prop && instance);
 
-	IPropertyEditor* out = nullptr;
-	out = factory.create(prop->custom_type_str);
+	std::unique_ptr<IPropertyEditor> out(factory.create(prop->custom_type_str));
 	if (out) {
 		out->post_construct_for_custom_type(instance, prop, parent);
 		return out;
@@ -194,42 +243,49 @@ IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& factory, P
 
 	switch (prop->type) {
 	case core_type_id::Bool:
-		return new BooleanEditor(instance, prop);
+		return std::make_unique<BooleanEditor>(instance, prop);
 	case core_type_id::Enum8:
 	case core_type_id::Enum16:
 	case core_type_id::Enum32:
-		return new EnumEditor(instance, prop);
+		return std::make_unique<EnumEditor>(instance, prop);
 	case core_type_id::StdString:
-		return new StringEditor(instance, prop);
+		return std::make_unique<StringEditor>(instance, prop);
 	case core_type_id::StringName:
-		return new StringNameEditor(instance, prop);
+		return std::make_unique<StringNameEditor>(instance, prop);
 	case core_type_id::Float:
-		return new FloatEditor(instance, prop);
+		return std::make_unique<FloatEditor>(instance, prop);
 	case core_type_id::Int8:
 	case core_type_id::Int16:
 	case core_type_id::Int32:
 	case core_type_id::Int64:
-		return new IntegerEditor(instance, prop);
+		return std::make_unique<IntegerEditor>(instance, prop);
+	case core_type_id::Double:
+		return std::make_unique<DoubleEditor>(instance, prop);
+	case core_type_id::ScriptString:
+		return std::make_unique<ScriptStringEditor>(instance, prop);
+	case core_type_id::Vec2:
+		return std::make_unique<Vector2Editor>(instance, prop);
 	case core_type_id::Vec3:
-		return new VectorEditor(instance, prop);
+		return std::make_unique<VectorEditor>(instance, prop);
 	case core_type_id::Quat:
-		return new RotationEditor(instance, prop);
-	case core_type_id::ObjHandlePtr: {
-		out = factory.create("ObjPtr");
-	} break;
-	case core_type_id::AssetPtr: {
-		out = factory.create("AssetPtr");
-	} break;
-	case core_type_id::ClassTypeInfo: {
-		out = factory.create("ClassTypePtr");
-	} break;
+		return std::make_unique<RotationEditor>(instance, prop);
+	case core_type_id::ObjHandlePtr:
+		out.reset(factory.create("ObjPtr"));
+		break;
+	case core_type_id::AssetPtr:
+		out.reset(factory.create("AssetPtr"));
+		break;
+	case core_type_id::ClassTypeInfo:
+		out.reset(factory.create("ClassTypePtr"));
+		break;
+	default:
+		break;
 	}
-	if (out) {
-		out->post_construct_for_custom_type(instance, prop, parent);
-	} else {
+	if (!out) {
 		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
 		return nullptr;
 	}
+	out->post_construct_for_custom_type(instance, prop, parent);
 	return out;
 }
 #endif

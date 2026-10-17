@@ -138,60 +138,6 @@ bool ArrayRow::internal_update() {
 	return ret;
 }
 
-static std::string type_to_string_arr(const PropertyInfo* p) {
-	ASSERT(p);
-	switch (p->type) {
-	case core_type_id::Bool:
-		return "Bool";
-	case core_type_id::Int8:
-		return "Int8";
-	case core_type_id::Int16:
-		return "Int16";
-	case core_type_id::Int32:
-		return "Int32";
-	case core_type_id::Int64:
-		return "Int64";
-	case core_type_id::Float:
-		return "Float";
-	case core_type_id::ActualStruct: {
-		return p->struct_type->structname;
-	} break;
-	case core_type_id::List: {
-		if (!p->list_ptr->get_is_new_list_type())
-			return "vector";
-		return "vector<" + type_to_string_arr(p->list_ptr->get_property()) + ">";
-	} break;
-	case core_type_id::StdString:
-		return "String";
-	case core_type_id::Quat:
-		return "Quat";
-	case core_type_id::Vec3:
-		return "Vec3";
-	case core_type_id::Enum8:
-	case core_type_id::Enum16:
-	case core_type_id::Enum32:
-		return p->enum_type->name;
-	case core_type_id::Struct: {
-		return p->custom_type_str;
-	}
-	default:
-		break;
-	}
-	return "Unknown Type";
-}
-
-static void draw_tooltip_arr(const PropertyInfo* prop) {
-	ASSERT(prop);
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-		ImGui::BeginTooltip();
-		ImGui::Text("%s", type_to_string_arr(prop).c_str());
-		if (*prop->tooltip) {
-			ImGui::TextColored(ImVec4(0.8, 0.8, 0.8, 1), "%s", prop->tooltip);
-		}
-		ImGui::EndTooltip();
-	}
-}
-
 void ArrayRow::draw_header(float header_ofs) {
 	ASSERT(prop);
 	ImGui::Dummy(ImVec2(header_ofs, 0));
@@ -208,7 +154,7 @@ void ArrayRow::draw_header(float header_ofs) {
 	if (g_prop_regular_font) ImGui::PushFont(g_prop_regular_font);
 	expanded = ImGui::TreeNodeEx(name, ImGuiTreeNodeFlags_DefaultOpen);
 	if (g_prop_regular_font) ImGui::PopFont();
-	draw_tooltip_arr(prop);
+	draw_property_tooltip(prop);
 	if (expanded)
 		ImGui::TreePop();
 	ImGui::PopStyleColor(3);

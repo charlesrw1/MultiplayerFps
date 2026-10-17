@@ -321,19 +321,24 @@ private:
         while (!AtEnd() && !Is("}")) {
             if ((Is("public") || Is("private")) && Is(":", 1)) { access = Advance().text; Advance(); continue; }
             const size_t before = index_;
+            std::vector<SyntaxAttribute> attributes;
+            while (Is("[")) { Advance(); const auto attribute = Identifier("attribute name"); attributes.push_back({attribute.text, attribute.span}); Match("]"); }
             const auto modifiers = ParseModifiers();
             const auto first = Identifier();
+            const auto rejectAttributes = [&] { for (const auto& attribute : attributes) tree_.diagnostics.push_back({"Only fields can have attributes", attribute.span}); };
             if (Is("(")) {
+                rejectAttributes();
                 result.functions.push_back(ParseFunction(access, first, {}, true, modifiers));
                 if (modifiers.isStatic || modifiers.isVirtual || modifiers.isOverride || modifiers.isAbstract || modifiers.isSealed) tree_.diagnostics.push_back({"Constructors cannot have modifiers", first.span});
             } else {
                 std::string type = first.text;
                 while (Is("[")) { Advance(); Match("]"); type += "[]"; }
                 const auto memberName = Identifier("member name");
-                if (Is("(")) result.functions.push_back(ParseFunction(access, memberName, std::move(type), false, modifiers));
+                if (Is("(")) { rejectAttributes(); result.functions.push_back(ParseFunction(access, memberName, std::move(type), false, modifiers)); }
                 else {
                     if (modifiers.isVirtual || modifiers.isOverride || modifiers.isAbstract || modifiers.isSealed) tree_.diagnostics.push_back({"Fields can only be 'static'", memberName.span});
                     SyntaxField field; field.access = access; field.type = std::move(type); field.name = memberName.text; field.span = memberName.span; field.isStatic = modifiers.isStatic;
+                    field.attributes = std::move(attributes);
                     if (Is("=")) { Advance(); field.initializer = ParseExpression(); }
                     Match(";"); result.fields.push_back(std::move(field));
                 }

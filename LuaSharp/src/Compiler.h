@@ -72,6 +72,8 @@ struct SyntaxExpression {
     bool lambdaIsBlock{};
 };
 
+// `[Name]` before a member.
+struct SyntaxAttribute { std::string name; TextSpan span; };
 struct SyntaxField {
     std::string access;
     std::string type;
@@ -79,6 +81,7 @@ struct SyntaxField {
     NodeId initializer{}; // 0 is the shared missing expression
     TextSpan span;
     bool isStatic{};
+    std::vector<SyntaxAttribute> attributes;
 };
 struct SyntaxStatement {
     enum class Kind { If, While, For, ForEach, Break, Continue, Return, Local, Expression } kind{Kind::Expression};

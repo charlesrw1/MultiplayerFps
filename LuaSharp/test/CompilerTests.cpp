@@ -1738,12 +1738,16 @@ constexpr std::string_view UnitDeclarations = "extern class Unit { int hp; virtu
 constexpr std::string_view UnitScript = R"(class Guard : Unit {
     int armor = 2;
     int made;
+    [Editable] float speed = 1.5;
+    [Editable] string tag = "g";
+    [Editable] Vec3 home;
     Guard() { made = hp + plain(); }
     override int hit(int amount) { return base.hit(amount - armor) + 1000; }
     int heal() { hp = hp + 5; return this.hp; }
     int get_made() { return made; }
+    float get_speed() { return speed; }
 }
-class Captain : Guard { override string name() { return "captain"; } }
+class Captain : Guard { [Editable] bool brave = true; override string name() { return "captain"; } }
 Unit held;
 auto heldNull = () => held == null;
 auto heldIsGuard = () => held is Guard;
@@ -1759,15 +1763,24 @@ void TestDerivedExternClassSemantics() {
     Require(has("class G : Unit {} class H : G {} H h = new H();", "derives from extern class 'Unit'"), "'new' of an indirect derived class was accepted");
     Require(has("class G : Unit { G(int x) {} }", "cannot have parameters"), "a constructor with parameters was accepted");
     Require(has("class G : Unit { override int plain() { return 1; } }", "not virtual"), "an override of a non-virtual extern method was accepted");
+    Require(has("class G : Unit { [Editable] int[] xs; }", "must be bool, int"), "an [Editable] list was accepted");
+    Require(has("class G { [Editable] int x; }", "needs a class that derives from an extern class"), "[Editable] on a plain script class was accepted");
+    Require(has("class G : Unit { [Editable] static int x; }", "Only an instance field"), "an [Editable] static field was accepted");
+    Require(has("class G : Unit { [Fancy] int x; }", "Unknown attribute 'Fancy'"), "an unknown attribute was accepted");
+    Require(has("class G : Unit { [Editable] [Editable] int x; }", "Duplicate attribute"), "a duplicate attribute was accepted");
+    Require(has("class G : Unit { [Editable] int f() { return 1; } }", "Only fields can have attributes"), "an attribute on a method was accepted");
     const auto valid = luasharp::Analyze(std::string(UnitDeclarations) + "\n" + std::string(UnitScript));
     Require(valid.diagnostics.empty(), "a valid derived class produced diagnostics: " + (valid.diagnostics.empty() ? std::string() : valid.diagnostics.front().message));
 
     const auto generated = luasharp::CompileToC(std::string(UnitDeclarations) + "\n" + std::string(UnitScript));
     for (const auto expected : {"void* ls_native; /* LS_NativeObject.native */", "LS_KIND_OBJECT, &ls_type_Unit, ls_vtable_Guard, LS_TYPE_NATIVE_BASE, 1, ls_host_overrides_Guard};",
                                 "{\"hit\", (void*)ls_Guard_hit},", "{\"name\", (void*)ls_Captain_name},", "extern ls_int ls_native_Unit__base_hit(void* self, ls_int amount);",
-                                "ls_Unit__base_hit((LS_Unit*)self", "LS_Guard* ls_Guard__host_alloc(void)", "ls_Unit__get_hp((LS_Unit*)self)", "ls_Unit__set_hp(", "ls_Unit_plain((LS_Unit*)self)"})
+                                "ls_Unit__base_hit((LS_Unit*)self", "LS_Guard* ls_Guard__host_alloc(void)", "ls_Unit__get_hp((LS_Unit*)self)", "ls_Unit__set_hp(", "ls_Unit_plain((LS_Unit*)self)",
+                                "{\"armor\", ls_offsetof(LS_Guard, armor), LS_KIND_INT, 0, (const LS_TypeInfo*)0, 0},", "{\"home\", ls_offsetof(LS_Guard, home), LS_KIND_STRUCT, 0, &ls_type_Vec3, LS_FIELD_EDITABLE},",
+                                "const LS_TypeInfo* ls_Captain__type(void) { return &ls_type_Captain; }"})
         Require(generated.c.find(expected) != std::string::npos, std::string("missing derived extern class lowering: ") + expected);
     Require(generated.c.find("ls_Guard_new") == std::string::npos, "a class that derives from an extern class got a script constructor");
+    Require(generated.hostClasses == std::vector<std::string>{"Guard", "Captain"}, "the host classes were not listed base first");
 }
 
 void TestNativeDerivedExternClasses() {
@@ -1811,6 +1824,22 @@ void TestNativeDerivedExternClasses() {
         Require(luasharp::NativeRuntime::HostOverrideCount(captain) == 2 && name && static_cast<const char*>(name(captain)) + 8 == std::string_view("captain"), "an inherited or new host override was wrong");
         Require(UnitHit(&captainHost, 4) == 1018, "an inherited override was not used");
         Require(module.LastError().empty(), "derived extern classes reported a runtime error: " + module.LastError());
+
+        // [Editable] fields, as the host reads them to make its PropertyInfos.
+        using luasharp::NativeRuntime; using luasharp::NativeValueKind;
+        const void* guardType = module.HostClassType("Guard");
+        const void* captainType = module.HostClassType("Captain");
+        Require(guardType && captainType && !module.HostClassType("Unit") && !module.HostClassType("Nope"), "HostClassType found the wrong classes");
+        Require(NativeRuntime::TypeName(captainType) == "Captain" && NativeRuntime::NativeBaseTypeName(captainType) == "Unit", "host class names were wrong");
+        Require(NativeRuntime::ScriptBaseType(captainType) == guardType && !NativeRuntime::ScriptBaseType(guardType), "host class bases were wrong");
+        const auto guardFields = NativeRuntime::EditableFields(guardType);
+        Require(guardFields.size() == 3 && guardFields[0].name == "speed" && guardFields[0].kind == NativeValueKind::Float && guardFields[1].kind == NativeValueKind::String &&
+                guardFields[2].kind == NativeValueKind::Struct && guardFields[2].structName == "Vec3", "Guard's editable fields were wrong");
+        const auto captainFields = NativeRuntime::EditableFields(captainType);
+        Require(captainFields.size() == 1 && captainFields[0].name == "brave" && captainFields[0].kind == NativeValueKind::Bool, "Captain's editable fields included inherited ones");
+        *reinterpret_cast<double*>(static_cast<char*>(captain) + guardFields[0].offset) = 4.25; // the host edits a field in place
+        Require(reinterpret_cast<double (*)(void*)>(module.FindSymbol("ls_Guard_get_speed"))(captain) == 4.25, "an editable field offset was wrong");
+        Require(*(static_cast<unsigned char*>(captain) + captainFields[0].offset) == 1, "an editable field initializer did not run");
 
         luasharp::NativeRuntime::DestroyNative(guard);
         Require(CallGlobalClosure(module, "heldNull").as.boolean == 1 && CallGlobalClosure(module, "heldIsGuard").as.boolean == 0, "a destroyed derived object was not null");

@@ -61,7 +61,8 @@ struct RuntimeAbi {
 // Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.
 struct NativeTypeInfo;
 struct NativeHostOverride { const char* name; void* function; }; // LS_HostOverride
-struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; };
+struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; unsigned long long flags; };
+constexpr unsigned long long FieldEditable = 1; // LS_FIELD_EDITABLE
 struct NativeTypeInfo {
     const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind;
     const NativeTypeInfo* base; void* const* vtable; unsigned long long flags;
@@ -628,24 +629,52 @@ void* NativeRuntime::NewNativeProxy(const void* nativeClass, void* native, Nativ
 void* NativeRuntime::NativeOf(const void* proxy) { return proxy ? static_cast<const NativeProxy*>(proxy)->native : nullptr; }
 void NativeRuntime::DestroyNative(void* proxy) { assert(proxy); static_cast<NativeProxy*>(proxy)->native = nullptr; }
 namespace {
+const NativeTypeInfo& HostClass(const void* type) {
+    assert(type);
+    const auto& info = *static_cast<const NativeTypeInfo*>(type);
+    assert((info.flags & TypeNativeBase) && "the class does not derive from an extern class");
+    return info;
+}
 const NativeTypeInfo& DerivedType(const void* object) {
     assert(object);
-    const auto& type = *static_cast<const NativeProxy*>(object)->type;
-    assert((type.flags & TypeNativeBase) && "the object's class does not derive from an extern class");
-    return type;
+    return HostClass(static_cast<const NativeProxy*>(object)->type);
 }
 } // namespace
-std::string_view NativeRuntime::NativeBaseName(const void* object) {
-    for (const auto* type = &DerivedType(object); type; type = type->base) if (type->flags & TypeNative) return type->name;
+std::string_view NativeRuntime::NativeBaseName(const void* object) { return NativeBaseTypeName(&DerivedType(object)); }
+std::string_view NativeRuntime::TypeName(const void* type) { return HostClass(type).name; }
+std::string_view NativeRuntime::NativeBaseTypeName(const void* type) {
+    for (const auto* info = &HostClass(type); info; info = info->base) if (info->flags & TypeNative) return info->name;
     assert(!"a class with LS_TYPE_NATIVE_BASE has an extern ancestor");
     return {};
 }
-void* NativeRuntime::HostOverride(const void* object, std::string_view method) {
-    const auto& type = DerivedType(object);
-    for (const auto& entry : std::span(type.hostOverrides, static_cast<size_t>(type.hostOverrideCount))) if (entry.name == method) return entry.function;
+const void* NativeRuntime::ScriptBaseType(const void* type) {
+    const auto* base = HostClass(type).base;
+    assert(base);
+    return (base->flags & TypeNativeBase) ? base : nullptr;
+}
+std::vector<NativeEditableField> NativeRuntime::EditableFields(const void* type) {
+    const auto& info = HostClass(type);
+    const auto* base = static_cast<const NativeTypeInfo*>(ScriptBaseType(type));
+    // A class lists the fields of its base first.
+    const size_t inherited = base ? static_cast<size_t>(base->fieldCount) : 0;
+    assert(inherited <= info.fieldCount);
+    std::vector<NativeEditableField> result;
+    for (const auto& field : Fields(info).subspan(inherited)) {
+        if (!(field.flags & FieldEditable)) continue;
+        assert(field.kind != KindOf(NativeValueKind::Struct) || field.type);
+        result.push_back({field.name, static_cast<size_t>(field.offset), static_cast<NativeValueKind>(field.kind),
+                          field.kind == KindOf(NativeValueKind::Struct) ? std::string_view(field.type->name) : std::string_view()});
+    }
+    return result;
+}
+void* NativeRuntime::HostOverride(const void* object, std::string_view method) { return TypeHostOverride(&DerivedType(object), method); }
+size_t NativeRuntime::HostOverrideCount(const void* object) { return TypeHostOverrideCount(&DerivedType(object)); }
+void* NativeRuntime::TypeHostOverride(const void* type, std::string_view method) {
+    const auto& info = HostClass(type);
+    for (const auto& entry : std::span(info.hostOverrides, static_cast<size_t>(info.hostOverrideCount))) if (entry.name == method) return entry.function;
     return nullptr;
 }
-size_t NativeRuntime::HostOverrideCount(const void* object) { return static_cast<size_t>(DerivedType(object).hostOverrideCount); }
+size_t NativeRuntime::TypeHostOverrideCount(const void* type) { return static_cast<size_t>(HostClass(type).hostOverrideCount); }
 void NativeRuntime::SetNative(void* object, void* native) {
     static_cast<void>(DerivedType(object));
     assert(native && !static_cast<NativeProxy*>(object)->native);

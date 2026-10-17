@@ -233,6 +233,15 @@ void* NativeModule::FindGlobal(std::string_view name) const {
     return getter ? getter() : nullptr;
 }
 
+const void* NativeModule::HostClassType(std::string_view className) const {
+    if (!impl_) return nullptr;
+    const auto& classes = impl_->generated.hostClasses;
+    if (std::find(classes.begin(), classes.end(), className) == classes.end()) return nullptr;
+    const auto type = reinterpret_cast<const void* (*)()>(impl_->getSymbol(impl_->state, ("ls_" + std::string(className) + "__type").c_str()));
+    assert(type && "the C backend emits ls_<Class>__type for each host class");
+    return type ? type() : nullptr;
+}
+
 std::string NativeModule::LastError() const {
     return impl_ ? impl_->runtime->LastError() : std::string{};
 }

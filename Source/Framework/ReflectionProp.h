@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 #include <cfloat>
+#include <string>
+#include <string_view>
 #include "Framework/EnumDefReflection.h"
 #include "Framework/StringUtil.h"
 #include "Framework/Factory.h"
@@ -35,6 +37,10 @@ enum class core_type_id : uint8_t
 	ClassTypeInfo,
 	StringName, // hashed string
 
+	// LuaSharp script fields (PROP_SCRIPT_FIELD)
+	Double,
+	ScriptString, // a GC string; read and write it with PropertyInfo::get/set_script_string
+
 	// MulticastDelegate,
 };
 
@@ -61,7 +67,19 @@ enum SerializedPropFlags
 	// not at (inst + offset). Set on synthesized PropertyInfo for Lua-defined Component subclasses so the
 	// reflection-backed editor + serializer can read/write Lua-authored fields with no code changes.
 	PROP_LUA_BACKED = 64,
+
+	// Storage is in the LuaSharp script object of the owning ClassBase (offset is from its start).
+	// Set on the PropertyInfos of [Editable] fields of LuaSharp classes (LuaSharpEngine).
+	PROP_SCRIPT_FIELD = 128,
 };
+
+// Access to core_type_id::ScriptString storage. The scripting engine that owns the strings sets these.
+struct ScriptStringAccess
+{
+	std::string (*read)(const void* slot) = nullptr;
+	void (*write)(void* slot, std::string_view text) = nullptr;
+};
+extern ScriptStringAccess g_script_strings;
 
 struct ParsedHintStr
 {
@@ -141,6 +159,9 @@ struct PropertyInfo
 
 	uint64_t get_int(const void* ptr) const;
 	void set_int(void* ptr, uint64_t i) const;
+
+	std::string get_script_string(const void* inst) const;
+	void set_script_string(void* inst, std::string_view text) const;
 
 	bool can_edit() const { return flags & PROP_EDITABLE; }
 	bool can_serialize() const { return flags & PROP_SERIALIZE; }

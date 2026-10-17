@@ -18,6 +18,7 @@ struct Serializer
 	virtual bool serialize(const char* tag, int32_t& i) = 0;
 	virtual bool serialize(const char* tag, int64_t& i) = 0;
 	virtual bool serialize(const char* tag, float& f) = 0;
+	virtual bool serialize(const char* tag, double& d) = 0;
 	virtual bool serialize(const char* tag, glm::vec3& f) = 0;
 	virtual bool serialize(const char* tag, glm::vec2& f) = 0;
 	virtual bool serialize(const char* tag, glm::quat& f) = 0;
@@ -29,6 +30,7 @@ struct Serializer
 	virtual void serialize_ar(int32_t& i) = 0;
 	virtual void serialize_ar(int64_t& i) = 0;
 	virtual void serialize_ar(float& f) = 0;
+	virtual void serialize_ar(double& d) = 0;
 	virtual void serialize_ar(glm::vec3& f) = 0;
 	virtual void serialize_ar(glm::vec2& f) = 0;
 	virtual void serialize_ar(glm::quat& f) = 0;

@@ -144,6 +144,15 @@ void Serializer::serialize_property(PropertyPtr ptr) {
 			float& f = ptr.as_float();
 			serialize(ptr.get_name(), f);
 		} break;
+		case core_type_id::Double: {
+			serialize(ptr.get_name(), ptr.as_double());
+		} break;
+		case core_type_id::ScriptString: {
+			auto pi = ptr.get_property_info();
+			string s = is_loading() ? string() : pi->get_script_string(ptr.get_instance_ptr_unsafe());
+			if (serialize(ptr.get_name(), s) && is_loading())
+				pi->set_script_string(ptr.get_instance_ptr_unsafe(), s);
+		} break;
 		case core_type_id::Quat: {
 			serialize(ptr.get_name(), ptr.as_quat());
 		} break;

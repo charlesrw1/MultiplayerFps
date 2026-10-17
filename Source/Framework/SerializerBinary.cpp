@@ -1,4 +1,5 @@
 #include "SerializerBinary.h"
+#include <bit>
 
 BinaryWriterBackend::BinaryWriterBackend(ClassBase& rootObj) {
 	write_class(rootObj);
@@ -68,6 +69,11 @@ bool BinaryWriterBackend::serialize(const char* tag, float& f) {
 	return true;
 }
 
+bool BinaryWriterBackend::serialize(const char* tag, double& d) {
+	writer.write_int64(std::bit_cast<uint64_t>(d));
+	return true;
+}
+
 bool BinaryWriterBackend::serialize(const char* tag, glm::vec3& f) {
 	writer.write_float(f.x);
 	writer.write_float(f.y);
@@ -118,6 +124,10 @@ void BinaryWriterBackend::serialize_ar(int64_t& i) {
 
 void BinaryWriterBackend::serialize_ar(float& f) {
 	BinaryWriterBackend::serialize("", f);
+}
+
+void BinaryWriterBackend::serialize_ar(double& d) {
+	BinaryWriterBackend::serialize("", d);
 }
 
 void BinaryWriterBackend::serialize_ar(glm::vec3& f) {

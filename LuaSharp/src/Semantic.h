@@ -175,6 +175,7 @@ struct BoundField {
     std::string type;
     std::string name;
     bool isStatic{};
+    bool isEditable{}; // [Editable]: the host can edit and save it
     NodeId initializer{};
     TextSpan span;
 };

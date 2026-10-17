@@ -5,11 +5,12 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace luasharp {
 
 // Must equal LS_ABI_VERSION in runtime/luasharp/runtime.h.
-constexpr unsigned long long NativeAbiVersion = 11;
+constexpr unsigned long long NativeAbiVersion = 12;
 
 using NativeTraceFunction =void (*)(void* runtimeContext, void* object);
 using NativeFinalizeFunction = void (*)(void* object);
@@ -32,6 +33,14 @@ struct NativeList {
     NativeElementKind elementKind{};
     const void* elementType{}; // LS_TypeInfo of object, struct and list elements
     std::byte* data{};
+};
+
+// An [Editable] field (LS_FIELD_EDITABLE) at offset in the objects of its class.
+struct NativeEditableField {
+    std::string_view name;
+    size_t offset{};
+    NativeValueKind kind{};
+    std::string_view structName; // Struct fields: Vec2, Vec3 or Quat
 };
 
 // Shared, non-moving native heap. Collection is stop-the-world: callers must
@@ -71,6 +80,15 @@ public:
     // Objects of a script class that derives from an extern class (LS_TYPE_NATIVE_BASE). They are proxies too.
     // The nearest extern class of the object's class.
     static std::string_view NativeBaseName(const void* object);
+    // The same for the classes, by LS_TypeInfo (NativeModule::HostClassType).
+    static std::string_view TypeName(const void* type);
+    static std::string_view NativeBaseTypeName(const void* type);
+    // The base class when it is a script class too; null when the base is the extern class.
+    static const void* ScriptBaseType(const void* type);
+    // The [Editable] fields the class declares, without those of its base classes.
+    static std::vector<NativeEditableField> EditableFields(const void* type);
+    static void* TypeHostOverride(const void* type, std::string_view method);
+    static size_t TypeHostOverrideCount(const void* type);
     // The script implementation of an extern virtual method; null when the class does not override it.
     static void* HostOverride(const void* object, std::string_view method);
     static size_t HostOverrideCount(const void* object);

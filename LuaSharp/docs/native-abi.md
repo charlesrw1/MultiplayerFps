@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `11`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `12`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -203,6 +203,17 @@ Creation:
 
 An abstract class has no `ls_T__host_alloc`.
 
+Type infos:
+
+- Each class of this kind exports `const LS_TypeInfo* ls_T__type(void)`. `CCompilationResult::hostClasses` lists these classes, base classes first. `NativeModule::HostClassType(name)` calls the function.
+- `NativeRuntime::TypeName`, `NativeBaseTypeName`, `ScriptBaseType` and `TypeHostOverride` read a type info. `ScriptBaseType` is null when the base is the extern class.
+
+Editable fields:
+
+- `[Editable]` before a field sets `LS_FIELD_EDITABLE` in `LS_FieldInfo::flags`. Only instance fields of a class with an extern ancestor can have it. The types are `bool`, `int`, `float`, `string`, `Vec2`, `Vec3` and `Quat`.
+- Other attributes, a duplicate attribute and attributes on methods are errors.
+- `NativeRuntime::EditableFields(type)` gives the name, offset and kind of each editable field that the class declares. It does not give the fields of its base classes.
+
 ### External enums
 
 - An enum in `NativeCompileOptions::declarations` or in other external types gets the C constant `LS_E_M`, the same as an enum in the module.
@@ -227,6 +238,7 @@ A script class can derive from a bound class `X`:
 - A class that is not scriptable can be a base only when the script class overrides none of its methods. `create` then makes a plain `X`.
 - A method that returns a reference has no slot. `create` reports an error when a script class overrides it.
 - The module must stay loaded while its objects are alive.
+- `LuaSharpEngine::load(name, source)` keeps the module and registers a `ClassTypeInfo` for each class with a scriptable engine base. `ClassBase::create_class`, the editor and serialization then find the class by name. Each editable field is a `PropertyInfo` with `PROP_SCRIPT_FIELD`: its offset is in the script object. `int` is `Int64`, `float` is `Double` and `string` is `ScriptString`.
 - A runtime error in an override stays in `NativeRuntime::LastError`. The override continues with default values, the same as other script code. No C++ exception goes through script frames.
 
 ## Structs

@@ -3,11 +3,83 @@
 #include "../../LuaSharp/src/CBackend.h"
 #include "Framework/ClassBase.h"
 #include "Framework/ClassTypeInfo.h"
+#include "Framework/ReflectionProp.h"
 #include "Framework/Util.h"
+#include <limits>
 #include <stdexcept>
 #include <unordered_map>
 
 LuaSharpEngine* LuaSharpEngine::inst = nullptr;
+
+// The ClassTypeInfo of a script class that derives from a scriptable engine class (LuaSharpEngine::load).
+// Its objects are ScriptImpl_X objects whose get_type() is this type.
+class LuaSharpClassTypeInfo final : public ClassTypeInfo
+{
+public:
+	LuaSharpClassTypeInfo(const luasharp::NativeModule& module, const void* script_type, const ClassTypeInfo& super,
+						  const ClassTypeInfo& engine_class, bool can_create)
+		: ClassTypeInfo("", &super, nullptr, can_create ? &allocate_object : nullptr, false, nullptr, 0, nullptr,
+						true /* LuaSharpEngine registers it */, can_create),
+		  module(module), script_type(script_type), engine_class(engine_class),
+		  name(luasharp::NativeRuntime::TypeName(script_type)) {
+		classname = name.c_str();
+		make_props();
+	}
+
+	const luasharp::NativeModule& module;
+	const void* const script_type; // LS_TypeInfo
+	const ClassTypeInfo& engine_class; // the nearest C++ class
+
+private:
+	static ClassBase* allocate_object(const ClassTypeInfo* type) {
+		ASSERT(LuaSharpEngine::inst);
+		const auto& self = static_cast<const LuaSharpClassTypeInfo&>(*type);
+		try {
+			return LuaSharpEngine::inst->make(self.module, self.name, &self).release();
+		} catch (const std::exception& error) {
+			sys_print(Error, "LuaSharp: cannot create %s: %s\n", self.classname, error.what());
+			return nullptr;
+		}
+	}
+	void make_props() {
+		using luasharp::NativeValueKind;
+		const auto fields = luasharp::NativeRuntime::EditableFields(script_type);
+		prop_names.reserve(fields.size()); // PropertyInfo::name points into these
+		for (const auto& field : fields) {
+			ASSERT(field.offset <= std::numeric_limits<uint16_t>::max());
+			const char* field_name = prop_names.emplace_back(field.name).c_str();
+			const auto offset = static_cast<uint16_t>(field.offset);
+			constexpr uint32_t flags = PROP_DEFAULT | PROP_SCRIPT_FIELD;
+			PropertyInfo prop(field_name, offset, flags);
+			switch (field.kind) {
+			case NativeValueKind::Bool: prop = make_bool_property(field_name, offset, flags); break;
+			case NativeValueKind::Int: prop = make_integer_property(field_name, offset, flags, sizeof(int64_t)); break;
+			case NativeValueKind::Float: prop.type = core_type_id::Double; break;
+			case NativeValueKind::String: prop.type = core_type_id::ScriptString; break;
+			case NativeValueKind::Struct:
+				if (field.structName == "Vec2") prop.type = core_type_id::Vec2;
+				else if (field.structName == "Vec3") prop.type = core_type_id::Vec3;
+				else if (field.structName == "Quat") prop.type = core_type_id::Quat;
+				else ASSERT(!"the checker allows only Vec2, Vec3 and Quat structs");
+				break;
+			default: ASSERT(!"the checker allows only these [Editable] types");
+			}
+			prop_storage.push_back(prop);
+		}
+		ASSERT(prop_names.size() == fields.size()); // no reallocation moved a name
+		if (prop_storage.empty())
+			return;
+		prop_list.list = prop_storage.data();
+		prop_list.count = static_cast<int>(prop_storage.size());
+		prop_list.type_name = classname;
+		props = &prop_list;
+	}
+
+	std::string name;
+	std::vector<std::string> prop_names;
+	std::vector<PropertyInfo> prop_storage;
+	PropertyInfoList prop_list;
+};
 
 namespace {
 std::vector<const lsbind::Bindings*>& bindings_registry() {
@@ -111,13 +183,21 @@ LuaSharpEngine::LuaSharpEngine() : runtime_(luasharp::NativeRuntime::Create()) {
 	for (const auto& [name, base] : bases)
 		register_class(register_class, name);
 	types_ = luasharp::DeclarationTypes({declarations_});
+	ASSERT(!g_script_strings.read && !g_script_strings.write);
+	g_script_strings.read = [](const void* slot) { return std::string(lsbind::view(*static_cast<void* const*>(slot))); };
+	g_script_strings.write = [](void* slot, std::string_view text) { *static_cast<void**>(slot) = lsbind::string(text); };
 	inst = this;
 }
 
 LuaSharpEngine::~LuaSharpEngine() {
 	ASSERT(inst == this);
+	for ([[maybe_unused]] ClassBase* object : proxied_)
+		ASSERT(!dynamic_cast<const LuaSharpClassTypeInfo*>(&object->get_type()) && "an object of a loaded script class outlives the engine");
 	while (!proxied_.empty())
 		release(*proxied_.begin());
+	for (auto& [name, loaded] : modules_)
+		unregister_classes(loaded);
+	g_script_strings = {};
 	inst = nullptr;
 }
 
@@ -146,6 +226,11 @@ void* LuaSharpEngine::proxy_of(const ClassBase* object) {
 }
 
 std::unique_ptr<ClassBase> LuaSharpEngine::create(const luasharp::NativeModule& module, std::string_view script_class) {
+	return make(module, script_class, find_type(module, script_class));
+}
+
+std::unique_ptr<ClassBase> LuaSharpEngine::make(const luasharp::NativeModule& module, std::string_view script_class,
+												 const LuaSharpClassTypeInfo* type) {
 	using luasharp::NativeRuntime;
 	ASSERT(module.Runtime() == runtime_);
 	const std::string prefix = "ls_" + std::string(script_class);
@@ -154,27 +239,30 @@ std::unique_ptr<ClassBase> LuaSharpEngine::create(const luasharp::NativeModule& 
 	if (!alloc || !init)
 		throw std::runtime_error("'" + std::string(script_class) +
 								 "' is not a script class that derives from an engine class, or it is abstract");
-	void* script = alloc();
-	if (!script)
-		throw std::runtime_error("LuaSharp could not allocate '" + std::string(script_class) + "': " + runtime_->LastError());
+	const void* script_type = module.HostClassType(script_class);
+	ASSERT(script_type && (!type || type->script_type == script_type));
 
-	const std::string base(NativeRuntime::NativeBaseName(script));
+	const std::string base(NativeRuntime::NativeBaseTypeName(script_type));
 	const ClassTypeInfo* info = ClassBase::find_class(base.c_str());
 	ASSERT(info); // every bound class is reflected
-	const auto scriptable = scriptables_.find(info->classname);
+	ASSERT(!type || &type->engine_class == info);
 	std::unique_ptr<ClassBase> object;
-	if (info->scriptable_allocate && scriptable != scriptables_.end()) {
-		void* const* slots = slots_of(script, *scriptable->second);
-		object.reset(info->scriptable_allocate(info));
-		scriptable->second->attach(object.get(), slots);
+	if (const lsbind::Scriptable* scriptable = scriptable_of(*info)) {
+		void* const* slots = slots_of(script_type, *scriptable);
+		object.reset(info->scriptable_allocate(type ? type : info)); // ScriptImpl_X::get_type()
+		scriptable->attach(object.get(), slots);
 	} else {
-		if (NativeRuntime::HostOverrideCount(script) != 0)
+		ASSERT(!type); // load registers only classes of scriptable engine classes
+		if (NativeRuntime::TypeHostOverrideCount(script_type) != 0)
 			throw std::runtime_error("'" + std::string(script_class) + "' overrides methods of '" + base +
 									 "', which is not scriptable (CLASS_BODY(" + base + ", scriptable))");
 		object.reset(info->allocate_this_type());
 		if (!object)
 			throw std::runtime_error("engine class '" + base + "' is abstract and not scriptable");
 	}
+	void* script = alloc();
+	if (!script)
+		throw std::runtime_error("LuaSharp could not allocate '" + std::string(script_class) + "': " + runtime_->LastError());
 	ASSERT(!object->script_proxy);
 	NativeRuntime::SetNative(script, object.get());
 	object->script_proxy = script;
@@ -184,20 +272,88 @@ std::unique_ptr<ClassBase> LuaSharpEngine::create(const luasharp::NativeModule& 
 	return object;
 }
 
-void* const* LuaSharpEngine::slots_of(const void* script, const lsbind::Scriptable& scriptable) {
+const lsbind::Scriptable* LuaSharpEngine::scriptable_of(const ClassTypeInfo& engine_class) const {
+	const auto found = scriptables_.find(engine_class.classname);
+	return engine_class.scriptable_allocate && found != scriptables_.end() ? found->second : nullptr;
+}
+
+void* const* LuaSharpEngine::slots_of(const void* script_type, const lsbind::Scriptable& scriptable) {
 	using luasharp::NativeRuntime;
 	std::vector<void*> slots;
 	size_t used = 0;
 	for (const char* name : scriptable.slot_names) {
-		slots.push_back(NativeRuntime::HostOverride(script, name));
+		slots.push_back(NativeRuntime::TypeHostOverride(script_type, name));
 		used += slots.back() != nullptr;
 	}
-	if (used != NativeRuntime::HostOverrideCount(script))
+	if (used != NativeRuntime::TypeHostOverrideCount(script_type))
 		throw std::runtime_error(std::string("a script class overrides a method of '") + scriptable.name +
 								 "' that ScriptImpl cannot call (it returns a reference)");
 	slots.push_back(nullptr); // so that data() is never null: a null ls_slots means a Lua object
 	// Tables are shared by content, so a table never names code of an unloaded module that reused an address.
 	return slot_tables_.insert(std::move(slots)).first->data();
+}
+
+const luasharp::NativeModule& LuaSharpEngine::load(const std::string& name, std::string_view source) {
+	if (modules_.contains(name))
+		throw std::runtime_error("LuaSharp module '" + name + "' is already loaded");
+	LoadedModule loaded;
+	loaded.module = std::make_unique<luasharp::NativeModule>(compile(source));
+	register_classes(loaded); // throws before the module is kept
+	return *modules_.emplace(name, std::move(loaded)).first->second.module;
+}
+
+void LuaSharpEngine::register_classes(LoadedModule& loaded) {
+	using luasharp::NativeRuntime;
+	const luasharp::NativeModule& module = *loaded.module;
+	auto find_loaded = [&](const void* script_type) -> const LuaSharpClassTypeInfo* {
+		for (const auto& type : loaded.classes)
+			if (type->script_type == script_type)
+				return type.get();
+		return nullptr;
+	};
+	for (const std::string& name : module.Generated().hostClasses) {
+		const void* script_type = module.HostClassType(name);
+		ASSERT(script_type);
+		if (ClassBase::find_class(name.c_str()))
+			throw std::runtime_error("LuaSharp class '" + name + "' has the name of a class that already exists");
+		const std::string base(NativeRuntime::NativeBaseTypeName(script_type));
+		const ClassTypeInfo* engine_class = ClassBase::find_class(base.c_str());
+		ASSERT(engine_class);
+		const lsbind::Scriptable* scriptable = scriptable_of(*engine_class);
+		if (!scriptable) {
+			// create() still makes these objects, but they have the type of the engine class.
+			if (!NativeRuntime::EditableFields(script_type).empty())
+				throw std::runtime_error("LuaSharp class '" + name + "' has [Editable] fields, but engine class '" + base +
+										 "' is not scriptable (CLASS_BODY(" + base + ", scriptable))");
+			continue;
+		}
+		static_cast<void>(slots_of(script_type, *scriptable)); // throws for overrides that ScriptImpl cannot call
+		const void* script_base = NativeRuntime::ScriptBaseType(script_type);
+		const ClassTypeInfo* super = script_base ? find_loaded(script_base) : engine_class;
+		ASSERT(super); // hostClasses lists base classes first
+		const bool can_create = module.FindSymbol("ls_" + name + "__host_alloc") != nullptr; // not abstract
+		loaded.classes.push_back(std::make_unique<LuaSharpClassTypeInfo>(module, script_type, *super, *engine_class, can_create));
+	}
+	for (const auto& type : loaded.classes)
+		ClassBase::register_class(type.get());
+	ClassBase::post_changes_class_init();
+}
+
+void LuaSharpEngine::unregister_classes(LoadedModule& loaded) {
+	for (const auto& type : loaded.classes)
+		ClassBase::unregister_class(type.get());
+	ClassBase::post_changes_class_init();
+	loaded.classes.clear();
+}
+
+const LuaSharpClassTypeInfo* LuaSharpEngine::find_type(const luasharp::NativeModule& module,
+													   std::string_view script_class) const {
+	for (const auto& [name, loaded] : modules_)
+		if (loaded.module.get() == &module)
+			for (const auto& type : loaded.classes)
+				if (type->classname == script_class)
+					return type.get();
+	return nullptr;
 }
 
 size_t LuaSharpEngine::collect() { return runtime_->Collect(); }

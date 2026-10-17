@@ -49,6 +49,7 @@ struct CCompilationResult {
     std::vector<NativeGlobal> globals;
     std::vector<NativeTypeLayout> types;
     std::vector<NativeClassBinding> nativeClasses; // each after its base
+    std::vector<std::string> hostClasses;          // script classes that derive from extern classes, each after its base
 };
 
 struct NativeSymbol {
@@ -97,6 +98,8 @@ public:
     void Initialize();
     [[nodiscard]] void* FindSymbol(std::string_view symbol) const;
     [[nodiscard]] void* FindGlobal(std::string_view name) const;
+    // The LS_TypeInfo of one of Generated().hostClasses; null for other names.
+    [[nodiscard]] const void* HostClassType(std::string_view className) const;
     [[nodiscard]] std::string LastError() const;
     void ClearError();
     [[nodiscard]] std::shared_ptr<NativeRuntime> Runtime() const;

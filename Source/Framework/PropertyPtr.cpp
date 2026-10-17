@@ -156,6 +156,15 @@ float& PropertyPtr::as_float() {
 	return *(float*)get_ptr();
 }
 
+bool PropertyPtr::is_double() const {
+	return core_type_id::Double == get_type();
+}
+
+double& PropertyPtr::as_double() {
+	assert(is_double());
+	return *(double*)get_ptr();
+}
+
 bool PropertyPtr::is_numeric() const {
 	return property->is_integral_type();
 }

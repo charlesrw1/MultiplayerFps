@@ -22,6 +22,11 @@ struct ImguiInputTextCallbackUserStruct
 
 int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data);
 
+// "Float", "vector<Int32>" and similar, for tooltips.
+std::string property_type_name(const PropertyInfo* p);
+// The type and tooltip of the last item, when it is hovered.
+void draw_property_tooltip(const PropertyInfo* prop);
+
 // draws an imgui tool to edit the property passed in
 class IGridRow;
 class IPropertyEditor

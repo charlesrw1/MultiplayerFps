@@ -91,6 +91,7 @@ public:
 	void serialize_ar(int32_t& i) final { write_to_array(i); }
 	void serialize_ar(int64_t& i) final { write_to_array(i); }
 	void serialize_ar(float& f) final { write_to_array(f); }
+	void serialize_ar(double& d) final { write_to_array(d); }
 	bool serialize(const char* tag, glm::vec3& v) final {
 		auto& vec = get_json(tag);
 		if (vec.is_array()) {
@@ -146,6 +147,7 @@ public:
 	void serialize_ar(std::string& s) final { write_to_array(s); }
 	bool serialize(const char* tag, bool& b) final { return write_to_dict(tag, b); }
 	bool serialize(const char* tag, float& f) final { return write_to_dict(tag, f); }
+	bool serialize(const char* tag, double& d) final { return write_to_dict(tag, d); }
 	bool serialize(const char* tag, int& i) final { return write_to_dict(tag, i); }
 	bool serialize(const char* tag, int8_t& i) final { return write_to_dict(tag, i); }
 	bool serialize(const char* tag, int16_t& i) final { return write_to_dict(tag, i); }
@@ -281,9 +283,11 @@ public:
 	void serialize_ar(int32_t& i) final { read_from_array(i); }
 	void serialize_ar(int64_t& i) final { read_from_array(i); }
 	void serialize_ar(float& f) final { read_from_array(f); }
+	void serialize_ar(double& d) final { read_from_array(d); }
 	void serialize_ar(std::string& s) final { read_from_array(s); }
 	bool serialize(const char* tag, bool& b) final { return read_from_dict(tag, b); }
 	bool serialize(const char* tag, float& f) final { return read_from_dict(tag, f); }
+	bool serialize(const char* tag, double& d) final { return read_from_dict(tag, d); }
 	bool serialize(const char* tag, int& i) final { return read_from_dict(tag, i); }
 	bool serialize(const char* tag, int8_t& i) final { return read_from_dict(tag, i); }
 	bool serialize(const char* tag, int16_t& i) final { return read_from_dict(tag, i); }
