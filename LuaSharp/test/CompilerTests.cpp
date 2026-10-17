@@ -1550,6 +1550,170 @@ auto check = () => asCube.describe() + string(asCube.extra.v) + asCube.name;
     RequireNativeError("class B {} class D : B {} class E {} table t = {v = new D()}; E e = t.v;", "expected E, got D");
 }
 
+// A host "engine" for the extern class tests. Thunks are plain functions, so the state is global.
+struct HostEntity { long long health{}; long long level{}; };
+struct HostWorld {
+    std::shared_ptr<luasharp::NativeRuntime> runtime;
+    std::vector<std::unique_ptr<HostEntity>> scriptOwned; // deleted by the proxy finalizer
+    std::vector<std::unique_ptr<HostEntity>> engineOwned;
+    std::vector<void*> engineProxies;
+    long long created{};
+};
+HostWorld g_world;
+
+void FinalizeScriptOwned(void* proxy) {
+    auto* native = luasharp::NativeRuntime::NativeOf(proxy);
+    std::erase_if(g_world.scriptOwned, [&](const auto& entity) { return entity.get() == native; });
+}
+void* EntityNew(long long health) {
+    auto& entity = g_world.scriptOwned.emplace_back(std::make_unique<HostEntity>(HostEntity{health}));
+    ++g_world.created;
+    return g_world.runtime->NewNativeProxy(g_world.runtime->FindNativeClass("Entity"), entity.get(), FinalizeScriptOwned);
+}
+void* EngineEntity(std::string_view type, long long health, long long level) {
+    auto& entity = g_world.engineOwned.emplace_back(std::make_unique<HostEntity>(HostEntity{health, level}));
+    return g_world.engineProxies.emplace_back(g_world.runtime->NewNativeProxy(g_world.runtime->FindNativeClass(type), entity.get()));
+}
+long long EntityGetHealth(void* self) { return static_cast<HostEntity*>(self)->health; }
+void EntitySetHealth(void* self, long long value) { static_cast<HostEntity*>(self)->health = value; }
+long long EntityDamage(void* self, long long amount) { static_cast<HostEntity*>(self)->health -= amount; return amount; }
+long long EntityCount() { return g_world.created; }
+void* EntitySpawn(void*, long long health) { return EngineEntity("Entity", health, 0); }
+unsigned char EntitySame(void* self, void* other) { return self == other; }
+long long PlayerLevel(void* self) { return static_cast<HostEntity*>(self)->level; }
+void* PlayerFind(long long level) { return EngineEntity("Player", 100, level); }
+
+constexpr std::string_view EntityDeclarations = R"(extern class Entity {
+    int health;
+    Entity(int health);
+    virtual int damage(int amount);
+    static int count();
+    virtual Entity spawn(int health);
+    virtual bool same(Entity other);
+}
+extern class Player : Entity { virtual int level(); static Player find(int level); })";
+
+std::vector<luasharp::NativeSymbol> EntitySymbols() {
+    return {{"ls_native_Entity_new", reinterpret_cast<const void*>(&EntityNew)}, {"ls_native_Entity__get_health", reinterpret_cast<const void*>(&EntityGetHealth)},
+            {"ls_native_Entity__set_health", reinterpret_cast<const void*>(&EntitySetHealth)}, {"ls_native_Entity_damage", reinterpret_cast<const void*>(&EntityDamage)},
+            {"ls_native_Entity_count", reinterpret_cast<const void*>(&EntityCount)}, {"ls_native_Entity_spawn", reinterpret_cast<const void*>(&EntitySpawn)},
+            {"ls_native_Entity_same", reinterpret_cast<const void*>(&EntitySame)}, {"ls_native_Player_level", reinterpret_cast<const void*>(&PlayerLevel)},
+            {"ls_native_Player_find", reinterpret_cast<const void*>(&PlayerFind)}};
+}
+
+void TestExternClassSemantics() {
+    const auto has = [](const luasharp::Analysis& analysis, std::string_view message) {
+        return std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [&](const auto& item) { return item.message.find(message) != std::string::npos; });
+    };
+    Require(has(luasharp::Analyze("extern class A { int f() { return 1; } }"), "cannot have a body"), "extern method body was not diagnosed");
+    Require(has(luasharp::Analyze("extern class A { int x = 1; }"), "cannot have an initializer"), "extern field initializer was not diagnosed");
+    Require(has(luasharp::Analyze("extern class A { static int x; }"), "cannot declare static field"), "extern static field was not diagnosed");
+    Require(has(luasharp::Analyze("extern class A { A(int x); A(float x); }"), "only one constructor"), "extern constructor overload was not diagnosed");
+    Require(has(luasharp::Analyze("extern class A { virtual void f(int x); virtual void f(float x); }"), "cannot be overloaded"), "extern method overload was not diagnosed");
+    Require(has(luasharp::Analyze("extern class A { abstract void f(); }"), "can only be 'static' or 'virtual'"), "extern method modifier was not diagnosed");
+    Require(has(luasharp::Analyze("class B {} extern class A : B {}"), "can only derive from an extern class"), "extern class with a script base was not diagnosed");
+    Require(has(luasharp::Analyze("extern class A {} A a = new A();"), "declares no constructor"), "extern class without a constructor was constructed");
+    Require(has(luasharp::Analyze("extern struct A {}"), "Only a class can be 'extern'"), "extern struct was not diagnosed");
+    Require(luasharp::Analyze("extern class A { int x; A(int x); virtual int f(); static A g(); } A a = new A(1); int y = a.f() + a.x; a.x = 2;").diagnostics.empty(), "valid extern class use produced diagnostics");
+    const auto generated = luasharp::CompileToC(std::string(EntityDeclarations) + "\nEntity e = new Entity(1);\nint h = e.health;\ne.health = 2;\nbool alive = e != null;");
+    for (const auto expected : {"typedef LS_NativeObject LS_Entity;", "LS_KIND_OBJECT, &ls_type_Entity, (void* const*)0, LS_TYPE_NATIVE};","extern ls_int ls_native_Entity__get_health(void* self);",
+                                "extern ls_bool ls_native_Entity_same(void* self, void* other);", "ls_native_ptr(other)", "ls_native_self(self, \"Entity.damage\")", "ls_Entity__set_health(",
+                                "extern LS_Player* ls_native_Player_find(ls_int level);"})
+        Require(generated.c.find(expected) != std::string::npos, std::string("missing extern class lowering: ") + expected);
+    Require(generated.nativeClasses.size() == 2 && generated.nativeClasses[0].name == "Entity" && generated.nativeClasses[1].baseName == "Entity", "extern classes were not reported base first");
+    bool rejected = false;
+    try { static_cast<void>(luasharp::DeclarationTypes({"class A {}"})); } catch (const std::runtime_error&) { rejected = true; }
+    Require(rejected, "a declaration source with script code was accepted");
+}
+
+void TestNativeExternClasses() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    g_world = {}; g_world.runtime = luasharp::NativeRuntime::Create();
+    auto& runtime = g_world.runtime;
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime; options.declarations = {std::string(EntityDeclarations)}; options.symbols = EntitySymbols();
+        auto module = luasharp::NativeModule::Compile(R"(Entity e = new Entity(10);
+int hp0 = e.health;
+e.health = 25;
+e.health += 5;
+int hp1 = e.health;
+int dealt = e.damage(7);
+int hp2 = e.health;
+int created = Entity.count();
+Entity child = e.spawn(3);
+int childHp = child.health;
+bool sameSelf = e.same(e);
+bool sameOther = e.same(child);
+bool sameNull = e.same(null);
+Player p = Player.find(4);
+int level = p.level();
+int pDealt = p.damage(1);
+Entity asEntity = p;
+bool pIsPlayer = asEntity is Player;
+bool eIsPlayer = e is Player;
+Player back = asEntity as Player;
+bool backOk = back != null;
+Entity again = back;
+bool eqSame = asEntity == again;
+table t = {v = p};
+bool anyIsPlayer = t.v is Player;
+Player fromAny = t.v;
+int anyLevel = fromAny.level();
+auto childNull = () => child == null;
+table held = {v = child};
+auto childFalsy = () => !held.v;
+auto childIsEntity = () => child is Entity;
+auto hitChild = () => child.damage(1);
+auto childHealth = () => child.health;
+)", options);
+        Require(NativeGlobal<long long>(module, "hp0") == 10 && NativeGlobal<long long>(module, "hp1") == 30 && NativeGlobal<long long>(module, "hp2") == 23, "extern field accessors were wrong");
+        Require(NativeGlobal<long long>(module, "dealt") == 7 && NativeGlobal<long long>(module, "created") == 1 && NativeGlobal<long long>(module, "childHp") == 3, "extern method calls were wrong");
+        Require(NativeGlobal<unsigned char>(module, "sameSelf") == 1 && NativeGlobal<unsigned char>(module, "sameOther") == 0 && NativeGlobal<unsigned char>(module, "sameNull") == 0, "extern arguments did not pass host pointers");
+        Require(NativeGlobal<long long>(module, "level") == 4 && NativeGlobal<long long>(module, "pDealt") == 1, "derived extern class calls were wrong");
+        Require(NativeGlobal<unsigned char>(module, "pIsPlayer") == 1 && NativeGlobal<unsigned char>(module, "eIsPlayer") == 0 && NativeGlobal<unsigned char>(module, "backOk") == 1 && NativeGlobal<unsigned char>(module, "eqSame") == 1, "'is', 'as' or '==' on extern classes was wrong");
+        Require(NativeGlobal<unsigned char>(module, "anyIsPlayer") == 1 && NativeGlobal<long long>(module, "anyLevel") == 4, "extern objects did not round-trip through `any`");
+        Require(module.LastError().empty(), "extern class program reported a runtime error: " + module.LastError());
+        Require(CallGlobalClosure(module, "childNull").as.boolean == 0, "a live proxy compared equal to null");
+
+        luasharp::NativeRuntime::DestroyNative(g_world.engineProxies.front());
+        Require(CallGlobalClosure(module, "childNull").as.boolean == 1, "a destroyed proxy did not compare equal to null");
+        Require(CallGlobalClosure(module, "childFalsy").as.boolean == 1 && CallGlobalClosure(module, "childIsEntity").as.boolean == 0, "a destroyed proxy was truthy or matched 'is'");
+        Require(module.LastError().empty(), "null checks on a destroyed proxy reported an error");
+        Require(CallGlobalClosure(module, "hitChild").as.integer == 0 && CallGlobalClosure(module, "childHealth").as.integer == 0, "a call on a destroyed proxy did not return the default");
+        Require(module.LastError().find("destroyed or null") != std::string::npos, "a call on a destroyed proxy did not report an error: " + module.LastError());
+        module.ClearError();
+
+        // A second module emits its own Entity type info; it matches the runtime's by name.
+        luasharp::NativeCompileOptions second = options; second.declarations.clear();
+        auto other = luasharp::NativeModule::Compile(std::string(EntityDeclarations) + "\nEntity made = new Entity(5);\ntable t = {v = made, p = Player.find(2)};\nbool isEntity = t.v is Entity;\nbool isPlayer = t.p is Player;\nPlayer p = t.p;\nEntity[] list = {made, p};", second);
+        Require(NativeGlobal<unsigned char>(other, "isEntity") == 1 && NativeGlobal<unsigned char>(other, "isPlayer") == 1 && other.LastError().empty() && g_world.scriptOwned.size() == 2,
+                "an inline extern class did not match the runtime type info");
+        bool conflict = false;
+        try { static_cast<void>(luasharp::NativeModule::Compile("extern class Player { virtual int level(); }", second)); }
+        catch (const std::runtime_error& error) { conflict = std::string_view(error.what()).find("different base") != std::string_view::npos; }
+        Require(conflict, "an extern class with a different base was accepted");
+        runtime->Collect();
+        Require(g_world.scriptOwned.size() == 2, "a collection freed reachable script-owned objects");
+    }
+    runtime->Collect();
+    Require(g_world.scriptOwned.empty(), "script-owned host objects were not finalized with their proxies");
+
+    // NativeRef keeps a proxy alive until Reset.
+    {
+        luasharp::NativeRef held(runtime, EntityNew(1));
+        runtime->Collect();
+        Require(g_world.scriptOwned.size() == 1 && luasharp::NativeRuntime::NativeOf(held.Get()), "a NativeRef did not keep its proxy alive");
+        luasharp::NativeRef moved = std::move(held);
+        runtime->Collect();
+        Require(g_world.scriptOwned.size() == 1 && !held.Get() && moved.Get(), "a moved NativeRef did not keep its proxy alive");
+        moved.Reset();
+        runtime->Collect();
+        Require(g_world.scriptOwned.empty(), "a reset NativeRef still kept its proxy alive");
+    }
+    g_world = {};
+}
+
 void TestInheritanceEmission() {
     const auto generated = luasharp::CompileToC(R"(class B { int x; virtual int f() { return 1; } int g() { return f(); } }
 sealed class D : B { int y; override int f() { return base.f() + 1; } }
@@ -1653,6 +1817,8 @@ int main() {
         {"native struct type checks", TestNativeStructTypeChecks},
         {"native structs across modules", TestNativeStructAcrossModules},
         {"native inheritance", TestNativeInheritance},
+        {"extern class semantics", TestExternClassSemantics},
+        {"native extern classes", TestNativeExternClasses},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
     };
 

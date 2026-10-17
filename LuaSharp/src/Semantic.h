@@ -92,6 +92,7 @@ struct Symbol {
     bool isOverride{};
     bool isAbstract{}; // Methods without a body; Class symbols that cannot be constructed
     bool isSealed{};   // Methods that cannot be overridden; Class symbols that cannot be derived from
+    bool isNative{};   // Class symbols: an `extern class`; its objects are host proxies (LS_NativeObject)
 };
 struct ExternalType {
     std::string name;
@@ -99,6 +100,7 @@ struct ExternalType {
     std::vector<Symbol> members;
     bool isEnum{};
     bool isStruct{};
+    bool isNative{}; // an `extern class`: the host implements its members (see docs/native-abi.md)
 };
 enum class DiagnosticSeverity { Error, Warning };
 struct Diagnostic {
@@ -237,6 +239,8 @@ struct Analysis {
 
 Analysis Analyze(std::string_view source);
 Analysis Analyze(std::string_view source, const std::vector<ExternalType>& externalTypes);
+// The classes and enums an analysis declares, as other sources see them. Inherited members are included.
+std::vector<ExternalType> ExportTypes(const Analysis& analysis);
 std::optional<std::string> ResolveVariableType(const Analysis& analysis, std::string_view name, size_t position);
 // Innermost bound expression whose span contains position.
 const BoundExpression* FindExpression(const Analysis& analysis, size_t position);

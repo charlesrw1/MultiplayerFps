@@ -40,7 +40,17 @@ This document records the design decisions for two work items:
 - Trace functions visit the address of each reference slot, not the value. The same functions can then mark objects and relocate them (see Hot reload).
 - Stable class type infos moved to Part 2. A reload today runs `ls_module_init` again with new module state, and objects from an old generation reach new code only through host pins. Stable type infos are useful only together with the reload changes in Part 2 (global migration and relocation).
 
-## Part 2: engine binding (design only)
+## Part 2: engine binding
+
+Part 2 has these milestones (#35):
+
+1. `extern class` declarations, proxies and the host API (#37). Done.
+2. Engine codegen: `engine.ls`, the typed C thunks and `ClassBase::script_proxy`. The engine links LuaSharp.
+3. Script classes that derive from engine classes (`ScriptImpl_X` slot tables).
+4. `[Editable]` fields as `PropertyInfo`. Remove `PROP_LUA_BACKED`.
+5. Hot reload: stable type infos, migration and relocation.
+
+Milestone 1 found that TinyCC on Windows does not resolve data symbols that `tcc_add_symbol` adds. Each module therefore emits its own type info for each extern class, and these match by name (see [native-abi.md](native-abi.md#extern-classes)). Stable script class type infos (milestone 5) must use module data that the host writes after relocation.
 
 ### Declarations
 
@@ -70,11 +80,12 @@ This document records the design decisions for two work items:
 - A script reference to an engine object points to a GC object with this header:
 
 ```c
-typedef struct LS_NativeObject { const LS_TypeInfo* type; ClassBase* native; } LS_NativeObject;
+typedef struct LS_NativeObject { const LS_TypeInfo* type; void* native; } LS_NativeObject;
 ```
 
 - For a plain engine object this object is a proxy with only the header. A script class that derives from an engine class adds its fields after the header. That object is the proxy.
 - `ClassBase::script_proxy` is a registered root slot. It keeps one proxy for each object, so `==` compares pointers. It also keeps the proxy alive while the C++ object lives.
+- For a script-owned object, `script_proxy` must be a weak pointer, not a root. A root would keep the proxy alive, so the finalizer that deletes the object would never run.
 - `~ClassBase` sets `proxy->native = nullptr` and unregisters the root slot. This costs O(1). Every script reference then sees null.
 - A destroyed object is null everywhere: `==`, truthiness, `is`, `as`. A call to a native member of a destroyed object reports a runtime error. Script field access on a destroyed scripted object also reports an error.
 

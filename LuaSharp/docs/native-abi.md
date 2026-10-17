@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `9`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `10`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -116,6 +116,64 @@ A class is a C `struct LS_Name` on the GC heap. Its first field is `const LS_Typ
 - Construction has two functions. `LS_T* ls_T_new(...)` allocates the object, sets `ls_type` to `T` and calls `void ls_T__init(LS_T* self, ...)`. `ls_T__init` calls the init function of the base constructor, then runs the field initializers of `T`, then the constructor body. Because `ls_type` is set first, a virtual call in a base constructor calls the most-derived override. An abstract class has no `ls_T_new`.
 - Overloaded constructors use `ls_T_new__N` and `ls_T__init__N`.
 - A class cannot derive from an external type yet. The C backend reports an error.
+
+## Extern classes
+
+An `extern class` is a class that the host implements. Its declaration has no code:
+
+```
+extern class Entity {
+    int health;
+    Entity(int health);
+    virtual int damage(int amount);
+    static int count();
+}
+extern class Player : Entity { virtual int level(); }
+```
+
+Rules:
+
+- A method has no body. A method can be `static` or `virtual`, but not `abstract`, `override` or `sealed`.
+- A field has no initializer. An extern class has no static fields.
+- An extern class has one constructor or none. Methods are not overloaded. Without a constructor, `new T()` is an error.
+- An extern class can derive only from an extern class. A script class cannot derive from an extern class yet.
+- Declarations can be in the module source or in `NativeCompileOptions::declarations`. A declaration source can contain only extern classes and enums. `DeclarationTypes()` converts declaration sources to `ExternalType` values.
+
+### Proxies
+
+- A script value of an extern class points to a proxy on the GC heap: `LS_NativeObject { const LS_TypeInfo* type; void* native; }`. All extern classes use this C layout.
+- `LS_TypeInfo.flags` has `LS_TYPE_NATIVE` for an extern class.
+- Each module emits its own `static const` type info for each extern class. Type infos with `LS_TYPE_NATIVE` match by name in `ls_is_a` and `ls_type_same`. The runtime owns the type info that proxies point to: `NativeRuntime::NativeClass(name, base)`. `NativeModule::Load` registers each extern class that the module uses. A base that is different from an earlier registration causes an error.
+- The host makes a proxy with `NativeRuntime::NewNativeProxy(type, native, finalize)`. Make one proxy for each host object, so that `==` compares pointers.
+- `NativeRuntime::DestroyNative(proxy)` sets `native` to null. After that, the proxy is null for `==`, `is`, `as`, `any` and conditions on `any`.
+- A call or a field access on a null or destroyed proxy reports the runtime error "access to 'T.m' on a destroyed or null object" and gives the default value of the result type.
+- A finalizer runs when the GC frees the proxy. Use it to delete a host object that script owns.
+
+TinyCC on Windows does not resolve data symbols that `tcc_add_symbol` adds. Only functions cross the boundary as symbols. This is why each module emits its own type infos.
+
+### Host thunks
+
+The host registers one C function in `NativeCompileOptions::symbols` for each member that the module declares:
+
+| Member | Host thunk |
+|---|---|
+| Method `R m(A a)` of `T` | `R ls_native_T_m(void* self, A a)` |
+| Static method `R m(A a)` of `T` | `R ls_native_T_m(A a)` |
+| Field `F f` of `T` | `F ls_native_T__get_f(void* self)` and `void ls_native_T__set_f(void* self, F value)` |
+| Constructor `T(A a)` | `LS_T* ls_native_T_new(A a)` |
+
+- `self` is the host pointer (`LS_NativeObject.native`), never null.
+- A parameter of an extern class type is the host pointer, or null for a null or destroyed proxy.
+- A result of an extern class type is a proxy. The constructor also returns a proxy.
+- Other types use their normal C types.
+- A derived class inherits the thunks of its base. Generated code calls `ls_native_Entity_damage` for `player.damage(1)`.
+- Generated code calls the thunks through wrappers (`ls_T_m`, `ls_T__get_f`, `ls_T__set_f`, `ls_T_new`). The wrappers check the receiver.
+
+### Root slots
+
+- `NativeRuntime::AddRootSlot(void** slot)` registers a host variable that holds a GC object. `Collect` marks `*slot`. `RemoveRootSlot` removes it.
+- `NativeRef` is a move-only root slot. It keeps one GC object alive while it holds it. A move registers the new slot and removes the old one.
+- Host code must keep GC objects only in root slots, so that a later moving collector can update them.
 
 ## Structs
 

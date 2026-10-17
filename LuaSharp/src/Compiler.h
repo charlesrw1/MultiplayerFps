@@ -120,6 +120,7 @@ struct SyntaxClass {
     bool isStruct{};
     bool isAbstract{};
     bool isSealed{};
+    bool isExtern{}; // declared by the host: members have no bodies
     std::vector<SyntaxField> fields;
     std::vector<SyntaxFunction> functions;
     TextSpan span;

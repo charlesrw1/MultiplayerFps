@@ -147,7 +147,8 @@ public:
             if (external.isEnum) enumTypes_.insert(external.name);
             if (external.isStruct) structTypes_.insert(external.name);
             Symbol typeSymbol{external.name, external.name, external.isEnum ? SymbolKind::Enum : SymbolKind::Class, 0, 0, {source_.size(), 0}, {}, external.name, "public"};
-            typeSymbol.isStruct = external.isStruct;
+            typeSymbol.isStruct = external.isStruct; typeSymbol.isNative = external.isNative;
+            if (external.isNative) nativeTypes_.insert(external.name);
             PushSymbol(std::move(typeSymbol));
             if (!external.baseType.empty()) result_.baseTypes[external.name] = external.baseType;
             for (auto member : external.members) {
@@ -232,7 +233,8 @@ private:
             if (value.isStruct) structTypes_.insert(value.name);
             const auto index = AddSymbol(value.name, value.name, SymbolKind::Class, value.span);
             auto& symbol = result_.symbols[index];
-            symbol.owner = value.name; symbol.isStruct = value.isStruct; symbol.isAbstract = value.isAbstract; symbol.isSealed = value.isSealed;
+            symbol.owner = value.name; symbol.isStruct = value.isStruct; symbol.isAbstract = value.isAbstract; symbol.isSealed = value.isSealed; symbol.isNative = value.isExtern;
+            if (value.isExtern) nativeTypes_.insert(value.name);
             if (value.isStruct && (value.isAbstract || value.isSealed)) AddDiagnostic("Structs cannot be 'abstract' or 'sealed'", value.span);
             if (value.isAbstract && value.isSealed) AddDiagnostic("Class '" + value.name + "' cannot be both 'abstract' and 'sealed'", value.span);
             if (!value.baseName.empty()) result_.baseTypes[value.name] = value.baseName;
@@ -242,6 +244,7 @@ private:
             CheckType(types_.Intern(value.baseName), value.span);
             if (structTypes_.contains(value.baseName) || enumTypes_.contains(value.baseName)) AddDiagnostic("Class '" + value.name + "' cannot derive from " + (enumTypes_.contains(value.baseName) ? "enum" : "struct") + " '" + value.baseName + "'", value.span);
             else if (const auto* base = FindClass(value.baseName); base && base->isSealed) AddDiagnostic("Class '" + value.name + "' cannot derive from sealed class '" + value.baseName + "'", value.span);
+            else if (value.isExtern && knownTypes_.contains(value.baseName) && !nativeTypes_.contains(value.baseName)) AddDiagnostic("Extern class '" + value.name + "' can only derive from an extern class", value.span);
         }
     }
     void DeclareMembers() {
@@ -266,6 +269,8 @@ private:
                 if (field.type == "void") AddDiagnostic("Field '" + field.name + "' cannot be 'void'", field.span);
                 if (std::any_of(declared.begin(), declared.end(), [&](const Declared& item) { return item.name == field.name; })) AddDiagnostic("Member '" + field.name + "' is already declared on " + value.name, field.span);
                 declared.push_back({field.name, false, {}});
+                if (value.isExtern && field.isStatic) AddDiagnostic("Extern class '" + value.name + "' cannot declare static field '" + field.name + "'", field.span);
+                if (value.isExtern && field.initializer) AddDiagnostic("Extern field '" + field.name + "' cannot have an initializer", field.span);
                 const auto index = AddSymbol(field.name, field.type, SymbolKind::Field, field.span);
                 result_.symbols[index].owner = value.name; result_.symbols[index].access = field.access; result_.symbols[index].isStatic = field.isStatic;
                 (field.isStatic ? statics : members).push_back(index);
@@ -278,9 +283,12 @@ private:
                 if (function.isConstructor) {
                     const bool duplicate = std::any_of(constructors.begin(), constructors.end(), [&](size_t other) { return SameParameterTypes(result_.symbols[other].parameters, parameters); });
                     if (duplicate) AddDiagnostic("Constructor with the same parameters is already declared on " + value.name, function.span);
+                    else if (value.isExtern && !constructors.empty()) AddDiagnostic("Extern class '" + value.name + "' can declare only one constructor", function.span);
                 } else {
                     const bool duplicate = std::any_of(declared.begin(), declared.end(), [&](const Declared& item) { return item.name == function.name && (!item.method || item.parameterTypes == parameterTypes); });
                     if (duplicate) AddDiagnostic("Member '" + function.name + "' is already declared on " + value.name, function.span);
+                    else if (value.isExtern && std::any_of(declared.begin(), declared.end(), [&](const Declared& item) { return item.name == function.name; }))
+                        AddDiagnostic("Extern method '" + function.name + "' cannot be overloaded", function.span);
                     declared.push_back({function.name, true, parameterTypes});
                 }
                 const auto index = AddSymbol(function.name, function.isConstructor ? value.name : function.returnType, SymbolKind::Method, function.span, std::move(parameters));
@@ -306,6 +314,12 @@ private:
         const auto& modifiers = function.modifiers;
         const bool dispatched = modifiers.isVirtual || modifiers.isOverride || modifiers.isAbstract;
         const auto name = "'" + function.name + "'";
+        if (owner.isExtern) {
+            if (function.hasBody) AddDiagnostic("Extern method " + name + " cannot have a body", function.span);
+            if (function.hasBaseCall) AddDiagnostic("Extern constructor of '" + owner.name + "' cannot call ': base(...)'", function.span);
+            if (modifiers.isOverride || modifiers.isAbstract || modifiers.isSealed) AddDiagnostic("Extern method " + name + " can only be 'static' or 'virtual'", function.span);
+            return;
+        }
         if (function.isConstructor) { if (!function.hasBody) AddDiagnostic("Constructor of '" + owner.name + "' must have a body", function.span); return; }
         if (owner.isStruct && (dispatched || modifiers.isSealed)) AddDiagnostic("Struct method " + name + " cannot be virtual, override, abstract or sealed", function.span);
         else if (function.isStatic && (dispatched || modifiers.isSealed)) AddDiagnostic("Static method " + name + " cannot be virtual, override, abstract or sealed", function.span);
@@ -533,7 +547,7 @@ private:
         }
         const auto declared = constructors_.find(name);
         if (declared != constructors_.end()) for (const auto index : declared->second) result.push_back(MakeCallable(index));
-        const bool inSource = FindClass(name) != nullptr;
+        const bool inSource = FindClass(name) != nullptr && !nativeTypes_.contains(name); // extern classes have no implicit constructor
         const bool hasDefault = std::any_of(result.begin(), result.end(), [](const Callable& item) { return item.parameters.empty(); });
         const bool defaultAllowed = structTypes_.contains(name) ? !hasDefault : result.empty();
         if (inSource && defaultAllowed) { Callable fallback; fallback.result = types_.Intern(name); result.push_back(fallback); }
@@ -551,7 +565,10 @@ private:
     void ResolveConstruction(const SyntaxExpression& expression, NodeId arguments, size_t count, TypeId& type, std::optional<size_t>& symbol, Lowering& lowering, const BuiltinMember*& nativeMember) {
         if (const auto* declared = FindClass(expression.text); declared && declared->isAbstract) { AddDiagnostic("Cannot create an instance of abstract class '" + expression.text + "'", expression.span); return; }
         const auto candidates = ConstructorCandidates(expression.text);
-        if (candidates.empty()) return;
+        if (candidates.empty()) {
+            if (nativeTypes_.contains(expression.text)) AddDiagnostic("Cannot create an instance of extern class '" + expression.text + "': it declares no constructor", expression.span);
+            return;
+        }
         const int pick = ResolveOverload(expression.text, candidates, arguments, count, expression.span, CallArgumentSpans(expression), true);
         if (pick < 0) return;
         const auto& chosen = candidates[static_cast<size_t>(pick)];
@@ -621,7 +638,9 @@ private:
         case SyntaxExpression::Kind::Parenthesized: return IsAddressable(node.children.first);
         case SyntaxExpression::Kind::Member: {
             if (node.lowering == Lowering::NativeConstant) return false;
-            return IsStructType(Node(node.children.first).type) ? IsAddressable(node.children.first) : true;
+            const auto receiver = Node(node.children.first).type;
+            if (nativeTypes_.contains(Name(receiver))) return false; // the host reads and writes extern fields through accessors
+            return IsStructType(receiver) ? IsAddressable(node.children.first) : true;
         }
         case SyntaxExpression::Kind::Index: return node.lowering == Lowering::ListIndex;
         default: return false;
@@ -1038,6 +1057,7 @@ private:
             result_.bound.enums.push_back(std::move(boundEnum));
         }
         for (const auto& value : result_.syntax.root.classes) {
+            if (value.isExtern) continue; // no code; ExportTypes describes it to the C backend
             const bool hasConstructor = std::any_of(value.functions.begin(), value.functions.end(), [](const auto& function) { return function.isConstructor; });
             if (!hasConstructor) RequireDefaultBaseConstructor(value, value.span);
             BoundClass boundClass; boundClass.name = value.name; boundClass.baseName = value.baseName; boundClass.span = value.span; boundClass.isStruct = value.isStruct;
@@ -1138,12 +1158,30 @@ private:
     StringSet declaredTypes_;
     StringSet registeredBuiltins_;
     StringSet enumTypes_;
+    StringSet nativeTypes_; // extern classes, from this source or from external types
 };
 
 } // namespace
 
 Analysis Analyze(std::string_view source) { auto syntax = ParseTree(source); return Analyzer(source, std::move(syntax)).Run(); }
 Analysis Analyze(std::string_view source, const std::vector<ExternalType>& externalTypes) { auto syntax = ParseTree(source); return Analyzer(source, std::move(syntax), externalTypes).Run(); }
+
+std::vector<ExternalType> ExportTypes(const Analysis& analysis) {
+    std::vector<ExternalType> result;
+    for (const auto& symbol : analysis.symbols) {
+        if ((symbol.kind != SymbolKind::Class && symbol.kind != SymbolKind::Enum) || !symbol.span.length) continue; // declared in this source
+        ExternalType type{symbol.name};
+        type.isEnum = symbol.kind == SymbolKind::Enum; type.isStruct = symbol.isStruct; type.isNative = symbol.isNative;
+        if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
+        if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) for (const auto index : members->second) type.members.push_back(analysis.symbols[index]);
+        if (!type.isEnum) {
+            if (const auto statics = analysis.members.find("$type:" + symbol.name); statics != analysis.members.end()) for (const auto index : statics->second) type.members.push_back(analysis.symbols[index]);
+            for (const auto& candidate : analysis.symbols) if (candidate.kind == SymbolKind::Method && candidate.name == symbol.name && candidate.owner == symbol.name && candidate.span.length) type.members.push_back(candidate); // constructors
+        }
+        result.push_back(std::move(type));
+    }
+    return result;
+}
 
 std::optional<std::string> ResolveVariableType(const Analysis& analysis, std::string_view name, size_t position) {
     const VariableBinding* best = nullptr;

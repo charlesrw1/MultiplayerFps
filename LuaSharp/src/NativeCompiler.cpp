@@ -150,7 +150,7 @@ NativeModule NativeModule::Compile(std::string_view source, std::string_view lib
 }
 
 NativeModule NativeModule::Compile(std::string_view source, const NativeCompileOptions& options) {
-    return Load(CompileToC(source, options.externalTypes), options);
+    return Load(CompileToC(source, DeclarationTypes(options.declarations, options.externalTypes)), options);
 }
 
 NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompileOptions& options) {
@@ -178,6 +178,8 @@ NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompil
     std::string errors;
     setError(impl->state, &errors, CaptureError);
     if (setOutput(impl->state, 1) < 0) throw std::runtime_error("tcc_set_output_type failed" + (errors.empty() ? std::string{} : ": " + errors));
+    // Before compiling: a base that differs from an earlier module's throws here.
+    for (const auto& binding : impl->generated.nativeClasses) static_cast<void>(impl->runtime->NativeClass(binding.name, binding.baseName));
     std::vector<std::string> registeredSymbols;
     for (const auto& symbol : options.symbols) {
         if (symbol.name.empty() || !symbol.address) throw std::runtime_error("Native symbols require a non-empty name and non-null address");

@@ -88,6 +88,8 @@ struct CEmitter {
     StringSet structNames;                  // user and native value types
     StringMap<const BoundClass*> classes;   // reference types
     StringMap<const BoundClass*> structs;   // user value types
+    StringMap<const ExternalType*> natives; // extern classes: host proxies (LS_NativeObject)
+    std::vector<const ExternalType*> orderedNatives; // each after its base
     struct FunctionRef { const BoundClass* owner{}; const BoundFunction* function{}; std::string cName; size_t ordinal{}; };
     std::unordered_map<size_t, FunctionRef> functionRefs; // symbol index -> emitted function
     std::vector<const BoundClass*> orderedClasses;         // reference types, each after its base
@@ -121,7 +123,11 @@ struct CEmitter {
             AssignFunctionNames(item);
             for (const auto& field : item.fields) if (field.isStatic) staticFields.emplace_back(&item, &field);
         }
-        for (const auto& item : externalTypes) { externalNames.insert(item.name); if (item.isEnum) enums.insert(item.name); if (item.isStruct) externalStructs.insert(item.name); }
+        for (const auto& item : externalTypes) {
+            externalNames.insert(item.name); if (item.isEnum) enums.insert(item.name); if (item.isStruct) externalStructs.insert(item.name);
+            if (item.isNative) natives.emplace(item.name, &item);
+        }
+        OrderNatives();
         OrderClasses();
         BuildVtables();
         bindingsBySymbol.resize(analysis.symbols.size());
@@ -157,9 +163,28 @@ struct CEmitter {
         if (found == classes.end()) throw std::runtime_error("Native C backend cannot derive '" + type.name + "' from external type '" + type.baseName + "' yet");
         return found->second;
     }
+    // The base of a script or extern class; empty at the root.
+    std::string_view BaseName(std::string_view type) const {
+        if (const auto found = classes.find(type); found != classes.end()) return found->second->baseName;
+        if (const auto found = natives.find(type); found != natives.end()) return found->second->baseType;
+        return {};
+    }
     bool IsSubclass(std::string_view derived, std::string_view base) const {
-        for (auto found = classes.find(derived); found != classes.end(); found = classes.find(found->second->baseName)) if (found->second->name == base) return true;
+        for (auto type = derived; !type.empty(); type = BaseName(type)) if (type == base) return true;
         return false;
+    }
+    void OrderNatives() {
+        std::unordered_set<const ExternalType*> done;
+        const auto visit = [&](auto&& self, const ExternalType& type) -> void {
+            if (!done.insert(&type).second) return;
+            if (!type.baseType.empty()) {
+                const auto base = natives.find(type.baseType);
+                if (base == natives.end()) throw std::runtime_error("Extern class '" + type.name + "' derives from '" + type.baseType + "', which is not an extern class");
+                self(self, *base->second);
+            }
+            orderedNatives.push_back(&type);
+        };
+        for (const auto& item : externalTypes) if (item.isNative) visit(visit, item);
     }
     void OrderClasses() {
         std::unordered_set<const BoundClass*> done;
@@ -281,6 +306,8 @@ struct CEmitter {
     TypeId Find(std::string_view type) const { return types.Find(type).value_or(TypeTable::Unknown); }
     bool IsEnum(TypeId type) const { return enums.contains(Name(type)); }
     bool IsClass(TypeId type) const { return classes.contains(Name(type)); }
+    bool IsNative(TypeId type) const { return natives.contains(Name(type)); }
+    bool IsObject(TypeId type) const { return IsClass(type) || IsNative(type); } // values start with an LS_TypeInfo pointer
     bool IsDynamic(TypeId type) const { return type == TypeTable::Table || type == TypeTable::Any; }
     bool IsStruct(TypeId type) const { return structNames.contains(Name(type)); }
     bool IsUserStruct(std::string_view name) const { return structs.contains(name); }
@@ -318,7 +345,7 @@ struct CEmitter {
         default: return false;
         }
     }
-    bool IsManagedObject(std::string_view type) const { return type == "string" || type == "table" || type == "any" || type.starts_with("$function:") || type.ends_with("[]") || classes.contains(type); }
+    bool IsManagedObject(std::string_view type) const { return type == "string" || type == "table" || type == "any" || type.starts_with("$function:") || type.ends_with("[]") || classes.contains(type) || natives.contains(type); }
     const BoundExpression& Child(const BoundExpression& value, size_t index) const { return program.Child(value, index); }
     const VariableBinding* Binding(size_t symbol) const { assert(symbol < bindingsBySymbol.size()); return bindingsBySymbol[symbol]; }
     const VariableBinding* BindingAt(size_t offset) const { const auto found = bindingAt.find(offset); return found == bindingAt.end() ? nullptr : found->second; }
@@ -341,7 +368,7 @@ struct CEmitter {
         if (type == TypeTable::Table) return "LS_KIND_TABLE";
         if (types.IsFunction(type)) return "LS_KIND_CLOSURE";
         if (types.IsList(type)) return "LS_KIND_LIST";
-        if (IsClass(type)) return "LS_KIND_OBJECT";
+        if (IsObject(type)) return "LS_KIND_OBJECT";
         if (IsStruct(type)) return "LS_KIND_STRUCT";
         return std::nullopt;
     }
@@ -357,7 +384,7 @@ struct CEmitter {
     }
     // The LS_TypeInfo of a class, struct or list type; null for other types.
     void TypeRef(TypeId type) {
-        if (IsClass(type) || IsStruct(type)) return Put("&ls_type_", Id{Name(type)});
+        if (IsObject(type) || IsStruct(type)) return Put("&ls_type_", Id{Name(type)});
         if (types.IsList(type) && HasListTypeInfo(type)) return Put("&ls_listtype_", type);
         Put("(const LS_TypeInfo*)0");
     }
@@ -460,7 +487,7 @@ struct CEmitter {
             const auto temp = Temp("unbox", nextLabel++);
             return Put("({ ", Type(type), ' ', temp, "; ls_unbox_struct(", part, ", &ls_type_", Id{Name(type)}, ", &", temp, "); ", temp, "; })");
         }
-        if (IsClass(type)) return Put("((", Type(type), ")ls_unbox_object(", part, ", &ls_type_", Id{Name(type)}, "))");
+        if (IsObject(type)) return Put("((", Type(type), ")ls_unbox_object(", part, ", &ls_type_", Id{Name(type)}, "))");
         Put("((", Type(type), ")ls_unbox_pointer(", part, ", ", KindName(type), "))");
     }
     // Emits value converted to target: boxes into `any`, unboxes out of it.
@@ -477,6 +504,13 @@ struct CEmitter {
         if (value.type == TypeTable::Any) return Put("ls_value_truthy(", Emitted(value, owner), ')');
         Expression(value, owner);
     }
+    // The extern class that declares the field or method a member expression names.
+    std::string_view MemberOwner(const BoundExpression& member) const {
+        if (member.symbolIndex) return analysis.symbols[*member.symbolIndex].owner;
+        return Name(Child(member, 0).type);
+    }
+    // Generated accessor of an extern field: ls_<Owner>__get_<field> or ls_<Owner>__set_<field>.
+    auto Accessor(std::string_view fieldOwner, std::string_view kind, std::string_view field) { return [this, fieldOwner, kind, field] { Put("ls_", Id{fieldOwner}, "__", kind, '_', Id{field}); }; }
     // Arguments start at child `first`, converted to the parameter types where known.
     void Arguments(const std::vector<TypeId>& parameters, const BoundExpression& value, size_t first, bool leadingComma, std::string_view owner) {
         for (size_t i = first; i < value.children.count; ++i) {
@@ -572,6 +606,7 @@ struct CEmitter {
             if (IsStruct(target)) return Put('(', child(0), ").", Id{text});
             if (target == TypeTable::Table) return Put("ls_table_get(", child(0), ", ", NameValue(text), ')');
             if (target == TypeTable::Any) return Put("ls_value_get(", child(0), ", ", NameValue(text), ')');
+            if (IsNative(target)) return Put(Accessor(MemberOwner(value), "get", text), '(', child(0), ')');
             if (externalNames.contains(Name(target))) if (const auto* symbol = ExternalMember(Name(target), text); symbol && symbol->kind == SymbolKind::Field)
                 throw std::runtime_error("Native C backend cannot directly access field '" + text + "' on opaque external type '" + Name(target) + "'");
             return Put(child(0), "->", Id{text});
@@ -586,6 +621,8 @@ struct CEmitter {
             if (value.lowering == Lowering::Concat) return Put("ls_string_concat(", child(0), ", ", child(1), ')');
             if (value.nativeOperator) return Put(Id{value.nativeOperator->cName}, '(', child(0), ", ", child(1), ')');
             const auto left = Child(value, 0).type, right = Child(value, 1).type;
+            if ((text == "==" || text == "!=") && (IsNative(left) || IsNative(right)) && left != TypeTable::Any && right != TypeTable::Any)
+                return Put(text == "!=" ? "(!" : "(", "ls_native_same(", child(0), ", ", child(1), "))");
             if ((text == "==" || text == "!=") && IsStruct(left) && left == right) return Put(text == "!=" ? "(!" : "(", "ls_", Id{Name(left)}, "_eq(", child(0), ", ", child(1), "))");
             if (left == TypeTable::Any || right == TypeTable::Any) {
                 if (text == "&&" || text == "||")
@@ -663,8 +700,8 @@ struct CEmitter {
         const auto& operand = Child(value, 0);
         const auto target = Find(value.Text());
         if (operand.type != TypeTable::Any) {
-            if (!IsClass(target)) throw std::runtime_error("Native C backend cannot test for external type '" + Name(target) + "'");
-            if (IsSubclass(Name(operand.type), Name(target))) return is ? Put('(', Emitted(operand, owner), " != 0)") : Put("((", Type(target), ')', Emitted(operand, owner), ')');
+            if (!IsObject(target)) throw std::runtime_error("Native C backend cannot test for external type '" + Name(target) + "'");
+            if (IsSubclass(Name(operand.type), Name(target))) return is ? Put("ls_object_alive(", Emitted(operand, owner), ')') : Put("((", Type(target), ')', Emitted(operand, owner), ')');
             if (is) return Put("ls_object_is(", Emitted(operand, owner), ", &ls_type_", Id{Name(target)}, ')');
             return Put("((", Type(target), ")ls_object_as(", Emitted(operand, owner), ", &ls_type_", Id{Name(target)}, "))");
         }
@@ -701,6 +738,15 @@ struct CEmitter {
             return Put("; ", table ? "ls_table_set(" : "ls_value_set(", container, ", ", key, ", ", update, "); ", update, "; })");
         }
         const auto type = target.type;
+        // An extern field: the setter returns the stored value. Evaluates the object, then the value.
+        if (target.kind == SyntaxExpression::Kind::Member && IsNative(Child(target, 0).type)) {
+            const auto object = Temp("object", label);
+            const auto fieldOwner = MemberOwner(target);
+            Put("({ ", Type(Child(target, 0).type), ' ', object, " = ", Emitted(Child(target, 0), owner), "; ", Accessor(fieldOwner, "set", target.Text()), '(', object, ", ");
+            if (!compound) Value(type, right, owner);
+            else Combine(type, operation, value.lowering, value.nativeOperator, [&] { Put(Accessor(fieldOwner, "get", target.Text()), '(', object, ')'); }, [&] { Operand(type, value.lowering, right, owner); });
+            return Put("); })");
+        }
         const auto slot = Temp("slot", label);
         const auto operand = [&] { Operand(type, value.lowering, right, owner); };
         const auto store = [&] { if (compound) Combine(type, operation, value.lowering, value.nativeOperator, [&] { Put('*', slot); }, update); else Put(update); };
@@ -785,6 +831,13 @@ struct CEmitter {
             Put(Id{value.nativeMember->cName}, '(', receiver); NativeArguments(*value.nativeMember, value, 1, true, owner);
             return Put(')');
         }
+        if (const auto* member = NativeMember(value)) {
+            // ls_<Owner>_<name> checks the receiver and calls the host thunk.
+            Put(Fn{member->owner, member->name}, '(');
+            if (!member->isStatic) Put(Emitted(Child(callee, 0), owner));
+            Arguments(ParameterTypes(member), value, 1, !member->isStatic, owner);
+            return Put(')');
+        }
         if (const auto* ref = FindFunctionRef(value)) return UserCall(value, callee, *ref, owner);
         if (callee.kind == SyntaxExpression::Kind::Member) {
             const auto& target = Child(callee, 0);
@@ -799,6 +852,12 @@ struct CEmitter {
         Put(')');
     }
 
+    // The extern method or constructor a call or `new` resolved to.
+    const Symbol* NativeMember(const BoundExpression& value) const {
+        if (!value.symbolIndex) return nullptr;
+        const auto& symbol = analysis.symbols[*value.symbolIndex];
+        return symbol.kind == SymbolKind::Method && natives.contains(symbol.owner) ? &symbol : nullptr;
+    }
     // Native arguments from child `first`; omitted optional parameters use their default C expression.
     void NativeArguments(const BuiltinMember& member, const BoundExpression& value, size_t first, bool leadingComma, std::string_view owner) {
         const size_t provided = value.children.count - first;
@@ -818,7 +877,7 @@ struct CEmitter {
         if (!ref && IsUserStruct(typeName)) return Put("ls_", Id{typeName}, "_default()");
         if (ref) Put(ref->cName); else Put(Fn{typeName, "new"});
         Put('(');
-        Arguments(ref ? ParameterTypes(ref->function) : std::vector<TypeId>{}, value, first, false, owner);
+        Arguments(ref ? ParameterTypes(ref->function) : ParameterTypes(NativeMember(value)), value, first, false, owner);
         Put(')');
     }
 
@@ -1111,6 +1170,66 @@ struct CEmitter {
             value.isStruct ? "LS_KIND_STRUCT" : "LS_KIND_OBJECT", ", ", [&] { if (base) Put("&ls_type_", Id{base->name}); else Put("(const LS_TypeInfo*)0"); }, ", ",
             [&] { if (slots && !slots->empty()) Put("ls_vtable_", name); else Put("(void* const*)0"); }, "};");
     }
+    // "Type name" or "Type? name" of an external parameter.
+    static std::pair<std::string_view, std::string_view> SplitParameter(std::string_view parameter) {
+        const auto split = parameter.find(' ');
+        auto type = parameter.substr(0, split);
+        if (type.ends_with('?')) type.remove_suffix(1);
+        return {type, split == std::string_view::npos ? std::string_view("argument") : parameter.substr(split + 1)};
+    }
+    // Host thunks take the host pointer for an extern class (null when null or destroyed), other types as they are.
+    void HostType(std::string_view type) { if (natives.contains(type)) Put("void*"); else Put(CTypeName{type}); }
+    void HostArgument(std::string_view type, std::string_view name) { if (natives.contains(type)) Put("ls_native_ptr(", Id{name}, ')'); else Put(Id{name}); }
+    // Per extern member: a declaration of the host thunk "ls_native_<Owner>_<name>" and a wrapper "ls_<Owner>_<name>"
+    // that checks the receiver. Fields use "__get_<field>" and "__set_<field>"; the constructor is "new".
+    void NativeDeclarations() {
+        for (const auto* type : orderedNatives) {
+            StringSet emitted;
+            for (const auto& member : type->members) {
+                if (member.owner != type->name || !emitted.insert(member.name).second) continue; // inherited: declared with its own class
+                const bool constructor = member.kind == SymbolKind::Method && member.name == type->name;
+                if (member.kind == SymbolKind::Field) NativeField(*type, member);
+                else if (constructor || member.kind == SymbolKind::Method) NativeMethod(*type, member, constructor);
+            }
+        }
+        if (!orderedNatives.empty()) Line(0);
+    }
+    void NativeField(const ExternalType& type, const Symbol& field) {
+        const Id name{type.name}, member{field.name};
+        const std::string label = type.name + "." + field.name;
+        Line(0, "extern ", [&] { HostType(field.type); }, " ls_native_", name, "__get_", member, "(void* self);");
+        Line(0, "extern void ls_native_", name, "__set_", member, "(void* self, ", [&] { HostType(field.type); }, " value);");
+        Line(0, "static ", CTypeName{field.type}, ' ', Accessor(type.name, "get", field.name), "(LS_", name, "* self) { void* ls_host = ls_native_self(self, \"", label,
+            "\"); if (!ls_host) return ", [&] { Default(Find(field.type)); }, "; return ls_native_", name, "__get_", member, "(ls_host); }");
+        Line(0, "static ", CTypeName{field.type}, ' ', Accessor(type.name, "set", field.name), "(LS_", name, "* self, ", CTypeName{field.type}, " value) { void* ls_host = ls_native_self(self, \"", label,
+            "\"); if (ls_host) ls_native_", name, "__set_", member, "(ls_host, ", [&] { HostArgument(field.type, "value"); }, "); return value; }");
+    }
+    void NativeMethod(const ExternalType& type, const Symbol& method, bool constructor) {
+        const Id name{type.name};
+        const std::string_view memberName = constructor ? std::string_view("new") : std::string_view(method.name);
+        const bool receiver = !constructor && !method.isStatic;
+        const auto hostParameters = [&] {
+            if (receiver) Put("void* self");
+            for (size_t i{}; i < method.parameters.size(); ++i) { const auto [parameterType, parameterName] = SplitParameter(method.parameters[i]); if (i || receiver) Put(", "); HostType(parameterType); Put(' ', Id{parameterName}); }
+            if (!receiver && method.parameters.empty()) Put("void");
+        };
+        const auto parameters = [&] {
+            if (receiver) Put("LS_", name, "* self");
+            for (size_t i{}; i < method.parameters.size(); ++i) { const auto [parameterType, parameterName] = SplitParameter(method.parameters[i]); if (i || receiver) Put(", "); Put(CTypeName{parameterType}, ' ', Id{parameterName}); }
+            if (!receiver && method.parameters.empty()) Put("void");
+        };
+        const auto arguments = [&] {
+            if (receiver) Put("ls_host");
+            for (size_t i{}; i < method.parameters.size(); ++i) { const auto [parameterType, parameterName] = SplitParameter(method.parameters[i]); if (i || receiver) Put(", "); HostArgument(parameterType, parameterName); }
+        };
+        // The host returns the proxy of an extern class result.
+        Line(0, "extern ", CTypeName{method.type}, " ls_native_", name, '_', Id{memberName}, '(', hostParameters, ");");
+        const auto call = [&] { Put("ls_native_", name, '_', Id{memberName}, '(', arguments, ')'); };
+        const bool returns = method.type != "void";
+        if (!receiver) return Line(0, "static ", CTypeName{method.type}, ' ', Fn{type.name, memberName}, '(', parameters, ") { ", returns ? "return " : "", call, "; }");
+        Line(0, "static ", CTypeName{method.type}, ' ', Fn{type.name, memberName}, '(', parameters, ") { void* ls_host = ls_native_self(self, \"", type.name, '.', method.name, "\"); if (!ls_host) return",
+            [&] { if (returns) { Put(' '); Default(Find(method.type)); } }, "; ", returns ? "return " : "", call, "; }");
+    }
     // One LS_TypeInfo per list type, so list headers and list fields can name their element type.
     void ListTypeInfos() {
         std::vector<TypeId> lists;
@@ -1225,11 +1344,17 @@ struct CEmitter {
         Line(0, "#include <luasharp/runtime.h>");
         Line(0);
         for (const auto& value : program.classes) Line(0, "typedef struct LS_", Id{value.name}, " LS_", Id{value.name}, ';');
-        for (const auto& value : externalTypes) if (!classes.contains(value.name) && !value.isEnum) Line(0, "typedef struct LS_", Id{value.name}, " LS_", Id{value.name}, ';');
+        for (const auto& value : externalTypes) if (!classes.contains(value.name) && !value.isEnum && !value.isNative) Line(0, "typedef struct LS_", Id{value.name}, " LS_", Id{value.name}, ';');
+        // Extern classes share one C layout. Their type infos match the runtime's (NativeRuntime::NativeClass) by name.
+        for (const auto* value : orderedNatives) {
+            Line(0, "typedef LS_NativeObject LS_", Id{value->name}, ';');
+            Line(0, "static const LS_TypeInfo ls_type_", Id{value->name}, " = {\"", value->name, "\", 0, (const LS_FieldInfo*)0, 0, (const LS_MethodInfo*)0, 0, LS_KIND_OBJECT, ",
+                [&] { if (value->baseType.empty()) Put("(const LS_TypeInfo*)0"); else Put("&ls_type_", Id{value->baseType}); }, ", (void* const*)0, LS_TYPE_NATIVE};");
+        }
         for (const auto& value : program.classes) Line(0, "static const LS_TypeInfo ls_type_", Id{value.name}, ';');
         if (!program.classes.empty() || !externalTypes.empty()) Line(0);
         ListTypeInfos();
-        for (const auto& value : externalTypes) if (!value.isEnum) for (const auto& member : value.members) if (member.kind == SymbolKind::Method) {
+        for (const auto& value : externalTypes) if (!value.isEnum && !value.isNative) for (const auto& member : value.members) if (member.kind == SymbolKind::Method) {
             const auto parameters = [&] {
                 Put("LS_", Id{value.name}, "* self");
                 for (const auto& parameter : member.parameters) {
@@ -1248,6 +1373,7 @@ struct CEmitter {
         }
         if (!program.enums.empty()) Line(0);
         StructDefinitions();
+        NativeDeclarations();
         for (const auto* value : orderedClasses) InstanceLayout(*value);
         for (size_t i{}; i < lambdas.size(); ++i) if (!lambdaCaptures[i].empty()) {
             Line(0, "typedef struct LS_LambdaEnv_", i, " {");
@@ -1299,6 +1425,7 @@ struct CEmitter {
         for (size_t i{}; i < lambdas.size(); ++i) Line(0, "static void ls_lambda_", i, "(void* environment, const LS_Value* arguments, LS_Value* result);");
         if (!lambdas.empty()) Line(0);
         CCompilationResult result;
+        for (const auto* value : orderedNatives) result.nativeClasses.push_back({value->name, value->baseType});
         for (const auto& value : program.classes) {
             NativeTypeLayout layout; layout.name = value.name; layout.baseName = value.baseName;
             for (const auto& field : value.fields) if (!field.isStatic) layout.fields.push_back({field.name, field.type});
@@ -1357,6 +1484,11 @@ struct CEmitter {
 };
 
 std::runtime_error SyntaxError(const SyntaxDiagnostic& diagnostic) { return std::runtime_error(diagnostic.message + " at " + std::to_string(diagnostic.span.offset)); }
+void ThrowFirstError(const Analysis& analysis) {
+    if (!analysis.syntax.diagnostics.empty()) throw SyntaxError(analysis.syntax.diagnostics.front());
+    const auto error = std::find_if(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& value) { return value.severity == DiagnosticSeverity::Error; });
+    if (error != analysis.diagnostics.end()) throw std::runtime_error(error->message + " at " + std::to_string(error->span.offset));
+}
 
 } // namespace
 
@@ -1369,10 +1501,22 @@ CCompilationResult CompileToC(std::string_view source, const std::vector<Externa
 }
 
 CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes) {
-    if (!analysis.syntax.diagnostics.empty()) throw SyntaxError(analysis.syntax.diagnostics.front());
-    const auto error = std::find_if(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& value) { return value.severity == DiagnosticSeverity::Error; });
-    if (error != analysis.diagnostics.end()) throw std::runtime_error(error->message + " at " + std::to_string(error->span.offset));
-    return CEmitter(analysis, externalTypes).Run();
+    ThrowFirstError(analysis);
+    // Extern classes declared in this source are described to the emitter like external ones.
+    auto types = externalTypes;
+    for (auto& type : ExportTypes(analysis)) if (type.isNative) types.push_back(std::move(type));
+    return CEmitter(analysis, types).Run();
+}
+
+std::vector<ExternalType> DeclarationTypes(const std::vector<std::string>& sources, std::vector<ExternalType> externalTypes) {
+    for (const auto& source : sources) {
+        const auto analysis = Analyze(source, externalTypes);
+        ThrowFirstError(analysis);
+        if (!analysis.bound.classes.empty() || !analysis.bound.Statements(analysis.bound.topLevel).empty())
+            throw std::runtime_error("A declaration source can declare only extern classes and enums");
+        for (auto& type : ExportTypes(analysis)) externalTypes.push_back(std::move(type));
+    }
+    return externalTypes;
 }
 
 } // namespace luasharp

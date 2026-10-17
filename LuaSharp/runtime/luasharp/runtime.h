@@ -3,7 +3,7 @@
 #ifndef LUASHARP_RUNTIME_H
 #define LUASHARP_RUNTIME_H
 
-#define LS_ABI_VERSION 9
+#define LS_ABI_VERSION 10
 
 typedef signed long long ls_int;          /* public LuaSharp int: signed 64-bit */
 typedef unsigned long long ls_wrap_bits;  /* internal arithmetic bits; never a LuaSharp value */
@@ -74,9 +74,16 @@ typedef struct LS_TypeInfo {
     ls_wrap_bits kind;                  /* LS_KIND_OBJECT, LS_KIND_STRUCT, or LS_KIND_LIST for a list type (one "element" field) */
     const struct LS_TypeInfo* base;     /* classes: the base class, or null */
     void* const* vtable;                /* classes: one function per virtual slot; null for an abstract slot */
+    ls_wrap_bits flags;                 /* LS_TYPE_* */
 } LS_TypeInfo;
+/* The objects of the type are LS_NativeObject proxies for host objects (extern classes). Type infos with this
+   flag match by name; the host's NativeRuntime owns the one its proxies point to. */
+#define LS_TYPE_NATIVE 1
 /* A class object; a derived class starts with the fields of its base, in the same order. */
 typedef struct LS_Object { const LS_TypeInfo* type; } LS_Object;
+/* A script reference to a host object. The host makes one proxy for each object and sets native to null
+   when it destroys the object. A destroyed proxy is null for ==, conditions, `is`, `as` and `any`. */
+typedef struct LS_NativeObject { const LS_TypeInfo* type; void* native; } LS_NativeObject;
 
 #define ls_offsetof(type, member) ((ls_wrap_bits)&((type*)0)->member)
 /* Interned member name, cached in a module static `ls_name_<id>` that the module traces as a root. */
@@ -213,13 +220,42 @@ static void* ls_unbox_pointer(LS_Value v, ls_wrap_bits kind) {
     return (void*)0;
 }
 
+static int ls_cstr_equal(const char* a, const char* b) {
+    while (*a && *a == *b) { ++a; ++b; }
+    return *a == *b;
+}
+
+/* One class. Each module emits its own copy of an extern class's type info, so those match by name. */
+static int ls_class_same(const LS_TypeInfo* a, const LS_TypeInfo* b) {
+    return a == b || (a && b && (a->flags & b->flags & LS_TYPE_NATIVE) && ls_cstr_equal(a->name, b->name));
+}
 /* True when type is target or derives from it. */
 static int ls_is_a(const LS_TypeInfo* type, const LS_TypeInfo* target) {
-    for (; type; type = type->base) if (type == target) return 1;
+    for (; type; type = type->base) if (ls_class_same(type, target)) return 1;
     return 0;
 }
 
+/* False for null and for a destroyed native object. */
+static ls_bool ls_object_alive(const void* object) {
+    return object && (!(((const LS_Object*)object)->type->flags & LS_TYPE_NATIVE) || ((const LS_NativeObject*)object)->native);
+}
+/* A destroyed native object reads as nil. */
+static LS_Value ls_value_live(LS_Value v) {
+    if (v.kind == LS_KIND_OBJECT && !ls_object_alive(v.as.pointer)) { v.kind = LS_KIND_NIL; v.as.pointer = (void*)0; }
+    return v;
+}
+/* The host object behind a proxy, for a call to member; reports an error and gives null when it is destroyed. */
+static void* ls_native_self(const void* object, const char* member) {
+    if (ls_object_alive(object)) return ((const LS_NativeObject*)object)->native;
+    ls_report_parts("access to '", member, "' on a destroyed or null object", 0);
+    return (void*)0;
+}
+/* `==` on native objects: all destroyed objects are null. */
+static ls_bool ls_native_same(const void* a, const void* b) { return a == b || (!ls_object_alive(a) && !ls_object_alive(b)); }
+static void* ls_native_ptr(const void* object) { return ls_object_alive(object) ? ((const LS_NativeObject*)object)->native : (void*)0; }
+
 static void* ls_unbox_object(LS_Value v, const LS_TypeInfo* type) {
+    v = ls_value_live(v);
     if (v.kind == LS_KIND_NIL) return (void*)0;
     if (v.kind == LS_KIND_OBJECT && ls_is_a(((LS_Object*)v.as.pointer)->type, type)) return v.as.pointer;
     ls_report_parts("expected ", type->name, ", got ", v.kind == LS_KIND_OBJECT ? ((LS_Object*)v.as.pointer)->type->name : ls_kind_name(v.kind));
@@ -227,19 +263,14 @@ static void* ls_unbox_object(LS_Value v, const LS_TypeInfo* type) {
 }
 
 /* `x is T` and `x as T` on a class value. */
-static ls_bool ls_object_is(const void* object, const LS_TypeInfo* type) { return object && ls_is_a(((const LS_Object*)object)->type, type); }
+static ls_bool ls_object_is(const void* object, const LS_TypeInfo* type) { return ls_object_alive(object) && ls_is_a(((const LS_Object*)object)->type, type); }
 static void* ls_object_as(void* object, const LS_TypeInfo* type) { return ls_object_is(object, type) ? object : (void*)0; }
 
-static int ls_cstr_equal(const char* a, const char* b) {
-    while (*a && *a == *b) { ++a; ++b; }
-    return *a == *b;
-}
-
 /* True for one LS_TypeInfo, or for structs and list types that match field by field (each module emits its own).
-   Classes match only by identity. */
+   Script classes match only by identity. */
 static int ls_type_same(const LS_TypeInfo* a, const LS_TypeInfo* b, int depth) {
     ls_wrap_bits i;
-    if (a == b) return 1;
+    if (ls_class_same(a, b)) return 1;
     if (!a || !b || a->kind != b->kind || a->kind == LS_KIND_OBJECT || depth > 8) return 0;
     if (a->size != b->size || a->field_count != b->field_count || !ls_cstr_equal(a->name, b->name)) return 0;
     for (i = 0; i < a->field_count; ++i) {
@@ -268,6 +299,7 @@ static LS_List* ls_unbox_list(LS_Value v, ls_wrap_bits element_kind, const LS_Ty
 
 /* `v is T` on `any`. type is the class or struct, or the element type of a list (with element_kind). */
 static ls_bool ls_value_is(LS_Value v, ls_wrap_bits kind, ls_wrap_bits element_kind, const LS_TypeInfo* type) {
+    v = ls_value_live(v);
     if (v.kind != kind) return 0;
     if (kind == LS_KIND_OBJECT) return ls_is_a(((LS_Object*)v.as.pointer)->type, type);
     if (kind == LS_KIND_STRUCT) return ls_type_same(*(const LS_TypeInfo**)v.as.pointer, type, 0);
@@ -378,7 +410,7 @@ static void ls_slot_store(char* slot, ls_wrap_bits kind, ls_wrap_bits element_ki
 }
 
 /* Lua truthiness: only nil and false are false. */
-static ls_bool ls_value_truthy(LS_Value v) { return !(v.kind == LS_KIND_NIL || (v.kind == LS_KIND_BOOL && !v.as.boolean)); }
+static ls_bool ls_value_truthy(LS_Value v) { v = ls_value_live(v); return !(v.kind == LS_KIND_NIL || (v.kind == LS_KIND_BOOL && !v.as.boolean)); }
 
 /* ---- closures ---- */
 
@@ -456,6 +488,7 @@ static ls_int ls_int_mod(ls_int a, ls_int b) {
 /* ---- dynamic values ---- */
 
 static ls_bool ls_value_equal(LS_Value a, LS_Value b) {
+    a = ls_value_live(a); b = ls_value_live(b);
     if (a.kind == LS_KIND_INT && b.kind == LS_KIND_FLOAT) return (ls_float)a.as.integer == b.as.number;
     if (a.kind == LS_KIND_FLOAT && b.kind == LS_KIND_INT) return a.as.number == (ls_float)b.as.integer;
     if (a.kind != b.kind) return 0;

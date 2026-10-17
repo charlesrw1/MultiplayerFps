@@ -11,7 +11,7 @@ namespace {
 
 const std::unordered_set<std::string> Keywords{
     "class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return",
-    "null", "true", "false", "virtual", "override", "abstract", "sealed", "is", "as"
+    "null", "true", "false", "virtual", "override", "abstract", "sealed", "is", "as", "extern"
 };
 
 TextSpan Cover(TextSpan first, TextSpan last) {
@@ -124,7 +124,7 @@ public:
         const auto mark = scratch_.size();
         while (!AtEnd()) {
             const size_t before = index_;
-            if (Is("class") || Is("struct") || Is("abstract") || Is("sealed")) { auto value = ParseClass(); tree_.root.classes.push_back(std::move(value)); }
+            if (Is("class") || Is("struct") || Is("abstract") || Is("sealed") || Is("extern")) { auto value = ParseClass(); tree_.root.classes.push_back(std::move(value)); }
             else if (Is("enum")) { auto value = ParseEnum(); tree_.root.enums.push_back(std::move(value)); }
             else { const auto statement = ParseStatement(); scratch_.push_back(statement); }
             if (index_ == before) Advance();
@@ -306,10 +306,12 @@ private:
         const auto close = Match("}"); result.span = Cover(start, close.span); return result;
     }
     SyntaxClass ParseClass() {
+        const bool isExtern = Is("extern"); if (isExtern) Advance();
         const auto classModifiers = ParseModifiers();
         const bool isStruct = Is("struct"); if (!isStruct) Match("class"); else Advance();
         const auto name = Identifier(isStruct ? "struct name" : "class name"); SyntaxClass result; result.name = name.text; result.span = name.span; result.isStruct = isStruct;
-        result.isAbstract = classModifiers.isAbstract; result.isSealed = classModifiers.isSealed;
+        result.isAbstract = classModifiers.isAbstract; result.isSealed = classModifiers.isSealed; result.isExtern = isExtern;
+        if (isExtern && isStruct) tree_.diagnostics.push_back({"Only a class can be 'extern'", name.span});
         if (classModifiers.isStatic || classModifiers.isVirtual || classModifiers.isOverride) tree_.diagnostics.push_back({"Only 'abstract' and 'sealed' can modify a class", name.span});
         if (Is(":")) {
             Advance(); result.baseName = Identifier("base type").text;

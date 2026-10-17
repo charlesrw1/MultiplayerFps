@@ -38,30 +38,16 @@ template <typename Visit> void ForEachDocument(Visit&& visit) {
     for (auto& [uri, document] : indexedDocuments) if (!documents.contains(uri)) visit(uri, document);
 }
 
-std::vector<luasharp::ExternalType> ExportsOf(const luasharp::Analysis& analysis) {
-    std::vector<luasharp::ExternalType> result;
-    for (const auto& symbol : analysis.symbols) {
-        if ((symbol.kind != luasharp::SymbolKind::Class && symbol.kind != luasharp::SymbolKind::Enum) || !symbol.span.length) continue;
-        luasharp::ExternalType type{symbol.name}; type.isEnum = symbol.kind == luasharp::SymbolKind::Enum; type.isStruct = symbol.isStruct; if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
-        if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) for (const auto index : members->second) type.members.push_back(analysis.symbols[index]);
-        if (!type.isEnum) {
-            if (const auto statics = analysis.members.find("$type:" + symbol.name); statics != analysis.members.end()) for (const auto index : statics->second) type.members.push_back(analysis.symbols[index]);
-            for (const auto& candidate : analysis.symbols) if (candidate.kind == luasharp::SymbolKind::Method && candidate.name == symbol.name && candidate.owner == symbol.name && candidate.span.length) type.members.push_back(candidate); // constructors
-        }
-        result.push_back(std::move(type));
-    }
-    return result;
-}
 // Positions are ignored: moving a declaration does not change what other files see.
 bool SameExports(const std::vector<luasharp::ExternalType>& left, const std::vector<luasharp::ExternalType>& right) {
-    const auto sameMember = [](const luasharp::Symbol& a, const luasharp::Symbol& b) { return a.name == b.name && a.type == b.type && a.kind == b.kind && a.parameters == b.parameters && a.owner == b.owner && a.access == b.access; };
-    const auto sameType = [&](const luasharp::ExternalType& a, const luasharp::ExternalType& b) { return a.name == b.name && a.baseType == b.baseType && a.isEnum == b.isEnum && std::equal(a.members.begin(), a.members.end(), b.members.begin(), b.members.end(), sameMember); };
+    const auto sameMember = [](const luasharp::Symbol& a, const luasharp::Symbol& b) { return a.name == b.name && a.type == b.type && a.kind == b.kind && a.parameters == b.parameters && a.owner == b.owner && a.access == b.access && a.isStatic == b.isStatic; };
+    const auto sameType = [&](const luasharp::ExternalType& a, const luasharp::ExternalType& b) { return a.name == b.name && a.baseType == b.baseType && a.isEnum == b.isEnum && a.isNative == b.isNative && std::equal(a.members.begin(), a.members.end(), b.members.begin(), b.members.end(), sameMember); };
     return std::equal(left.begin(), left.end(), right.begin(), right.end(), sameType);
 }
 const luasharp::Analysis& Standalone(Document& document) {
     if (document.standalone) return *document.standalone;
     document.standalone = std::make_unique<luasharp::Analysis>(luasharp::Analyze(document.text));
-    auto exports = ExportsOf(*document.standalone);
+    auto exports = luasharp::ExportTypes(*document.standalone);
     if (!SameExports(exports, document.exports)) { document.exports = std::move(exports); ++exportsRevision; }
     return *document.standalone;
 }
@@ -257,7 +243,7 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         return result;
     }
     const char* words[] = {"class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return", "void", "null",
-                           "virtual", "override", "abstract", "sealed", "is", "as", "base"};
+                           "virtual", "override", "abstract", "sealed", "extern", "is", "as", "base"};
     for (const auto* word : words) result.push_back({{"label", word}, {"kind", 14}});
     for (const auto& type : luasharp::BuiltinTypes()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in type"}});
     for (const auto& type : luasharp::BuiltinStaticClasses()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in static class"}});

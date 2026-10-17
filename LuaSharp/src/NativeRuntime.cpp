@@ -63,8 +63,13 @@ struct NativeTypeInfo;
 struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; };
 struct NativeTypeInfo {
     const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind;
-    const NativeTypeInfo* base; void* const* vtable;
+    const NativeTypeInfo* base; void* const* vtable; unsigned long long flags;
 };
+constexpr unsigned long long TypeNative = 1; // LS_TYPE_NATIVE
+// Mirrors LS_NativeObject.
+struct NativeProxy { const NativeTypeInfo* type; void* native; };
+// An extern class type info and the name it points to.
+struct NativeClassEntry { std::string name; NativeTypeInfo info{}; };
 constexpr unsigned long long SlotValue = 0, SlotFloat32 = 16, SlotInt32 = 17, StructPayload = 16;
 constexpr unsigned long long KindOf(NativeValueKind kind) { return static_cast<unsigned long long>(kind); }
 
@@ -249,6 +254,8 @@ struct NativeRuntime::Impl {
     size_t allocatedBytes{};
     std::unordered_map<void*, size_t> pins;
     std::unordered_map<size_t, NativeRootTraceFunction> roots;
+    std::unordered_set<void**> rootSlots;
+    std::unordered_map<std::string, std::unique_ptr<NativeClassEntry>> nativeClasses;
     std::unordered_map<std::string, void*> strings;
     std::unordered_map<void*, std::string> stringKeys;
     size_t nextRoot{1};
@@ -461,6 +468,11 @@ std::string FormatValue(const NativeValue& value) {
     case NativeValueKind::String: return std::string(View(value.as.pointer));
     case NativeValueKind::Closure: return reference("function");
     case NativeValueKind::Struct: return FormatStruct(BoxType(value.as.pointer), BoxValue(value.as.pointer));
+    case NativeValueKind::Object: {
+        const auto& proxy = *static_cast<const NativeProxy*>(value.as.pointer);
+        if ((proxy.type->flags & TypeNative) && !proxy.native) return "nil"; // destroyed
+        return reference("table");
+    }
     default: return reference("table");
     }
 }
@@ -538,6 +550,7 @@ size_t NativeRuntime::Collect() {
     std::scoped_lock lock(impl_->mutex);
     for (auto* current = impl_->allocations; current; current = current->next) current->marked = false;
     for (const auto& [object, count] : impl_->pins) if (count) Mark(object);
+    for (auto* slot : impl_->rootSlots) Mark(*slot);
     for (const auto& [id, trace] : impl_->roots) { static_cast<void>(id); if (trace) trace(this); }
 
     size_t reclaimed{};
@@ -568,6 +581,69 @@ size_t NativeRuntime::RegisterRoots(NativeRootTraceFunction trace) {
     std::scoped_lock lock(impl_->mutex); const auto id = impl_->nextRoot++; impl_->roots.emplace(id, trace); return id;
 }
 void NativeRuntime::UnregisterRoots(size_t registration) { std::scoped_lock lock(impl_->mutex); impl_->roots.erase(registration); }
+
+void NativeRuntime::AddRootSlot(void** slot) {
+    assert(slot);
+    std::scoped_lock lock(impl_->mutex);
+    [[maybe_unused]] const bool added = impl_->rootSlots.insert(slot).second;
+    assert(added && "root slot registered twice");
+}
+void NativeRuntime::RemoveRootSlot(void** slot) {
+    std::scoped_lock lock(impl_->mutex);
+    [[maybe_unused]] const auto removed = impl_->rootSlots.erase(slot);
+    assert(removed == 1 && "root slot was not registered");
+}
+
+const void* NativeRuntime::NativeClass(std::string_view name, std::string_view baseName) {
+    std::scoped_lock lock(impl_->mutex);
+    const auto* base = static_cast<const NativeTypeInfo*>(baseName.empty() ? nullptr : FindNativeClass(baseName));
+    if (!baseName.empty() && !base) throw std::runtime_error("Native class '" + std::string(name) + "' needs its base '" + std::string(baseName) + "' first");
+    if (const auto found = impl_->nativeClasses.find(std::string(name)); found != impl_->nativeClasses.end()) {
+        if (found->second->info.base != base) throw std::runtime_error("Native class '" + std::string(name) + "' was registered with a different base");
+        return &found->second->info;
+    }
+    auto entry = std::make_unique<NativeClassEntry>();
+    entry->name = name;
+    entry->info.name = entry->name.c_str(); entry->info.kind = KindOf(NativeValueKind::Object); entry->info.base = base; entry->info.flags = TypeNative;
+    const auto* info = &entry->info;
+    impl_->nativeClasses.emplace(entry->name, std::move(entry));
+    return info;
+}
+const void* NativeRuntime::FindNativeClass(std::string_view name) const {
+    std::scoped_lock lock(impl_->mutex);
+    const auto found = impl_->nativeClasses.find(std::string(name));
+    return found == impl_->nativeClasses.end() ? nullptr : &found->second->info;
+}
+void* NativeRuntime::NewNativeProxy(const void* nativeClass, void* native, NativeFinalizeFunction finalize) {
+    const auto* type = static_cast<const NativeTypeInfo*>(nativeClass);
+    assert(type && (type->flags & TypeNative) && "NewNativeProxy needs a type from NativeClass");
+    assert(native);
+    auto* proxy = static_cast<NativeProxy*>(Allocate(sizeof(NativeProxy), nullptr, finalize));
+    if (proxy) { proxy->type = type; proxy->native = native; }
+    return proxy;
+}
+void* NativeRuntime::NativeOf(const void* proxy) { return proxy ? static_cast<const NativeProxy*>(proxy)->native : nullptr; }
+void NativeRuntime::DestroyNative(void* proxy) { assert(proxy); static_cast<NativeProxy*>(proxy)->native = nullptr; }
+
+NativeRef::NativeRef(std::shared_ptr<NativeRuntime> runtime, void* object) : runtime_(std::move(runtime)), object_(object) {
+    assert(runtime_);
+    runtime_->AddRootSlot(&object_);
+}
+NativeRef::~NativeRef() { Reset(); }
+NativeRef::NativeRef(NativeRef&& other) noexcept { *this = std::move(other); }
+NativeRef& NativeRef::operator=(NativeRef&& other) noexcept {
+    if (this == &other) return *this;
+    Reset();
+    if (!other.runtime_) return *this;
+    runtime_ = std::move(other.runtime_); object_ = other.object_;
+    runtime_->RemoveRootSlot(&other.object_); other.object_ = nullptr;
+    runtime_->AddRootSlot(&object_);
+    return *this;
+}
+void NativeRef::Reset() {
+    if (runtime_) runtime_->RemoveRootSlot(&object_);
+    runtime_.reset(); object_ = nullptr;
+}
 
 void* NativeRuntime::Intern(std::string_view utf8) {
     std::scoped_lock lock(impl_->mutex);

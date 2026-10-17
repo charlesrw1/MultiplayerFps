@@ -136,6 +136,27 @@ Rect r = s as Rect;        // null when s is not a Rect
 - `x is T` is true when `x` is not null and is a `T`. `x as T` gives `x` as a `T`, or `null`. Both work on class values and on `any`. On `any`, `is` also tests for `int`, `float`, `bool`, `string`, `table`, lists, enums and structs; `as` needs a reference type.
 - A derived class cannot declare a field with the name of an inherited field.
 
+## Extern classes
+
+An `extern class` declares a class that the host program implements. Script code uses it like other classes:
+
+```
+extern class Entity {
+    int health;
+    Entity(int health);
+    virtual int damage(int amount);
+    static int count();
+}
+Entity e = new Entity(10);
+e.health += 5;
+int dealt = e.damage(3);
+```
+
+- Members have no bodies, and fields have no initializers. An extern class has at most one constructor and no overloads.
+- An extern class can derive only from another extern class.
+- When the host destroys the object, every script reference to it becomes `null`. A call on a destroyed object reports a runtime error.
+- The host supplies one C function for each member. See [native-abi.md](docs/native-abi.md#extern-classes).
+
 ## Native math types and the `math` library
 
 `Vec2`, `Vec3` (float32 components), `Vec2i`, `Vec3i` (int32 components), `Quat` and `Mat4x4` are native structs with the layouts in [`runtime/luasharp/vecmath.h`](runtime/luasharp/vecmath.h). `Mat4x4` is column-major like glm: element (row r, column c) is `m[c * 4 + r]`. `Quat` stores `x, y, z, w` like glm, but `Quat.new` takes `(w, x, y, z)`. Euler angles are the glm convention (`pitch, yaw, roll` in `x, y, z`). The reference is in [`docs/math-library.md`](docs/math-library.md).

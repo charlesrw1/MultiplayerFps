@@ -36,11 +36,19 @@ struct NativeTypeLayout {
     bool operator==(const NativeTypeLayout&) const = default;
 };
 
+// An extern class the module uses. Load registers it with NativeRuntime::NativeClass(name, baseName),
+// so all modules of a runtime agree on its base.
+struct NativeClassBinding {
+    std::string name;
+    std::string baseName;
+};
+
 struct CCompilationResult {
     std::string c;
     std::vector<NativeExport> exports;
     std::vector<NativeGlobal> globals;
     std::vector<NativeTypeLayout> types;
+    std::vector<NativeClassBinding> nativeClasses; // each after its base
 };
 
 struct NativeSymbol {
@@ -51,6 +59,8 @@ struct NativeSymbol {
 struct NativeCompileOptions {
     std::string libtccPath;
     std::vector<ExternalType> externalTypes;
+    // Declaration-only sources, such as engine.ls: extern classes and enums. Each sees the ones before it.
+    std::vector<std::string> declarations;
     std::vector<NativeSymbol> symbols;
     std::shared_ptr<NativeRuntime> runtime;
     bool initialize{true}; // false: caller runs NativeModule::Initialize() itself
@@ -63,6 +73,8 @@ CCompilationResult CompileToC(std::string_view source);
 CCompilationResult CompileToC(std::string_view source, const std::vector<ExternalType>& externalTypes);
 // For an analysis the caller already has; externalTypes must match the ones it was analyzed with.
 CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes = {});
+// The types of declaration sources, after externalTypes. Throws on a diagnostic error, or when a source declares code.
+std::vector<ExternalType> DeclarationTypes(const std::vector<std::string>& sources, std::vector<ExternalType> externalTypes = {});
 
 class NativeModule {
 public:

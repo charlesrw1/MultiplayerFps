@@ -9,7 +9,7 @@
 namespace luasharp {
 
 // Must equal LS_ABI_VERSION in runtime/luasharp/runtime.h.
-constexpr unsigned long long NativeAbiVersion = 9;
+constexpr unsigned long long NativeAbiVersion = 10;
 
 using NativeTraceFunction =void (*)(void* runtimeContext, void* object);
 using NativeFinalizeFunction = void (*)(void* object);
@@ -53,6 +53,21 @@ public:
     void Unpin(void* object);
     size_t RegisterRoots(NativeRootTraceFunction trace);
     void UnregisterRoots(size_t registration);
+    // A host variable that holds a GC object. Collect marks *slot. The slot must stay registered at most once.
+    void AddRootSlot(void** slot);
+    void RemoveRootSlot(void** slot);
+
+    // The LS_TypeInfo of an extern class, owned by the runtime and stable for its lifetime. The first call
+    // creates it; later calls must give the same base. The base must already exist.
+    const void* NativeClass(std::string_view name, std::string_view baseName = {});
+    [[nodiscard]] const void* FindNativeClass(std::string_view name) const;
+    // A proxy (LS_NativeObject) for a host object. finalize, when given, runs when the GC frees the proxy:
+    // script-owned host objects delete themselves there.
+    void* NewNativeProxy(const void* nativeClass, void* native, NativeFinalizeFunction finalize = nullptr);
+    // The host object behind a proxy; null once destroyed.
+    static void* NativeOf(const void* proxy);
+    // Script then sees the proxy as null.
+    static void DestroyNative(void* proxy);
 
     void* Intern(std::string_view utf8);
     [[nodiscard]] size_t AllocationCount() const;
@@ -68,6 +83,26 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
+};
+
+// A move-only root slot: keeps one GC object alive while the NativeRef holds it.
+// Host code keeps GC objects only through these, so a moving collector can update them.
+class NativeRef {
+public:
+    NativeRef() = default;
+    NativeRef(std::shared_ptr<NativeRuntime> runtime, void* object);
+    ~NativeRef();
+    NativeRef(NativeRef&& other) noexcept;
+    NativeRef& operator=(NativeRef&& other) noexcept;
+    NativeRef(const NativeRef&) = delete;
+    NativeRef& operator=(const NativeRef&) = delete;
+
+    [[nodiscard]] void* Get() const { return object_; }
+    void Reset();
+
+private:
+    std::shared_ptr<NativeRuntime> runtime_;
+    void* object_{};
 };
 
 } // namespace luasharp
