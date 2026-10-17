@@ -76,7 +76,7 @@ private:
 		prop_list.list = prop_storage.data();
 		prop_list.count = static_cast<int>(prop_storage.size());
 		prop_list.type_name = classname;
-		props = &prop_list;
+		set_props(&prop_list);
 	}
 
 	std::string name;

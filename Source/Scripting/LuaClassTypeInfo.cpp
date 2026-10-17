@@ -379,7 +379,7 @@ void LuaClassTypeInfo::init_lua_type() {
 	// the metatable is rebuilt, BEFORE live-instance shadow buffers are reallocated by
 	// the reload-merge path in check_for_reload().
 	synthesize_lua_props_for_component_subclass();
-	this->props = get_lua_props_list();
+	set_props(get_lua_props_list());
 }
 
 ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {

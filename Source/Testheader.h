@@ -8,6 +8,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
+#include "Assets/IAsset.h"
+#include "Game/EntityPtr.h"
+#include "Framework/Util.h"
 
 // LuaSharp binding tests (luasharp_engine_test.cpp). Values are not ordinals, so the thunks must map them.
 NEWENUM(LsTestMode, uint8_t){
@@ -139,4 +142,25 @@ public:
 	std::string myStr;
 	int variable = 0;
 	StringName nameField;
+};
+
+// Property accessor tests (property_access_test.cpp): one field of each value domain.
+class PropAccessTestThing : public ClassBase
+{
+public:
+	CLASS_BODY(PropAccessTestThing);
+	REF float speed = 1.5f;
+	REFLECT(min = 0, max = 10)
+	float clamped = 5.f;
+	REF int32_t signed_count = -3;
+	REF uint8_t mask = 0xF0;
+	REF bool enabled = true;
+	REF std::string label = "thing";
+	REF StringName tag;
+	REF glm::vec3 offset = glm::vec3(1, 2, 3);
+	REF glm::quat facing = glm::quat(1, 0, 0, 0);
+	REF LsTestMode mode = LsTestMode::Fast;
+	REF AssetPtr<IAsset> asset;
+	REF obj<Entity> target;
+	REF Color32 tint = COLOR_RED;
 };

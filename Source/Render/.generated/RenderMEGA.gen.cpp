@@ -1,7 +1,7 @@
 // **** GENERATED SOURCE FILE version:1 ****
 #include "Framework/ReflectionProp.h"
 #include "Framework/ReflectionMacros.h"
-#include "Framework/VectorReflect2.h"
+#include "Framework/PropertyMake.h"
 #include "Framework/EnumDefReflection.h"
 #include "Framework/InterfaceTypeInfo.h"
 #include "Scripting/ScriptFunctionCodegen.h"
@@ -198,31 +198,31 @@ ClassTypeInfo PostProcessSettings::StaticType = ClassTypeInfo(
 const PropertyInfoList* PostProcessSettings::get_props()
 {
     START_PROPS(PostProcessSettings)
-		make_float_property("exposure",offsetof(PostProcessSettings, exposure),PROP_DEFAULT,""),
-		make_float_property("contrast",offsetof(PostProcessSettings, contrast),PROP_DEFAULT,""),
-		make_float_property("saturation",offsetof(PostProcessSettings, saturation),PROP_DEFAULT,""),
-		make_float_property("bloom_intensity",offsetof(PostProcessSettings, bloom_intensity),PROP_DEFAULT,""),
-		make_bool_property_custom("bloom_enabled",offsetof(PostProcessSettings, bloom_enabled),PROP_DEFAULT,"",""),
-		make_float_property("bloom_filter_radius",offsetof(PostProcessSettings, bloom_filter_radius),PROP_DEFAULT,""),
-		make_assetptr_property_new("bloom_lens_dirt",offsetof(PostProcessSettings, bloom_lens_dirt),PROP_DEFAULT,"optional dirt/smudge mask\n",&Texture::StaticType),
-		make_float_property("bloom_lens_dirt_intensity",offsetof(PostProcessSettings, bloom_lens_dirt_intensity),PROP_DEFAULT,""),
-		make_integer_property("tonemap_type",offsetof(PostProcessSettings, tonemap_type),PROP_DEFAULT,sizeof(int),""),
-		make_float_property("vignette_intensity",offsetof(PostProcessSettings, vignette_intensity),PROP_DEFAULT,""),
-		make_float_property("vignette_falloff",offsetof(PostProcessSettings, vignette_falloff),PROP_DEFAULT,""),
-		make_float_property("chromatic_ab",offsetof(PostProcessSettings, chromatic_ab),PROP_DEFAULT,""),
-		make_float_property("grain_intensity",offsetof(PostProcessSettings, grain_intensity),PROP_DEFAULT,""),
-		make_float_property("grain_size",offsetof(PostProcessSettings, grain_size),PROP_DEFAULT,""),
-		make_float_property("sharpness",offsetof(PostProcessSettings, sharpness),PROP_DEFAULT,""),
-		make_float_property("color_temp",offsetof(PostProcessSettings, color_temp),PROP_DEFAULT,""),
-		make_bool_property_custom("auto_exposure",offsetof(PostProcessSettings, auto_exposure),PROP_DEFAULT,"",""),
-		make_integer_property("ae_method",offsetof(PostProcessSettings, ae_method),PROP_DEFAULT,sizeof(int),""),
-		make_float_property("ae_min_ev",offsetof(PostProcessSettings, ae_min_ev),PROP_DEFAULT,""),
-		make_float_property("ae_max_ev",offsetof(PostProcessSettings, ae_max_ev),PROP_DEFAULT,""),
-		make_float_property("ae_speed_up",offsetof(PostProcessSettings, ae_speed_up),PROP_DEFAULT,""),
-		make_float_property("ae_speed_down",offsetof(PostProcessSettings, ae_speed_down),PROP_DEFAULT,""),
-		make_float_property("ae_key",offsetof(PostProcessSettings, ae_key),PROP_DEFAULT,""),
-		make_float_property("ae_low_pct",offsetof(PostProcessSettings, ae_low_pct),PROP_DEFAULT,""),
-		make_float_property("ae_high_pct",offsetof(PostProcessSettings, ae_high_pct),PROP_DEFAULT,"")
+		make_property<&PostProcessSettings::exposure, checked_offset<offsetof(PostProcessSettings, exposure)>()>("exposure",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::contrast, checked_offset<offsetof(PostProcessSettings, contrast)>()>("contrast",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::saturation, checked_offset<offsetof(PostProcessSettings, saturation)>()>("saturation",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::bloom_intensity, checked_offset<offsetof(PostProcessSettings, bloom_intensity)>()>("bloom_intensity",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::bloom_enabled, checked_offset<offsetof(PostProcessSettings, bloom_enabled)>()>("bloom_enabled",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::bloom_filter_radius, checked_offset<offsetof(PostProcessSettings, bloom_filter_radius)>()>("bloom_filter_radius",PROP_DEFAULT,"","","upsample tent-filter radius, in UV space\n"),
+		make_property<&PostProcessSettings::bloom_lens_dirt, checked_offset<offsetof(PostProcessSettings, bloom_lens_dirt)>()>("bloom_lens_dirt",PROP_DEFAULT,"","","optional dirt/smudge mask\n"),
+		make_property<&PostProcessSettings::bloom_lens_dirt_intensity, checked_offset<offsetof(PostProcessSettings, bloom_lens_dirt_intensity)>()>("bloom_lens_dirt_intensity",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::tonemap_type, checked_offset<offsetof(PostProcessSettings, tonemap_type)>()>("tonemap_type",PROP_DEFAULT,"","","0=linear,1=reinhard,2=aces,3=uncharted2\n"),
+		make_property<&PostProcessSettings::vignette_intensity, checked_offset<offsetof(PostProcessSettings, vignette_intensity)>()>("vignette_intensity",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::vignette_falloff, checked_offset<offsetof(PostProcessSettings, vignette_falloff)>()>("vignette_falloff",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::chromatic_ab, checked_offset<offsetof(PostProcessSettings, chromatic_ab)>()>("chromatic_ab",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::grain_intensity, checked_offset<offsetof(PostProcessSettings, grain_intensity)>()>("grain_intensity",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::grain_size, checked_offset<offsetof(PostProcessSettings, grain_size)>()>("grain_size",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::sharpness, checked_offset<offsetof(PostProcessSettings, sharpness)>()>("sharpness",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::color_temp, checked_offset<offsetof(PostProcessSettings, color_temp)>()>("color_temp",PROP_DEFAULT,"","","-1=cool, +1=warm\n"),
+		make_property<&PostProcessSettings::auto_exposure, checked_offset<offsetof(PostProcessSettings, auto_exposure)>()>("auto_exposure",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::ae_method, checked_offset<offsetof(PostProcessSettings, ae_method)>()>("ae_method",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::ae_min_ev, checked_offset<offsetof(PostProcessSettings, ae_min_ev)>()>("ae_min_ev",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::ae_max_ev, checked_offset<offsetof(PostProcessSettings, ae_max_ev)>()>("ae_max_ev",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::ae_speed_up, checked_offset<offsetof(PostProcessSettings, ae_speed_up)>()>("ae_speed_up",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::ae_speed_down, checked_offset<offsetof(PostProcessSettings, ae_speed_down)>()>("ae_speed_down",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::ae_key, checked_offset<offsetof(PostProcessSettings, ae_key)>()>("ae_key",PROP_DEFAULT,"","",""),
+		make_property<&PostProcessSettings::ae_low_pct, checked_offset<offsetof(PostProcessSettings, ae_low_pct)>()>("ae_low_pct",PROP_DEFAULT,"","","fraction of darkest pixels to exclude\n"),
+		make_property<&PostProcessSettings::ae_high_pct, checked_offset<offsetof(PostProcessSettings, ae_high_pct)>()>("ae_high_pct",PROP_DEFAULT,"","","fraction of brightest pixels to exclude\n")
     END_PROPS(PostProcessSettings)
 }
 
@@ -266,16 +266,16 @@ ClassTypeInfo TextureImportSettings::StaticType = ClassTypeInfo(
 const PropertyInfoList* TextureImportSettings::get_props()
 {
     START_PROPS(TextureImportSettings)
-		make_bool_property_custom("is_generated",offsetof(TextureImportSettings, is_generated),PROP_DEFAULT,"",""),
-		make_string_property("src_file",offsetof(TextureImportSettings, src_file),PROP_DEFAULT,""),
-		make_enum_property("compression",offsetof(TextureImportSettings, compression),PROP_DEFAULT,sizeof(TextureCompressionType),&::EnumTrait<TextureCompressionType>::StaticEnumType, ""),
-		make_bool_property_custom("is_srgb",offsetof(TextureImportSettings, is_srgb),PROP_DEFAULT,"",""),
-		make_integer_property("resize_width",offsetof(TextureImportSettings, resize_width),PROP_DEFAULT,sizeof(int),""),
-		make_bool_property_custom("is_normalmap",offsetof(TextureImportSettings, is_normalmap),PROP_DEFAULT,"",""),
-		make_bool_property_custom("make_uncompressed",offsetof(TextureImportSettings, make_uncompressed),PROP_DEFAULT,"",""),
-		make_bool_property_custom("load_source_file",offsetof(TextureImportSettings, load_source_file),PROP_DEFAULT,"",""),
-		make_bool_property_custom("nearest_filtering",offsetof(TextureImportSettings, nearest_filtering),PROP_DEFAULT,"",""),
-		make_integer_property("simplifiedColor",offsetof(TextureImportSettings, simplifiedColor),PROP_DEFAULT,sizeof(Color32),"","ColorUint")
+		make_property<&TextureImportSettings::is_generated, checked_offset<offsetof(TextureImportSettings, is_generated)>()>("is_generated",PROP_DEFAULT,"","","was this not sourced from a file, if so skip it\n"),
+		make_property<&TextureImportSettings::src_file, checked_offset<offsetof(TextureImportSettings, src_file)>()>("src_file",PROP_DEFAULT,"","","relative filepath, must be in same directory\n"),
+		make_property<&TextureImportSettings::compression, checked_offset<offsetof(TextureImportSettings, compression)>()>("compression",PROP_DEFAULT,"","",""),
+		make_property<&TextureImportSettings::is_srgb, checked_offset<offsetof(TextureImportSettings, is_srgb)>()>("is_srgb",PROP_DEFAULT,"","","applies to Compressed_BC1 and HighQuality_BC7 only\n"),
+		make_property<&TextureImportSettings::resize_width, checked_offset<offsetof(TextureImportSettings, resize_width)>()>("resize_width",PROP_DEFAULT,"","","ie 1024, 2048 etc resize source image\n"),
+		make_property<&TextureImportSettings::is_normalmap, checked_offset<offsetof(TextureImportSettings, is_normalmap)>()>("is_normalmap",PROP_DEFAULT,"","","Deprecated, kept only so old .tis files still parse; migrated into\n`compression` by migrate_legacy_tis_compression() and then ignored.\n"),
+		make_property<&TextureImportSettings::make_uncompressed, checked_offset<offsetof(TextureImportSettings, make_uncompressed)>()>("make_uncompressed",PROP_DEFAULT,"","",""),
+		make_property<&TextureImportSettings::load_source_file, checked_offset<offsetof(TextureImportSettings, load_source_file)>()>("load_source_file",PROP_DEFAULT,"","",""),
+		make_property<&TextureImportSettings::nearest_filtering, checked_offset<offsetof(TextureImportSettings, nearest_filtering)>()>("nearest_filtering",PROP_DEFAULT,"","",""),
+		make_property<&TextureImportSettings::simplifiedColor, checked_offset<offsetof(TextureImportSettings, simplifiedColor)>()>("simplifiedColor",PROP_DEFAULT,"","","")
     END_PROPS(TextureImportSettings)
 }
 

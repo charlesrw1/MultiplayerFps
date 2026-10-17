@@ -279,7 +279,6 @@
     <ClInclude Include="Framework\StructReflection.h" />
     <ClInclude Include="Framework\SysPrint.h" />
     <ClInclude Include="Framework\Jobs.h" />
-    <ClInclude Include="Framework\VectorReflect2.h" />
     <ClInclude Include="Game\ObsGame\ObsGameHeaders.h" />
     <ClInclude Include="Game\CarGame\CarGame.h" />
     <ClInclude Include="Game\CarGame\CarGui.h" />
@@ -386,6 +385,8 @@
     <ClInclude Include="Framework\PropertyEd.h" />
     <ClInclude Include="Framework\Rect2d.h" />
     <ClInclude Include="Framework\ReflectionProp.h" />
+    <ClInclude Include="Framework\PropertyMake.h" />
+    <ClInclude Include="Framework\PropertyValue.h" />
     <ClInclude Include="Framework\ReflectionMacros.h" />
     <ClInclude Include="Framework\ArrayReflection.h" />
     <ClInclude Include="Framework\StringName.h" />

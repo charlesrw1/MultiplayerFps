@@ -48,6 +48,8 @@ public:
 	bool operator==(const ClassTypeInfo& other) const { return id == other.id; }
 	ClassBase* allocate_this_type() const { return allocate ? allocate(this) : nullptr; }
 	bool has_allocate_func() const { return allocate != nullptr; }
+	// Sets props and makes this class the owner of each property.
+	void set_props(const PropertyInfoList* list);
 
 	REFLECT();
 	bool is_subclass_of(const ClassTypeInfo* info) const;

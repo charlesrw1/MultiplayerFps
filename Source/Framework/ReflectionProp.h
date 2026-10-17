@@ -8,6 +8,7 @@
 #include "Framework/Factory.h"
 #include "Framework/DictParser.h"
 #include "Framework/ClassBase.h"
+#include "Framework/PropertyValue.h"
 
 // If you modify this, change the autoenumdef!!
 enum class core_type_id : uint8_t
@@ -120,6 +121,12 @@ struct PropertyInfo;
 
 struct lua_State;
 
+// PropertyInfo::offset is 16 bits. Generated code computes offsets through this, so a field past 64 KB is a compile error.
+template <size_t Offset> constexpr uint16_t checked_offset() {
+	static_assert(Offset <= UINT16_MAX, "reflected field offset does not fit in PropertyInfo::offset");
+	return static_cast<uint16_t>(Offset);
+}
+
 typedef std::string (*SerializePropFunc_t)(DictWriter& out, const PropertyInfo& info, const void* inst,
 										   ClassBase* user);
 typedef void (*UnSerializePropFunc_t)(DictParser& in, const PropertyInfo& info, void* inst, StringView token,
@@ -146,6 +153,10 @@ struct PropertyInfo
 	const StructTypeInfo* struct_type = nullptr;
 	const ClassTypeInfo* class_type = nullptr; // used for objtype,assetptr,classtype
 	PropertyAttributes attrs;
+	// Reads and writes the value. Null: the storage at get_ptr(), by type.
+	const PropertyAccess* access = nullptr;
+	// The class whose objects hold this property; set by the class type. Null for struct members and list elements.
+	const ClassTypeInfo* owner = nullptr;
 
 	// SerializePropFunc_t serialize_func = nullptr;
 	// UnSerializePropFunc_t unserialize_func = nullptr;
@@ -153,6 +164,21 @@ struct PropertyInfo
 	// const multicast_funcs* multicast = nullptr;
 
 	uint8_t* get_ptr(const void* inst) const;
+
+	// False for lists, structs and unique_ptrs: they have no single value.
+	bool has_value() const;
+	void get_value(const void* inst, PropValue& out) const;
+	PropValue get_value(const void* inst) const;
+	// Clamps numbers to attrs.min/max.
+	void set_value(void* inst, const PropValue& in, SetMode mode = SetMode::Edit) const;
+	// T is a domain type or a C++ type that converts to one (see prop_value_as).
+	template <typename T> T get(const void* inst) const { return prop_value_as<T>(get_value(inst)); }
+	template <typename T> void set(void* inst, const T& value, SetMode mode = SetMode::Edit) const {
+		if constexpr (std::is_same_v<T, IAsset*>)
+			set_value(inst, AssetRef{value, class_type}, mode);
+		else
+			set_value(inst, to_prop_value(value), mode);
+	}
 
 	float get_float(const void* ptr) const;
 	void set_float(void* ptr, float f) const;

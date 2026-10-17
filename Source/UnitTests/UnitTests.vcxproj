@@ -184,6 +184,7 @@
     <ClCompile Include="maputil_test.cpp" />
     <ClCompile Include="pool_allocator_test.cpp" />
     <ClCompile Include="luasharp_engine_test.cpp" />
+    <ClCompile Include="property_access_test.cpp" />
     <ClCompile Include="scripting_test.cpp" />
     <ClCompile Include="scripting_manager_test.cpp" />
     <ClCompile Include="scripting_classreg_test.cpp" />

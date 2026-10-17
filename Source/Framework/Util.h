@@ -68,6 +68,7 @@ struct Color32
 	uint8_t a = 0xff;
 
 	uint32_t to_uint() const { return *(uint32_t*)this; }
+	bool operator==(const Color32&) const = default;
 };
 #define COLOR_WHITE Color32(0xff, 0xff, 0xff, 0xff)
 #define COLOR_BLACK Color32(0, 0, 0, 0xff)

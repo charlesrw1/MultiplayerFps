@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="..">
@@ -947,7 +947,10 @@
     <ClInclude Include="Framework\Util.h">
       <Filter>Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Framework\VectorReflect2.h">
+    <ClInclude Include="Framework\PropertyMake.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\PropertyValue.h">
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="Game\BaseUpdater.h">

@@ -362,6 +362,24 @@ TEST_F(LuaSharpEngineTest, EditableFieldsArePropertyInfos) {
 	EXPECT_STREQ(heavy->props->list[0].name, "armor");
 }
 
+TEST_F(LuaSharpEngineTest, EditableFieldsAreValues) {
+	const auto& module = engine->load("turrets", EditableSource);
+	std::unique_ptr<ClassBase> object = engine->create(module, "Turret");
+	const ClassTypeInfo& type = object->get_type();
+	// A script float and a C++ float are the same domain; so are a GC string and a std::string.
+	EXPECT_DOUBLE_EQ(find_prop(type, "range")->get<double>(object.get()), 2.5);
+	EXPECT_EQ(find_prop(type, "label")->get<std::string>(object.get()), "turret");
+	EXPECT_EQ(find_prop(type, "ammo")->get<int64_t>(object.get()), 3);
+	EXPECT_TRUE(find_prop(type, "armed")->get<bool>(object.get()));
+	EXPECT_EQ(find_prop(type, "range")->owner, &type);
+
+	find_prop(type, "label")->set(object.get(), std::string("valued"));
+	find_prop(type, "aim")->set(object.get(), glm::vec3(7, 8, 9));
+	engine->collect();
+	EXPECT_EQ(find_prop(type, "label")->get<std::string>(object.get()), "valued");
+	EXPECT_EQ(find_prop(type, "aim")->get<glm::vec3>(object.get()), glm::vec3(7, 8, 9));
+}
+
 TEST_F(LuaSharpEngineTest, EditableFieldsSerialize) {
 	const auto& module = engine->load("turrets", EditableSource);
 	std::unique_ptr<ClassBase> source = engine->create(module, "HeavyTurret");

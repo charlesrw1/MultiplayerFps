@@ -3,10 +3,19 @@
 #include <unordered_map>
 #include <vector>
 #include "Framework/Util.h"
+#include "Framework/ReflectionProp.h"
 #include "SerializedForDiffing.h"
 #include "Scripting/ScriptManager.h"
 
 const bool ClassBase::CreateDefaultObject = false;
+
+void ClassTypeInfo::set_props(const PropertyInfoList* list) {
+	props = list;
+	if (!list)
+		return;
+	for (int i = 0; i < list->count; i++)
+		list->list[i].owner = this;
+}
 
 bool ClassTypeInfo::is_subclass_of(const ClassTypeInfo* info) const {
 	assert(info);
@@ -234,7 +243,7 @@ void ClassBase::init_classes_startup() {
 	// now call get props functions
 	for (auto& classtype : get_registry().id_to_typeinfo) {
 		if (classtype->get_props_function) {
-			classtype->props = classtype->get_props_function();
+			classtype->set_props(classtype->get_props_function());
 		}
 	}
 	// now call default constructors

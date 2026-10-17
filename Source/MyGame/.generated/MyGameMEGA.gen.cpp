@@ -1,7 +1,7 @@
 // **** GENERATED SOURCE FILE version:1 ****
 #include "Framework/ReflectionProp.h"
 #include "Framework/ReflectionMacros.h"
-#include "Framework/VectorReflect2.h"
+#include "Framework/PropertyMake.h"
 #include "Framework/EnumDefReflection.h"
 #include "Framework/InterfaceTypeInfo.h"
 #include "Scripting/ScriptFunctionCodegen.h"
@@ -76,55 +76,55 @@ ClassTypeInfo AnimGraphTester::StaticType = ClassTypeInfo(
 const PropertyInfoList* AnimGraphTester::get_props()
 {
     START_PROPS(AnimGraphTester)
-		make_enum_property("mode",offsetof(AnimGraphTester, mode),PROP_DEFAULT,sizeof(AnimGraphTestMode),&::EnumTrait<AnimGraphTestMode>::StaticEnumType, ""),
-		make_assetptr_property_new("model",offsetof(AnimGraphTester, model),PROP_DEFAULT,"",&Model::StaticType),
-		make_assetptr_property_new("matoverride",offsetof(AnimGraphTester, matoverride),PROP_DEFAULT,"",&MaterialInstance::StaticType),
-		make_assetptr_property_new("prop",offsetof(AnimGraphTester, prop),PROP_DEFAULT,"Optional prop: when set, a transient child MeshComponent entity is spawned and\nparented to prop_bone on the character (e.g. a rifle on the right hand) for testing.\n",&Model::StaticType),
-		make_string_property("prop_bone",offsetof(AnimGraphTester, prop_bone),PROP_DEFAULT,"BoneNameString"),
-		make_assetptr_property_new("clip0",offsetof(AnimGraphTester, clip0),PROP_DEFAULT,"Animation clips used by the graph modes\nprimary / idle clip\n",&AnimationSeqAsset::StaticType),
-		make_assetptr_property_new("clip1",offsetof(AnimGraphTester, clip1),PROP_DEFAULT,"secondary clip (walk, upper-body, additive)\n",&AnimationSeqAsset::StaticType),
-		make_assetptr_property_new("clip2",offsetof(AnimGraphTester, clip2),PROP_DEFAULT,"tertiary clip (BlendByInt state 2 / BlendSpace2D corner)\n",&AnimationSeqAsset::StaticType),
-		make_assetptr_property_new("clip3",offsetof(AnimGraphTester, clip3),PROP_DEFAULT,"quaternary clip (BlendSpace2D corner)\n",&AnimationSeqAsset::StaticType),
-		make_assetptr_property_new("slot_clip",offsetof(AnimGraphTester, slot_clip),PROP_DEFAULT,"one-shot clip fired into SlotPlaying slot\n",&AnimationSeqAsset::StaticType),
-		make_assetptr_property_new("footstep_particle",offsetof(AnimGraphTester, footstep_particle),PROP_DEFAULT,"",&ParticleAsset::StaticType),
-		make_assetptr_property_new("footstep_sfx",offsetof(AnimGraphTester, footstep_sfx),PROP_DEFAULT,"",&SoundFile::StaticType),
-		make_string_property("bone_ik_upper",offsetof(AnimGraphTester, bone_ik_upper),PROP_DEFAULT,"BoneNameString"),
-		make_string_property("bone_ik_end",offsetof(AnimGraphTester, bone_ik_end),PROP_DEFAULT,"BoneNameString"),
-		make_vec3_property("look_forward_axis",offsetof(AnimGraphTester, look_forward_axis),PROP_DEFAULT,""),
-		make_bool_property_custom("use_pole_bone_for_ik",offsetof(AnimGraphTester, use_pole_bone_for_ik),PROP_DEFAULT,"",""),
-		make_float_property("max_stretch",offsetof(AnimGraphTester, max_stretch),PROP_DEFAULT,""),
-		make_float_property("start_stretch_ratio",offsetof(AnimGraphTester, start_stretch_ratio),PROP_DEFAULT,""),
-		make_string_property("bone_upper_blend",offsetof(AnimGraphTester, bone_upper_blend),PROP_DEFAULT,"BoneNameString"),
-		make_string_property("bone_copy_src",offsetof(AnimGraphTester, bone_copy_src),PROP_DEFAULT,"BoneNameString"),
-		make_string_property("bone_copy_dst",offsetof(AnimGraphTester, bone_copy_dst),PROP_DEFAULT,"BoneNameString"),
-		make_string_property("bone_grip_other",offsetof(AnimGraphTester, bone_grip_other),PROP_DEFAULT,"BoneNameString"),
-		make_string_property("bone_grip_mask",offsetof(AnimGraphTester, bone_grip_mask),PROP_DEFAULT,"BoneNameString"),
-		make_string_property("bone_spring",offsetof(AnimGraphTester, bone_spring),PROP_DEFAULT,"BoneNameString"),
-		make_float_property("spring_yaw_stiffness",offsetof(AnimGraphTester, spring_yaw_stiffness),PROP_DEFAULT,""),
-		make_float_property("spring_yaw_damping",offsetof(AnimGraphTester, spring_yaw_damping),PROP_DEFAULT,""),
-		make_float_property("spring_pitch_stiffness",offsetof(AnimGraphTester, spring_pitch_stiffness),PROP_DEFAULT,""),
-		make_float_property("spring_pitch_damping",offsetof(AnimGraphTester, spring_pitch_damping),PROP_DEFAULT,""),
-		make_float_property("spring_along_stiffness",offsetof(AnimGraphTester, spring_along_stiffness),PROP_DEFAULT,""),
-		make_float_property("spring_along_damping",offsetof(AnimGraphTester, spring_along_damping),PROP_DEFAULT,""),
-		make_bool_property_custom("spring_allow_length_flex",offsetof(AnimGraphTester, spring_allow_length_flex),PROP_DEFAULT,"",""),
-		make_float_property("spring_gravity",offsetof(AnimGraphTester, spring_gravity),PROP_DEFAULT,""),
-		make_float_property("foot_trace_dist",offsetof(AnimGraphTester, foot_trace_dist),PROP_DEFAULT,""),
-		make_float_property("foot_height_off",offsetof(AnimGraphTester, foot_height_off),PROP_DEFAULT,""),
-		make_float_property("foot_max_tilt_deg",offsetof(AnimGraphTester, foot_max_tilt_deg),PROP_DEFAULT,""),
-		make_bool_property_custom("foot_align_rot",offsetof(AnimGraphTester, foot_align_rot),PROP_DEFAULT,"",""),
-		make_float_property("pelvis_interp_speed",offsetof(AnimGraphTester, pelvis_interp_speed),PROP_DEFAULT,""),
-		make_integer_property("gungrip_frame_eval",offsetof(AnimGraphTester, gungrip_frame_eval),PROP_DEFAULT,sizeof(int),""),
-		make_integer_property("cachepose_frame_eval_2",offsetof(AnimGraphTester, cachepose_frame_eval_2),PROP_DEFAULT,sizeof(int),""),
-		make_float_property("generic_alpha",offsetof(AnimGraphTester, generic_alpha),PROP_DEFAULT,""),
-		make_enum_property("transition_easing",offsetof(AnimGraphTester, transition_easing),PROP_DEFAULT,sizeof(Easing),&::EnumTrait<Easing>::StaticEnumType, ""),
-		make_float_property("transition_time",offsetof(AnimGraphTester, transition_time),PROP_DEFAULT,""),
-		make_float_property("bs2d_x",offsetof(AnimGraphTester, bs2d_x),PROP_DEFAULT,""),
-		make_float_property("bs2d_y",offsetof(AnimGraphTester, bs2d_y),PROP_DEFAULT,""),
-		make_bool_property_custom("bs2d_manual",offsetof(AnimGraphTester, bs2d_manual),PROP_DEFAULT,"",""),
-		make_float_property("bs_smooth_time",offsetof(AnimGraphTester, bs_smooth_time),PROP_DEFAULT,""),
-		make_float_property("bs_input_smooth",offsetof(AnimGraphTester, bs_input_smooth),PROP_DEFAULT,""),
-		make_bool_property_custom("cached_use_run",offsetof(AnimGraphTester, cached_use_run),PROP_DEFAULT,"",""),
-		make_bool_property_custom("cached_use_meshspace",offsetof(AnimGraphTester, cached_use_meshspace),PROP_DEFAULT,"","")
+		make_property<&AnimGraphTester::mode, checked_offset<offsetof(AnimGraphTester, mode)>()>("mode",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::model, checked_offset<offsetof(AnimGraphTester, model)>()>("model",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::matoverride, checked_offset<offsetof(AnimGraphTester, matoverride)>()>("matoverride",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::prop, checked_offset<offsetof(AnimGraphTester, prop)>()>("prop",PROP_DEFAULT,"","","Optional prop: when set, a transient child MeshComponent entity is spawned and\nparented to prop_bone on the character (e.g. a rifle on the right hand) for testing.\n"),
+		make_property<&AnimGraphTester::prop_bone, checked_offset<offsetof(AnimGraphTester, prop_bone)>()>("prop_bone",PROP_DEFAULT,"BoneNameString","",""),
+		make_property<&AnimGraphTester::clip0, checked_offset<offsetof(AnimGraphTester, clip0)>()>("clip0",PROP_DEFAULT,"","","Animation clips used by the graph modes\nprimary / idle clip\n"),
+		make_property<&AnimGraphTester::clip1, checked_offset<offsetof(AnimGraphTester, clip1)>()>("clip1",PROP_DEFAULT,"","","secondary clip (walk, upper-body, additive)\n"),
+		make_property<&AnimGraphTester::clip2, checked_offset<offsetof(AnimGraphTester, clip2)>()>("clip2",PROP_DEFAULT,"","","tertiary clip (BlendByInt state 2 / BlendSpace2D corner)\n"),
+		make_property<&AnimGraphTester::clip3, checked_offset<offsetof(AnimGraphTester, clip3)>()>("clip3",PROP_DEFAULT,"","","quaternary clip (BlendSpace2D corner)\n"),
+		make_property<&AnimGraphTester::slot_clip, checked_offset<offsetof(AnimGraphTester, slot_clip)>()>("slot_clip",PROP_DEFAULT,"","","one-shot clip fired into SlotPlaying slot\n"),
+		make_property<&AnimGraphTester::footstep_particle, checked_offset<offsetof(AnimGraphTester, footstep_particle)>()>("footstep_particle",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::footstep_sfx, checked_offset<offsetof(AnimGraphTester, footstep_sfx)>()>("footstep_sfx",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::bone_ik_upper, checked_offset<offsetof(AnimGraphTester, bone_ik_upper)>()>("bone_ik_upper",PROP_DEFAULT,"BoneNameString","","Bone names â€” use the dropdown picker to select from the attached model's skeleton\n"),
+		make_property<&AnimGraphTester::bone_ik_end, checked_offset<offsetof(AnimGraphTester, bone_ik_end)>()>("bone_ik_end",PROP_DEFAULT,"BoneNameString","",""),
+		make_property<&AnimGraphTester::look_forward_axis, checked_offset<offsetof(AnimGraphTester, look_forward_axis)>()>("look_forward_axis",PROP_DEFAULT,"","","ALSO: used for IK as offset for pole bone\n"),
+		make_property<&AnimGraphTester::use_pole_bone_for_ik, checked_offset<offsetof(AnimGraphTester, use_pole_bone_for_ik)>()>("use_pole_bone_for_ik",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::max_stretch, checked_offset<offsetof(AnimGraphTester, max_stretch)>()>("max_stretch",PROP_DEFAULT,"","","Two-bone IK limb stretching. <= 1.0 disables stretching (limb stays fixed-length and\nstops short when unreachable); above 1.0 is the max length multiplier allowed.\n"),
+		make_property<&AnimGraphTester::start_stretch_ratio, checked_offset<offsetof(AnimGraphTester, start_stretch_ratio)>()>("start_stretch_ratio",PROP_DEFAULT,"","","Fraction (0-1) of natural reach at which stretching starts ramping in, before the limb\nis fully extended. Lower than 1 avoids a pop/lock right at full extension. Only matters\nwhen max_stretch > 1.\n"),
+		make_property<&AnimGraphTester::bone_upper_blend, checked_offset<offsetof(AnimGraphTester, bone_upper_blend)>()>("bone_upper_blend",PROP_DEFAULT,"BoneNameString","",""),
+		make_property<&AnimGraphTester::bone_copy_src, checked_offset<offsetof(AnimGraphTester, bone_copy_src)>()>("bone_copy_src",PROP_DEFAULT,"BoneNameString","",""),
+		make_property<&AnimGraphTester::bone_copy_dst, checked_offset<offsetof(AnimGraphTester, bone_copy_dst)>()>("bone_copy_dst",PROP_DEFAULT,"BoneNameString","",""),
+		make_property<&AnimGraphTester::bone_grip_other, checked_offset<offsetof(AnimGraphTester, bone_grip_other)>()>("bone_grip_other",PROP_DEFAULT,"BoneNameString","",""),
+		make_property<&AnimGraphTester::bone_grip_mask, checked_offset<offsetof(AnimGraphTester, bone_grip_mask)>()>("bone_grip_mask",PROP_DEFAULT,"BoneNameString","","GunGripIK: the additive upper-body motion is masked off this bone + its children\n(the right arm chain the grip IK drives), so the additive doesn't fight the IK.\n"),
+		make_property<&AnimGraphTester::bone_spring, checked_offset<offsetof(AnimGraphTester, bone_spring)>()>("bone_spring",PROP_DEFAULT,"BoneNameString","","SpringBoneTest\n"),
+		make_property<&AnimGraphTester::spring_yaw_stiffness, checked_offset<offsetof(AnimGraphTester, spring_yaw_stiffness)>()>("spring_yaw_stiffness",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::spring_yaw_damping, checked_offset<offsetof(AnimGraphTester, spring_yaw_damping)>()>("spring_yaw_damping",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::spring_pitch_stiffness, checked_offset<offsetof(AnimGraphTester, spring_pitch_stiffness)>()>("spring_pitch_stiffness",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::spring_pitch_damping, checked_offset<offsetof(AnimGraphTester, spring_pitch_damping)>()>("spring_pitch_damping",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::spring_along_stiffness, checked_offset<offsetof(AnimGraphTester, spring_along_stiffness)>()>("spring_along_stiffness",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::spring_along_damping, checked_offset<offsetof(AnimGraphTester, spring_along_damping)>()>("spring_along_damping",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::spring_allow_length_flex, checked_offset<offsetof(AnimGraphTester, spring_allow_length_flex)>()>("spring_allow_length_flex",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::spring_gravity, checked_offset<offsetof(AnimGraphTester, spring_gravity)>()>("spring_gravity",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::foot_trace_dist, checked_offset<offsetof(AnimGraphTester, foot_trace_dist)>()>("foot_trace_dist",PROP_DEFAULT,"","","FeetIK grounding tuning\nhalf-length of the downward probe (meters), centered on foot\n"),
+		make_property<&AnimGraphTester::foot_height_off, checked_offset<offsetof(AnimGraphTester, foot_height_off)>()>("foot_height_off",PROP_DEFAULT,"","","keep foot this far above the hit surface (meters)\n"),
+		make_property<&AnimGraphTester::foot_max_tilt_deg, checked_offset<offsetof(AnimGraphTester, foot_max_tilt_deg)>()>("foot_max_tilt_deg",PROP_DEFAULT,"","","clamp surface-align rotation\n"),
+		make_property<&AnimGraphTester::foot_align_rot, checked_offset<offsetof(AnimGraphTester, foot_align_rot)>()>("foot_align_rot",PROP_DEFAULT,"","","rotate foot to match surface normal (modify-bone after IK)\n"),
+		make_property<&AnimGraphTester::pelvis_interp_speed, checked_offset<offsetof(AnimGraphTester, pelvis_interp_speed)>()>("pelvis_interp_speed",PROP_DEFAULT,"","","pelvis-drop smoothing rate (higher = snappier)\n"),
+		make_property<&AnimGraphTester::gungrip_frame_eval, checked_offset<offsetof(AnimGraphTester, gungrip_frame_eval)>()>("gungrip_frame_eval",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::cachepose_frame_eval_2, checked_offset<offsetof(AnimGraphTester, cachepose_frame_eval_2)>()>("cachepose_frame_eval_2",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::generic_alpha, checked_offset<offsetof(AnimGraphTester, generic_alpha)>()>("generic_alpha",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::transition_easing, checked_offset<offsetof(AnimGraphTester, transition_easing)>()>("transition_easing",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::transition_time, checked_offset<offsetof(AnimGraphTester, transition_time)>()>("transition_time",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::bs2d_x, checked_offset<offsetof(AnimGraphTester, bs2d_x)>()>("bs2d_x",PROP_DEFAULT,"","","BlendSpace2D: clip0=(-1,-1) clip1=(1,-1) clip2=(-1,1) clip3=(1,1). When bs2d_manual is\nfalse the input auto-sweeps in a circle; the editor preview UI (see\nAnimGraphTesterEditorUI) sets bs2d_manual=true and writes bs2d_x/y directly when the\nuser drags the marker.\n"),
+		make_property<&AnimGraphTester::bs2d_y, checked_offset<offsetof(AnimGraphTester, bs2d_y)>()>("bs2d_y",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::bs2d_manual, checked_offset<offsetof(AnimGraphTester, bs2d_manual)>()>("bs2d_manual",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::bs_smooth_time, checked_offset<offsetof(AnimGraphTester, bs_smooth_time)>()>("bs_smooth_time",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::bs_input_smooth, checked_offset<offsetof(AnimGraphTester, bs_input_smooth)>()>("bs_input_smooth",PROP_DEFAULT,"","",""),
+		make_property<&AnimGraphTester::cached_use_run, checked_offset<offsetof(AnimGraphTester, cached_use_run)>()>("cached_use_run",PROP_DEFAULT,"","","CachedPoseTest: manual toggles (instead of auto-cycling on a timer).\nlower body: false = clip0 (walk), true = clip1 (run)\n"),
+		make_property<&AnimGraphTester::cached_use_meshspace, checked_offset<offsetof(AnimGraphTester, cached_use_meshspace)>()>("cached_use_meshspace",PROP_DEFAULT,"","","final toggle: false = local-space masked blend, true = mesh-space\n")
     END_PROPS(AnimGraphTester)
 }
 
@@ -340,7 +340,7 @@ ClassTypeInfo fpsSpawnPoint::StaticType = ClassTypeInfo(
 const PropertyInfoList* fpsSpawnPoint::get_props()
 {
     START_PROPS(fpsSpawnPoint)
-		make_string_property("other",offsetof(fpsSpawnPoint, other),PROP_DEFAULT,"EntityTarget")
+		make_property<&fpsSpawnPoint::other, checked_offset<offsetof(fpsSpawnPoint, other)>()>("other",PROP_DEFAULT,"EntityTarget","","")
     END_PROPS(fpsSpawnPoint)
 }
 
@@ -353,7 +353,7 @@ ClassTypeInfo fpsPropPhysics::StaticType = ClassTypeInfo(
 const PropertyInfoList* fpsPropPhysics::get_props()
 {
     START_PROPS(fpsPropPhysics)
-		make_assetptr_property_new("model",offsetof(fpsPropPhysics, model),PROP_DEFAULT,"",&Model::StaticType)
+		make_property<&fpsPropPhysics::model, checked_offset<offsetof(fpsPropPhysics, model)>()>("model",PROP_DEFAULT,"","","")
     END_PROPS(fpsPropPhysics)
 }
 
@@ -366,13 +366,13 @@ ClassTypeInfo fpsFlickeringLightScript::StaticType = ClassTypeInfo(
 const PropertyInfoList* fpsFlickeringLightScript::get_props()
 {
     START_PROPS(fpsFlickeringLightScript)
-		make_float_property("min_intensity",offsetof(fpsFlickeringLightScript, min_intensity),PROP_DEFAULT,""),
-		make_float_property("max_intensity",offsetof(fpsFlickeringLightScript, max_intensity),PROP_DEFAULT,""),
-		make_float_property("radius",offsetof(fpsFlickeringLightScript, radius),PROP_DEFAULT,""),
-		make_integer_property("color",offsetof(fpsFlickeringLightScript, color),PROP_DEFAULT,sizeof(Color32),"","ColorUint"),
-		make_float_property("frequency",offsetof(fpsFlickeringLightScript, frequency),PROP_DEFAULT,""),
-		make_float_property("offset",offsetof(fpsFlickeringLightScript, offset),PROP_DEFAULT,""),
-		make_integer_property("octaves",offsetof(fpsFlickeringLightScript, octaves),PROP_DEFAULT,sizeof(int),"")
+		make_property<&fpsFlickeringLightScript::min_intensity, checked_offset<offsetof(fpsFlickeringLightScript, min_intensity)>()>("min_intensity",PROP_DEFAULT,"","",""),
+		make_property<&fpsFlickeringLightScript::max_intensity, checked_offset<offsetof(fpsFlickeringLightScript, max_intensity)>()>("max_intensity",PROP_DEFAULT,"","",""),
+		make_property<&fpsFlickeringLightScript::radius, checked_offset<offsetof(fpsFlickeringLightScript, radius)>()>("radius",PROP_DEFAULT,"","",""),
+		make_property<&fpsFlickeringLightScript::color, checked_offset<offsetof(fpsFlickeringLightScript, color)>()>("color",PROP_DEFAULT,"","",""),
+		make_property<&fpsFlickeringLightScript::frequency, checked_offset<offsetof(fpsFlickeringLightScript, frequency)>()>("frequency",PROP_DEFAULT,"","",""),
+		make_property<&fpsFlickeringLightScript::offset, checked_offset<offsetof(fpsFlickeringLightScript, offset)>()>("offset",PROP_DEFAULT,"","",""),
+		make_property<&fpsFlickeringLightScript::octaves, checked_offset<offsetof(fpsFlickeringLightScript, octaves)>()>("octaves",PROP_DEFAULT,"","","")
     END_PROPS(fpsFlickeringLightScript)
 }
 
@@ -418,14 +418,14 @@ ClassTypeInfo PhysicsLayerTesterObject::StaticType = ClassTypeInfo(
 const PropertyInfoList* PhysicsLayerTesterObject::get_props()
 {
     START_PROPS(PhysicsLayerTesterObject)
-		make_integer_property("collider_type",offsetof(PhysicsLayerTesterObject, collider_type),PROP_DEFAULT,sizeof(int),""),
-		make_assetptr_property_new("model",offsetof(PhysicsLayerTesterObject, model),PROP_DEFAULT,"",&Model::StaticType),
-		make_assetptr_property_new("trigger",offsetof(PhysicsLayerTesterObject, trigger),PROP_DEFAULT,"",&MaterialInstance::StaticType),
-		make_enum_property("bodytype",offsetof(PhysicsLayerTesterObject, bodytype),PROP_DEFAULT,sizeof(BodyType),&::EnumTrait<BodyType>::StaticEnumType, ""),
-		make_bool_property_custom("is_trigger",offsetof(PhysicsLayerTesterObject, is_trigger),PROP_DEFAULT,"",""),
-		make_new_struct_type("simulate_toggle",offsetof(PhysicsLayerTesterObject, simulate_toggle),PROP_DEFAULT,"",&BoolButton::StructType),
-		make_new_struct_type("respawn",offsetof(PhysicsLayerTesterObject, respawn),PROP_DEFAULT,"",&BoolButton::StructType),
-		make_integer_property("layer",offsetof(PhysicsLayerTesterObject, layer),PROP_DEFAULT,sizeof(int),"")
+		make_property<&PhysicsLayerTesterObject::collider_type, checked_offset<offsetof(PhysicsLayerTesterObject, collider_type)>()>("collider_type",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterObject::model, checked_offset<offsetof(PhysicsLayerTesterObject, model)>()>("model",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterObject::trigger, checked_offset<offsetof(PhysicsLayerTesterObject, trigger)>()>("trigger",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterObject::bodytype, checked_offset<offsetof(PhysicsLayerTesterObject, bodytype)>()>("bodytype",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterObject::is_trigger, checked_offset<offsetof(PhysicsLayerTesterObject, is_trigger)>()>("is_trigger",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterObject::simulate_toggle, checked_offset<offsetof(PhysicsLayerTesterObject, simulate_toggle)>()>("simulate_toggle",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterObject::respawn, checked_offset<offsetof(PhysicsLayerTesterObject, respawn)>()>("respawn",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterObject::layer, checked_offset<offsetof(PhysicsLayerTesterObject, layer)>()>("layer",PROP_DEFAULT,"","","")
     END_PROPS(PhysicsLayerTesterObject)
 }
 
@@ -438,12 +438,12 @@ ClassTypeInfo PhysicsLayerTesterRaycast::StaticType = ClassTypeInfo(
 const PropertyInfoList* PhysicsLayerTesterRaycast::get_props()
 {
     START_PROPS(PhysicsLayerTesterRaycast)
-		make_bool_property_custom("layer0",offsetof(PhysicsLayerTesterRaycast, layer0),PROP_DEFAULT,"",""),
-		make_bool_property_custom("layer1",offsetof(PhysicsLayerTesterRaycast, layer1),PROP_DEFAULT,"",""),
-		make_bool_property_custom("layer2",offsetof(PhysicsLayerTesterRaycast, layer2),PROP_DEFAULT,"",""),
-		make_bool_property_custom("layer3",offsetof(PhysicsLayerTesterRaycast, layer3),PROP_DEFAULT,"",""),
-		make_bool_property_custom("layer4",offsetof(PhysicsLayerTesterRaycast, layer4),PROP_DEFAULT,"",""),
-		make_bool_property_custom("layer5",offsetof(PhysicsLayerTesterRaycast, layer5),PROP_DEFAULT,"","")
+		make_property<&PhysicsLayerTesterRaycast::layer0, checked_offset<offsetof(PhysicsLayerTesterRaycast, layer0)>()>("layer0",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterRaycast::layer1, checked_offset<offsetof(PhysicsLayerTesterRaycast, layer1)>()>("layer1",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterRaycast::layer2, checked_offset<offsetof(PhysicsLayerTesterRaycast, layer2)>()>("layer2",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterRaycast::layer3, checked_offset<offsetof(PhysicsLayerTesterRaycast, layer3)>()>("layer3",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterRaycast::layer4, checked_offset<offsetof(PhysicsLayerTesterRaycast, layer4)>()>("layer4",PROP_DEFAULT,"","",""),
+		make_property<&PhysicsLayerTesterRaycast::layer5, checked_offset<offsetof(PhysicsLayerTesterRaycast, layer5)>()>("layer5",PROP_DEFAULT,"","","")
     END_PROPS(PhysicsLayerTesterRaycast)
 }
 
