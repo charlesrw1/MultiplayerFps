@@ -333,8 +333,11 @@ void ClassBase::free_table_registry_id() {
 	}
 }
 #include "Assets/AssetDatabase.h"
+#include "Scripting/LuaSharpEngine.h"
 ClassBase::~ClassBase() {
 	free_table_registry_id();
+	if (script_proxy)
+		LuaSharpEngine::on_object_destroyed(this);
 }
 // dont move or set the lua_table_id. its lazily evaluated, so it will create itself when needed
 ClassBase& ClassBase::operator=(const ClassBase& other) {

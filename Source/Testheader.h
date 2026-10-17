@@ -4,6 +4,62 @@
 #include "Framework/InterfaceTypeInfo.h"
 #include "Framework/MulticastDelegate.h"
 #include "Framework/StringName.h"
+#include "Framework/EnumDefReflection.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <vector>
+
+// LuaSharp binding tests (luasharp_engine_test.cpp). Values are not ordinals, so the thunks must map them.
+NEWENUM(LsTestMode, uint8_t){
+	Off = 2,
+	Slow = 5,
+	Fast = 9,
+};
+
+class LsTestBase : public ClassBase
+{
+public:
+	CLASS_BODY(LsTestBase);
+	REF virtual int describe() { return 1; }
+	REF int base_value = 7;
+};
+
+class LsTestThing : public LsTestBase
+{
+public:
+	CLASS_BODY(LsTestThing);
+	REF int describe() override { return 2; } // dispatches through LsTestBase's thunk
+
+	REF float speed = 1.5f;
+	REF bool enabled = true;
+	REF std::string label = "thing";
+	REF LsTestMode mode = LsTestMode::Slow;
+	REF glm::vec3 offset = glm::vec3(1, 2, 3);
+	REFLECT(script_read)
+	int read_only = 4;
+
+	REF int add(int a, int b) { return a + b; }
+	REF float scale(float f) { return f * speed; }
+	REF glm::vec3 shift(glm::vec3 v) { return v + offset; }
+	REF glm::quat turn(glm::quat q) { return glm::quat(q.w, q.y, q.x, q.z); }
+	REF glm::mat4 twice(glm::mat4 m) { return m * 2.0f; }
+	REF std::string greet(const std::string& name) { return "hi " + name; }
+	REF StringName tag(StringName n) { return n; }
+	REF LsTestMode next_mode(LsTestMode m) { return m == LsTestMode::Off ? LsTestMode::Slow : LsTestMode::Fast; }
+	REF LsTestThing* get_partner() { return partner; }
+	REF void set_partner(LsTestThing* p) { partner = p; }
+	REF bool is_partner(const LsTestThing* other) { return other == partner; }
+	REF int get_secret() { return secret; }
+	REF std::vector<int> numbers() { return {}; } // not bound in this milestone
+	REF static int instance_count() { return 3; }
+	REF static LsTestThing* find_first() { return first; }
+
+	static inline LsTestThing* first = nullptr;
+	LsTestThing* partner = nullptr;
+
+private:
+	REF int secret = 11; // bound through its PropertyInfo offset
+};
 
 class ITestInterface {
 public:
@@ -56,7 +112,7 @@ public:
 
 		variable = v;
 	}
-	REF void set_str(string s) { myStr = s; }
+	REF void set_str(std::string s) { myStr = s; }
 
 	// StringName Lua/C++ boundary round-trip, exercised by scripting_lua_dispatch_test.cpp.
 	REF StringName get_name_field() { return nameField; }

@@ -1174,7 +1174,15 @@ std::vector<ExternalType> ExportTypes(const Analysis& analysis) {
         type.isEnum = symbol.kind == SymbolKind::Enum; type.isStruct = symbol.isStruct; type.isNative = symbol.isNative;
         if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
         if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) for (const auto index : members->second) type.members.push_back(analysis.symbols[index]);
-        if (!type.isEnum) {
+        if (type.isEnum) {
+            const auto bound = std::ranges::find(analysis.bound.enums, symbol.name, &BoundEnum::name);
+            assert(bound != analysis.bound.enums.end());
+            for (const auto& member : type.members) {
+                const auto value = std::ranges::find(bound->members, member.name, &BoundEnumMember::name);
+                assert(value != bound->members.end());
+                type.values.push_back(value->value);
+            }
+        } else {
             if (const auto statics = analysis.members.find("$type:" + symbol.name); statics != analysis.members.end()) for (const auto index : statics->second) type.members.push_back(analysis.symbols[index]);
             for (const auto& candidate : analysis.symbols) if (candidate.kind == SymbolKind::Method && candidate.name == symbol.name && candidate.owner == symbol.name && candidate.span.length) type.members.push_back(candidate); // constructors
         }

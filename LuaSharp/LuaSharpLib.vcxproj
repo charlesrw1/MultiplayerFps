@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- The LuaSharp compiler and native runtime as a static library. The engine (Core) and the LuaSharp tools link it. -->
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}</ProjectGuid>
+    <RootNamespace>LuaSharpLib</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration"><ConfigurationType>StaticLibrary</ConfigurationType><UseDebugLibraries>true</UseDebugLibraries><PlatformToolset>v145</PlatformToolset><CharacterSet>Unicode</CharacterSet></PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration"><ConfigurationType>StaticLibrary</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries><PlatformToolset>v145</PlatformToolset><CharacterSet>Unicode</CharacterSet></PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup><OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir><IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir></PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile><WarningLevel>Level4</WarningLevel><SDLCheck>true</SDLCheck><ConformanceMode>true</ConformanceMode><LanguageStandard>stdcpp20</LanguageStandard><AdditionalIncludeDirectories>$(ProjectDir)src</AdditionalIncludeDirectories></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'"><ClCompile><PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'"><ClCompile><PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions><Optimization>MaxSpeed</Optimization></ClCompile></ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Builtins.cpp" />
+    <ClCompile Include="src\CBackend.cpp" />
+    <ClCompile Include="src\Compiler.cpp" />
+    <ClCompile Include="src\NativeCompiler.cpp" />
+    <ClCompile Include="src\NativeRuntime.cpp" />
+    <ClCompile Include="src\Semantic.cpp" />
+    <ClInclude Include="src\Builtins.h" />
+    <ClInclude Include="src\CBackend.h" />
+    <ClInclude Include="src\NativeRuntime.h" />
+    <ClInclude Include="src\Compiler.h" />
+    <ClInclude Include="src\Semantic.h" />
+    <None Include="runtime\luasharp\runtime.h" />
+    <None Include="runtime\luasharp\vecmath.h" />
+    <None Include="src\BuiltinMathMembers.inc" />
+    <None Include="src\BuiltinMathOperators.inc" />
+    <None Include="scripts\gen_vecmath.py" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

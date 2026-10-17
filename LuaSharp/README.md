@@ -156,6 +156,7 @@ int dealt = e.damage(3);
 - An extern class can derive only from another extern class.
 - When the host destroys the object, every script reference to it becomes `null`. A call on a destroyed object reports a runtime error.
 - The host supplies one C function for each member. See [native-abi.md](docs/native-abi.md#extern-classes).
+- The CsRemake engine links `LuaSharpLib.vcxproj` and generates its declarations and thunks. See [native-abi.md](docs/native-abi.md#engine-binding).
 
 ## Native math types and the `math` library
 

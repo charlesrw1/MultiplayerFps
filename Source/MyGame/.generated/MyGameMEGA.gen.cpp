@@ -441,3 +441,459 @@ const PropertyInfoList* PhysicsLayerTesterRaycast::get_props()
     END_PROPS(PhysicsLayerTesterRaycast)
 }
 
+
+// ---- LuaSharp binding (Scripts/codegen_luasharp.py) ----
+#include "Scripting/LuaSharpBinding.h"
+static const int64_t ls_enum_AnimGraphTestMode[] = {static_cast<int64_t>(AnimGraphTestMode::BasicIK), static_cast<int64_t>(AnimGraphTestMode::LookAt), static_cast<int64_t>(AnimGraphTestMode::GunGripIK), static_cast<int64_t>(AnimGraphTestMode::FeetIK), static_cast<int64_t>(AnimGraphTestMode::BlendMasked), static_cast<int64_t>(AnimGraphTestMode::CopyBone), static_cast<int64_t>(AnimGraphTestMode::SlotPlaying), static_cast<int64_t>(AnimGraphTestMode::Additive), static_cast<int64_t>(AnimGraphTestMode::BlendByInt), static_cast<int64_t>(AnimGraphTestMode::DurationEventTest), static_cast<int64_t>(AnimGraphTestMode::BlendSpace2D), static_cast<int64_t>(AnimGraphTestMode::SpringBoneTest), static_cast<int64_t>(AnimGraphTestMode::CachedPoseTest)};
+static const int64_t ls_enum_Easing[] = {static_cast<int64_t>(Easing::Linear), static_cast<int64_t>(Easing::CubicEaseIn), static_cast<int64_t>(Easing::CubicEaseOut), static_cast<int64_t>(Easing::CubicEaseInOut), static_cast<int64_t>(Easing::Constant)};
+static const int64_t ls_enum_BodyType[] = {static_cast<int64_t>(BodyType::Static), static_cast<int64_t>(BodyType::Kinematic), static_cast<int64_t>(BodyType::Dynamic)};
+static uint16_t ls_offset_AnimGraphTester_mode() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "mode"); return offset; }
+static int64_t ls_native_AnimGraphTester__get_mode(void* self) { return lsbind::enum_ordinal(ls_enum_AnimGraphTestMode, std::size(ls_enum_AnimGraphTestMode), static_cast<int64_t>(lsbind::field<AnimGraphTestMode>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_mode()))); }
+static void ls_native_AnimGraphTester__set_mode(void* self, int64_t value) { lsbind::field<AnimGraphTestMode>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_mode()) = static_cast<AnimGraphTestMode>(lsbind::enum_value(ls_enum_AnimGraphTestMode, std::size(ls_enum_AnimGraphTestMode), value)); }
+static uint16_t ls_offset_AnimGraphTester_prop_bone() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "prop_bone"); return offset; }
+static void* ls_native_AnimGraphTester__get_prop_bone(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_prop_bone())); }
+static void ls_native_AnimGraphTester__set_prop_bone(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_prop_bone()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_footstep_sfx() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "footstep_sfx"); return offset; }
+static void* ls_native_AnimGraphTester__get_footstep_sfx(void* self) { return lsbind::proxy_of(lsbind::field<SoundFile*>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_footstep_sfx())); }
+static void ls_native_AnimGraphTester__set_footstep_sfx(void* self, void* value) { lsbind::field<SoundFile*>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_footstep_sfx()) = lsbind::object<SoundFile>(value); }
+static uint16_t ls_offset_AnimGraphTester_bone_ik_upper() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bone_ik_upper"); return offset; }
+static void* ls_native_AnimGraphTester__get_bone_ik_upper(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_ik_upper())); }
+static void ls_native_AnimGraphTester__set_bone_ik_upper(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_ik_upper()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_bone_ik_end() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bone_ik_end"); return offset; }
+static void* ls_native_AnimGraphTester__get_bone_ik_end(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_ik_end())); }
+static void ls_native_AnimGraphTester__set_bone_ik_end(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_ik_end()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_look_forward_axis() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "look_forward_axis"); return offset; }
+static lsbind::Vec3 ls_native_AnimGraphTester__get_look_forward_axis(void* self) { return lsbind::to_ls(lsbind::field<glm::vec3>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_look_forward_axis())); }
+static void ls_native_AnimGraphTester__set_look_forward_axis(void* self, lsbind::Vec3 value) { lsbind::field<glm::vec3>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_look_forward_axis()) = lsbind::to_glm(value); }
+static uint16_t ls_offset_AnimGraphTester_use_pole_bone_for_ik() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "use_pole_bone_for_ik"); return offset; }
+static uint8_t ls_native_AnimGraphTester__get_use_pole_bone_for_ik(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_use_pole_bone_for_ik()) ? 1 : 0); }
+static void ls_native_AnimGraphTester__set_use_pole_bone_for_ik(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_use_pole_bone_for_ik()) = (value != 0); }
+static uint16_t ls_offset_AnimGraphTester_max_stretch() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "max_stretch"); return offset; }
+static double ls_native_AnimGraphTester__get_max_stretch(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_max_stretch())); }
+static void ls_native_AnimGraphTester__set_max_stretch(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_max_stretch()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_start_stretch_ratio() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "start_stretch_ratio"); return offset; }
+static double ls_native_AnimGraphTester__get_start_stretch_ratio(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_start_stretch_ratio())); }
+static void ls_native_AnimGraphTester__set_start_stretch_ratio(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_start_stretch_ratio()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_bone_upper_blend() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bone_upper_blend"); return offset; }
+static void* ls_native_AnimGraphTester__get_bone_upper_blend(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_upper_blend())); }
+static void ls_native_AnimGraphTester__set_bone_upper_blend(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_upper_blend()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_bone_copy_src() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bone_copy_src"); return offset; }
+static void* ls_native_AnimGraphTester__get_bone_copy_src(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_copy_src())); }
+static void ls_native_AnimGraphTester__set_bone_copy_src(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_copy_src()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_bone_copy_dst() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bone_copy_dst"); return offset; }
+static void* ls_native_AnimGraphTester__get_bone_copy_dst(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_copy_dst())); }
+static void ls_native_AnimGraphTester__set_bone_copy_dst(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_copy_dst()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_bone_grip_other() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bone_grip_other"); return offset; }
+static void* ls_native_AnimGraphTester__get_bone_grip_other(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_grip_other())); }
+static void ls_native_AnimGraphTester__set_bone_grip_other(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_grip_other()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_bone_grip_mask() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bone_grip_mask"); return offset; }
+static void* ls_native_AnimGraphTester__get_bone_grip_mask(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_grip_mask())); }
+static void ls_native_AnimGraphTester__set_bone_grip_mask(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_grip_mask()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_bone_spring() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bone_spring"); return offset; }
+static void* ls_native_AnimGraphTester__get_bone_spring(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_spring())); }
+static void ls_native_AnimGraphTester__set_bone_spring(void* self, void* value) { lsbind::field<std::string>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bone_spring()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_AnimGraphTester_spring_yaw_stiffness() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "spring_yaw_stiffness"); return offset; }
+static double ls_native_AnimGraphTester__get_spring_yaw_stiffness(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_yaw_stiffness())); }
+static void ls_native_AnimGraphTester__set_spring_yaw_stiffness(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_yaw_stiffness()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_spring_yaw_damping() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "spring_yaw_damping"); return offset; }
+static double ls_native_AnimGraphTester__get_spring_yaw_damping(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_yaw_damping())); }
+static void ls_native_AnimGraphTester__set_spring_yaw_damping(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_yaw_damping()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_spring_pitch_stiffness() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "spring_pitch_stiffness"); return offset; }
+static double ls_native_AnimGraphTester__get_spring_pitch_stiffness(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_pitch_stiffness())); }
+static void ls_native_AnimGraphTester__set_spring_pitch_stiffness(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_pitch_stiffness()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_spring_pitch_damping() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "spring_pitch_damping"); return offset; }
+static double ls_native_AnimGraphTester__get_spring_pitch_damping(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_pitch_damping())); }
+static void ls_native_AnimGraphTester__set_spring_pitch_damping(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_pitch_damping()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_spring_along_stiffness() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "spring_along_stiffness"); return offset; }
+static double ls_native_AnimGraphTester__get_spring_along_stiffness(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_along_stiffness())); }
+static void ls_native_AnimGraphTester__set_spring_along_stiffness(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_along_stiffness()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_spring_along_damping() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "spring_along_damping"); return offset; }
+static double ls_native_AnimGraphTester__get_spring_along_damping(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_along_damping())); }
+static void ls_native_AnimGraphTester__set_spring_along_damping(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_along_damping()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_spring_allow_length_flex() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "spring_allow_length_flex"); return offset; }
+static uint8_t ls_native_AnimGraphTester__get_spring_allow_length_flex(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_allow_length_flex()) ? 1 : 0); }
+static void ls_native_AnimGraphTester__set_spring_allow_length_flex(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_allow_length_flex()) = (value != 0); }
+static uint16_t ls_offset_AnimGraphTester_spring_gravity() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "spring_gravity"); return offset; }
+static double ls_native_AnimGraphTester__get_spring_gravity(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_gravity())); }
+static void ls_native_AnimGraphTester__set_spring_gravity(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_spring_gravity()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_foot_trace_dist() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "foot_trace_dist"); return offset; }
+static double ls_native_AnimGraphTester__get_foot_trace_dist(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_foot_trace_dist())); }
+static void ls_native_AnimGraphTester__set_foot_trace_dist(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_foot_trace_dist()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_foot_height_off() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "foot_height_off"); return offset; }
+static double ls_native_AnimGraphTester__get_foot_height_off(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_foot_height_off())); }
+static void ls_native_AnimGraphTester__set_foot_height_off(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_foot_height_off()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_foot_max_tilt_deg() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "foot_max_tilt_deg"); return offset; }
+static double ls_native_AnimGraphTester__get_foot_max_tilt_deg(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_foot_max_tilt_deg())); }
+static void ls_native_AnimGraphTester__set_foot_max_tilt_deg(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_foot_max_tilt_deg()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_foot_align_rot() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "foot_align_rot"); return offset; }
+static uint8_t ls_native_AnimGraphTester__get_foot_align_rot(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_foot_align_rot()) ? 1 : 0); }
+static void ls_native_AnimGraphTester__set_foot_align_rot(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_foot_align_rot()) = (value != 0); }
+static uint16_t ls_offset_AnimGraphTester_pelvis_interp_speed() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "pelvis_interp_speed"); return offset; }
+static double ls_native_AnimGraphTester__get_pelvis_interp_speed(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_pelvis_interp_speed())); }
+static void ls_native_AnimGraphTester__set_pelvis_interp_speed(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_pelvis_interp_speed()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_gungrip_frame_eval() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "gungrip_frame_eval"); return offset; }
+static int64_t ls_native_AnimGraphTester__get_gungrip_frame_eval(void* self) { return static_cast<int64_t>(lsbind::field<int>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_gungrip_frame_eval())); }
+static void ls_native_AnimGraphTester__set_gungrip_frame_eval(void* self, int64_t value) { lsbind::field<int>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_gungrip_frame_eval()) = static_cast<int>(value); }
+static uint16_t ls_offset_AnimGraphTester_cachepose_frame_eval_2() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "cachepose_frame_eval_2"); return offset; }
+static int64_t ls_native_AnimGraphTester__get_cachepose_frame_eval_2(void* self) { return static_cast<int64_t>(lsbind::field<int>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_cachepose_frame_eval_2())); }
+static void ls_native_AnimGraphTester__set_cachepose_frame_eval_2(void* self, int64_t value) { lsbind::field<int>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_cachepose_frame_eval_2()) = static_cast<int>(value); }
+static uint16_t ls_offset_AnimGraphTester_generic_alpha() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "generic_alpha"); return offset; }
+static double ls_native_AnimGraphTester__get_generic_alpha(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_generic_alpha())); }
+static void ls_native_AnimGraphTester__set_generic_alpha(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_generic_alpha()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_transition_easing() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "transition_easing"); return offset; }
+static int64_t ls_native_AnimGraphTester__get_transition_easing(void* self) { return lsbind::enum_ordinal(ls_enum_Easing, std::size(ls_enum_Easing), static_cast<int64_t>(lsbind::field<Easing>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_transition_easing()))); }
+static void ls_native_AnimGraphTester__set_transition_easing(void* self, int64_t value) { lsbind::field<Easing>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_transition_easing()) = static_cast<Easing>(lsbind::enum_value(ls_enum_Easing, std::size(ls_enum_Easing), value)); }
+static uint16_t ls_offset_AnimGraphTester_transition_time() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "transition_time"); return offset; }
+static double ls_native_AnimGraphTester__get_transition_time(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_transition_time())); }
+static void ls_native_AnimGraphTester__set_transition_time(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_transition_time()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_bs2d_x() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bs2d_x"); return offset; }
+static double ls_native_AnimGraphTester__get_bs2d_x(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs2d_x())); }
+static void ls_native_AnimGraphTester__set_bs2d_x(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs2d_x()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_bs2d_y() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bs2d_y"); return offset; }
+static double ls_native_AnimGraphTester__get_bs2d_y(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs2d_y())); }
+static void ls_native_AnimGraphTester__set_bs2d_y(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs2d_y()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_bs2d_manual() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bs2d_manual"); return offset; }
+static uint8_t ls_native_AnimGraphTester__get_bs2d_manual(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs2d_manual()) ? 1 : 0); }
+static void ls_native_AnimGraphTester__set_bs2d_manual(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs2d_manual()) = (value != 0); }
+static uint16_t ls_offset_AnimGraphTester_bs_smooth_time() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bs_smooth_time"); return offset; }
+static double ls_native_AnimGraphTester__get_bs_smooth_time(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs_smooth_time())); }
+static void ls_native_AnimGraphTester__set_bs_smooth_time(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs_smooth_time()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_bs_input_smooth() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "bs_input_smooth"); return offset; }
+static double ls_native_AnimGraphTester__get_bs_input_smooth(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs_input_smooth())); }
+static void ls_native_AnimGraphTester__set_bs_input_smooth(void* self, double value) { lsbind::field<float>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_bs_input_smooth()) = static_cast<float>(value); }
+static uint16_t ls_offset_AnimGraphTester_cached_use_run() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "cached_use_run"); return offset; }
+static uint8_t ls_native_AnimGraphTester__get_cached_use_run(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_cached_use_run()) ? 1 : 0); }
+static void ls_native_AnimGraphTester__set_cached_use_run(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_cached_use_run()) = (value != 0); }
+static uint16_t ls_offset_AnimGraphTester_cached_use_meshspace() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "cached_use_meshspace"); return offset; }
+static uint8_t ls_native_AnimGraphTester__get_cached_use_meshspace(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_cached_use_meshspace()) ? 1 : 0); }
+static void ls_native_AnimGraphTester__set_cached_use_meshspace(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_cached_use_meshspace()) = (value != 0); }
+static void ls_native_fpsLuaBridge_init(void* self) { lsbind::object<fpsLuaBridge>(self)->init(); }
+static void ls_native_fpsLuaBridge_start_level_script(void* self) { lsbind::object<fpsLuaBridge>(self)->start_level_script(); }
+static void ls_native_fpsLuaBridge_update(void* self) { lsbind::object<fpsLuaBridge>(self)->update(); }
+static void ls_native_fpsLuaBridge_imgui_tick(void* self) { lsbind::object<fpsLuaBridge>(self)->imgui_tick(); }
+static void ls_native_fpsApp_change_level(void* self, void* next_level) { lsbind::object<fpsApp>(self)->change_level(std::string(lsbind::view(next_level))); }
+static void* ls_native_fpsApp_get_player(void* self) { return lsbind::proxy_of(lsbind::object<fpsApp>(self)->get_player()); }
+static uint16_t ls_offset_fpsSpawnPoint_other() { static const uint16_t offset = lsbind::field_offset(fpsSpawnPoint::get_props(), "other"); return offset; }
+static void* ls_native_fpsSpawnPoint__get_other(void* self) { return lsbind::string(lsbind::field<std::string>(lsbind::object<fpsSpawnPoint>(self), ls_offset_fpsSpawnPoint_other())); }
+static void ls_native_fpsSpawnPoint__set_other(void* self, void* value) { lsbind::field<std::string>(lsbind::object<fpsSpawnPoint>(self), ls_offset_fpsSpawnPoint_other()) = std::string(lsbind::view(value)); }
+static uint16_t ls_offset_fpsPropPhysics_model() { static const uint16_t offset = lsbind::field_offset(fpsPropPhysics::get_props(), "model"); return offset; }
+static void* ls_native_fpsPropPhysics__get_model(void* self) { return lsbind::proxy_of(lsbind::field<Model*>(lsbind::object<fpsPropPhysics>(self), ls_offset_fpsPropPhysics_model())); }
+static void ls_native_fpsPropPhysics__set_model(void* self, void* value) { lsbind::field<Model*>(lsbind::object<fpsPropPhysics>(self), ls_offset_fpsPropPhysics_model()) = lsbind::object<Model>(value); }
+static uint16_t ls_offset_fpsFlickeringLightScript_min_intensity() { static const uint16_t offset = lsbind::field_offset(fpsFlickeringLightScript::get_props(), "min_intensity"); return offset; }
+static double ls_native_fpsFlickeringLightScript__get_min_intensity(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_min_intensity())); }
+static void ls_native_fpsFlickeringLightScript__set_min_intensity(void* self, double value) { lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_min_intensity()) = static_cast<float>(value); }
+static uint16_t ls_offset_fpsFlickeringLightScript_max_intensity() { static const uint16_t offset = lsbind::field_offset(fpsFlickeringLightScript::get_props(), "max_intensity"); return offset; }
+static double ls_native_fpsFlickeringLightScript__get_max_intensity(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_max_intensity())); }
+static void ls_native_fpsFlickeringLightScript__set_max_intensity(void* self, double value) { lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_max_intensity()) = static_cast<float>(value); }
+static uint16_t ls_offset_fpsFlickeringLightScript_radius() { static const uint16_t offset = lsbind::field_offset(fpsFlickeringLightScript::get_props(), "radius"); return offset; }
+static double ls_native_fpsFlickeringLightScript__get_radius(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_radius())); }
+static void ls_native_fpsFlickeringLightScript__set_radius(void* self, double value) { lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_radius()) = static_cast<float>(value); }
+static uint16_t ls_offset_fpsFlickeringLightScript_frequency() { static const uint16_t offset = lsbind::field_offset(fpsFlickeringLightScript::get_props(), "frequency"); return offset; }
+static double ls_native_fpsFlickeringLightScript__get_frequency(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_frequency())); }
+static void ls_native_fpsFlickeringLightScript__set_frequency(void* self, double value) { lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_frequency()) = static_cast<float>(value); }
+static uint16_t ls_offset_fpsFlickeringLightScript_offset() { static const uint16_t offset = lsbind::field_offset(fpsFlickeringLightScript::get_props(), "offset"); return offset; }
+static double ls_native_fpsFlickeringLightScript__get_offset(void* self) { return static_cast<double>(lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_offset())); }
+static void ls_native_fpsFlickeringLightScript__set_offset(void* self, double value) { lsbind::field<float>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_offset()) = static_cast<float>(value); }
+static uint16_t ls_offset_fpsFlickeringLightScript_octaves() { static const uint16_t offset = lsbind::field_offset(fpsFlickeringLightScript::get_props(), "octaves"); return offset; }
+static int64_t ls_native_fpsFlickeringLightScript__get_octaves(void* self) { return static_cast<int64_t>(lsbind::field<int>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_octaves())); }
+static void ls_native_fpsFlickeringLightScript__set_octaves(void* self, int64_t value) { lsbind::field<int>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_octaves()) = static_cast<int>(value); }
+static uint16_t ls_offset_PhysicsLayerTesterObject_collider_type() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterObject::get_props(), "collider_type"); return offset; }
+static int64_t ls_native_PhysicsLayerTesterObject__get_collider_type(void* self) { return static_cast<int64_t>(lsbind::field<int>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_collider_type())); }
+static void ls_native_PhysicsLayerTesterObject__set_collider_type(void* self, int64_t value) { lsbind::field<int>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_collider_type()) = static_cast<int>(value); }
+static uint16_t ls_offset_PhysicsLayerTesterObject_bodytype() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterObject::get_props(), "bodytype"); return offset; }
+static int64_t ls_native_PhysicsLayerTesterObject__get_bodytype(void* self) { return lsbind::enum_ordinal(ls_enum_BodyType, std::size(ls_enum_BodyType), static_cast<int64_t>(lsbind::field<BodyType>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_bodytype()))); }
+static void ls_native_PhysicsLayerTesterObject__set_bodytype(void* self, int64_t value) { lsbind::field<BodyType>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_bodytype()) = static_cast<BodyType>(lsbind::enum_value(ls_enum_BodyType, std::size(ls_enum_BodyType), value)); }
+static uint16_t ls_offset_PhysicsLayerTesterObject_is_trigger() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterObject::get_props(), "is_trigger"); return offset; }
+static uint8_t ls_native_PhysicsLayerTesterObject__get_is_trigger(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_is_trigger()) ? 1 : 0); }
+static void ls_native_PhysicsLayerTesterObject__set_is_trigger(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_is_trigger()) = (value != 0); }
+static uint16_t ls_offset_PhysicsLayerTesterObject_layer() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterObject::get_props(), "layer"); return offset; }
+static int64_t ls_native_PhysicsLayerTesterObject__get_layer(void* self) { return static_cast<int64_t>(lsbind::field<int>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_layer())); }
+static void ls_native_PhysicsLayerTesterObject__set_layer(void* self, int64_t value) { lsbind::field<int>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_layer()) = static_cast<int>(value); }
+static uint16_t ls_offset_PhysicsLayerTesterRaycast_layer0() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterRaycast::get_props(), "layer0"); return offset; }
+static uint8_t ls_native_PhysicsLayerTesterRaycast__get_layer0(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer0()) ? 1 : 0); }
+static void ls_native_PhysicsLayerTesterRaycast__set_layer0(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer0()) = (value != 0); }
+static uint16_t ls_offset_PhysicsLayerTesterRaycast_layer1() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterRaycast::get_props(), "layer1"); return offset; }
+static uint8_t ls_native_PhysicsLayerTesterRaycast__get_layer1(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer1()) ? 1 : 0); }
+static void ls_native_PhysicsLayerTesterRaycast__set_layer1(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer1()) = (value != 0); }
+static uint16_t ls_offset_PhysicsLayerTesterRaycast_layer2() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterRaycast::get_props(), "layer2"); return offset; }
+static uint8_t ls_native_PhysicsLayerTesterRaycast__get_layer2(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer2()) ? 1 : 0); }
+static void ls_native_PhysicsLayerTesterRaycast__set_layer2(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer2()) = (value != 0); }
+static uint16_t ls_offset_PhysicsLayerTesterRaycast_layer3() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterRaycast::get_props(), "layer3"); return offset; }
+static uint8_t ls_native_PhysicsLayerTesterRaycast__get_layer3(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer3()) ? 1 : 0); }
+static void ls_native_PhysicsLayerTesterRaycast__set_layer3(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer3()) = (value != 0); }
+static uint16_t ls_offset_PhysicsLayerTesterRaycast_layer4() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterRaycast::get_props(), "layer4"); return offset; }
+static uint8_t ls_native_PhysicsLayerTesterRaycast__get_layer4(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer4()) ? 1 : 0); }
+static void ls_native_PhysicsLayerTesterRaycast__set_layer4(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer4()) = (value != 0); }
+static uint16_t ls_offset_PhysicsLayerTesterRaycast_layer5() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterRaycast::get_props(), "layer5"); return offset; }
+static uint8_t ls_native_PhysicsLayerTesterRaycast__get_layer5(void* self) { return static_cast<uint8_t>(lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer5()) ? 1 : 0); }
+static void ls_native_PhysicsLayerTesterRaycast__set_layer5(void* self, uint8_t value) { lsbind::field<bool>(lsbind::object<PhysicsLayerTesterRaycast>(self), ls_offset_PhysicsLayerTesterRaycast_layer5()) = (value != 0); }
+static const char* const ls_declarations[] = {
+	R"ls(enum AnimGraphTestMode { BasicIK, LookAt, GunGripIK, FeetIK, BlendMasked, CopyBone, SlotPlaying, Additive, BlendByInt, DurationEventTest, BlendSpace2D, SpringBoneTest, CachedPoseTest }
+)ls",
+	R"ls(// BikeObject (BikeHeaders.h)
+extern class BikeObject : Component {
+}
+)ls",
+	R"ls(// BikeGameApplication (BikeHeaders.h)
+extern class BikeGameApplication : Application {
+}
+)ls",
+	R"ls(// AnimGraphTester (AnimGraphTester.h)
+extern class AnimGraphTester : Component {
+    AnimGraphTestMode mode;
+    string prop_bone;
+    SoundFile footstep_sfx;
+    string bone_ik_upper;
+    string bone_ik_end;
+    Vec3 look_forward_axis;
+    bool use_pole_bone_for_ik;
+    float max_stretch;
+    float start_stretch_ratio;
+    string bone_upper_blend;
+    string bone_copy_src;
+    string bone_copy_dst;
+    string bone_grip_other;
+    string bone_grip_mask;
+    string bone_spring;
+    float spring_yaw_stiffness;
+    float spring_yaw_damping;
+    float spring_pitch_stiffness;
+    float spring_pitch_damping;
+    float spring_along_stiffness;
+    float spring_along_damping;
+    bool spring_allow_length_flex;
+    float spring_gravity;
+    float foot_trace_dist;
+    float foot_height_off;
+    float foot_max_tilt_deg;
+    bool foot_align_rot;
+    float pelvis_interp_speed;
+    int gungrip_frame_eval;
+    int cachepose_frame_eval_2;
+    float generic_alpha;
+    Easing transition_easing;
+    float transition_time;
+    float bs2d_x;
+    float bs2d_y;
+    bool bs2d_manual;
+    float bs_smooth_time;
+    float bs_input_smooth;
+    bool cached_use_run;
+    bool cached_use_meshspace;
+    // skipped model: AssetPtr<Model>
+    // skipped matoverride: AssetPtr<MaterialInstance>
+    // skipped prop: AssetPtr<Model>
+    // skipped clip0: AssetPtr<AnimationSeqAsset>
+    // skipped clip1: AssetPtr<AnimationSeqAsset>
+    // skipped clip2: AssetPtr<AnimationSeqAsset>
+    // skipped clip3: AssetPtr<AnimationSeqAsset>
+    // skipped slot_clip: AssetPtr<AnimationSeqAsset>
+    // skipped footstep_particle: AssetPtr<ParticleAsset>
+}
+)ls",
+	R"ls(// fpsLuaBridge (fpsApp.h)
+extern class fpsLuaBridge : ClassBase {
+    virtual void init();
+    virtual void start_level_script();
+    virtual void update();
+    virtual void imgui_tick();
+}
+)ls",
+	R"ls(// fpsApp (fpsApp.h)
+extern class fpsApp : Application {
+    void change_level(string next_level);
+    Entity get_player();
+}
+)ls",
+	R"ls(// fpsSpawnPoint (fpsObjects.h)
+extern class fpsSpawnPoint : Component {
+    string other;
+}
+)ls",
+	R"ls(// fpsPropPhysics (fpsObjects.h)
+extern class fpsPropPhysics : Component {
+    Model model;
+}
+)ls",
+	R"ls(// fpsFlickeringLightScript (fpsObjects.h)
+extern class fpsFlickeringLightScript : Component {
+    float min_intensity;
+    float max_intensity;
+    float radius;
+    float frequency;
+    float offset;
+    int octaves;
+    // skipped color: Color32
+}
+)ls",
+	R"ls(// fpsPlayer (fpsObjects.h)
+extern class fpsPlayer : Component {
+    // skipped get_blah_components(): const std::vector<Component*>
+}
+)ls",
+	R"ls(// PhysicsLayerTesterTriggerScript (fpsTestObjects.h)
+extern class PhysicsLayerTesterTriggerScript : Component {
+}
+)ls",
+	R"ls(// PhysicsLayerTesterObject (fpsTestObjects.h)
+extern class PhysicsLayerTesterObject : Component {
+    int collider_type;
+    BodyType bodytype;
+    bool is_trigger;
+    int layer;
+    // skipped model: AssetPtr<Model>
+    // skipped trigger: AssetPtr<MaterialInstance>
+    // skipped simulate_toggle: BoolButton
+    // skipped respawn: BoolButton
+}
+)ls",
+	R"ls(// PhysicsLayerTesterRaycast (fpsTestObjects.h)
+extern class PhysicsLayerTesterRaycast : Component {
+    bool layer0;
+    bool layer1;
+    bool layer2;
+    bool layer3;
+    bool layer4;
+    bool layer5;
+}
+)ls",
+};
+static lsbind::Symbol const ls_symbols[] = {
+	{"ls_native_AnimGraphTester__get_mode", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_mode)},
+	{"ls_native_AnimGraphTester__set_mode", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_mode)},
+	{"ls_native_AnimGraphTester__get_prop_bone", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_prop_bone)},
+	{"ls_native_AnimGraphTester__set_prop_bone", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_prop_bone)},
+	{"ls_native_AnimGraphTester__get_footstep_sfx", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_footstep_sfx)},
+	{"ls_native_AnimGraphTester__set_footstep_sfx", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_footstep_sfx)},
+	{"ls_native_AnimGraphTester__get_bone_ik_upper", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bone_ik_upper)},
+	{"ls_native_AnimGraphTester__set_bone_ik_upper", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bone_ik_upper)},
+	{"ls_native_AnimGraphTester__get_bone_ik_end", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bone_ik_end)},
+	{"ls_native_AnimGraphTester__set_bone_ik_end", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bone_ik_end)},
+	{"ls_native_AnimGraphTester__get_look_forward_axis", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_look_forward_axis)},
+	{"ls_native_AnimGraphTester__set_look_forward_axis", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_look_forward_axis)},
+	{"ls_native_AnimGraphTester__get_use_pole_bone_for_ik", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_use_pole_bone_for_ik)},
+	{"ls_native_AnimGraphTester__set_use_pole_bone_for_ik", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_use_pole_bone_for_ik)},
+	{"ls_native_AnimGraphTester__get_max_stretch", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_max_stretch)},
+	{"ls_native_AnimGraphTester__set_max_stretch", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_max_stretch)},
+	{"ls_native_AnimGraphTester__get_start_stretch_ratio", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_start_stretch_ratio)},
+	{"ls_native_AnimGraphTester__set_start_stretch_ratio", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_start_stretch_ratio)},
+	{"ls_native_AnimGraphTester__get_bone_upper_blend", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bone_upper_blend)},
+	{"ls_native_AnimGraphTester__set_bone_upper_blend", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bone_upper_blend)},
+	{"ls_native_AnimGraphTester__get_bone_copy_src", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bone_copy_src)},
+	{"ls_native_AnimGraphTester__set_bone_copy_src", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bone_copy_src)},
+	{"ls_native_AnimGraphTester__get_bone_copy_dst", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bone_copy_dst)},
+	{"ls_native_AnimGraphTester__set_bone_copy_dst", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bone_copy_dst)},
+	{"ls_native_AnimGraphTester__get_bone_grip_other", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bone_grip_other)},
+	{"ls_native_AnimGraphTester__set_bone_grip_other", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bone_grip_other)},
+	{"ls_native_AnimGraphTester__get_bone_grip_mask", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bone_grip_mask)},
+	{"ls_native_AnimGraphTester__set_bone_grip_mask", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bone_grip_mask)},
+	{"ls_native_AnimGraphTester__get_bone_spring", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bone_spring)},
+	{"ls_native_AnimGraphTester__set_bone_spring", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bone_spring)},
+	{"ls_native_AnimGraphTester__get_spring_yaw_stiffness", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_spring_yaw_stiffness)},
+	{"ls_native_AnimGraphTester__set_spring_yaw_stiffness", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_spring_yaw_stiffness)},
+	{"ls_native_AnimGraphTester__get_spring_yaw_damping", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_spring_yaw_damping)},
+	{"ls_native_AnimGraphTester__set_spring_yaw_damping", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_spring_yaw_damping)},
+	{"ls_native_AnimGraphTester__get_spring_pitch_stiffness", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_spring_pitch_stiffness)},
+	{"ls_native_AnimGraphTester__set_spring_pitch_stiffness", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_spring_pitch_stiffness)},
+	{"ls_native_AnimGraphTester__get_spring_pitch_damping", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_spring_pitch_damping)},
+	{"ls_native_AnimGraphTester__set_spring_pitch_damping", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_spring_pitch_damping)},
+	{"ls_native_AnimGraphTester__get_spring_along_stiffness", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_spring_along_stiffness)},
+	{"ls_native_AnimGraphTester__set_spring_along_stiffness", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_spring_along_stiffness)},
+	{"ls_native_AnimGraphTester__get_spring_along_damping", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_spring_along_damping)},
+	{"ls_native_AnimGraphTester__set_spring_along_damping", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_spring_along_damping)},
+	{"ls_native_AnimGraphTester__get_spring_allow_length_flex", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_spring_allow_length_flex)},
+	{"ls_native_AnimGraphTester__set_spring_allow_length_flex", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_spring_allow_length_flex)},
+	{"ls_native_AnimGraphTester__get_spring_gravity", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_spring_gravity)},
+	{"ls_native_AnimGraphTester__set_spring_gravity", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_spring_gravity)},
+	{"ls_native_AnimGraphTester__get_foot_trace_dist", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_foot_trace_dist)},
+	{"ls_native_AnimGraphTester__set_foot_trace_dist", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_foot_trace_dist)},
+	{"ls_native_AnimGraphTester__get_foot_height_off", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_foot_height_off)},
+	{"ls_native_AnimGraphTester__set_foot_height_off", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_foot_height_off)},
+	{"ls_native_AnimGraphTester__get_foot_max_tilt_deg", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_foot_max_tilt_deg)},
+	{"ls_native_AnimGraphTester__set_foot_max_tilt_deg", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_foot_max_tilt_deg)},
+	{"ls_native_AnimGraphTester__get_foot_align_rot", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_foot_align_rot)},
+	{"ls_native_AnimGraphTester__set_foot_align_rot", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_foot_align_rot)},
+	{"ls_native_AnimGraphTester__get_pelvis_interp_speed", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_pelvis_interp_speed)},
+	{"ls_native_AnimGraphTester__set_pelvis_interp_speed", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_pelvis_interp_speed)},
+	{"ls_native_AnimGraphTester__get_gungrip_frame_eval", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_gungrip_frame_eval)},
+	{"ls_native_AnimGraphTester__set_gungrip_frame_eval", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_gungrip_frame_eval)},
+	{"ls_native_AnimGraphTester__get_cachepose_frame_eval_2", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_cachepose_frame_eval_2)},
+	{"ls_native_AnimGraphTester__set_cachepose_frame_eval_2", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_cachepose_frame_eval_2)},
+	{"ls_native_AnimGraphTester__get_generic_alpha", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_generic_alpha)},
+	{"ls_native_AnimGraphTester__set_generic_alpha", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_generic_alpha)},
+	{"ls_native_AnimGraphTester__get_transition_easing", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_transition_easing)},
+	{"ls_native_AnimGraphTester__set_transition_easing", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_transition_easing)},
+	{"ls_native_AnimGraphTester__get_transition_time", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_transition_time)},
+	{"ls_native_AnimGraphTester__set_transition_time", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_transition_time)},
+	{"ls_native_AnimGraphTester__get_bs2d_x", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bs2d_x)},
+	{"ls_native_AnimGraphTester__set_bs2d_x", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bs2d_x)},
+	{"ls_native_AnimGraphTester__get_bs2d_y", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bs2d_y)},
+	{"ls_native_AnimGraphTester__set_bs2d_y", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bs2d_y)},
+	{"ls_native_AnimGraphTester__get_bs2d_manual", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bs2d_manual)},
+	{"ls_native_AnimGraphTester__set_bs2d_manual", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bs2d_manual)},
+	{"ls_native_AnimGraphTester__get_bs_smooth_time", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bs_smooth_time)},
+	{"ls_native_AnimGraphTester__set_bs_smooth_time", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bs_smooth_time)},
+	{"ls_native_AnimGraphTester__get_bs_input_smooth", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_bs_input_smooth)},
+	{"ls_native_AnimGraphTester__set_bs_input_smooth", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_bs_input_smooth)},
+	{"ls_native_AnimGraphTester__get_cached_use_run", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_cached_use_run)},
+	{"ls_native_AnimGraphTester__set_cached_use_run", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_cached_use_run)},
+	{"ls_native_AnimGraphTester__get_cached_use_meshspace", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__get_cached_use_meshspace)},
+	{"ls_native_AnimGraphTester__set_cached_use_meshspace", reinterpret_cast<const void*>(&ls_native_AnimGraphTester__set_cached_use_meshspace)},
+	{"ls_native_fpsLuaBridge_init", reinterpret_cast<const void*>(&ls_native_fpsLuaBridge_init)},
+	{"ls_native_fpsLuaBridge_start_level_script", reinterpret_cast<const void*>(&ls_native_fpsLuaBridge_start_level_script)},
+	{"ls_native_fpsLuaBridge_update", reinterpret_cast<const void*>(&ls_native_fpsLuaBridge_update)},
+	{"ls_native_fpsLuaBridge_imgui_tick", reinterpret_cast<const void*>(&ls_native_fpsLuaBridge_imgui_tick)},
+	{"ls_native_fpsApp_change_level", reinterpret_cast<const void*>(&ls_native_fpsApp_change_level)},
+	{"ls_native_fpsApp_get_player", reinterpret_cast<const void*>(&ls_native_fpsApp_get_player)},
+	{"ls_native_fpsSpawnPoint__get_other", reinterpret_cast<const void*>(&ls_native_fpsSpawnPoint__get_other)},
+	{"ls_native_fpsSpawnPoint__set_other", reinterpret_cast<const void*>(&ls_native_fpsSpawnPoint__set_other)},
+	{"ls_native_fpsPropPhysics__get_model", reinterpret_cast<const void*>(&ls_native_fpsPropPhysics__get_model)},
+	{"ls_native_fpsPropPhysics__set_model", reinterpret_cast<const void*>(&ls_native_fpsPropPhysics__set_model)},
+	{"ls_native_fpsFlickeringLightScript__get_min_intensity", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__get_min_intensity)},
+	{"ls_native_fpsFlickeringLightScript__set_min_intensity", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__set_min_intensity)},
+	{"ls_native_fpsFlickeringLightScript__get_max_intensity", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__get_max_intensity)},
+	{"ls_native_fpsFlickeringLightScript__set_max_intensity", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__set_max_intensity)},
+	{"ls_native_fpsFlickeringLightScript__get_radius", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__get_radius)},
+	{"ls_native_fpsFlickeringLightScript__set_radius", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__set_radius)},
+	{"ls_native_fpsFlickeringLightScript__get_frequency", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__get_frequency)},
+	{"ls_native_fpsFlickeringLightScript__set_frequency", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__set_frequency)},
+	{"ls_native_fpsFlickeringLightScript__get_offset", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__get_offset)},
+	{"ls_native_fpsFlickeringLightScript__set_offset", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__set_offset)},
+	{"ls_native_fpsFlickeringLightScript__get_octaves", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__get_octaves)},
+	{"ls_native_fpsFlickeringLightScript__set_octaves", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__set_octaves)},
+	{"ls_native_PhysicsLayerTesterObject__get_collider_type", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__get_collider_type)},
+	{"ls_native_PhysicsLayerTesterObject__set_collider_type", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__set_collider_type)},
+	{"ls_native_PhysicsLayerTesterObject__get_bodytype", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__get_bodytype)},
+	{"ls_native_PhysicsLayerTesterObject__set_bodytype", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__set_bodytype)},
+	{"ls_native_PhysicsLayerTesterObject__get_is_trigger", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__get_is_trigger)},
+	{"ls_native_PhysicsLayerTesterObject__set_is_trigger", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__set_is_trigger)},
+	{"ls_native_PhysicsLayerTesterObject__get_layer", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__get_layer)},
+	{"ls_native_PhysicsLayerTesterObject__set_layer", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__set_layer)},
+	{"ls_native_PhysicsLayerTesterRaycast__get_layer0", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__get_layer0)},
+	{"ls_native_PhysicsLayerTesterRaycast__set_layer0", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__set_layer0)},
+	{"ls_native_PhysicsLayerTesterRaycast__get_layer1", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__get_layer1)},
+	{"ls_native_PhysicsLayerTesterRaycast__set_layer1", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__set_layer1)},
+	{"ls_native_PhysicsLayerTesterRaycast__get_layer2", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__get_layer2)},
+	{"ls_native_PhysicsLayerTesterRaycast__set_layer2", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__set_layer2)},
+	{"ls_native_PhysicsLayerTesterRaycast__get_layer3", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__get_layer3)},
+	{"ls_native_PhysicsLayerTesterRaycast__set_layer3", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__set_layer3)},
+	{"ls_native_PhysicsLayerTesterRaycast__get_layer4", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__get_layer4)},
+	{"ls_native_PhysicsLayerTesterRaycast__set_layer4", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__set_layer4)},
+	{"ls_native_PhysicsLayerTesterRaycast__get_layer5", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__get_layer5)},
+	{"ls_native_PhysicsLayerTesterRaycast__set_layer5", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterRaycast__set_layer5)},
+};
+static lsbind::Class const ls_classes[] = {
+	{"BikeObject", "Component"},
+	{"BikeGameApplication", "Application"},
+	{"AnimGraphTester", "Component"},
+	{"fpsLuaBridge", "ClassBase"},
+	{"fpsApp", "Application"},
+	{"fpsSpawnPoint", "Component"},
+	{"fpsPropPhysics", "Component"},
+	{"fpsFlickeringLightScript", "Component"},
+	{"fpsPlayer", "Component"},
+	{"PhysicsLayerTesterTriggerScript", "Component"},
+	{"PhysicsLayerTesterObject", "Component"},
+	{"PhysicsLayerTesterRaycast", "Component"},
+};
+static const lsbind::Registrar ls_registrar{"MyGameMEGA", ls_declarations, ls_symbols, ls_classes};

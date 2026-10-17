@@ -64,25 +64,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\Builtins.cpp" />
-    <ClCompile Include="src\CBackend.cpp" />
-    <ClCompile Include="src\Compiler.cpp" />
-    <ClCompile Include="src\NativeCompiler.cpp" />
-    <ClCompile Include="src\NativeRuntime.cpp" />
-    <ClCompile Include="src\Semantic.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Builtins.h" />
-    <ClInclude Include="src\CBackend.h" />
-    <ClInclude Include="src\NativeRuntime.h" />
-    <ClInclude Include="src\Compiler.h" />
-    <ClInclude Include="src\Semantic.h" />
-    <None Include="runtime\luasharp\runtime.h" />
-    <None Include="runtime\luasharp\vecmath.h" />
-    <None Include="src\BuiltinMathMembers.inc" />
-    <None Include="src\BuiltinMathOperators.inc" />
-    <None Include="scripts\gen_vecmath.py" />
+    <ProjectReference Include="LuaSharpLib.vcxproj"><Project>{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}</Project></ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="TinyCC.targets" />

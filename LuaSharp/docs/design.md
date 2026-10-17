@@ -45,12 +45,19 @@ This document records the design decisions for two work items:
 Part 2 has these milestones (#35):
 
 1. `extern class` declarations, proxies and the host API (#37). Done.
-2. Engine codegen: `engine.ls`, the typed C thunks and `ClassBase::script_proxy`. The engine links LuaSharp.
+2. Engine codegen: `engine.ls`, the typed C thunks and `ClassBase::script_proxy`. The engine links LuaSharp (#38). Done.
 3. Script classes that derive from engine classes (`ScriptImpl_X` slot tables).
 4. `[Editable]` fields as `PropertyInfo`. Remove `PROP_LUA_BACKED`.
 5. Hot reload: stable type infos, migration and relocation.
 
 Milestone 1 found that TinyCC on Windows does not resolve data symbols that `tcc_add_symbol` adds. Each module therefore emits its own type info for each extern class, and these match by name (see [native-abi.md](native-abi.md#extern-classes)). Stable script class type infos (milestone 5) must use module data that the host writes after relocation.
+
+Milestone 2 found these items:
+
+- MSVC returns glm types in a different way than C returns a struct, because glm types have constructors. The thunks therefore use plain mirror structs (`lsbind::Vec3` and similar) at the C boundary.
+- The Python header parser does not keep the values of C++ enum members. The codegen therefore converts between the C++ value and the LuaSharp ordinal with a generated table.
+- Each module must declare all engine classes, so each compile takes approximately 0.6 s. A precompiled declaration header can make this faster.
+- `std::vector`, `std::optional`, structs, handles, delegates and overloads are not bound yet. `engine.ls` shows each skipped member as a comment.
 
 ### Declarations
 

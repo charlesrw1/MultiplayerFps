@@ -197,6 +197,7 @@
     <ClCompile Include="Scripting\LuaTransform.cpp" />
     <ClCompile Include="Scripting\LuaVecQuat.cpp" />
     <ClCompile Include="Scripting\ScriptingStdLib.cpp" />
+    <ClCompile Include="Scripting\LuaSharpEngine.cpp" />
     <ClCompile Include="Scripting\ScriptManager.cpp" />
     <ClCompile Include="Scripting\ScriptLoadingUtil.cpp" />
     <ClCompile Include="Scripting\LuaClassTypeInfo.cpp" />
@@ -412,6 +413,8 @@
     <ClInclude Include="Scripting\LuaTransform.h" />
     <ClInclude Include="Scripting\LuaVecQuat.h" />
     <ClInclude Include="Scripting\ScriptingStdLib.h" />
+    <ClInclude Include="Scripting\LuaSharpBinding.h" />
+    <ClInclude Include="Scripting\LuaSharpEngine.h" />
     <ClInclude Include="Scripting\ScriptManager.h" />
     <ClInclude Include="Sound\SoundComponent.h" />
     <ClInclude Include="Testheader.h" />
@@ -692,6 +695,13 @@
       <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">8</MinUnityFiles>
     </ClCompile>
   </ItemDefinitionGroup>
+  <!-- LuaSharpLib.lib is merged into Core.lib, so every program that links Core gets it. -->
+  <ItemGroup>
+    <ProjectReference Include="..\LuaSharp\LuaSharpLib.vcxproj">
+      <Project>{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

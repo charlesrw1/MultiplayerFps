@@ -101,6 +101,7 @@ struct ExternalType {
     bool isEnum{};
     bool isStruct{};
     bool isNative{}; // an `extern class`: the host implements its members (see docs/native-abi.md)
+    std::vector<long long> values; // enums: the value of each member; empty means ordinals
 };
 enum class DiagnosticSeverity { Error, Warning };
 struct Diagnostic {

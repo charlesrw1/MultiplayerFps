@@ -175,6 +175,22 @@ The host registers one C function in `NativeCompileOptions::symbols` for each me
 - `NativeRef` is a move-only root slot. It keeps one GC object alive while it holds it. A move registers the new slot and removes the old one.
 - Host code must keep GC objects only in root slots, so that a later moving collector can update them.
 
+### External enums
+
+- An enum in `NativeCompileOptions::declarations` or in other external types gets the C constant `LS_E_M`, the same as an enum in the module.
+- `ExternalType::values` holds the value of each member. When it is empty, the value of a member is its ordinal.
+
+### Engine binding
+
+The engine binds its reflected classes with generated code (`Scripts/codegen_luasharp.py`):
+
+- Each codegen pass writes `engine.ls` (or `<pass>_engine.ls`) to the scripts folder. The same text goes into the generated C++ file.
+- The generated C++ file has one thunk for each bound member, and it registers the declarations and the thunks with `lsbind::Registrar` (`Source/Scripting/LuaSharpBinding.h`).
+- `LuaSharpEngine` collects all registrations. It owns the `NativeRuntime`, registers each class base first, and compiles modules with all declarations and thunks.
+- `LuaSharpEngine::proxy_of` makes one proxy for each `ClassBase` and keeps it in `ClassBase::script_proxy`, which is a root slot. The type of the proxy is the nearest bound class of the object.
+- `~ClassBase` calls `DestroyNative` on the proxy and removes the root slot.
+- A `REFLECT(script_read)` field has a setter that reports a runtime error.
+
 ## Structs
 
 A struct is a C `struct LS_Name` that is passed, returned and stored by value. A class field, a list element or a closure cell stores it inline. Its fields can hold references. The collector traces those through the struct's `LS_TypeInfo` wherever the struct is stored: class fields, list elements, boxes, cells, globals and static fields.

@@ -1371,6 +1371,11 @@ struct CEmitter {
         for (const auto& value : program.enums) {
             for (const auto& member : value.members) Line(0, "#define LS_", Id{value.name}, '_', Id{member.name}, " ((ls_int)", member.value, ')');
         }
+        for (const auto& value : externalTypes) if (value.isEnum) {
+            assert(value.values.empty() || value.values.size() == value.members.size());
+            for (size_t index = 0; index < value.members.size(); ++index)
+                Line(0, "#define LS_", Id{value.name}, '_', Id{value.members[index].name}, " ((ls_int)", value.values.empty() ? static_cast<long long>(index) : value.values[index], ')');
+        }
         if (!program.enums.empty()) Line(0);
         StructDefinitions();
         NativeDeclarations();

@@ -565,5 +565,78 @@ public:
         self.assertEqual(func_names, ["get_value", "do_stuff"])
 
 
+class TestLuaSharpBinding(unittest.TestCase):
+    HEADER = """class ClassBase {
+public:
+    CLASS_BODY(ClassBase);
+};
+NEWENUM(Mode, uint8_t){
+    Off = 2,
+    On = 4,
+};
+class Animal : public ClassBase {
+public:
+    CLASS_BODY(Animal);
+    REF virtual void speak(int times) {}
+    REF int legs = 4;
+};
+class Dog : public Animal {
+public:
+    CLASS_BODY(Dog);
+    REF void speak(int times) override {}
+    REF static Dog* find(const std::string& name);
+    REF glm::vec3 where(Mode m, Animal* other);
+    REF std::vector<int> bones();
+    REF void bark();
+    REF void bark(int loud);
+    REF void in();
+    REFLECT(script_read)
+    float speed = 1;
+    REFLECT(hide)
+    int hidden = 0;
+};
+"""
+
+    def generate(self) -> tuple[str, str]:
+        import codegen_luasharp as ls
+        typenames = cg.read_typenames_from_text(io.StringIO(self.HEADER), "<test>")
+        cg.ClassDef.fixup_types(typenames)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+            f.write(self.HEADER)
+            tmp_path = f.name
+        try:
+            classes, _ = cg.parse_file(tmp_path, typenames)
+        finally:
+            os.unlink(tmp_path)
+        return ls.generate(classes, typenames, "TEST")
+
+    def test_declarations(self):
+        declarations, _ = self.generate()
+        self.assertIn("enum Mode { Off, On }", declarations)
+        self.assertIn("extern class Animal : ClassBase {\n    virtual void speak(int times);\n    int legs;\n", declarations)
+        self.assertIn("extern class Dog : Animal {\n    static Dog find(string name);\n    Vec3 where(Mode m, Animal other);\n    void bark();\n    float speed;\n", declarations)
+        self.assertNotIn("void speak", declarations.split("extern class Dog")[1])  # the Animal thunk dispatches the override
+        self.assertIn("// skipped bones(): std::vector<int>", declarations)
+        self.assertIn("// skipped bark(): overload", declarations)
+        self.assertIn("// skipped in(): name is a LuaSharp keyword", declarations)
+        self.assertNotIn("hidden", declarations)
+
+    def test_thunks(self):
+        _, cpp = self.generate()
+        self.assertIn("static const int64_t ls_enum_Mode[] = {static_cast<int64_t>(Mode::Off), static_cast<int64_t>(Mode::On)};", cpp)
+        self.assertIn("static void* ls_native_Dog_find(void* name) { return lsbind::proxy_of(Dog::find(std::string(lsbind::view(name)))); }", cpp)
+        self.assertIn("lsbind::object<Dog>(self)->where(static_cast<Mode>(lsbind::enum_value(ls_enum_Mode, std::size(ls_enum_Mode), m)), lsbind::object<Animal>(other))", cpp)
+        self.assertIn("lsbind::field_offset(Dog::get_props(), \"speed\")", cpp)
+        self.assertIn("static void ls_native_Dog__set_speed(void*, double) { lsbind::report_error(\"field 'Dog.speed' is read-only\"); }", cpp)
+        self.assertIn("{\"ls_native_Animal__get_legs\", reinterpret_cast<const void*>(&ls_native_Animal__get_legs)}", cpp)
+        self.assertIn("\t{\"Dog\", \"Animal\"},\n", cpp)
+        self.assertIn("static const lsbind::Registrar ls_registrar{\"TEST\", ls_declarations, ls_symbols, ls_classes};", cpp)
+
+    def test_empty_pass(self):
+        import codegen_luasharp as ls
+        _, cpp = ls.generate([], {}, "EMPTY")
+        self.assertEqual(cpp, "")
+
+
 if __name__ == "__main__":
     unittest.main()

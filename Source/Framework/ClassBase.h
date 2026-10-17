@@ -146,6 +146,10 @@ public:
 	virtual const LuaClassTypeInfo* get_lua_owner_type() const { return nullptr; }
 
 private:
+	friend class LuaSharpEngine;
+	// The LuaSharp proxy (a GC root slot), or null. Not copied or moved; see LuaSharpEngine.
+	void* script_proxy = nullptr;
+
 	// this is used for interop with lua
 	// this is the table id returned by luaL_ref in the registry
 	// the lua table stores a ptr to this object. when the object is deleted in c++, the table's ptr is nulled

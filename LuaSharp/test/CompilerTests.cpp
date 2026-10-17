@@ -522,6 +522,12 @@ class Calculator {
         static_cast<void>(luasharp::CompileToC("class Derived : Component {}", {{"Component", "", {}, false, false}}));
         throw std::runtime_error("native backend silently accepted a class deriving from an external type");
     } catch (const std::runtime_error& error) { Require(std::string_view(error.what()).find("from external type 'Component'") != std::string_view::npos, std::string("unclear native error: ") + error.what()); }
+    luasharp::ExternalType mode{"Mode"};
+    mode.isEnum = true;
+    mode.members = {{"Off", "Mode", luasharp::SymbolKind::Field}, {"Fast", "Mode", luasharp::SymbolKind::Field}};
+    mode.values = {2, 9};
+    const auto externalEnum = luasharp::CompileToC("Mode m = Mode.Fast;", {mode});
+    Require(externalEnum.c.find("#define LS_Mode_Off ((ls_int)2)") != std::string::npos && externalEnum.c.find("#define LS_Mode_Fast ((ls_int)9)") != std::string::npos, "external enum constants were not emitted");
     rejects("table t = {}; int[] values = t;", "cannot convert between 'table' and 'int[]'");
     rejects("int[] values = {}; table t = values;", "cannot convert between 'table' and 'int[]'");
 }
@@ -1748,6 +1754,45 @@ void TestNativeRegistryMatchesHeader() {
     static_cast<void>(luasharp::NativeModule::Load(std::move(generated), {}));
 }
 
+// Host thunks take and return math types by value with C layouts; Vec2 (8 bytes) goes in a register, the others by reference.
+struct HostVec2 { float x, y; };
+struct HostVec3 { float x, y, z; };
+struct HostMat4 { float m[16]; };
+std::shared_ptr<luasharp::NativeRuntime> g_shapeRuntime;
+int g_shape{};
+HostVec2 ls_native_Shape_half(void*, HostVec2 v) { return {v.x / 2, v.y / 2}; }
+HostVec3 ls_native_Shape_cross(void*, HostVec3 a, HostVec3 b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
+HostMat4 ls_native_Shape_scale(void*, HostMat4 m, double s) { for (auto& v : m.m) v *= static_cast<float>(s); return m; }
+HostVec2 ls_native_Shape_origin(void) { return {1, 2}; }
+void* ls_native_Shape_make(void) { return g_shapeRuntime->NewNativeProxy(g_shapeRuntime->NativeClass("Shape"), &g_shape); }
+
+void TestNativeValueTypeThunks() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    g_shapeRuntime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = g_shapeRuntime;
+        options.symbols = {{"ls_native_Shape_half", reinterpret_cast<const void*>(&ls_native_Shape_half)}, {"ls_native_Shape_cross", reinterpret_cast<const void*>(&ls_native_Shape_cross)},
+            {"ls_native_Shape_scale", reinterpret_cast<const void*>(&ls_native_Shape_scale)}, {"ls_native_Shape_origin", reinterpret_cast<const void*>(&ls_native_Shape_origin)},
+            {"ls_native_Shape_make", reinterpret_cast<const void*>(&ls_native_Shape_make)}};
+        auto module = luasharp::NativeModule::Compile(R"(extern class Shape { Vec2 half(Vec2 v); Vec3 cross(Vec3 a, Vec3 b); Mat4x4 scale(Mat4x4 m, float s); static Vec2 origin(); static Shape make(); }
+Shape s = Shape.make();
+Vec2 h = s.half(Vec2.new(4, 6));
+Vec2 o = Shape.origin();
+Vec3 c = s.cross(Vec3.new(1, 0, 0), Vec3.new(0, 1, 0));
+Mat4x4 m = s.scale(Mat4x4.identity(), 3.0);
+)", options);
+        const auto h = NativeGlobal<HostVec2>(module, "h"), o = NativeGlobal<HostVec2>(module, "o");
+        const auto c = NativeGlobal<HostVec3>(module, "c");
+        const auto m = NativeGlobal<HostMat4>(module, "m");
+        Require(h.x == 2 && h.y == 3 && o.x == 1 && o.y == 2, "Vec2 did not cross the host boundary by value");
+        Require(c.x == 0 && c.y == 0 && c.z == 1, "Vec3 did not cross the host boundary by value");
+        Require(m.m[0] == 3 && m.m[5] == 3 && m.m[1] == 0 && m.m[15] == 3, "Mat4x4 did not cross the host boundary by value");
+        Require(module.LastError().empty(), "value type thunks reported an error: " + module.LastError());
+    }
+    g_shapeRuntime.reset();
+}
+
 void TestStructEmission() {
     const auto generated = luasharp::CompileToC("struct P { int a; Vec3 v; static int make(int x) { return x; } P(int a) { this.a = a; } }\nP p = P(1);\nint r = P.make(2);");
     for (const auto expected : {"struct LS_P {", "LS_P ls_P_new(ls_int a)", "LS_P ls_P_default(void)", "ls_bool ls_P_eq(LS_P a, LS_P b)", "ls_int ls_P_make(ls_int x)", "((*self)).a = a"})
@@ -1819,6 +1864,7 @@ int main() {
         {"native inheritance", TestNativeInheritance},
         {"extern class semantics", TestExternClassSemantics},
         {"native extern classes", TestNativeExternClasses},
+        {"native value type thunks", TestNativeValueTypeThunks},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
     };
 

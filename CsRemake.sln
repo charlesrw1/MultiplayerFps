@@ -60,6 +60,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharpTests", "LuaSharp\L
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharpLsp", "LuaSharp\LuaSharpLsp.vcxproj", "{F4C743BF-7E25-4B3F-B5EA-AF1C1AE3903D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharpLib", "LuaSharp\LuaSharpLib.vcxproj", "{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -218,6 +220,12 @@ Global
 		{F4C743BF-7E25-4B3F-B5EA-AF1C1AE3903D}.NoEditRelease|x64.Build.0 = Release|x64
 		{F4C743BF-7E25-4B3F-B5EA-AF1C1AE3903D}.Release|x64.ActiveCfg = Release|x64
 		{F4C743BF-7E25-4B3F-B5EA-AF1C1AE3903D}.Release|x64.Build.0 = Release|x64
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}.Debug|x64.ActiveCfg = Debug|x64
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}.Debug|x64.Build.0 = Debug|x64
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}.NoEditRelease|x64.ActiveCfg = Release|x64
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}.NoEditRelease|x64.Build.0 = Release|x64
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}.Release|x64.ActiveCfg = Release|x64
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
