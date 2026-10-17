@@ -178,12 +178,13 @@ template <typename T> PropertyInfo element_property() {
 
 template <auto Member, uint16_t Offset>
 PropertyInfo make_property(const char* name, uint32_t flags, const char* custom_type = "", const char* hint = "",
-						   const char* tooltip = "") {
+						   const char* tooltip = "", const char* former_name = nullptr) {
 	using T = typename prop_make::member<decltype(Member)>::type;
 	PropertyInfo p(name, Offset, flags);
 	p.custom_type_str = custom_type;
 	p.range_hint = hint;
 	p.tooltip = tooltip;
+	p.former_name = former_name;
 	prop_make::describe<T>(p, prop_make::value_access<T, &prop_make::locate_member<Member>>());
 	return p;
 }

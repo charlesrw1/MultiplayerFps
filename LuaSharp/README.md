@@ -155,7 +155,8 @@ int dealt = e.damage(3);
 - Members have no bodies, and fields have no initializers. An extern class has at most one constructor and no overloads.
 - An extern class can derive only from another extern class.
 - A script class can derive from an extern class and override its `virtual` methods. The host calls the overrides, and `base.m()` calls the host implementation. The host makes these objects, so `new` in script is an error and constructors have no parameters. See [native-abi.md](docs/native-abi.md#script-classes-that-derive-from-extern-classes).
-- In such a class, `[Editable]` before an instance field shows the field in the editor and serializes it: `[Editable] float speed = 3;`. The field type must be `bool`, `int`, `float`, `string`, `Vec2`, `Vec3` or `Quat`.
+- In such a class, `[Editable]` before an instance field shows the field in the editor and serializes it: `[Editable] float speed = 3;`. The field type must be `bool`, `int`, `float`, `string`, `Vec2`, `Vec3`, `Quat` or an extern class. The engine accepts asset classes (`Texture`, `Model`) and `Entity` for extern-class fields.
+- `[Editor("Name")]` picks a host editor for an editable field, and `[Former("old")]` gives its previous name so that saved data still loads: `[Editable, Editor("BoneNameString")] string bone;`.
 - When the host destroys the object, every script reference to it becomes `null`. A call on a destroyed object reports a runtime error.
 - The host supplies one C function for each member. See [native-abi.md](docs/native-abi.md#extern-classes).
 - The CsRemake engine links `LuaSharpLib.vcxproj` and generates its declarations and thunks. See [native-abi.md](docs/native-abi.md#engine-binding).

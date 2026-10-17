@@ -61,7 +61,7 @@ struct RuntimeAbi {
 // Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.
 struct NativeTypeInfo;
 struct NativeHostOverride { const char* name; void* function; }; // LS_HostOverride
-struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; unsigned long long flags; };
+struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; unsigned long long flags; const char* editor; const char* former; };
 constexpr unsigned long long FieldEditable = 1; // LS_FIELD_EDITABLE
 struct NativeTypeInfo {
     const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind;
@@ -661,9 +661,11 @@ std::vector<NativeEditableField> NativeRuntime::EditableFields(const void* type)
     std::vector<NativeEditableField> result;
     for (const auto& field : Fields(info).subspan(inherited)) {
         if (!(field.flags & FieldEditable)) continue;
-        assert(field.kind != KindOf(NativeValueKind::Struct) || field.type);
+        const bool typed = field.kind == KindOf(NativeValueKind::Struct) || field.kind == KindOf(NativeValueKind::Object);
+        assert(!typed || field.type);
+        const auto text = [](const char* s) { return s ? std::string_view(s) : std::string_view(); };
         result.push_back({field.name, static_cast<size_t>(field.offset), static_cast<NativeValueKind>(field.kind),
-                          field.kind == KindOf(NativeValueKind::Struct) ? std::string_view(field.type->name) : std::string_view()});
+                          typed ? std::string_view(field.type->name) : std::string_view(), text(field.editor), text(field.former)});
     }
     return result;
 }

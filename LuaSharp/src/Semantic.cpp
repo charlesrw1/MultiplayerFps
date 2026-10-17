@@ -367,19 +367,37 @@ private:
             }
         }
     }
-    static bool IsEditable(const SyntaxField& field) {
-        return std::any_of(field.attributes.begin(), field.attributes.end(), [](const SyntaxAttribute& attribute) { return attribute.name == "Editable"; });
+    static const SyntaxAttribute* FindAttribute(const SyntaxField& field, std::string_view name) {
+        const auto found = std::find_if(field.attributes.begin(), field.attributes.end(), [&](const SyntaxAttribute& attribute) { return attribute.name == name; });
+        return found == field.attributes.end() ? nullptr : &*found;
     }
-    // [Editable] is the only attribute. The host stores these types in place (docs/native-abi.md).
+    static bool IsEditable(const SyntaxField& field) { return FindAttribute(field, "Editable") != nullptr; }
+    static std::string AttributeArgument(const SyntaxField& field, std::string_view name) {
+        const auto* attribute = FindAttribute(field, name);
+        return attribute && attribute->argument ? *attribute->argument : std::string();
+    }
+    // [Editable] fields are stored by the host in place (docs/native-abi.md). [Editor("name")] picks the host editor;
+    // [Former("old")] is the previous name of the field, so the host can read data saved under it.
     void CheckAttributes(const SyntaxClass& owner, const SyntaxField& field) {
         static constexpr std::array<std::string_view, 7> editableTypes{"bool", "int", "float", "string", "Vec2", "Vec3", "Quat"};
         StringSet seen;
         for (const auto& attribute : field.attributes) {
-            if (attribute.name != "Editable") { AddDiagnostic("Unknown attribute '" + attribute.name + "'", attribute.span); continue; }
+            const bool takesArgument = attribute.name == "Editor" || attribute.name == "Former";
+            if (attribute.name != "Editable" && !takesArgument) { AddDiagnostic("Unknown attribute '" + attribute.name + "'", attribute.span); continue; }
             if (!seen.insert(attribute.name).second) { AddDiagnostic("Duplicate attribute '" + attribute.name + "'", attribute.span); continue; }
+            if (takesArgument != attribute.argument.has_value()) {
+                AddDiagnostic(takesArgument ? "[" + attribute.name + "] needs a name argument" : "[" + attribute.name + "] takes no argument", attribute.span);
+                continue;
+            }
+            if (takesArgument) {
+                if (!IsEditable(field)) AddDiagnostic("[" + attribute.name + "] applies only to an [Editable] field (" + field.name + ")", attribute.span);
+                else if (attribute.argument->empty() || !std::all_of(attribute.argument->begin(), attribute.argument->end(), [](unsigned char ch) { return std::isalnum(ch) || ch == '_'; }))
+                    AddDiagnostic("The argument of [" + attribute.name + "] must be a name of letters, digits and '_'", attribute.span);
+                continue;
+            }
             if (field.isStatic || owner.isStruct || owner.isExtern) AddDiagnostic("Only an instance field of a script class can be [Editable] (" + field.name + ")", attribute.span);
-            else if (std::find(editableTypes.begin(), editableTypes.end(), field.type) == editableTypes.end())
-                AddDiagnostic("[Editable] field '" + field.name + "' must be bool, int, float, string, Vec2, Vec3 or Quat", attribute.span);
+            else if (std::find(editableTypes.begin(), editableTypes.end(), field.type) == editableTypes.end() && !nativeTypes_.contains(field.type))
+                AddDiagnostic("[Editable] field '" + field.name + "' must be bool, int, float, string, Vec2, Vec3, Quat or an extern class", attribute.span);
         }
     }
     // The nearest extern class that a script class derives from; empty when there is none.
@@ -1110,6 +1128,8 @@ private:
             for (const auto& field : value.fields) {
                 BoundField boundField; boundField.access = field.access; boundField.type = field.type; boundField.name = field.name; boundField.span = field.span; boundField.isStatic = field.isStatic;
                 boundField.isEditable = IsEditable(field);
+                boundField.editor = AttributeArgument(field, "Editor");
+                boundField.former = AttributeArgument(field, "Former");
                 const auto& initializer = Syntax().Expression(field.initializer);
                 if (initializer.kind != SyntaxExpression::Kind::Missing) {
                     std::vector<Local> none; boundField.initializer = AllocateExpressions(1);

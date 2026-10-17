@@ -157,6 +157,24 @@ private:
         if (!AtEnd() && Current().kind != SyntaxTokenKind::Symbol) return Advance();
         return {SyntaxTokenKind::Bad, "<missing>", {Current().span.offset, 0}};
     }
+    // The attributes between `[` and `]`.
+    void ParseAttributes(std::vector<SyntaxAttribute>& attributes) {
+        do {
+            const auto name = Identifier("attribute name");
+            SyntaxAttribute attribute{name.text, name.span};
+            if (Is("(")) {
+                Advance();
+                const auto& argument = Current();
+                // A plain name in quotes; escapes are not decoded.
+                if (argument.kind == SyntaxTokenKind::String && argument.text.size() >= 2 && argument.text.find('\\') == std::string::npos)
+                    attribute.argument = Advance().text.substr(1, argument.text.size() - 2);
+                else
+                    tree_.diagnostics.push_back({"Expected a string literal without escapes as the attribute argument", argument.span});
+                Match(")");
+            }
+            attributes.push_back(std::move(attribute));
+        } while (Is(",") && (Advance(), true));
+    }
     SyntaxToken MemberName() {
         if (Current().kind == SyntaxTokenKind::Identifier || Current().kind == SyntaxTokenKind::Keyword) return Advance();
         tree_.diagnostics.push_back({"Expected member name", Current().span});
@@ -322,7 +340,7 @@ private:
             if ((Is("public") || Is("private")) && Is(":", 1)) { access = Advance().text; Advance(); continue; }
             const size_t before = index_;
             std::vector<SyntaxAttribute> attributes;
-            while (Is("[")) { Advance(); const auto attribute = Identifier("attribute name"); attributes.push_back({attribute.text, attribute.span}); Match("]"); }
+            while (Is("[")) { Advance(); ParseAttributes(attributes); Match("]"); }
             const auto modifiers = ParseModifiers();
             const auto first = Identifier();
             const auto rejectAttributes = [&] { for (const auto& attribute : attributes) tree_.diagnostics.push_back({"Only fields can have attributes", attribute.span}); };

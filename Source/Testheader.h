@@ -11,6 +11,7 @@
 #include "Assets/IAsset.h"
 #include "Game/EntityPtr.h"
 #include "Framework/Util.h"
+#include "Framework/SavedFields.h"
 
 // LuaSharp binding tests (luasharp_engine_test.cpp). Values are not ordinals, so the thunks must map them.
 NEWENUM(LsTestMode, uint8_t){
@@ -163,4 +164,22 @@ public:
 	REF AssetPtr<IAsset> asset;
 	REF obj<Entity> target;
 	REF Color32 tint = COLOR_RED;
+};
+
+// Saved-data renames and upgrades (property_access_test.cpp). Version 2 renamed "power" to "strength" and doubled it.
+class PropUpgradeTestThing : public ClassBase
+{
+public:
+	CLASS_BODY(PropUpgradeTestThing);
+	REFLECT(former = health)
+	int hp = 10;
+	REF int strength = 1;
+	int get_data_version() const override { return 2; }
+	void upgrade_data(int from_version, SavedFields& fields) override {
+		if (from_version >= 2)
+			return;
+		fields.rename("power", "strength");
+		if (fields.has("strength"))
+			fields.json()["strength"] = fields.json()["strength"].get<int>() * 2;
+	}
 };

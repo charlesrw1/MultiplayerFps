@@ -1734,13 +1734,15 @@ long long UnitHit(void* self, long long amount) {
 void* UnitName(void*) { return g_unitRuntime->Intern("unit"); }
 long long UnitPlain(void*) { return 7; }
 
-constexpr std::string_view UnitDeclarations = "extern class Unit { int hp; virtual int hit(int amount); virtual string name(); int plain(); }";
+constexpr std::string_view UnitDeclarations = "extern class Unit { int hp; virtual int hit(int amount); virtual string name(); int plain(); }\nextern class Gear { }";
 constexpr std::string_view UnitScript = R"(class Guard : Unit {
     int armor = 2;
     int made;
     [Editable] float speed = 1.5;
     [Editable] string tag = "g";
     [Editable] Vec3 home;
+    [Editable, Editor("Slider"), Former("velocity")] float pace = 2.0;
+    [Editable] Gear gear;
     Guard() { made = hp + plain(); }
     override int hit(int amount) { return base.hit(amount - armor) + 1000; }
     int heal() { hp = hp + 5; return this.hp; }
@@ -1769,6 +1771,12 @@ void TestDerivedExternClassSemantics() {
     Require(has("class G : Unit { [Fancy] int x; }", "Unknown attribute 'Fancy'"), "an unknown attribute was accepted");
     Require(has("class G : Unit { [Editable] [Editable] int x; }", "Duplicate attribute"), "a duplicate attribute was accepted");
     Require(has("class G : Unit { [Editable] int f() { return 1; } }", "Only fields can have attributes"), "an attribute on a method was accepted");
+    Require(has("class G : Unit { [Editable, Editor] int x; }", "[Editor] needs a name argument"), "[Editor] without an argument was accepted");
+    Require(has("class G : Unit { [Editable(\"x\")] int x; }", "[Editable] takes no argument"), "[Editable] with an argument was accepted");
+    Require(has("class G : Unit { [Former(\"y\")] int x; }", "applies only to an [Editable] field"), "[Former] without [Editable] was accepted");
+    Require(has("class G : Unit { [Editable, Editor(\"a b\")] int x; }", "must be a name"), "an [Editor] name with a space was accepted");
+    Require(has("class G : Unit { [Editable, Editor(x)] int x; }", "Expected a string literal"), "an attribute argument that is not a string was accepted");
+    Require(!has("class G : Unit { [Editable] Unit other; }", "must be bool"), "an [Editable] extern-class field was rejected");
     const auto valid = luasharp::Analyze(std::string(UnitDeclarations) + "\n" + std::string(UnitScript));
     Require(valid.diagnostics.empty(), "a valid derived class produced diagnostics: " + (valid.diagnostics.empty() ? std::string() : valid.diagnostics.front().message));
 
@@ -1776,7 +1784,9 @@ void TestDerivedExternClassSemantics() {
     for (const auto expected : {"void* ls_native; /* LS_NativeObject.native */", "LS_KIND_OBJECT, &ls_type_Unit, ls_vtable_Guard, LS_TYPE_NATIVE_BASE, 1, ls_host_overrides_Guard};",
                                 "{\"hit\", (void*)ls_Guard_hit},", "{\"name\", (void*)ls_Captain_name},", "extern ls_int ls_native_Unit__base_hit(void* self, ls_int amount);",
                                 "ls_Unit__base_hit((LS_Unit*)self", "LS_Guard* ls_Guard__host_alloc(void)", "ls_Unit__get_hp((LS_Unit*)self)", "ls_Unit__set_hp(", "ls_Unit_plain((LS_Unit*)self)",
-                                "{\"armor\", ls_offsetof(LS_Guard, armor), LS_KIND_INT, 0, (const LS_TypeInfo*)0, 0},", "{\"home\", ls_offsetof(LS_Guard, home), LS_KIND_STRUCT, 0, &ls_type_Vec3, LS_FIELD_EDITABLE},",
+                                "{\"armor\", ls_offsetof(LS_Guard, armor), LS_KIND_INT, 0, (const LS_TypeInfo*)0, 0, (const char*)0, (const char*)0},",
+                                "{\"home\", ls_offsetof(LS_Guard, home), LS_KIND_STRUCT, 0, &ls_type_Vec3, LS_FIELD_EDITABLE, (const char*)0, (const char*)0},",
+                                "LS_FIELD_EDITABLE, \"Slider\", \"velocity\"},", "{\"gear\", ls_offsetof(LS_Guard, gear), LS_KIND_OBJECT, 0, &ls_type_Gear, LS_FIELD_EDITABLE,",
                                 "const LS_TypeInfo* ls_Captain__type(void) { return &ls_type_Captain; }"})
         Require(generated.c.find(expected) != std::string::npos, std::string("missing derived extern class lowering: ") + expected);
     Require(generated.c.find("ls_Guard_new") == std::string::npos, "a class that derives from an extern class got a script constructor");
@@ -1833,8 +1843,11 @@ void TestNativeDerivedExternClasses() {
         Require(NativeRuntime::TypeName(captainType) == "Captain" && NativeRuntime::NativeBaseTypeName(captainType) == "Unit", "host class names were wrong");
         Require(NativeRuntime::ScriptBaseType(captainType) == guardType && !NativeRuntime::ScriptBaseType(guardType), "host class bases were wrong");
         const auto guardFields = NativeRuntime::EditableFields(guardType);
-        Require(guardFields.size() == 3 && guardFields[0].name == "speed" && guardFields[0].kind == NativeValueKind::Float && guardFields[1].kind == NativeValueKind::String &&
-                guardFields[2].kind == NativeValueKind::Struct && guardFields[2].structName == "Vec3", "Guard's editable fields were wrong");
+        Require(guardFields.size() == 5 && guardFields[0].name == "speed" && guardFields[0].kind == NativeValueKind::Float && guardFields[1].kind == NativeValueKind::String &&
+                guardFields[2].kind == NativeValueKind::Struct && guardFields[2].typeName == "Vec3", "Guard's editable fields were wrong");
+        Require(guardFields[3].editor == "Slider" && guardFields[3].former == "velocity" && guardFields[0].editor.empty() && guardFields[0].former.empty(),
+                "the [Editor] and [Former] names were wrong");
+        Require(guardFields[4].kind == NativeValueKind::Object && guardFields[4].typeName == "Gear", "an extern-class field did not name its class");
         const auto captainFields = NativeRuntime::EditableFields(captainType);
         Require(captainFields.size() == 1 && captainFields[0].name == "brave" && captainFields[0].kind == NativeValueKind::Bool, "Captain's editable fields included inherited ones");
         *reinterpret_cast<double*>(static_cast<char*>(captain) + guardFields[0].offset) = 4.25; // the host edits a field in place

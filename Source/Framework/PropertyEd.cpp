@@ -16,10 +16,6 @@ static uint32_t color32_to_uint(Color32 color) {
 IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,
 					 int row_idx, uint32_t property_flag_mask);
 
-// Defined in PropertyEdWidgets.cpp
-std::unique_ptr<IPropertyEditor> create_ipropertyed(const FnFactory<IPropertyEditor>& factory, PropertyInfo* prop,
-													void* instance, IGridRow* parent);
-
 // ---- UniquePtrRow ----
 
 class UniquePtrRow : public IGridRow

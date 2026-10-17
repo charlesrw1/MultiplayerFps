@@ -46,6 +46,8 @@ struct Serializer
 	// Handles both loading and saving
 	void serialize_property(PropertyPtr ptr);
 	void serialize_property_ar(PropertyPtr ptr);
+	// A value property (PropertyInfo::has_value), in a dict (tag) or an array (null tag). False when not found.
+	bool serialize_value(const char* tag, const PropertyInfo& prop, void* inst);
 
 	virtual bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) = 0;
 	virtual void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) = 0;
@@ -61,6 +63,10 @@ struct Serializer
 	bool is_saving() { return !is_loading(); }
 
 	virtual const char* get_debug_tag() = 0;
+
+private:
+	void serialize_property_shared(const char* tag, PropertyPtr ptr);
+	template <typename T> bool serialize_tagged(const char* tag, T& value);
 };
 
 class BaseUpdater;

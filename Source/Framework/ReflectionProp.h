@@ -40,7 +40,7 @@ enum class core_type_id : uint8_t
 
 	// LuaSharp script fields (PROP_SCRIPT_FIELD)
 	Double,
-	ScriptString, // a GC string; read and write it with PropertyInfo::get/set_script_string
+	ScriptString, // a GC string; only through get_value/set_value
 
 	// MulticastDelegate,
 };
@@ -69,33 +69,11 @@ enum SerializedPropFlags
 	// reflection-backed editor + serializer can read/write Lua-authored fields with no code changes.
 	PROP_LUA_BACKED = 64,
 
-	// Storage is in the LuaSharp script object of the owning ClassBase (offset is from its start).
-	// Set on the PropertyInfos of [Editable] fields of LuaSharp classes (LuaSharpEngine).
+	// Storage is in the LuaSharp script object of the owning ClassBase (offset is from its start). Only the
+	// accessor (LuaSharpEngine) reaches it; get_ptr asserts. Set on the [Editable] fields of LuaSharp classes.
 	PROP_SCRIPT_FIELD = 128,
 };
 
-// Access to core_type_id::ScriptString storage. The scripting engine that owns the strings sets these.
-struct ScriptStringAccess
-{
-	std::string (*read)(const void* slot) = nullptr;
-	void (*write)(void* slot, std::string_view text) = nullptr;
-};
-extern ScriptStringAccess g_script_strings;
-
-struct ParsedHintStr
-{
-	bool has_default = false;
-	bool has_min = false;
-	bool has_max = false;
-	float default_f = 0.0f;
-	int default_i = 0;
-	float min_f = -9999.f;
-	float max_f = 9999.f;
-	int min_i = INT32_MIN;
-	int max_i = INT32_MAX;
-	float step_f = 0.1f;
-	int step_i = 1;
-};
 
 // Structured per-property attributes populated by codegen from REFLECT(...) kwargs.
 // Unset means "no constraint": min/max use sentinel +/-FLT_MAX, step==0 disables stepping.
@@ -157,6 +135,8 @@ struct PropertyInfo
 	const PropertyAccess* access = nullptr;
 	// The class whose objects hold this property; set by the class type. Null for struct members and list elements.
 	const ClassTypeInfo* owner = nullptr;
+	// The previous name (REFLECT(former=...), LuaSharp [Former("...")]): readers use it when name is missing.
+	const char* former_name = nullptr;
 
 	// SerializePropFunc_t serialize_func = nullptr;
 	// UnSerializePropFunc_t unserialize_func = nullptr;
@@ -186,8 +166,6 @@ struct PropertyInfo
 	uint64_t get_int(const void* ptr) const;
 	void set_int(void* ptr, uint64_t i) const;
 
-	std::string get_script_string(const void* inst) const;
-	void set_script_string(void* inst, std::string_view text) const;
 
 	bool can_edit() const { return flags & PROP_EDITABLE; }
 	bool can_serialize() const { return flags & PROP_SERIALIZE; }
@@ -205,7 +183,6 @@ struct FunctionInfo
 	int (*lua_c_function)(lua_State* state) = nullptr;
 };
 
-ParsedHintStr parse_hint_str_for_property(PropertyInfo* prop);
 PropertyInfo make_bool_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
 PropertyInfo make_integer_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const char* hint = "",
 								   const char* customtype = "");

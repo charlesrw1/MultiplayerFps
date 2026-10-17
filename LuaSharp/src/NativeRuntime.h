@@ -10,7 +10,7 @@
 namespace luasharp {
 
 // Must equal LS_ABI_VERSION in runtime/luasharp/runtime.h.
-constexpr unsigned long long NativeAbiVersion = 12;
+constexpr unsigned long long NativeAbiVersion = 13;
 
 using NativeTraceFunction =void (*)(void* runtimeContext, void* object);
 using NativeFinalizeFunction = void (*)(void* object);
@@ -40,7 +40,9 @@ struct NativeEditableField {
     std::string_view name;
     size_t offset{};
     NativeValueKind kind{};
-    std::string_view structName; // Struct fields: Vec2, Vec3 or Quat
+    std::string_view typeName; // Struct fields: Vec2, Vec3 or Quat; Object fields: the extern class
+    std::string_view editor;   // [Editor("name")], or empty
+    std::string_view former;   // [Former("old")], or empty
 };
 
 // Shared, non-moving native heap. Collection is stop-the-world: callers must

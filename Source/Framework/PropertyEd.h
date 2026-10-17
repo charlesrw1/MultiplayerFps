@@ -106,6 +106,9 @@ public:
 };
 
 template <typename T> class FnFactory;
+// The editor of a value property: the factory editor named by custom_type_str, else the one for its type.
+std::unique_ptr<IPropertyEditor> create_ipropertyed(const FnFactory<IPropertyEditor>& factory, PropertyInfo* prop,
+													void* instance, IGridRow* parent);
 
 enum PropertyGridFlags
 { PG_LIST_PASSTHROUGH = 1 };
@@ -229,103 +232,6 @@ public:
 	PropertyInfo* prop = nullptr;
 
 	std::unique_ptr<IPropertyEditor> prop_editor = nullptr;
-};
-
-class StringEditor : public IPropertyEditor
-{
-public:
-	StringEditor(void* inst, PropertyInfo* prop) {
-		this->instance = inst;
-		this->prop = prop;
-	}
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-
-	virtual bool can_reset() override;
-	virtual void reset_value() override;
-};
-
-class StringNameEditor : public IPropertyEditor
-{
-public:
-	StringNameEditor(void* inst, PropertyInfo* prop) {
-		this->instance = inst;
-		this->prop = prop;
-	}
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-
-private:
-	bool init_ = false;
-	char buf_[128] = {};
-};
-
-class FloatEditor : public IPropertyEditor
-{
-public:
-	FloatEditor(void* inst, PropertyInfo* prop) {
-		this->instance = inst;
-		this->prop = prop;
-		// hint_str = parse_hint_str_for_property(prop);
-	}
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-
-	virtual bool can_reset() override {
-		return hint_str.has_default && (abs(prop->get_float(instance) - hint_str.default_f) > 0.000001);
-	}
-	virtual void reset_value() override { prop->set_float(instance, hint_str.default_f); }
-
-	ParsedHintStr hint_str;
-};
-
-class IntegerEditor : public IPropertyEditor
-{
-public:
-	IntegerEditor(void* inst, PropertyInfo* prop) {
-		this->instance = inst;
-		this->prop = prop;
-		// hint_str = parse_hint_str_for_property(prop);
-	}
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-	virtual bool can_reset() override { return hint_str.has_default && prop->get_int(instance) != hint_str.default_i; }
-	virtual void reset_value() override { prop->set_int(instance, hint_str.default_i); }
-	ParsedHintStr hint_str;
-};
-
-class EnumEditor : public IPropertyEditor
-{
-public:
-	EnumEditor(void* inst, PropertyInfo* prop) {
-		this->instance = inst;
-		this->prop = prop;
-		// hint_str = parse_hint_str_for_property(prop);
-	}
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-	virtual bool can_reset() override { return hint_str.has_default && prop->get_int(instance) != hint_str.default_i; }
-	virtual void reset_value() override { prop->set_int(instance, hint_str.default_i); }
-	ParsedHintStr hint_str;
-};
-
-class BooleanEditor : public IPropertyEditor
-{
-public:
-	BooleanEditor(void* inst, PropertyInfo* prop) {
-		this->instance = inst;
-		this->prop = prop;
-		// hint_str = parse_hint_str_for_property(prop);
-	}
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-	virtual bool can_reset() override { return hint_str.has_default && prop->get_int(instance) != hint_str.default_i; }
-	virtual void reset_value() override { prop->set_int(instance, hint_str.default_i); }
-	ParsedHintStr hint_str;
 };
 
 #endif

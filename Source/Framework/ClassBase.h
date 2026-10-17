@@ -67,6 +67,7 @@ private:
 	static const PropertyInfoList* get_props();
 
 struct Serializer;
+class SavedFields;
 struct TypeInfoWithExtra;
 class ClassBase
 {
@@ -81,6 +82,11 @@ public:
 	ClassBase(ClassBase&& other);
 
 	virtual void serialize(Serializer& s) {} // override to add custom serialization functionality
+	// The version of the saved form of this class. Raise it when that form changes, and convert older data in
+	// upgrade_data. A field rename needs only REFLECT(former=old_name).
+	virtual int get_data_version() const { return 0; }
+	// Converts fields saved by version from_version (lower than get_data_version()) before they are read.
+	virtual void upgrade_data(int from_version, SavedFields& fields) {}
 	// cast this class to type T, returns nullptr if failed
 	template <typename T> const T* cast_to() const { return (is_a<T>() ? static_cast<const T*>(this) : nullptr); }
 	template <typename T> T* cast_to() { return (is_a<T>() ? static_cast<T*>(this) : nullptr); }

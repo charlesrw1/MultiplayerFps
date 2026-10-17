@@ -4,6 +4,12 @@
 #include "Log.h"
 #include "SerializedForDiffing.h"
 #include "LevelSerialization/SerializeNew.h"
+#include "Framework/SavedFields.h"
+
+// The key of the data version of a class. The entity and its component share one JSON object, so it names the class.
+static std::string data_version_key(const ClassBase& obj) {
+	return std::string("__data_version:") + obj.get_type().classname;
+}
 
 // extern string serialize_build_relative_path(const char* from, const char* to);
 // extern string unserialize_relative_to_absolute(const char* relative, const char* root);
@@ -40,6 +46,9 @@ WriteSerializerBackendJson2::WriteSerializerBackendJson2(const char* debug_tag, 
 	if (diff) {
 		(*stack.back().ptr) = JsonSerializerUtil::diff_json(diff->jsonObj, (*stack.back().ptr));
 	}
+	// After the diff, which would remove it: the default object has the same version.
+	if (const int version = ptr->get_data_version(); version > 0)
+		(*stack.back().ptr)[data_version_key(*ptr)] = version;
 	stack.pop_back();
 }
 
@@ -113,6 +122,7 @@ ReadSerializerBackendJson2::ReadSerializerBackendJson2(const char* debug_tag, nl
 
 void ReadSerializerBackendJson2::load_shared() {
 	stack.push_back(obj);
+	upgrade_if_old();
 
 	rootobj.serialize(*this);
 	for (PropertyPtr property : ClassPropPtr(&rootobj)) {
@@ -140,6 +150,21 @@ void ReadSerializerBackendJson2::load_shared() {
 	}
 	stack.pop_back();
 	assert(stack.empty());
+}
+
+void ReadSerializerBackendJson2::upgrade_if_old() {
+	if (!obj->is_object())
+		return;
+	const std::string key = data_version_key(rootobj);
+	const int saved = obj->contains(key) && (*obj)[key].is_number_integer() ? (*obj)[key].get<int>() : 0;
+	const int current = rootobj.get_data_version();
+	if (saved > current)
+		sys_print(Warning, "ReadSerializerBackendJson2(%s): %s data has version %d, newer than this build (%d)\n",
+				  get_debug_tag(), rootobj.get_type().classname, saved, current);
+	if (saved >= current)
+		return;
+	SavedFields fields(*obj);
+	rootobj.upgrade_data(saved, fields);
 }
 
 bool ReadSerializerBackendJson2::serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {

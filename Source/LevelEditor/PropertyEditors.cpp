@@ -440,39 +440,26 @@ bool SharedAssetPropertyEditor::internal_update() {
 }
 
 std::string AssetPropertyEditor::get_str() {
-	auto ptr = (IAsset**)prop->get_ptr(instance);
-	return (*ptr) ? (*ptr)->get_name() : "";
+	IAsset* asset = prop->get<IAsset*>(instance);
+	return asset ? asset->get_name() : "";
 }
 
 void AssetPropertyEditor::set_asset(const std::string& str) {
-	auto ptr = (IAsset**)prop->get_ptr(instance);
-	if (str.empty()) {
-		*ptr = nullptr;
-	} else {
-		auto classtype = prop->class_type;
-		auto asset = g_assets.generic_find(str, classtype).get(); // loader->load_asset(resource->filename);
-		*ptr = asset;
-	}
+	IAsset* asset = str.empty() ? nullptr : g_assets.generic_find(str, prop->class_type).get();
+	prop->set(instance, asset);
 }
 
 bool AssetPropertyEditor::get_failed_load() const {
-	auto ptr = *(IAsset**)prop->get_ptr(instance);
-	if (ptr && ptr->did_load_fail())
-		return true;
-	return false;
+	IAsset* asset = prop->get<IAsset*>(instance);
+	return asset && asset->did_load_fail();
 }
 
 bool ColorEditor::internal_update() {
-	assert(prop->type == core_type_id::Int32);
-	Color32* c = (Color32*)prop->get_ptr(instance);
-	ImVec4 col = ImGui::ColorConvertU32ToFloat4(c->to_uint());
-	if (ImGui::ColorEdit3("##coloredit", &col.x)) {
-		auto uint_col = ImGui::ColorConvertFloat4ToU32(col);
-		uint32_t* prop_int = (uint32_t*)prop->get_ptr(instance);
-		*prop_int = uint_col;
-		return true;
-	}
-	return false;
+	ImVec4 col = ImGui::ColorConvertU32ToFloat4(prop->get<Color32>(instance).to_uint());
+	if (!ImGui::ColorEdit3("##coloredit", &col.x))
+		return false;
+	prop->set(instance, Color32(ImGui::ColorConvertFloat4ToU32(col)));
+	return true;
 }
 
 int ColorEditor::extra_row_count() {
@@ -480,13 +467,12 @@ int ColorEditor::extra_row_count() {
 }
 
 bool ColorEditor::can_reset() {
-	Color32* c = (Color32*)prop->get_ptr(instance);
-	return c->r != 255 || c->g != 255 || c->b != 255;
+	const Color32 c = prop->get<Color32>(instance);
+	return c.r != 255 || c.g != 255 || c.b != 255;
 }
 
 void ColorEditor::reset_value() {
-	Color32* c = (Color32*)prop->get_ptr(instance);
-	*c = COLOR_WHITE;
+	prop->set(instance, COLOR_WHITE);
 }
 
 bool ButtonPropertyEditor::internal_update() {
@@ -507,31 +493,33 @@ bool ButtonPropertyEditor::can_reset() {
 }
 
 bool RagdollGroupMaskEditor::internal_update() {
-	uint8_t* mask = prop->get_ptr(instance);
+	uint8_t mask = prop->get<uint8_t>(instance);
 	static const char* names[] = {"Torso", "Head", "Arm Left", "Arm Right", "Leg Left", "Leg Right"};
 	bool changed = false;
 	for (int i = 1; i <= 6; i++) {
 		uint8_t bit = (uint8_t)(1 << i);
-		bool on = (*mask & bit) != 0;
+		bool on = (mask & bit) != 0;
 		if (ImGui::Checkbox(names[i - 1], &on)) {
 			if (on)
-				*mask |= bit;
+				mask |= bit;
 			else
-				*mask &= ~bit;
+				mask &= ~bit;
 			changed = true;
 		}
 		if (i != 6)
 			ImGui::SameLine();
 	}
 	if (ImGui::SmallButton("All")) {
-		*mask = 0xFF;
+		mask = 0xFF;
 		changed = true;
 	}
 	ImGui::SameLine();
 	if (ImGui::SmallButton("None")) {
-		*mask = 0;
+		mask = 0;
 		changed = true;
 	}
+	if (changed)
+		prop->set(instance, mask);
 	return changed;
 }
 
@@ -592,12 +580,14 @@ public:
 #include "Game/Entity.h"
 bool EntityTransformCopyEditor::internal_update() {
 	ASSERT(prop && instance);
-	glm::vec3* v = (glm::vec3*)prop->get_ptr(instance);
+	glm::vec3 v = prop->get<glm::vec3>(instance);
 
 	// Leave room on the right for the copy button (square, one frame high).
 	const float button_w = ImGui::GetFrameHeight();
 	ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - button_w - ImGui::GetStyle().ItemSpacing.x);
-	bool ret = ImGui::DragFloat3("##vec", (float*)v, 0.05f);
+	bool ret = ImGui::DragFloat3("##vec", &v.x, 0.05f);
+	if (ret)
+		prop->set(instance, v);
 
 	ImGui::SameLine();
 	auto* ent = (Entity*)instance;
@@ -637,6 +627,7 @@ void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEdi
 	factory.add("EntityBoneParentString", []() { return new EntityBoneParentStringEditor; });
 	factory.add("EditorNameString", []() { return new EditorNameStringEditor; });
 	factory.add("EntityTarget", [&doc]() { return new EntityTargetEditor(&doc); });
+	factory.add("ObjPtr", [&doc]() { return new EntityTargetEditor(&doc); });
 	factory.add("BoneNameString", []() { return new BoneNameStringEditor; });
 	factory.add("EntityTransformCopy", []() { return new EntityTransformCopyEditor; });
 }
@@ -735,14 +726,14 @@ bool ClassTypePtrPropertyEditor::internal_update() {
 	assert(type_of_base);
 
 	bool has_update = false;
-	const ClassTypeInfo** ptr_prop = (const ClassTypeInfo**)prop->get_ptr(instance);
-	const char* preview = (*ptr_prop) ? (*ptr_prop)->classname : "<empty>";
+	const ClassTypeInfo* current = prop->get<const ClassTypeInfo*>(instance);
+	const char* preview = current ? current->classname : "<empty>";
 	if (ImGui::BeginCombo("##combocalsstype", preview)) {
 		auto subclasses = ClassBase::get_subclasses(type_of_base);
 		for (; !subclasses.is_end(); subclasses.next()) {
 
-			if (ImGui::Selectable(subclasses.get_type()->classname, subclasses.get_type() == *ptr_prop)) {
-				*ptr_prop = subclasses.get_type();
+			if (ImGui::Selectable(subclasses.get_type()->classname, subclasses.get_type() == current)) {
+				prop->set(instance, subclasses.get_type());
 				has_update = true;
 			}
 		}
@@ -773,10 +764,8 @@ static bool level_has_name_conflict(const std::string& name, void* skip_instance
 }
 
 bool EditorNameStringEditor::internal_update() {
-	ASSERT(prop->type == core_type_id::StdString);
-	std::string* str = (std::string*)prop->get_ptr(instance);
-
-	name_conflict = level_has_name_conflict(*str, instance);
+	std::string name = prop->get<std::string>(instance);
+	name_conflict = level_has_name_conflict(name, instance);
 
 	auto* dl = ImGui::GetWindowDrawList();
 	auto& style = ImGui::GetStyle();
@@ -786,9 +775,10 @@ bool EditorNameStringEditor::internal_update() {
 	const float input_w = avail - icon_w - style.ItemSpacing.x;
 
 	ImGui::SetNextItemWidth(input_w);
-	bool changed = ImGui::InputText("##edname", (char*)str->c_str(), str->size() + 1,
-		ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, str);
-	if (changed) *str = str->c_str();
+	bool changed = ImGui::InputText("##edname", (char*)name.c_str(), name.size() + 1,
+		ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &name);
+	if (changed)
+		prop->set(instance, std::string(name.c_str()));
 
 	ImGui::SameLine(0, style.ItemSpacing.x);
 	ImVec2 icon_pos = ImGui::GetCursorScreenPos();
@@ -806,13 +796,11 @@ bool EditorNameStringEditor::internal_update() {
 }
 
 bool EditorNameStringEditor::can_reset() {
-	std::string* str = (std::string*)prop->get_ptr(instance);
-	return !str->empty();
+	return !prop->get<std::string>(instance).empty();
 }
 
 void EditorNameStringEditor::reset_value() {
-	std::string* str = (std::string*)prop->get_ptr(instance);
-	str->clear();
+	prop->set(instance, std::string());
 }
 
 // ---------------------------------------------------------------------------
@@ -844,7 +832,7 @@ EntityTargetEditor::EntityTargetEditor(EditorDoc* doc) : doc(doc) {
 	mb_handle = idraw->get_scene()->register_meshbuilder();
 	doc->on_eyedropper_callback.add(this, [this](const Entity* picked) {
 		if (this->doc->get_active_eyedropper_user_id() == this && picked) {
-			set_str(picked->get_editor_name());
+			set_target(picked);
 		}
 	});
 }
@@ -854,16 +842,36 @@ EntityTargetEditor::~EntityTargetEditor() {
 	doc->on_eyedropper_callback.remove(this);
 }
 
-std::string EntityTargetEditor::get_str() const {
-	return *(std::string*)prop->get_ptr(instance);
+bool EntityTargetEditor::by_name() const {
+	ASSERT(prop->type == core_type_id::StdString || prop->type == core_type_id::ObjHandlePtr);
+	return prop->type == core_type_id::StdString;
 }
 
-void EntityTargetEditor::set_str(const std::string& v) {
-	*(std::string*)prop->get_ptr(instance) = v;
+bool EntityTargetEditor::has_target() const {
+	return by_name() ? !prop->get<std::string>(instance).empty() : prop->get<EntityRef>(instance).handle != 0;
 }
 
 Entity* EntityTargetEditor::find_target() const {
-	return find_entity_by_name(get_str());
+	if (by_name())
+		return find_entity_by_name(prop->get<std::string>(instance));
+	return EntityPtr(prop->get<EntityRef>(instance).handle).get();
+}
+
+std::string EntityTargetEditor::target_label() const {
+	if (by_name())
+		return prop->get<std::string>(instance);
+	const int64_t handle = prop->get<EntityRef>(instance).handle;
+	Entity* target = find_target();
+	if (target && !target->get_editor_name().empty())
+		return target->get_editor_name();
+	return "Entity #" + std::to_string(handle);
+}
+
+void EntityTargetEditor::set_target(const Entity* target) {
+	if (by_name())
+		prop->set(instance, target ? target->get_editor_name() : std::string());
+	else
+		prop->set(instance, EntityRef{target ? target->get_instance_id() : 0});
 }
 
 void EntityTargetEditor::rebuild_debug_line() {
@@ -889,9 +897,9 @@ void EntityTargetEditor::rebuild_debug_line() {
 }
 
 bool EntityTargetEditor::internal_update() {
-	ASSERT(prop->type == core_type_id::StdString);
-	std::string cur = get_str();
-	target_valid = find_entity_by_name(cur) != nullptr || cur.empty();
+	const bool has_value = has_target();
+	const std::string cur = has_value ? target_label() : std::string();
+	target_valid = !has_value || find_target() != nullptr;
 
 	auto* dl = ImGui::GetWindowDrawList();
 	auto& style = ImGui::GetStyle();
@@ -904,7 +912,7 @@ bool EntityTargetEditor::internal_update() {
 	ImGui::BeginGroup();
 
 	const float row1_input_w = avail - icon_w - style.ItemSpacing.x;
-	const char* preview = cur.empty() ? "<none>" : cur.c_str();
+	const char* preview = has_value ? cur.c_str() : "<none>";
 	ImGui::SetNextItemWidth(row1_input_w);
 	if (ImGui::BeginCombo("##etcombo", preview, ImGuiComboFlags_HeightLarge)) {
 		if (set_keyboard_focus) {
@@ -917,9 +925,8 @@ bool EntityTargetEditor::internal_update() {
 			filter_buf = filter_buf.c_str();
 
 		auto filter_lower = StringUtils::to_lower(filter_buf);
-		if (ImGui::Selectable("<none>", cur.empty())) {
-			set_str("");
-			cur.clear();
+		if (ImGui::Selectable("<none>", !has_value)) {
+			set_target(nullptr);
 			changed = true;
 		}
 		auto* level = eng->get_level();
@@ -933,8 +940,7 @@ bool EntityTargetEditor::internal_update() {
 					if (lower.find(filter_lower) == std::string::npos) continue;
 				}
 				if (ImGui::Selectable(name.c_str(), name == cur)) {
-					set_str(name);
-					cur = name;
+					set_target(e);
 					changed = true;
 				}
 			}
@@ -951,14 +957,14 @@ bool EntityTargetEditor::internal_update() {
 		ImGui::Dummy(ImVec2(icon_w, fh));
 		const float r = fh * 0.35f;
 		ImVec2 center = ImVec2(icon_pos.x + icon_w * 0.5f, icon_pos.y + fh * 0.5f);
-		if (cur.empty())
+		if (!has_value)
 			dl->AddCircleFilled(center, r, IM_COL32(120, 120, 120, 180));
 		else if (target_valid)
 			dl->AddCircleFilled(center, r, IM_COL32(60, 200, 80, 255));
 		else
 			dl->AddCircleFilled(center, r, IM_COL32(220, 60, 60, 255));
 		if (ImGui::IsItemHovered()) {
-			if (cur.empty()) ImGui::SetTooltip("No target");
+			if (!has_value) ImGui::SetTooltip("No target");
 			else if (target_valid) ImGui::SetTooltip("Target found: %s", cur.c_str());
 			else ImGui::SetTooltip("Entity not found: %s", cur.c_str());
 		}
@@ -971,7 +977,7 @@ bool EntityTargetEditor::internal_update() {
 
 		const bool in_eyedrop = doc->is_in_eyedropper_mode() &&
 		                        doc->get_active_eyedropper_user_id() == this;
-		const bool has_target = target_valid && !cur.empty();
+		const bool can_select = target_valid && has_value;
 		const float btn_w = fh;
 
 		auto draw_icon_btn = [&](const char* id, AssetPtr<Texture> tex, bool active, bool enabled,
@@ -1012,7 +1018,7 @@ bool EntityTargetEditor::internal_update() {
 
 		ImGui::SameLine(0, style.ItemSpacing.x);
 
-		if (draw_icon_btn("##select", bubble_tex, false, has_target, dummy_pos)) {
+		if (draw_icon_btn("##select", bubble_tex, false, can_select, dummy_pos)) {
 			Entity* target = find_target();
 			if (target) {
 				doc->selection_state->clear_all_selected();
@@ -1020,7 +1026,7 @@ bool EntityTargetEditor::internal_update() {
 			}
 		}
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-			if (has_target) ImGui::SetTooltip("Select target entity: %s", cur.c_str());
+			if (can_select) ImGui::SetTooltip("Select target entity: %s", cur.c_str());
 			else            ImGui::SetTooltip("Select target (set a valid entity name first)");
 		}
 	}
@@ -1032,7 +1038,7 @@ bool EntityTargetEditor::internal_update() {
 }
 
 void EntityTargetEditor::reset_value() {
-	set_str("");
+	set_target(nullptr);
 }
 
 // ---------------------------------------------------------------------------
@@ -1103,10 +1109,10 @@ bool BoneNameStringEditor::draw_tree_node(int bone_idx, const std::string& curre
 }
 
 bool BoneNameStringEditor::internal_update() {
-	ASSERT(prop->type == core_type_id::StdString);
 	ensure_init();
 
-	std::string* str = (std::string*)prop->get_ptr(instance);
+	std::string value = prop->get<std::string>(instance);
+	std::string* str = &value;
 	if (bone_nodes.empty()) {
 		ImGui::TextDisabled("No skeleton (attach a model with bones)");
 		return false;
@@ -1160,17 +1166,17 @@ bool BoneNameStringEditor::internal_update() {
 		set_keyboard_focus = true;
 	}
 
+	if (changed)
+		prop->set(instance, value);
 	return changed;
 }
 
 bool BoneNameStringEditor::can_reset() {
-	std::string* str = (std::string*)prop->get_ptr(instance);
-	return !str->empty();
+	return !prop->get<std::string>(instance).empty();
 }
 
 void BoneNameStringEditor::reset_value() {
-	std::string* str = (std::string*)prop->get_ptr(instance);
-	str->clear();
+	prop->set(instance, std::string());
 }
 
 #endif

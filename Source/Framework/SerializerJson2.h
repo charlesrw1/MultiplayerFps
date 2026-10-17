@@ -303,6 +303,8 @@ public:
 
 private:
 	void load_shared();
+	// Calls rootobj.upgrade_data when the data has an older version than the class.
+	void upgrade_if_old();
 	// Stack size 1 means we're reading directly from the root object passed in; nested
 	// dicts/arrays push deeper frames, and their keys are tracked by their parent's read.
 	void mark_consumed(const char* tag) {

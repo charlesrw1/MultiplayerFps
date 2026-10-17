@@ -140,6 +140,8 @@ class Property:
         self.attr_category : str|None = None
         self.attr_hidden : bool = False
         self.attr_readonly : bool = False
+        # REFLECT(former=old_name): the previous name; readers use it when the current name is missing.
+        self.former_name : str|None = None
 
     def has_any_attrs(self) -> bool:
         return (self.attr_min is not None or self.attr_max is not None or self.attr_step is not None
@@ -332,6 +334,12 @@ def parse_reflect_macro(line : str) -> Property:
                 current_prop.attr_hidden = True
             elif t=="readonly":
                 current_prop.attr_readonly = True
+            elif t=="former":
+                if next(token_iter) != "=":
+                    raise Exception("expected '=' after 'former'")
+                current_prop.former_name = next(token_iter).strip('"')
+                if not current_prop.former_name.isidentifier():
+                    raise Exception(f"former name must be an identifier, got \"{current_prop.former_name}\"")
             else:
                 raise Exception(f"unexpected REFLECT(...) arg \"{t}\"")
 

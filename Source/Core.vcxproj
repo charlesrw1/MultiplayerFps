@@ -387,6 +387,7 @@
     <ClInclude Include="Framework\ReflectionProp.h" />
     <ClInclude Include="Framework\PropertyMake.h" />
     <ClInclude Include="Framework\PropertyValue.h" />
+    <ClInclude Include="Framework\SavedFields.h" />
     <ClInclude Include="Framework\ReflectionMacros.h" />
     <ClInclude Include="Framework\ArrayReflection.h" />
     <ClInclude Include="Framework\StringName.h" />

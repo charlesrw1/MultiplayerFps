@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -72,8 +73,8 @@ struct SyntaxExpression {
     bool lambdaIsBlock{};
 };
 
-// `[Name]` before a member.
-struct SyntaxAttribute { std::string name; TextSpan span; };
+// `[Name]` or `[Name("argument")]` before a member; several can share brackets: `[A, B("x")]`.
+struct SyntaxAttribute { std::string name; TextSpan span; std::optional<std::string> argument; };
 struct SyntaxField {
     std::string access;
     std::string type;

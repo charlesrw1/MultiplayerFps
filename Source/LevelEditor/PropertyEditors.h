@@ -165,8 +165,8 @@ private:
 
 struct MeshBuilder_Object;
 class MeshBuilder;
-// String property editor for entity references: combo dropdown of all entity names,
-// eyedropper button (colorize icon), select-target button (bubble icon), and a
+// Entity reference editor, for an entity name (std::string, REFLECT(type=EntityTarget)) or an EntityRef (obj<T>):
+// combo dropdown of all entity names, eyedropper button (colorize icon), select-target button (bubble icon), and a
 // 3D debug line from the owning entity to the target.
 class EntityTargetEditor : public IPropertyEditor
 {
@@ -174,12 +174,15 @@ public:
 	explicit EntityTargetEditor(EditorDoc* doc);
 	~EntityTargetEditor() override;
 	bool internal_update() override;
-	bool can_reset() override { return !get_str().empty(); }
+	bool can_reset() override { return has_target(); }
 	void reset_value() override;
-private:
-	std::string get_str() const;
-	void set_str(const std::string& v);
 	Entity* find_target() const;
+	void set_target(const Entity* target);
+
+private:
+	bool by_name() const;
+	bool has_target() const;
+	std::string target_label() const;
 	void rebuild_debug_line();
 
 	EditorDoc* doc = nullptr;

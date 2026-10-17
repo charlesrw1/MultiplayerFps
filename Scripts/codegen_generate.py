@@ -46,7 +46,8 @@ def write_prop(typenames:dict[str,ClassDef],prop : Property,newclass:ClassDef) -
     tooltip = f'"{escape_quote_characters(prop.tooltip)}"'
     member = f"&{newclass.classname}::{prop.name}"
     offset = f"checked_offset<offsetof({newclass.classname}, {prop.name})>()"
-    base = f'make_property<{member}, {offset}>("{prop.name}",{prop.get_flags()},{custom_type},{hint},{tooltip})'
+    former = f',"{prop.former_name}"' if prop.former_name else ""
+    base = f'make_property<{member}, {offset}>("{prop.name}",{prop.get_flags()},{custom_type},{hint},{tooltip}{former})'
     attrs = prop.emit_attrs_struct()
     if attrs:
         return f"apply_attrs({base},{attrs})"

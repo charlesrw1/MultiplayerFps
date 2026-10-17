@@ -950,6 +950,9 @@
     <ClInclude Include="Framework\PropertyMake.h">
       <Filter>Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Framework\SavedFields.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
     <ClInclude Include="Framework\PropertyValue.h">
       <Filter>Framework</Filter>
     </ClInclude>

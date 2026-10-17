@@ -3,7 +3,7 @@
 #ifndef LUASHARP_RUNTIME_H
 #define LUASHARP_RUNTIME_H
 
-#define LS_ABI_VERSION 12
+#define LS_ABI_VERSION 13
 
 typedef signed long long ls_int;          /* public LuaSharp int: signed 64-bit */
 typedef unsigned long long ls_wrap_bits;  /* internal arithmetic bits; never a LuaSharp value */
@@ -59,6 +59,8 @@ typedef struct LS_FieldInfo {
     ls_wrap_bits element_kind;          /* list fields only */
     const struct LS_TypeInfo* type;     /* class and struct fields; the element type of list fields */
     ls_wrap_bits flags;                 /* LS_FIELD_* */
+    const char* editor;                 /* [Editor("name")], or null */
+    const char* former;                 /* [Former("old")], or null */
 } LS_FieldInfo;
 /* [Editable]: the host edits and saves the field in place. */
 #define LS_FIELD_EDITABLE 1

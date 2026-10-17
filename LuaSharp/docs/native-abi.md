@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `12`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `13`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -210,9 +210,12 @@ Type infos:
 
 Editable fields:
 
-- `[Editable]` before a field sets `LS_FIELD_EDITABLE` in `LS_FieldInfo::flags`. Only instance fields of a class with an extern ancestor can have it. The types are `bool`, `int`, `float`, `string`, `Vec2`, `Vec3` and `Quat`.
-- Other attributes, a duplicate attribute and attributes on methods are errors.
-- `NativeRuntime::EditableFields(type)` gives the name, offset and kind of each editable field that the class declares. It does not give the fields of its base classes.
+- `[Editable]` before a field sets `LS_FIELD_EDITABLE` in `LS_FieldInfo::flags`. Only instance fields of a class with an extern ancestor can have it. The types are `bool`, `int`, `float`, `string`, `Vec2`, `Vec3`, `Quat` and extern classes.
+- An extern-class field holds the proxy of the host object, or null. The CsRemake engine accepts asset classes and `Entity` (and their subclasses). The editor shows the asset picker or the entity picker. Other extern classes are a load error.
+- `[Editor("Name")]` sets `LS_FieldInfo::editor`: the name of a host editor (in CsRemake, `PropertyInfo::custom_type_str`). `[Former("old")]` sets `LS_FieldInfo::former`: the previous name of the field, so that the host can read data saved under it. Both need `[Editable]` on the same field. The argument is a string of letters, digits and `_`. Fields without them have null pointers.
+- Attributes can share brackets: `[Editable, Editor("BoneNameString")]`.
+- Other attributes, a duplicate attribute, a missing or extra argument, and attributes on methods are errors.
+- `NativeRuntime::EditableFields(type)` gives the name, offset, kind, type name (structs and extern classes), editor and former name of each editable field that the class declares. It does not give the fields of its base classes.
 
 ### External enums
 

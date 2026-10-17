@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "Framework/ClassBase.h"
 #include "Framework/ReflectionProp.h"
+#include "Framework/SerializerJson2.h"
 #include "Testheader.h"
 
 // PropertyInfo values (PropertyAccess) over C++ fields. LuaSharp fields: luasharp_engine_test.cpp.
@@ -97,4 +98,35 @@ TEST_F(PropertyAccessTest, ValuesCompare) {
 	EXPECT_EQ(prop("offset").get_value(&thing), prop("offset").get_value(&other));
 	other.offset.x = 9;
 	EXPECT_NE(prop("offset").get_value(&thing), prop("offset").get_value(&other));
+}
+
+// Renames (REFLECT(former=...)) and upgrades (get_data_version/upgrade_data) when data is read.
+class SavedDataTest : public ::testing::Test
+{
+protected:
+	static void SetUpTestSuite() { ClassBase::init_classes_startup(); }
+	static PropUpgradeTestThing read(nlohmann::json json) {
+		PropUpgradeTestThing thing;
+		ReadSerializerBackendJson2 reader("test", json, thing);
+		return thing;
+	}
+};
+
+TEST_F(SavedDataTest, FormerNameIsRead) {
+	EXPECT_EQ(read({{"health", 25}}).hp, 25);
+	EXPECT_EQ(read({{"health", 25}, {"hp", 30}}).hp, 30); // the current name wins
+}
+
+TEST_F(SavedDataTest, OlderDataIsUpgraded) {
+	EXPECT_EQ(read({{"power", 4}}).strength, 8);
+	EXPECT_EQ(read({{"strength", 4}, {"__data_version:PropUpgradeTestThing", 2}}).strength, 4);
+}
+
+TEST_F(SavedDataTest, WriterSavesTheVersion) {
+	PropUpgradeTestThing thing;
+	thing.strength = 5;
+	WriteSerializerBackendJson2 writer("test", thing);
+	nlohmann::json json = writer.get_output();
+	EXPECT_EQ(json["__data_version:PropUpgradeTestThing"], 2);
+	EXPECT_EQ(read(json).strength, 5); // not upgraded again
 }

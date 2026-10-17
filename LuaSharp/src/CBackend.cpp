@@ -417,6 +417,11 @@ struct CEmitter {
         if (types.IsList(type) && HasListTypeInfo(type)) return Put("&ls_listtype_", type);
         Put("(const LS_TypeInfo*)0");
     }
+    // A C string literal of an attribute name (letters, digits and '_'), or a null pointer when it is empty.
+    void CName(std::string_view name) {
+        if (name.empty()) return Put("(const char*)0");
+        Put('"', name, '"');
+    }
     // kind, element_kind, type of an LS_FieldInfo for a slot of this type. A list slot names its element type.
     void FieldDescriptor(TypeId type) {
         if (!types.IsList(type)) return Put(KindName(type), ", 0, ", [&] { TypeRef(type); });
@@ -1200,7 +1205,7 @@ struct CEmitter {
         if (!fields.empty()) {
             Line(0, "static const LS_FieldInfo ls_fields_", name, "[] = {");
             for (const auto* field : fields)
-                Line(1, "{\"", field->name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field->name}, "), ", [&] { FieldDescriptor(Find(field->type)); }, ", ", field->isEditable ? "LS_FIELD_EDITABLE" : "0", "},");
+                Line(1, "{\"", field->name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field->name}, "), ", [&] { FieldDescriptor(Find(field->type)); }, ", ", field->isEditable ? "LS_FIELD_EDITABLE" : "0", ", ", [&] { CName(field->editor); }, ", ", [&] { CName(field->former); }, "},");
             Line(0, "};");
         }
         if (!methods.empty()) {

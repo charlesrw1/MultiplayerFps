@@ -274,7 +274,7 @@ namespace {
 constexpr const char* EditableSource = R"(
 class Turret : LsTestScriptable {
 	[Editable] float range = 2.5;
-	[Editable] int ammo = 3;
+	[Editable, Former("rounds")] int ammo = 3;
 	[Editable] bool armed = true;
 	[Editable] string label = "turret";
 	[Editable] Vec3 aim = Vec3.new(1, 2, 3);
@@ -297,10 +297,16 @@ const PropertyInfo* find_prop(const ClassTypeInfo& type, std::string_view name) 
 			return &type.props->list[i];
 	return nullptr;
 }
-template <typename T> T& at(const ClassTypeInfo& type, ClassBase& object, std::string_view name) {
+template <typename T> T get(const ClassTypeInfo& type, ClassBase& object, std::string_view name) {
 	const PropertyInfo* prop = find_prop(type, name);
 	EXPECT_NE(prop, nullptr) << name;
-	return *reinterpret_cast<T*>(prop->get_ptr(&object));
+	return prop ? prop->get<T>(&object) : T{};
+}
+template <typename T> void set(const ClassTypeInfo& type, ClassBase& object, std::string_view name, const T& value) {
+	const PropertyInfo* prop = find_prop(type, name);
+	EXPECT_NE(prop, nullptr) << name;
+	if (prop)
+		prop->set(&object, value);
 }
 } // namespace
 
@@ -342,19 +348,19 @@ TEST_F(LuaSharpEngineTest, EditableFieldsArePropertyInfos) {
 	EXPECT_TRUE(find_prop(type, "aim")->flags & PROP_SCRIPT_FIELD);
 
 	// Initializers ran; writes through the PropertyInfos reach script code.
-	EXPECT_DOUBLE_EQ(at<double>(type, *object, "range"), 2.5);
-	EXPECT_EQ(at<int64_t>(type, *object, "ammo"), 3);
-	EXPECT_EQ(at<uint8_t>(type, *object, "armed"), 1);
-	EXPECT_EQ(at<glm::vec3>(type, *object, "aim"), glm::vec3(1, 2, 3));
-	EXPECT_EQ(find_prop(type, "label")->get_script_string(object.get()), "turret");
-	at<double>(type, *object, "range") = 7.5;
-	find_prop(type, "label")->set_script_string(object.get(), "renamed");
+	EXPECT_DOUBLE_EQ(get<double>(type, *object, "range"), 2.5);
+	EXPECT_EQ(get<int64_t>(type, *object, "ammo"), 3);
+	EXPECT_TRUE(get<bool>(type, *object, "armed"));
+	EXPECT_EQ(get<glm::vec3>(type, *object, "aim"), glm::vec3(1, 2, 3));
+	EXPECT_EQ(get<std::string>(type, *object, "label"), "turret");
+	set(type, *object, "range", 7.5);
+	set(type, *object, "label", std::string("renamed"));
 	void* script = engine->proxy_of(object.get());
 	EXPECT_DOUBLE_EQ(reinterpret_cast<double (*)(void*)>(module.FindSymbol("ls_Turret_get_range"))(script), 7.5);
 	EXPECT_EQ(lsbind::view(reinterpret_cast<void* (*)(void*)>(module.FindSymbol("ls_Turret_get_label"))(script)), "renamed");
 	engine->collect(); // the written string is reachable from the object
 
-	EXPECT_EQ(find_prop(type, "label")->get_script_string(object.get()), "renamed");
+	EXPECT_EQ(get<std::string>(type, *object, "label"), "renamed");
 	// A derived class lists only its own fields; the editor walks super_typeinfo for the others.
 	const ClassTypeInfo* heavy = ClassBase::find_class("HeavyTurret");
 	ASSERT_TRUE(heavy && heavy->props);
@@ -385,10 +391,10 @@ TEST_F(LuaSharpEngineTest, EditableFieldsSerialize) {
 	std::unique_ptr<ClassBase> source = engine->create(module, "HeavyTurret");
 	const ClassTypeInfo& heavy = source->get_type();
 	const ClassTypeInfo& turret = *heavy.super_typeinfo;
-	at<double>(turret, *source, "range") = 0.1;
-	at<int64_t>(heavy, *source, "armor") = 12;
-	at<glm::vec3>(turret, *source, "aim") = glm::vec3(4, 5, 6);
-	find_prop(turret, "label")->set_script_string(source.get(), "saved");
+	set(turret, *source, "range", 0.1);
+	set(heavy, *source, "armor", 12);
+	set(turret, *source, "aim", glm::vec3(4, 5, 6));
+	set(turret, *source, "label", std::string("saved"));
 
 	WriteSerializerBackendJson2 writer("test", *source);
 	nlohmann::json json = writer.get_output();
@@ -397,11 +403,55 @@ TEST_F(LuaSharpEngineTest, EditableFieldsSerialize) {
 
 	std::unique_ptr<ClassBase> loaded = engine->create(module, "HeavyTurret");
 	ReadSerializerBackendJson2 reader("test", json, *loaded);
-	EXPECT_EQ(at<double>(turret, *loaded, "range"), 0.1); // double precision is kept
-	EXPECT_EQ(at<int64_t>(heavy, *loaded, "armor"), 12);
-	EXPECT_EQ(at<glm::vec3>(turret, *loaded, "aim"), glm::vec3(4, 5, 6));
-	EXPECT_EQ(find_prop(turret, "label")->get_script_string(loaded.get()), "saved");
-	EXPECT_EQ(at<int64_t>(turret, *loaded, "ammo"), 3);
+	EXPECT_EQ(get<double>(turret, *loaded, "range"), 0.1); // double precision is kept
+	EXPECT_EQ(get<int64_t>(heavy, *loaded, "armor"), 12);
+	EXPECT_EQ(get<glm::vec3>(turret, *loaded, "aim"), glm::vec3(4, 5, 6));
+	EXPECT_EQ(get<std::string>(turret, *loaded, "label"), "saved");
+	EXPECT_EQ(get<int64_t>(turret, *loaded, "ammo"), 3);
+}
+
+TEST_F(LuaSharpEngineTest, EditableFieldsReadFormerNames) {
+	const auto& module = engine->load("turrets", EditableSource);
+	std::unique_ptr<ClassBase> object = engine->create(module, "Turret");
+	EXPECT_STREQ(find_prop(object->get_type(), "ammo")->former_name, "rounds");
+	nlohmann::json json = {{"rounds", 8}};
+	ReadSerializerBackendJson2 reader("test", json, *object);
+	EXPECT_EQ(get<int64_t>(object->get_type(), *object, "ammo"), 8);
+}
+
+TEST_F(LuaSharpEngineTest, ExternClassFieldsAreReferences) {
+	const auto& module = engine->load("holders", R"(
+class Holder : LsTestScriptable {
+	[Editable] IAsset art;
+	[Editable, Editor("EntityTarget")] Entity who;
+	override int tick(int dt) {
+		if (art == null && who == null) {
+			return 1;
+		}
+		return 0;
+	}
+}
+)");
+	std::unique_ptr<LsTestScriptable> object(static_cast<LsTestScriptable*>(engine->create(module, "Holder").release()));
+	const ClassTypeInfo& type = object->get_type();
+	const PropertyInfo* art = find_prop(type, "art");
+	const PropertyInfo* who = find_prop(type, "who");
+	ASSERT_TRUE(art && who);
+	EXPECT_EQ(art->type, core_type_id::AssetPtr);
+	EXPECT_EQ(art->class_type, &IAsset::StaticType);
+	EXPECT_EQ(who->type, core_type_id::ObjHandlePtr);
+	EXPECT_STREQ(who->custom_type_str, "EntityTarget");
+	EXPECT_EQ(art->get<AssetRef>(object.get()), (AssetRef{nullptr, &IAsset::StaticType}));
+	EXPECT_EQ(who->get<EntityRef>(object.get()).handle, 0);
+	EXPECT_EQ(object->tick(0), 1); // the script sees null references
+
+	try {
+		engine->load("bad_holder", "class BadHolder : LsTestScriptable { [Editable] LsTestThing thing; }");
+		ADD_FAILURE() << "an [Editable] field of a class that is not an asset or an Entity was accepted";
+	} catch (const std::runtime_error& error) {
+		EXPECT_NE(std::string_view(error.what()).find("an asset or an Entity"), std::string_view::npos) << error.what();
+	}
+	EXPECT_EQ(ClassBase::find_class("BadHolder"), nullptr);
 }
 
 TEST_F(LuaSharpEngineTest, LoadErrors) {

@@ -8,12 +8,74 @@
 #include "Framework/Files.h"
 #include "Framework/StringUtils.h"
 #include "Scripting/ScriptManager.h"
+#include "Assets/IAsset.h"
+#include "Game/Entity.h"
+#include "GameEnginePublic.h"
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
 
 LuaSharpEngine* LuaSharpEngine::inst = nullptr;
+
+namespace {
+// PROP_SCRIPT_FIELD storage: offset bytes into the script object of the owner (LuaSharp/docs/native-abi.md).
+uint8_t* script_slot(const PropertyInfo& p, const void* inst) {
+	auto* script = static_cast<uint8_t*>(static_cast<const ClassBase*>(inst)->get_script_proxy());
+	ASSERT(script && "a script field needs the owner's script object");
+	return script + p.offset;
+}
+template <typename T> T& slot_as(uint8_t* slot) { return *reinterpret_cast<T*>(slot); }
+// An extern-class field holds the proxy of the engine object, or null.
+ClassBase* object_in(uint8_t* slot) {
+	void* proxy = slot_as<void*>(slot);
+	return proxy ? static_cast<ClassBase*>(luasharp::NativeRuntime::NativeOf(proxy)) : nullptr;
+}
+void store_object(uint8_t* slot, const PropertyInfo& p, ClassBase* object) {
+	ASSERT(!object || object->get_type().is_a(*p.class_type));
+	slot_as<void*>(slot) = lsbind::proxy_of(object);
+}
+
+void script_get(const PropertyInfo& p, const void* inst, PropValue& out) {
+	uint8_t* slot = script_slot(p, inst);
+	switch (p.type) {
+	case core_type_id::Bool: out = slot_as<uint8_t>(slot) != 0; break;
+	case core_type_id::Int64: out = slot_as<int64_t>(slot); break;
+	case core_type_id::Double: out = slot_as<double>(slot); break;
+	case core_type_id::ScriptString: out = std::string(lsbind::view(slot_as<void*>(slot))); break;
+	case core_type_id::Vec2: out = lsbind::to_glm(slot_as<lsbind::Vec2>(slot)); break;
+	case core_type_id::Vec3: out = lsbind::to_glm(slot_as<lsbind::Vec3>(slot)); break;
+	case core_type_id::Quat: out = lsbind::to_glm(slot_as<lsbind::Quat>(slot)); break;
+	case core_type_id::AssetPtr: out = AssetRef{static_cast<IAsset*>(object_in(slot)), p.class_type}; break;
+	case core_type_id::ObjHandlePtr: {
+		auto* object = static_cast<BaseUpdater*>(object_in(slot));
+		out = EntityRef{object ? object->get_instance_id() : 0};
+	} break;
+	default: ASSERT(!"not a script field type");
+	}
+}
+
+void script_set(const PropertyInfo& p, void* inst, const PropValue& in, SetMode) {
+	uint8_t* slot = script_slot(p, inst);
+	switch (p.type) {
+	case core_type_id::Bool: slot_as<uint8_t>(slot) = prop_value_get<bool>(in) ? 1 : 0; break;
+	case core_type_id::Int64: slot_as<int64_t>(slot) = prop_value_get<int64_t>(in); break;
+	case core_type_id::Double: slot_as<double>(slot) = prop_value_get<double>(in); break;
+	case core_type_id::ScriptString: slot_as<void*>(slot) = lsbind::string(prop_value_get<std::string>(in)); break;
+	case core_type_id::Vec2: slot_as<lsbind::Vec2>(slot) = lsbind::to_ls(prop_value_get<glm::vec2>(in)); break;
+	case core_type_id::Vec3: slot_as<lsbind::Vec3>(slot) = lsbind::to_ls(prop_value_get<glm::vec3>(in)); break;
+	case core_type_id::Quat: slot_as<lsbind::Quat>(slot) = lsbind::to_ls(prop_value_get<glm::quat>(in)); break;
+	case core_type_id::AssetPtr: store_object(slot, p, prop_value_get<AssetRef>(in).asset); break;
+	case core_type_id::ObjHandlePtr: {
+		const int64_t handle = prop_value_get<EntityRef>(in).handle;
+		store_object(slot, p, handle && eng ? eng->get_object(handle) : nullptr);
+	} break;
+	default: ASSERT(!"not a script field type");
+	}
+}
+
+const PropertyAccess script_field_access{script_get, script_set};
+} // namespace
 
 // The ClassTypeInfo of a script class that derives from a scriptable engine class (LuaSharpEngine::load).
 // Its objects are ScriptImpl_X objects whose get_type() is this type.
@@ -45,32 +107,36 @@ private:
 			return nullptr;
 		}
 	}
+	// Throws std::runtime_error for an extern-class field that the editor cannot edit.
 	void make_props() {
 		using luasharp::NativeValueKind;
 		const auto fields = luasharp::NativeRuntime::EditableFields(script_type);
-		prop_names.reserve(fields.size()); // PropertyInfo::name points into these
+		prop_strings.reserve(fields.size() * 3); // PropertyInfo strings point into these
+		auto keep = [&](std::string_view text) { return text.empty() ? "" : prop_strings.emplace_back(text).c_str(); };
 		for (const auto& field : fields) {
 			ASSERT(field.offset <= std::numeric_limits<uint16_t>::max());
-			const char* field_name = prop_names.emplace_back(field.name).c_str();
-			const auto offset = static_cast<uint16_t>(field.offset);
-			constexpr uint32_t flags = PROP_DEFAULT | PROP_SCRIPT_FIELD;
-			PropertyInfo prop(field_name, offset, flags);
+			PropertyInfo prop(keep(field.name), static_cast<uint16_t>(field.offset), PROP_DEFAULT | PROP_SCRIPT_FIELD);
+			prop.access = &script_field_access;
+			prop.custom_type_str = keep(field.editor);
+			if (!field.former.empty())
+				prop.former_name = keep(field.former);
 			switch (field.kind) {
-			case NativeValueKind::Bool: prop = make_bool_property(field_name, offset, flags); break;
-			case NativeValueKind::Int: prop = make_integer_property(field_name, offset, flags, sizeof(int64_t)); break;
+			case NativeValueKind::Bool: prop.type = core_type_id::Bool; break;
+			case NativeValueKind::Int: prop.type = core_type_id::Int64; break;
 			case NativeValueKind::Float: prop.type = core_type_id::Double; break;
 			case NativeValueKind::String: prop.type = core_type_id::ScriptString; break;
 			case NativeValueKind::Struct:
-				if (field.structName == "Vec2") prop.type = core_type_id::Vec2;
-				else if (field.structName == "Vec3") prop.type = core_type_id::Vec3;
-				else if (field.structName == "Quat") prop.type = core_type_id::Quat;
+				if (field.typeName == "Vec2") prop.type = core_type_id::Vec2;
+				else if (field.typeName == "Vec3") prop.type = core_type_id::Vec3;
+				else if (field.typeName == "Quat") prop.type = core_type_id::Quat;
 				else ASSERT(!"the checker allows only Vec2, Vec3 and Quat structs");
 				break;
+			case NativeValueKind::Object: set_object_type(prop, field.typeName); break;
 			default: ASSERT(!"the checker allows only these [Editable] types");
 			}
 			prop_storage.push_back(prop);
 		}
-		ASSERT(prop_names.size() == fields.size()); // no reallocation moved a name
+		ASSERT(prop_strings.size() <= fields.size() * 3); // no reallocation moved a string
 		if (prop_storage.empty())
 			return;
 		prop_list.list = prop_storage.data();
@@ -79,8 +145,22 @@ private:
 		set_props(&prop_list);
 	}
 
+	// An asset field is an AssetRef; an Entity field is an EntityRef.
+	void set_object_type(PropertyInfo& prop, std::string_view extern_class) {
+		const ClassTypeInfo* type = ClassBase::find_class(std::string(extern_class).c_str());
+		ASSERT(type); // every extern class is a reflected engine class
+		prop.class_type = type;
+		if (type->is_a(IAsset::StaticType))
+			prop.type = core_type_id::AssetPtr;
+		else if (type->is_a(Entity::StaticType))
+			prop.type = core_type_id::ObjHandlePtr;
+		else
+			throw std::runtime_error("[Editable] field '" + std::string(prop.name) + "' of '" + name + "' has type '" +
+									 std::string(extern_class) + "'; an extern-class field must be an asset or an Entity");
+	}
+
 	std::string name;
-	std::vector<std::string> prop_names;
+	std::vector<std::string> prop_strings;
 	std::vector<PropertyInfo> prop_storage;
 	PropertyInfoList prop_list;
 };
@@ -187,9 +267,6 @@ LuaSharpEngine::LuaSharpEngine() : runtime_(luasharp::NativeRuntime::Create()) {
 	for (const auto& [name, base] : bases)
 		register_class(register_class, name);
 	types_ = luasharp::DeclarationTypes({declarations_});
-	ASSERT(!g_script_strings.read && !g_script_strings.write);
-	g_script_strings.read = [](const void* slot) { return std::string(lsbind::view(*static_cast<void* const*>(slot))); };
-	g_script_strings.write = [](void* slot, std::string_view text) { *static_cast<void**>(slot) = lsbind::string(text); };
 	inst = this;
 }
 
@@ -201,7 +278,6 @@ LuaSharpEngine::~LuaSharpEngine() {
 		release(*proxied_.begin());
 	for (auto& [name, loaded] : modules_)
 		unregister_classes(loaded);
-	g_script_strings = {};
 	inst = nullptr;
 }
 
