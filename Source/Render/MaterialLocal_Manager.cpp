@@ -164,7 +164,7 @@ void MaterialManagerLocal::prewarm_manifest() {
 		const std::string path = trim(line.substr(0, split));
 		if (path.empty()) continue;
 		auto material = g_assets.find_sync_sptr<MaterialInstance>(path);
-		if (!material) { sys_print(Warning, "shader prewarm: material not found %s\n", path.c_str()); continue; }
+		if (!material || !material->is_valid_to_use()) { sys_print(Warning, "shader prewarm: material not found %s\n", path.c_str()); continue; }
 		const int flags = split == std::string::npos ? 0 : parse_flags(trim(line.substr(split + 1)));
 		if (gfx().get_device_type() == GraphicsDeviceType::OpenGl) {
 			std::string shader_path = FileSys::get_game_path() + std::string("/") + material->get_name();
