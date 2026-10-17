@@ -11,7 +11,7 @@ namespace {
 
 const std::unordered_set<std::string> Keywords{
     "class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return",
-    "null", "true", "false"
+    "null", "true", "false", "virtual", "override", "abstract", "sealed", "is", "as"
 };
 
 TextSpan Cover(TextSpan first, TextSpan last) {
@@ -124,7 +124,7 @@ public:
         const auto mark = scratch_.size();
         while (!AtEnd()) {
             const size_t before = index_;
-            if (Is("class") || Is("struct")) { auto value = ParseClass(); tree_.root.classes.push_back(std::move(value)); }
+            if (Is("class") || Is("struct") || Is("abstract") || Is("sealed")) { auto value = ParseClass(); tree_.root.classes.push_back(std::move(value)); }
             else if (Is("enum")) { auto value = ParseEnum(); tree_.root.enums.push_back(std::move(value)); }
             else { const auto statement = ParseStatement(); scratch_.push_back(statement); }
             if (index_ == before) Advance();
@@ -262,15 +262,36 @@ private:
         result.span = Cover(start, PreviousSpan());
         return Add(std::move(result));
     }
-    SyntaxFunction ParseFunction(std::string access, SyntaxToken name, std::string returnType, bool constructor) {
+    SyntaxFunction ParseFunction(std::string access, SyntaxToken name, std::string returnType, bool constructor, SyntaxModifiers modifiers) {
         SyntaxFunction result; result.access = std::move(access); result.name = name.text; result.returnType = std::move(returnType); result.isConstructor = constructor; result.span = name.span;
+        result.modifiers = modifiers; result.isStatic = modifiers.isStatic;
         Match("(");
         while (!AtEnd() && !Is(")")) {
             auto [type, typeSpan] = ParseType(); const auto parameterName = Identifier("parameter name");
             result.parameters.push_back({std::move(type), parameterName.text, Cover(typeSpan, parameterName.span)});
             if (!Is(",")) break; Advance();
         }
-        Match(")"); result.body = ParseBlock(); return result;
+        Match(")");
+        if (constructor && Is(":")) {
+            const auto colon = Advance().span;
+            if (Is("base")) Advance(); else tree_.diagnostics.push_back({"Expected 'base' after ':' in a constructor", Current().span});
+            const auto mark = scratch_.size(); PushArguments();
+            result.hasBaseCall = true; result.baseArguments = Link(mark); result.baseSpan = Cover(colon, PreviousSpan());
+        }
+        if (Is(";")) { Advance(); result.hasBody = false; }
+        else result.body = ParseBlock();
+        return result;
+    }
+    // static, virtual, override, abstract and sealed, in any order.
+    SyntaxModifiers ParseModifiers() {
+        SyntaxModifiers result;
+        for (;;) {
+            bool* flag = Is("static") && !Is("(", 1) ? &result.isStatic : Is("virtual") ? &result.isVirtual : Is("override") ? &result.isOverride
+                : Is("abstract") ? &result.isAbstract : Is("sealed") ? &result.isSealed : nullptr;
+            if (!flag) return result;
+            if (*flag) tree_.diagnostics.push_back({"Duplicate modifier '" + Current().text + "'", Current().span});
+            *flag = true; Advance();
+        }
     }
     SyntaxEnum ParseEnum() {
         const auto start = Match("enum").span; const auto name = Identifier("enum name");
@@ -285,7 +306,11 @@ private:
         const auto close = Match("}"); result.span = Cover(start, close.span); return result;
     }
     SyntaxClass ParseClass() {
-        const bool isStruct = Is("struct"); Advance(); const auto name = Identifier(isStruct ? "struct name" : "class name"); SyntaxClass result; result.name = name.text; result.span = name.span; result.isStruct = isStruct;
+        const auto classModifiers = ParseModifiers();
+        const bool isStruct = Is("struct"); if (!isStruct) Match("class"); else Advance();
+        const auto name = Identifier(isStruct ? "struct name" : "class name"); SyntaxClass result; result.name = name.text; result.span = name.span; result.isStruct = isStruct;
+        result.isAbstract = classModifiers.isAbstract; result.isSealed = classModifiers.isSealed;
+        if (classModifiers.isStatic || classModifiers.isVirtual || classModifiers.isOverride) tree_.diagnostics.push_back({"Only 'abstract' and 'sealed' can modify a class", name.span});
         if (Is(":")) {
             Advance(); result.baseName = Identifier("base type").text;
             if (isStruct) tree_.diagnostics.push_back({"Structs cannot have a base type", name.span});
@@ -294,18 +319,19 @@ private:
         while (!AtEnd() && !Is("}")) {
             if ((Is("public") || Is("private")) && Is(":", 1)) { access = Advance().text; Advance(); continue; }
             const size_t before = index_;
-            const bool isStatic = Is("static") && !Is("(", 1) ? (Advance(), true) : false;
+            const auto modifiers = ParseModifiers();
             const auto first = Identifier();
             if (Is("(")) {
-                result.functions.push_back(ParseFunction(access, first, {}, true));
-                if (isStatic) tree_.diagnostics.push_back({"Constructors cannot be static", first.span});
+                result.functions.push_back(ParseFunction(access, first, {}, true, modifiers));
+                if (modifiers.isStatic || modifiers.isVirtual || modifiers.isOverride || modifiers.isAbstract || modifiers.isSealed) tree_.diagnostics.push_back({"Constructors cannot have modifiers", first.span});
             } else {
                 std::string type = first.text;
                 while (Is("[")) { Advance(); Match("]"); type += "[]"; }
                 const auto memberName = Identifier("member name");
-                if (Is("(")) { result.functions.push_back(ParseFunction(access, memberName, std::move(type), false)); result.functions.back().isStatic = isStatic; }
+                if (Is("(")) result.functions.push_back(ParseFunction(access, memberName, std::move(type), false, modifiers));
                 else {
-                    SyntaxField field; field.access = access; field.type = std::move(type); field.name = memberName.text; field.span = memberName.span; field.isStatic = isStatic;
+                    if (modifiers.isVirtual || modifiers.isOverride || modifiers.isAbstract || modifiers.isSealed) tree_.diagnostics.push_back({"Fields can only be 'static'", memberName.span});
+                    SyntaxField field; field.access = access; field.type = std::move(type); field.name = memberName.text; field.span = memberName.span; field.isStatic = modifiers.isStatic;
                     if (Is("=")) { Advance(); field.initializer = ParseExpression(); }
                     Match(";"); result.fields.push_back(std::move(field));
                 }
@@ -315,6 +341,7 @@ private:
         Match("}"); return result;
     }
 
+    static constexpr int TypeTestPrecedence = 5; // `is` and `as` bind like relational operators
     static int Precedence(std::string_view op) {
         if (op == "=" || op == "+=" || op == "-=" || op == "*=" || op == "/=") return 1;
         if (op == "||") return 2; if (op == "&&") return 3;
@@ -359,7 +386,15 @@ private:
     NodeId ParseExpression(int minimum = 0) {
         auto left = ParseUnary();
         while (!AtEnd()) {
-            const auto& operation = Current(); const int precedence = Precedence(operation.text);
+            const auto& operation = Current();
+            if (operation.kind == SyntaxTokenKind::Keyword && (operation.text == "is" || operation.text == "as")) {
+                if (TypeTestPrecedence < minimum) break;
+                const auto kind = Advance().text == "is" ? SyntaxExpression::Kind::Is : SyntaxExpression::Kind::As;
+                auto [type, span] = ParseType();
+                left = Add(kind, std::move(type), Cover(Span(left), span), Link({left}));
+                continue;
+            }
+            const int precedence = Precedence(operation.text);
             if (precedence < minimum) break;
             Advance(); const bool assignment = precedence == 1;
             const auto right = ParseExpression(precedence + (assignment ? 0 : 1));

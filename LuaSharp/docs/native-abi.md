@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `8`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `9`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
@@ -13,7 +13,7 @@ This document defines the native backend contract. The ABI version is currently 
 | `table` | opaque `LS_Table*` | GC-managed dynamic table with tagged keys and values |
 | `T[]` | `LS_List*` | GC-managed dynamic array of unboxed `T` elements, zero-based |
 | `any` | 16-byte `LS_Value` | 64-bit kind tag (`LS_KIND_*`) plus a 64-bit scalar or managed pointer payload |
-| class reference | `LS_Type*` | Nullable, stable for the lifetime of its owning runtime heap. The first field is `const LS_TypeInfo*` |
+| class reference | `LS_Type*` | Nullable, stable for the lifetime of its owning runtime heap. The first field is `const LS_TypeInfo*`. A derived class starts with the fields of its base (see Classes and inheritance) |
 | enum | signed 64-bit `ls_int` | Values use the declaration's resolved integer value |
 | struct | C `LS_Name` by value | Value type. Copied on assignment, argument passing and return. Fields can hold references |
 
@@ -50,11 +50,11 @@ A table read gives `any`. A lambda parameter is also `any`. The native backend c
 - Boxing a typed value into `LS_Value` cannot fail. A null reference boxes as nil.
 - Unboxing checks the kind at run time. A wrong kind reports an error, for example `expected int, got string`, and gives zero or null. Nil unboxes to null for reference types.
 - A float with an integer value unboxes to `int`, as in Lua `math.tointeger`.
-- A class object unboxes only to its own class. Each object starts with a `const LS_TypeInfo*`, and the check compares that pointer.
+- A class object unboxes to its own class or to a base class. Each object starts with a `const LS_TypeInfo*`, and the check walks the `base` chain of that type info.
 - A list unboxes when its element kind and element type match. Object elements must have the same class. Struct and list elements must have the same layout (see Structs).
 - An `any` condition uses Lua truthiness: only nil and false are false. `bool(x)` on `any` does the same.
 
-`LS_TypeInfo` holds the class name, a table of fields (name, offset and kind) and a table of method thunks. With it, `any` code can do these operations on class objects:
+`LS_TypeInfo` holds the class name, a table of fields (name, offset and kind) and a table of method thunks. Both tables include inherited members, and each method entry calls the most-derived implementation. With it, `any` code can do these operations on class objects:
 - `x.field` reads a field, and `x.field = v` writes it with a checked unbox.
 - `x.method(args)` calls a method. Missing arguments are nil.
 
@@ -90,7 +90,7 @@ Strings are immutable and interned, so `==` compares pointers. Every operation t
 - A table foreach loop visits non-null entries in insertion order.
 - A foreach loop over `any` follows the Lua backend. With two variables it is `pairs`, and with one variable it is `ipairs`, which stops at the first nil. A list in `any` gives 1-based keys, the same as Lua.
 
-`NativeRuntime` owns zeroed, non-moving allocations and performs precise stop-the-world mark-and-sweep collection. Generated trace functions cover class reference fields, struct fields that hold references, closure environments, cells and static fields; the runtime traces tagged table keys and values and list elements. Module globals are registered as roots while their module is loaded, and host code can keep returned objects alive with `Pin`/`Unpin`. Collection currently occurs only when the host calls `Collect`, so it must not run concurrently with generated code. There is consequently no write barrier or generated stack-map requirement yet.
+`NativeRuntime` owns zeroed, non-moving allocations and performs precise stop-the-world mark-and-sweep collection. Generated trace functions cover class reference fields (inherited ones included), struct fields that hold references, closure environments, cells and static fields. They pass `mark` the address of each reference slot, not its value, so that a later runtime can also move objects and update the slots; the runtime traces tagged table keys and values and list elements. Module globals are registered as roots while their module is loaded, and host code can keep returned objects alive with `Pin`/`Unpin`. Collection currently occurs only when the host calls `Collect`, so it must not run concurrently with generated code. There is consequently no write barrier or generated stack-map requirement yet.
 
 Interning is weak: identical live strings share one object, but the intern table does not itself keep strings alive. Sweeping a string removes its intern-table entry. ABI changes increment `abi_version`; generated code must never guess the layout of a different version.
 
@@ -105,6 +105,17 @@ Module state remains inside the TinyCC module and therefore dies when that modul
 Host functions are registered explicitly with `NativeCompileOptions::symbols`. Semantic declarations are supplied separately through `NativeCompileOptions::externalTypes`; registering an address never bypasses LuaSharp type checking.
 
 External object types are opaque. Generated code may pass their pointers to declared methods, but it may not inspect their C++ layout. Engine integrations should use generation-checked handles or opaque API objects rather than exposing C++ object memory.
+
+## Classes and inheritance
+
+A class is a C `struct LS_Name` on the GC heap. Its first field is `const LS_TypeInfo* ls_type`. A derived class repeats the fields of its base first, in the same order, so a `LS_Derived*` is a valid `LS_Base*`.
+
+- `LS_TypeInfo.base` points to the type info of the base class, or is null. `ls_is_a` walks this chain. `is`, `as` and unboxing from `any` use it.
+- `LS_TypeInfo.vtable` holds one function pointer for each virtual slot. A `virtual` or `abstract` method adds a slot. An `override` uses the slot of the method it overrides. An abstract slot holds null; code cannot create an abstract class, so an object never has a null slot.
+- A call to a virtual method loads the function from `obj->ls_type->vtable[slot]`. The function type uses the class that declared the slot as `self`. A call through `base`, a call to a sealed method and a call on a value of a sealed class are direct calls.
+- Construction has two functions. `LS_T* ls_T_new(...)` allocates the object, sets `ls_type` to `T` and calls `void ls_T__init(LS_T* self, ...)`. `ls_T__init` calls the init function of the base constructor, then runs the field initializers of `T`, then the constructor body. Because `ls_type` is set first, a virtual call in a base constructor calls the most-derived override. An abstract class has no `ls_T_new`.
+- Overloaded constructors use `ls_T_new__N` and `ls_T__init__N`.
+- A class cannot derive from an external type yet. The C backend reports an error.
 
 ## Structs
 
@@ -152,6 +163,8 @@ The first reload layer is implemented by `ReloadableNativeProgram`. A `NativeFun
 - retains old TinyCC modules so a call that loaded the previous address can finish safely.
 
 Module-global values are not migrated yet, and retired generations are intentionally retained until the reloadable program is destroyed. Host-owned state and active-call epochs will replace those temporary policies.
+
+Type infos and vtables live in each module. An object keeps the type info of the generation that created it, so its virtual calls use the code of that generation. [`design.md`](design.md) describes the planned change: one type info for each class, owned by the runtime and updated in place.
 
 ## Command line and printf
 

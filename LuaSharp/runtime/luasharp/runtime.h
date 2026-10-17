@@ -3,7 +3,7 @@
 #ifndef LUASHARP_RUNTIME_H
 #define LUASHARP_RUNTIME_H
 
-#define LS_ABI_VERSION 8
+#define LS_ABI_VERSION 9
 
 typedef signed long long ls_int;          /* public LuaSharp int: signed 64-bit */
 typedef unsigned long long ls_wrap_bits;  /* internal arithmetic bits; never a LuaSharp value */
@@ -72,7 +72,10 @@ typedef struct LS_TypeInfo {
     const LS_MethodInfo* methods;
     ls_wrap_bits size;                  /* structs: sizeof the value, without the box header */
     ls_wrap_bits kind;                  /* LS_KIND_OBJECT, LS_KIND_STRUCT, or LS_KIND_LIST for a list type (one "element" field) */
+    const struct LS_TypeInfo* base;     /* classes: the base class, or null */
+    void* const* vtable;                /* classes: one function per virtual slot; null for an abstract slot */
 } LS_TypeInfo;
+/* A class object; a derived class starts with the fields of its base, in the same order. */
 typedef struct LS_Object { const LS_TypeInfo* type; } LS_Object;
 
 #define ls_offsetof(type, member) ((ls_wrap_bits)&((type*)0)->member)
@@ -86,7 +89,8 @@ typedef struct LS_RuntimeApi {
     ls_wrap_bits abi_version;
     void* context;
     void* (*allocate)(void* context, ls_wrap_bits size, LS_TraceFunction trace);
-    void (*mark)(void* context, void* object);
+    /* Visits one reference slot. Trace functions pass the slot address, not its value, so the runtime can also update it. */
+    void (*mark)(void* context, void** slot);
     void* (*intern)(void* context, const char* value);
     void* (*table_create)(void* context, ls_wrap_bits count, const LS_Value* pairs);
     void (*table_get)(void* context, void* table, const LS_Value* key, LS_Value* out);
@@ -155,8 +159,8 @@ static void* ls_alloc(ls_wrap_bits size, LS_TraceFunction trace) {
     return value;
 }
 
-static void ls_mark_value(void* context, const LS_Value* value) {
-    if (value && value->kind >= LS_KIND_STRING && value->kind <= LS_KIND_STRUCT) ls_runtime->mark(context, value->as.pointer);
+static void ls_mark_value(void* context, LS_Value* value) {
+    if (value && value->kind >= LS_KIND_STRING && value->kind <= LS_KIND_STRUCT) ls_runtime->mark(context, &value->as.pointer);
 }
 
 static void ls_printf(ls_string format, ls_wrap_bits count, const LS_Value* arguments) {
@@ -209,12 +213,22 @@ static void* ls_unbox_pointer(LS_Value v, ls_wrap_bits kind) {
     return (void*)0;
 }
 
+/* True when type is target or derives from it. */
+static int ls_is_a(const LS_TypeInfo* type, const LS_TypeInfo* target) {
+    for (; type; type = type->base) if (type == target) return 1;
+    return 0;
+}
+
 static void* ls_unbox_object(LS_Value v, const LS_TypeInfo* type) {
     if (v.kind == LS_KIND_NIL) return (void*)0;
-    if (v.kind == LS_KIND_OBJECT && ((LS_Object*)v.as.pointer)->type == type) return v.as.pointer;
+    if (v.kind == LS_KIND_OBJECT && ls_is_a(((LS_Object*)v.as.pointer)->type, type)) return v.as.pointer;
     ls_report_parts("expected ", type->name, ", got ", v.kind == LS_KIND_OBJECT ? ((LS_Object*)v.as.pointer)->type->name : ls_kind_name(v.kind));
     return (void*)0;
 }
+
+/* `x is T` and `x as T` on a class value. */
+static ls_bool ls_object_is(const void* object, const LS_TypeInfo* type) { return object && ls_is_a(((const LS_Object*)object)->type, type); }
+static void* ls_object_as(void* object, const LS_TypeInfo* type) { return ls_object_is(object, type) ? object : (void*)0; }
 
 static int ls_cstr_equal(const char* a, const char* b) {
     while (*a && *a == *b) { ++a; ++b; }
@@ -252,22 +266,31 @@ static LS_List* ls_unbox_list(LS_Value v, ls_wrap_bits element_kind, const LS_Ty
     return (LS_List*)0;
 }
 
+/* `v is T` on `any`. type is the class or struct, or the element type of a list (with element_kind). */
+static ls_bool ls_value_is(LS_Value v, ls_wrap_bits kind, ls_wrap_bits element_kind, const LS_TypeInfo* type) {
+    if (v.kind != kind) return 0;
+    if (kind == LS_KIND_OBJECT) return ls_is_a(((LS_Object*)v.as.pointer)->type, type);
+    if (kind == LS_KIND_STRUCT) return ls_type_same(*(const LS_TypeInfo**)v.as.pointer, type, 0);
+    if (kind == LS_KIND_LIST) return ((LS_List*)v.as.pointer)->element_kind == element_kind && ls_type_same(((LS_List*)v.as.pointer)->element_type, type, 0);
+    return 1;
+}
+
 /* ---- structs: value types boxed on the GC heap only when they become `any` ---- */
 
 /* Marks the references inside a struct value. Field offsets include the box header. */
-static void ls_trace_struct_value(void* context, const LS_TypeInfo* type, const char* value) {
+static void ls_trace_struct_value(void* context, const LS_TypeInfo* type, char* value) {
     ls_wrap_bits i;
     for (i = 0; i < type->field_count; ++i) {
         const LS_FieldInfo* field = &type->fields[i];
-        const char* slot = value + field->offset - LS_STRUCT_PAYLOAD;
-        if (field->kind == LS_ELEMENT_VALUE) ls_mark_value(context, (const LS_Value*)slot);
+        char* slot = value + field->offset - LS_STRUCT_PAYLOAD;
+        if (field->kind == LS_ELEMENT_VALUE) ls_mark_value(context, (LS_Value*)slot);
         else if (field->kind == LS_KIND_STRUCT) ls_trace_struct_value(context, field->type, slot);
-        else if (field->kind >= LS_KIND_STRING && field->kind <= LS_KIND_LIST) ls_runtime->mark(context, *(void* const*)slot);
+        else if (field->kind >= LS_KIND_STRING && field->kind <= LS_KIND_LIST) ls_runtime->mark(context, (void**)slot);
     }
 }
 
 static void ls_trace_struct_box(void* context, void* object) {
-    ls_trace_struct_value(context, *(const LS_TypeInfo**)object, (const char*)object + LS_STRUCT_PAYLOAD);
+    ls_trace_struct_value(context, *(const LS_TypeInfo**)object, (char*)object + LS_STRUCT_PAYLOAD);
 }
 
 static ls_bool ls_value_equal(LS_Value a, LS_Value b);
@@ -361,7 +384,7 @@ static ls_bool ls_value_truthy(LS_Value v) { return !(v.kind == LS_KIND_NIL || (
 
 static void ls_trace_closure(void* context, void* object) {
     LS_Closure* closure = (LS_Closure*)object;
-    if (closure->environment) ls_runtime->mark(context, closure->environment);
+    if (closure->environment) ls_runtime->mark(context, &closure->environment);
 }
 
 static LS_Closure* ls_closure_create(void (*invoke)(void*, const LS_Value*, LS_Value*), void* environment, ls_wrap_bits arity) {
@@ -381,8 +404,8 @@ static LS_Value ls_closure_call(LS_Closure* closure, const LS_Value* arguments) 
     return result;
 }
 
-static void ls_trace_cell_pointer(void* context, void* object) { ls_runtime->mark(context, *(void**)object); }
-static void ls_trace_cell_value(void* context, void* object) { ls_mark_value(context, (const LS_Value*)object); }
+static void ls_trace_cell_pointer(void* context, void* object) { ls_runtime->mark(context, (void**)object); }
+static void ls_trace_cell_value(void* context, void* object) { ls_mark_value(context, (LS_Value*)object); }
 
 /* Heap slot for a captured local that is also assigned, so closures and the enclosing scope share it. */
 static void* ls_cell_create(ls_wrap_bits size, ls_wrap_bits kind) {

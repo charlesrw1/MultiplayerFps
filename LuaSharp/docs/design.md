@@ -22,7 +22,8 @@ This document records the design decisions for two work items:
 - `base.m(args)` calls the base implementation without virtual dispatch.
 - `x is T` is true when `x` is not null and its class is `T` or derives from `T`.
 - `x as T` gives `x` as a `T`, or `null` when `x is T` is false.
-- `is` and `as` accept class and `any` operands. For `any`, `T` can also be a primitive or a struct.
+- `is` and `as` accept class and `any` operands. For `any`, `is` can also test for a primitive, an enum, a list or a struct. `as` needs a reference type (a class, `string`, `table` or a list).
+- `base` is not reserved. A field or local with that name keeps its meaning.
 
 ### Runtime
 
@@ -36,8 +37,8 @@ This document records the design decisions for two work items:
 
 ### Groundwork for Part 2
 
-- Class type infos are stable across hot reload: one per class name, owned by the runtime. A reload updates the vtable and method table in place. Existing objects then call the new code.
 - Trace functions visit the address of each reference slot, not the value. The same functions can then mark objects and relocate them (see Hot reload).
+- Stable class type infos moved to Part 2. A reload today runs `ls_module_init` again with new module state, and objects from an old generation reach new code only through host pins. Stable type infos are useful only together with the reload changes in Part 2 (global migration and relocation).
 
 ## Part 2: engine binding (design only)
 
@@ -104,6 +105,7 @@ void update() final { if (auto fn = script_slots->update) fn(script_proxy); else
 ### Hot reload
 
 - A reload happens at a frame boundary, when no script function is on the stack.
+- Class type infos are stable: one per class name, owned by the runtime. Generated code reaches them through a pointer that the host sets after relocation. A reload updates the vtable and method table in place, so existing objects call the new code.
 - Code changes: the runtime updates function slots, vtables and method tables. No object moves.
 - Globals and static fields keep their values. A changed initializer does not run again.
 - Layout changes (a field added, removed, moved or changed in type): the runtime makes a new object for each instance of the changed class. It copies fields that have the same name and type. Then it walks every reference slot in the heap and changes pointers to the old objects. A type that stores a changed struct inline also changes layout.

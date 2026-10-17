@@ -315,7 +315,7 @@ class Child : Base { string read(int value) { return "bad"; } }
     Require(std::any_of(overrideMismatch.diagnostics.begin(), overrideMismatch.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("does not match the inherited signature") != std::string::npos; }), "incompatible override was accepted");
 
     const auto requiredBase = luasharp::Analyze("class Base { Base(int value) {} } class Child : Base {}");
-    Require(std::any_of(requiredBase.diagnostics.begin(), requiredBase.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("requires constructor arguments") != std::string::npos; }), "unsupported required base constructor was silently ignored");
+    Require(std::any_of(requiredBase.diagnostics.begin(), requiredBase.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("has no parameterless constructor") != std::string::npos; }), "missing base constructor arguments were accepted");
 }
 
 void TestBuiltinNullability() {
@@ -518,7 +518,10 @@ class Calculator {
         }
         throw std::runtime_error("native backend silently accepted: " + std::string(source));
     };
-    rejects("class Base {} class Derived : Base {}", "does not support class inheritance");
+    try {
+        static_cast<void>(luasharp::CompileToC("class Derived : Component {}", {{"Component", "", {}, false, false}}));
+        throw std::runtime_error("native backend silently accepted a class deriving from an external type");
+    } catch (const std::runtime_error& error) { Require(std::string_view(error.what()).find("from external type 'Component'") != std::string_view::npos, std::string("unclear native error: ") + error.what()); }
     rejects("table t = {}; int[] values = t;", "cannot convert between 'table' and 'int[]'");
     rejects("int[] values = {}; table t = values;", "cannot convert between 'table' and 'int[]'");
 }
@@ -1098,6 +1101,64 @@ Grid.made += 1;)", "valid static field program");
     Require(staticFields == 2, "implicit and qualified static field reads were not lowered as static fields");
 }
 
+void TestInheritanceSemantics() {
+    RequireClean(R"(abstract class Shape {
+    string name;
+    Shape(string n) { name = n; }
+    abstract float area();
+    virtual string describe() { return name + " " + string(area()); }
+    int sides() { return 0; }
+}
+class Rect : Shape {
+    float w; float h;
+    Rect(float w, float h) : base("rect") { this.w = w; this.h = h; }
+    override float area() { return w * h; }
+    override string describe() { return "[" + base.describe() + "]"; }
+}
+sealed class Square : Rect {
+    Square(float s) : base(s, s) {}
+    sealed override float area() { return base.area(); }
+}
+class Plain { int base = 1; int f() { return base; } }
+Shape s = new Square(2);
+bool isRect = s is Rect;
+Rect r = s as Rect;
+table t = {v = s};
+bool anyIsSquare = t.v is Square;
+bool anyIsInt = t.v is int;
+Rect fromAny = t.v as Rect;
+int sides = r.sides();)", "valid inheritance program");
+    RequireDiagnostic("class B { void f() {} } class D : B { void f() {} }", "hides inherited method 'B.f', which is not virtual");
+    RequireDiagnostic("class B { virtual void f() {} } class D : B { void f() {} }", "must be marked 'override'");
+    RequireDiagnostic("class B { void f() {} } class D : B { override void f() {} }", "which is not virtual, abstract or override");
+    RequireDiagnostic("class B {} class D : B { override void f() {} }", "no inherited virtual method has the same parameters");
+    RequireDiagnostic("class B { virtual void f() {} } class D : B { sealed override void f() {} } class E : D { override void f() {} }", "cannot override sealed method 'D.f'");
+    RequireDiagnostic("sealed class B {} class D : B {}", "cannot derive from sealed class 'B'");
+    RequireDiagnostic("struct S {} class D : S {}", "cannot derive from struct 'S'");
+    RequireDiagnostic("abstract class B { abstract void f(); } B b = new B();", "Cannot create an instance of abstract class 'B'");
+    RequireDiagnostic("abstract class B { abstract void f(); } class D : B {}", "must be 'abstract' or override abstract method 'B.f'");
+    RequireDiagnostic("class B { abstract void f(); }", "must be 'abstract' to declare abstract method");
+    RequireDiagnostic("abstract class B { abstract void f() {} }", "cannot have a body");
+    RequireDiagnostic("class B { void f(); }", "must have a body");
+    RequireDiagnostic("class B { static virtual void f() {} }", "Static method 'f' cannot be virtual");
+    RequireDiagnostic("struct S { virtual void f() {} }", "Struct method 'f' cannot be virtual");
+    RequireDiagnostic("abstract struct S {}", "Structs cannot be 'abstract' or 'sealed'");
+    RequireDiagnostic("class B { sealed void f() {} }", "Only an 'override' method can be 'sealed'");
+    RequireDiagnostic("class B { virtual override void f() {} }", "can only be one of");
+    RequireDiagnostic("class B { private: virtual void f() {} }", "cannot be private");
+    RequireDiagnostic("class B { B(int x) {} } class D : B { D() {} }", "Base class 'B' has no parameterless constructor");
+    RequireDiagnostic("class B { B(int x) {} } class D : B {}", "Base class 'B' has no parameterless constructor");
+    RequireDiagnostic("class B { B(int x) {} } class D : B { D() : base(\"no\") {} }", "Constructor argument 1 for 'B' expects 'int'");
+    RequireDiagnostic("class D { D() : base() {} }", "requires a base class");
+    RequireDiagnostic("class B { B(int x) {} } class D : B { int y; D() : base(y) {} }", "Instance member 'y' cannot be used in base constructor arguments");
+    RequireDiagnostic("class B { int x; } class D : B { int x; }", "conflicts with the field inherited from 'B'");
+    RequireDiagnostic("class B { void f() {} } class D : B { void g() { auto b = base; } }", "'base' can only be used to access a member");
+    RequireDiagnostic("abstract class B { abstract void f(); } class D : B { override void f() { base.f(); } }", "Cannot call abstract method 'B.f' through 'base'");
+    RequireDiagnostic("class A {} class B {} A a = new A(); bool x = a is B;", "the classes are not related");
+    RequireDiagnostic("int i = 1; bool x = i is int;", "requires a class or 'any' operand");
+    RequireDiagnostic("table t = {}; auto x = t.v as int;", "'as' requires a reference type");
+}
+
 void TestStaticMethodsAndOverloads() {
     RequireClean(R"(class Util {
     static int twice(int x) { return x * 2; }
@@ -1400,6 +1461,109 @@ void TestNativeStructAcrossModules() {
     Require(wider == 0 && widerError == "expected P, got P", "a struct with a different layout crossed modules: " + widerError);
 }
 
+void TestNativeInheritance() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto runtime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.runtime = runtime;
+        auto module = luasharp::NativeModule::Compile(R"(abstract class Shape {
+    string name;
+    int built;
+    static string log = "";
+    Shape(string n) { name = n; log = log + "S"; built = kind(); }
+    abstract int area();
+    virtual int kind() { return 1; }
+    virtual string describe() { return name + ":" + string(area()); }
+    int sides() { return 0; }
+}
+class Node { int v; Node(int x) { v = x; } }
+class Rect : Shape {
+    int w = 1;
+    int h = 1;
+    Node extra = new Node(5);
+    Rect(int w, int h) : base("rect") { this.w = w; this.h = h; log = log + "R"; }
+    Rect(int s) : base("sq" + string(s)) { w = s; h = s; }
+    override int area() { return w * h; }
+    override int kind() { return 2; }
+    override string describe() { return "[" + base.describe() + "]"; }
+}
+sealed class Cube : Rect {
+    int d = 3;
+    Cube() : base(2, 2) { log = log + "C"; }
+    override int area() { return base.area() * d; }
+}
+Shape a = new Rect(2, 3);
+Shape b = new Cube();
+Rect c = new Rect(4);
+int areaA = a.area();
+int areaB = b.area();
+string descA = a.describe();
+string descB = b.describe();
+string descC = c.describe();
+int builtB = b.built;
+int sides = b.sides();
+string order = Shape.log;
+bool aIsRect = a is Rect;
+bool aIsCube = a is Cube;
+bool bIsCube = b is Cube;
+Shape nothing = null;
+bool nullIs = nothing is Rect;
+Cube asCube = b as Cube;
+Cube asNone = a as Cube;
+int cubeD = asCube.d;
+bool asNull = asNone == null;
+table t = {s = b};
+bool anyIsRect = t.s is Rect;
+bool anyIsString = t.s is string;
+Rect fromAny = t.s;
+int fromAnyArea = fromAny.area();
+bool anyAsOk = (t.s as Rect) != null;
+int dynArea = int(t.s.area());
+string dynDescribe = string(t.s.describe());
+Shape[] shapes = {a, b, c};
+int total = 0;
+for (s in shapes) { total += s.area(); }
+auto check = () => asCube.describe() + string(asCube.extra.v) + asCube.name;
+)", options);
+        Require(NativeGlobal<long long>(module, "areaA") == 6 && NativeGlobal<long long>(module, "areaB") == 12, "virtual calls did not dispatch to the override");
+        Require(NativeText(module, "descA") == "[rect:6]" && NativeText(module, "descB") == "[rect:12]" && NativeText(module, "descC") == "[sq4:16]", "base calls or inherited virtual calls were wrong: " + std::string(NativeText(module, "descB")));
+        Require(NativeGlobal<long long>(module, "builtB") == 2, "a virtual call in a base constructor did not dispatch to the derived class");
+        Require(NativeGlobal<long long>(module, "sides") == 0, "inherited non-virtual method call was wrong");
+        Require(NativeText(module, "order") == "SRSRCS", "constructors ran in the wrong order: " + std::string(NativeText(module, "order")));
+        Require(NativeGlobal<unsigned char>(module, "aIsRect") == 1 && NativeGlobal<unsigned char>(module, "aIsCube") == 0 && NativeGlobal<unsigned char>(module, "bIsCube") == 1 && NativeGlobal<unsigned char>(module, "nullIs") == 0, "'is' on class values was wrong");
+        Require(NativeGlobal<long long>(module, "cubeD") == 3 && NativeGlobal<unsigned char>(module, "asNull") == 1, "'as' on class values was wrong");
+        Require(NativeGlobal<unsigned char>(module, "anyIsRect") == 1 && NativeGlobal<unsigned char>(module, "anyIsString") == 0 && NativeGlobal<unsigned char>(module, "anyAsOk") == 1, "'is' or 'as' on `any` was wrong");
+        Require(NativeGlobal<long long>(module, "fromAnyArea") == 12, "a derived object did not unbox from `any` to its base class");
+        Require(NativeGlobal<long long>(module, "dynArea") == 12 && NativeText(module, "dynDescribe") == "[rect:12]", "dynamic calls did not use the most-derived methods");
+        Require(NativeGlobal<long long>(module, "total") == 34, "virtual calls in a loop over base-typed elements were wrong");
+        Require(module.LastError().empty(), "inheritance program reported a runtime error: " + module.LastError());
+        for (int pass{}; pass < 3; ++pass) {
+            runtime->Collect();
+            const auto checked = CallGlobalClosure(module, "check");
+            Require(checked.kind == luasharp::NativeValueKind::String, "check closure did not return a string");
+            const auto* text = static_cast<const NativeString*>(checked.as.pointer);
+            Require(std::string_view(text->data, static_cast<size_t>(text->length)) == "[rect:12]5rect", "collection freed a field declared in a base class");
+        }
+    }
+    Require(runtime->Collect() > 0 && runtime->AllocationCount() == 0, "inheritance graph was not reclaimed after module unload");
+    RequireNativeError("class B {} class D : B {} class E {} table t = {v = new D()}; E e = t.v;", "expected E, got D");
+}
+
+void TestInheritanceEmission() {
+    const auto generated = luasharp::CompileToC(R"(class B { int x; virtual int f() { return 1; } int g() { return f(); } }
+sealed class D : B { int y; override int f() { return base.f() + 1; } }
+B b = new D();
+D d = new D();
+int viaBase = b.f();
+int viaSealed = d.f();
+int inherited = d.g();)");
+    for (const auto expected : {"struct LS_D {\n    const LS_TypeInfo* ls_type;\n    ls_int x;\n    ls_int y;\n};", "static void* const ls_vtable_D[] = {", "(void*)ls_D_f, /* f() */",
+                                "&ls_type_B, ls_vtable_D};", "void ls_D__init(LS_D* self) {\n    ls_B__init((LS_B*)self);", "->ls_type->vtable[0])(", "ls_B_f(((LS_B*)self))",
+                                "ls_state.viaSealed = ls_D_f(ls_state.d);", "ls_state.inherited = ls_B_g((LS_B*)ls_state.d);"})
+        Require(generated.c.find(expected) != std::string::npos, std::string("missing inheritance lowering: ") + expected);
+}
+
 // Every native function the registry advertises must exist in the generated C header.
 void TestNativeRegistryMatchesHeader() {
     if (!luasharp::NativeModule::IsLibTccAvailable()) return;
@@ -1479,6 +1643,8 @@ int main() {
         {"struct semantics", TestStructSemantics},
         {"static field semantics", TestStaticFieldSemantics},
         {"static methods and overloads", TestStaticMethodsAndOverloads},
+        {"inheritance semantics", TestInheritanceSemantics},
+        {"inheritance C emission", TestInheritanceEmission},
         {"struct C emission", TestStructEmission},
         {"native structs", TestNativeStructs},
         {"native struct boundaries", TestNativeStructBoundaries},
@@ -1486,6 +1652,7 @@ int main() {
         {"native struct references", TestNativeStructReferences},
         {"native struct type checks", TestNativeStructTypeChecks},
         {"native structs across modules", TestNativeStructAcrossModules},
+        {"native inheritance", TestNativeInheritance},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
     };
 

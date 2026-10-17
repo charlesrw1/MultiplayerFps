@@ -23,6 +23,10 @@ assert.ok(grammar.repository.keywords.patterns.some(pattern => pattern.match.inc
 for (const keyword of ["for", "in", "break", "continue"]) {
     assert.ok(grammar.repository.keywords.patterns.some(pattern => pattern.name === "keyword.control.luasharp" && pattern.match.includes(keyword)), `${keyword} must be highlighted as a control keyword`);
 }
+for (const keyword of ["virtual", "override", "abstract", "sealed"]) {
+    assert.ok(grammar.repository.keywords.patterns.some(pattern => pattern.name === "storage.modifier.luasharp" && pattern.match.includes(keyword)), `${keyword} must be highlighted as a modifier`);
+}
+assert.ok(grammar.repository.keywords.patterns.some(pattern => pattern.match.includes("is|as")), "is and as must be highlighted");
 assert.ok(grammar.repository.operators.patterns.some(pattern => pattern.match.includes("\\.\\.")), "integer range operator must be highlighted");
 assert.ok(grammar.repository.operators.patterns.some(pattern => pattern.match.includes("=>")), "lambda arrow must be highlighted");
 

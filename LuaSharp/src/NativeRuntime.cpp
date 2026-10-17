@@ -40,7 +40,7 @@ struct RuntimeAbi {
     unsigned long long abiVersion{AbiVersion};
     void* context{};
     void* (*allocate)(void*, unsigned long long, NativeTraceFunction){};
-    void (*mark)(void*, void*){};
+    void (*mark)(void*, void**){};
     void* (*intern)(void*, const char*){};
     void* (*tableCreate)(void*, unsigned long long, const NativeValue*){};
     void (*tableGet)(void*, void*, const NativeValue*, NativeValue*){};
@@ -61,7 +61,10 @@ struct RuntimeAbi {
 // Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.
 struct NativeTypeInfo;
 struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; };
-struct NativeTypeInfo { const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind; };
+struct NativeTypeInfo {
+    const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind;
+    const NativeTypeInfo* base; void* const* vtable;
+};
 constexpr unsigned long long SlotValue = 0, SlotFloat32 = 16, SlotInt32 = 17, StructPayload = 16;
 constexpr unsigned long long KindOf(NativeValueKind kind) { return static_cast<unsigned long long>(kind); }
 
@@ -258,7 +261,7 @@ namespace {
 void* AbiAllocate(void* context, unsigned long long size, NativeTraceFunction trace) {
     return static_cast<NativeRuntime*>(context)->Allocate(static_cast<size_t>(size), trace);
 }
-void AbiMark(void* context, void* object) { static_cast<NativeRuntime*>(context)->Mark(object); }
+void AbiMark(void* context, void** slot) { assert(slot); static_cast<NativeRuntime*>(context)->Mark(*slot); }
 void* AbiIntern(void* context, const char* string) { return static_cast<NativeRuntime*>(context)->Intern(string ? std::string_view(string) : std::string_view{}); }
 void TraceTable(void* context, void* object) {
     auto& runtime = *static_cast<NativeRuntime*>(context);

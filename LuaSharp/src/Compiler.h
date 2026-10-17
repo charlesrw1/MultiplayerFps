@@ -61,7 +61,8 @@ struct SyntaxParameter { std::string type; std::string name; TextSpan span; };
 struct SyntaxExpression {
     enum class Kind {
         Missing, Identifier, Number, String, Null, Boolean, Table, TableEntry, New,
-        Member, Call, Index, Slice, Range, Lambda, Unary, Binary, Assignment, Parenthesized
+        Member, Call, Index, Slice, Range, Lambda, Unary, Binary, Assignment, Parenthesized,
+        Is, As // text is the type name; one child, the operand
     } kind{Kind::Missing};
     std::string text;
     TextSpan span;
@@ -94,12 +95,20 @@ struct SyntaxStatement {
     NodeRange elseBody;
     TextSpan span;
 };
+struct SyntaxModifiers {
+    bool isStatic{}, isVirtual{}, isOverride{}, isAbstract{}, isSealed{};
+};
 struct SyntaxFunction {
     std::string access;
     std::string name;
     std::string returnType;
     bool isConstructor{};
     bool isStatic{};
+    SyntaxModifiers modifiers;
+    bool hasBody{true};      // false for `abstract void f();`
+    bool hasBaseCall{};      // constructor declares `: base(...)`
+    NodeRange baseArguments; // expression ids
+    TextSpan baseSpan;
     std::vector<SyntaxParameter> parameters;
     NodeRange body;
     TextSpan span;
@@ -109,6 +118,8 @@ struct SyntaxClass {
     std::string name;
     std::string baseName;
     bool isStruct{};
+    bool isAbstract{};
+    bool isSealed{};
     std::vector<SyntaxField> fields;
     std::vector<SyntaxFunction> functions;
     TextSpan span;
@@ -145,6 +156,7 @@ struct SyntaxTree {
     [[nodiscard]] NodeList<SyntaxExpression> Children(const SyntaxExpression& value) const { return {expressions, Links(value.children)}; }
     [[nodiscard]] const SyntaxExpression& Child(const SyntaxExpression& value, size_t index) const { assert(index < value.children.count); return Expression(links[value.children.first + index]); }
     [[nodiscard]] NodeList<SyntaxStatement> Statements(NodeRange range) const { return {statements, Links(range)}; }
+    [[nodiscard]] NodeList<SyntaxExpression> Expressions(NodeRange range) const { return {expressions, Links(range)}; }
     [[nodiscard]] std::span<const SyntaxParameter> Parameters(const SyntaxExpression& value) const {
         assert(value.parameters.first + value.parameters.count <= parameters.size());
         return std::span(parameters).subspan(value.parameters.first, value.parameters.count);

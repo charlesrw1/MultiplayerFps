@@ -256,7 +256,8 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         }
         return result;
     }
-    const char* words[] = {"class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return", "void", "null"};
+    const char* words[] = {"class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return", "void", "null",
+                           "virtual", "override", "abstract", "sealed", "is", "as", "base"};
     for (const auto* word : words) result.push_back({{"label", word}, {"kind", 14}});
     for (const auto& type : luasharp::BuiltinTypes()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in type"}});
     for (const auto& type : luasharp::BuiltinStaticClasses()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in static class"}});

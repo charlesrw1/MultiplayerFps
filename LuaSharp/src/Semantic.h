@@ -67,7 +67,7 @@ private:
 };
 
 enum class Lowering : uint8_t {
-    None, ImplicitField, ImplicitMethod, StaticCall, StaticField, NativeMethod, NativeStatic, NativeConstant, Construct, Printf, Concat, CompoundConcat, ListIndex, ListSet,
+    None, ImplicitField, ImplicitMethod, StaticCall, StaticField, Base, NativeMethod, NativeStatic, NativeConstant, Construct, Printf, Concat, CompoundConcat, ListIndex, ListSet,
     ListPushBack, ListPopBack, ListSize, ListEmpty, ListClear,
     StringLength, StringContains, StringStartsWith, StringEndsWith, StringSubstring, StringLower, StringUpper,
     CastIdentity, CastString, CastBoolNumber, CastBoolString, CastIntFloat, CastNumberBool, CastNumberString, CastDynamic
@@ -88,6 +88,10 @@ struct Symbol {
     bool implicit{}; // member of a builtin or external type; has no declaration in this source
     bool isStatic{};
     bool isStruct{}; // Class symbols: a value type
+    bool isVirtual{};  // Methods: dispatched through the vtable (virtual, abstract or override)
+    bool isOverride{};
+    bool isAbstract{}; // Methods without a body; Class symbols that cannot be constructed
+    bool isSealed{};   // Methods that cannot be overridden; Class symbols that cannot be derived from
 };
 struct ExternalType {
     std::string name;
@@ -152,9 +156,15 @@ struct BoundFunction {
     std::string returnType;
     bool isConstructor{};
     bool isStatic{};
+    bool isVirtual{};
+    bool isAbstract{};
     size_t symbolIndex{};
     std::vector<SyntaxParameter> parameters;
     NodeRange body;
+    // Constructors of derived classes: `: base(...)`. Without it, the parameterless base constructor runs.
+    bool hasBaseCall{};
+    std::optional<size_t> baseConstructor; // null for the implicit default constructor of the base
+    NodeRange baseArguments;               // bound expression ids
     TextSpan span;
 };
 struct BoundField {
@@ -169,6 +179,8 @@ struct BoundClass {
     std::string name;
     std::string baseName;
     bool isStruct{};
+    bool isAbstract{};
+    bool isSealed{};
     std::vector<BoundField> fields;
     std::vector<BoundFunction> functions;
     TextSpan span;

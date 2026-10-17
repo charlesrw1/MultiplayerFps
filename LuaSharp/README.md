@@ -34,7 +34,7 @@ The versioned runtime contract, scalar semantics, module state, external-symbol 
 LuaSharp `int` is a signed 64-bit native value. Generated arithmetic uses private unsigned bit operations only to guarantee two's-complement wrapping without invoking C signed-overflow undefined behavior; unsigned integers are not exposed as a LuaSharp type. `ReloadableNativeProgram` provides stable atomic function slots, validates signatures/class layouts/global types, and retains old code generations so already-loaded calls can finish safely.
 
 The native slice supports these features:
-- primitives, enums, and classes without inheritance, with constructors and methods
+- primitives, enums, and classes with constructors, methods and single inheritance (see below)
 - top-level initialization
 - `if`, `while`, C-style `for`, `break` and `continue`
 - foreach loops over lists (values, or index and value), over tables (key and value), and over inclusive ranges such as `1..10`
@@ -49,7 +49,7 @@ The native slice supports these features:
 The shared runtime uses a precise, non-moving mark-and-sweep heap. It traces module globals, class fields, list elements, table contents, closure environments and cells, and explicit host pins.
 
 These features fail with an explicit backend error:
-- inheritance
+- a class that derives from an external type
 - conversions between `table` and list values other than literals
 
 Semantic analysis accepts them, so they type-check in the editor.
@@ -103,6 +103,39 @@ class Counter {
 
 Methods, constructors and static methods can be overloaded. The compiler chooses the overload at compile time. An exact type match is best. After that it prefers `int` to `float`, a derived class to its base class, `null`, and last a conversion through `any`. If two overloads match equally well, the call is an error, unless an argument has the type `any`. The first overload of a name keeps the plain C name (`ls_Util_twice`). Later overloads get a suffix (`ls_Util_twice__1`). Their export names include the parameter types (`Util.twice(float)`). Overloaded methods are not reachable through `any`.
 
+## Inheritance
+
+A class can derive from one other class. Methods are not virtual unless you mark them, as in C#.
+
+```
+abstract class Shape {
+    string name;
+    Shape(string n) { name = n; }
+    abstract float area();
+    virtual string describe() { return name + ": " + string(area()); }
+}
+class Rect : Shape {
+    float w; float h;
+    Rect(float w, float h) : base("rect") { this.w = w; this.h = h; }
+    override float area() { return w * h; }
+    override string describe() { return "[" + base.describe() + "]"; }
+}
+sealed class Square : Rect {
+    Square(float s) : base(s, s) {}
+}
+Shape s = new Square(2);
+bool isRect = s is Rect;   // true
+Rect r = s as Rect;        // null when s is not a Rect
+```
+
+- `virtual` lets a derived class replace a method. `override` replaces it, with the same parameters and result. `abstract` declares a method without a body, in an `abstract` class. `sealed override` stops further overrides, and a `sealed` class cannot be a base.
+- A method with the same parameters as an inherited one must be an `override`. Hiding an inherited method is an error.
+- `Derived(...) : base(args)` calls a base constructor. Without it, the parameterless base constructor runs, and it is an error if the base has none. The base constructor arguments can use the parameters, but not `this`.
+- Order of construction: base field initializers, base constructor body, derived field initializers, derived constructor body. A virtual call in a base constructor calls the derived override.
+- `base.m(args)` calls the base implementation directly. `base` is not reserved: a field or local called `base` keeps its name.
+- `x is T` is true when `x` is not null and is a `T`. `x as T` gives `x` as a `T`, or `null`. Both work on class values and on `any`. On `any`, `is` also tests for `int`, `float`, `bool`, `string`, `table`, lists, enums and structs; `as` needs a reference type.
+- A derived class cannot declare a field with the name of an inherited field.
+
 ## Native math types and the `math` library
 
 `Vec2`, `Vec3` (float32 components), `Vec2i`, `Vec3i` (int32 components), `Quat` and `Mat4x4` are native structs with the layouts in [`runtime/luasharp/vecmath.h`](runtime/luasharp/vecmath.h). `Mat4x4` is column-major like glm: element (row r, column c) is `m[c * 4 + r]`. `Quat` stores `x, y, z, w` like glm, but `Quat.new` takes `(w, x, y, z)`. Euler angles are the glm convention (`pitch, yaw, roll` in `x, y, z`). The reference is in [`docs/math-library.md`](docs/math-library.md).
@@ -117,7 +150,7 @@ The vector, matrix and `math` sources are generated. Edit `scripts/gen_vecmath.p
 
 The VS Code extension indexes every `.ls` file in the workspace and refreshes that index as files change. Cross-file types and members participate in diagnostics, completion, hover, definition, references, rename, and document/workspace symbols. Semantic tokens distinguish user-declared class types from grammar-colored built-in types, and protocol positions are UTF-16 correct.
 
-Remaining features that need an explicit language design are explicit imports/modules, base-constructor arguments, user-defined operator declarations, tuple/multiple-return types, and explicit nullable-type syntax. Formatting and diagnostic code actions are also not implemented yet.
+Remaining features that need an explicit language design are explicit imports/modules, user-defined operator declarations, tuple/multiple-return types, and explicit nullable-type syntax. Formatting and diagnostic code actions are also not implemented yet.
 
 `LuaSharpTests` is the unit-test executable. The native LSP integration test is self-contained and can be run after building `LuaSharpLsp`:
 
