@@ -534,6 +534,24 @@ struct NativeDebugger::Impl {
         return result;
     }
 
+    // The top-level variables and static fields ("Type.field") of the module of a stopped frame.
+    std::vector<Child> StaticSlots(size_t frameIndex) const {
+        std::vector<Child> result;
+        if (frameIndex >= frames.size()) return result;
+        const auto& tables = *frames[frameIndex].module->tables;
+        assert(tables.staticCount == 0 || (tables.statics && tables.staticsBase));
+        const auto* base = static_cast<const std::byte*>(tables.staticsBase);
+        for (uint64_t i{}; i < tables.staticCount; ++i) result.push_back({tables.statics[i].name, {}, SlotOf(base, tables.statics[i])});
+        return result;
+    }
+    // "Type" of a frame in a method "Type.name"; empty for top-level code and lambdas.
+    std::string_view FrameOwner(size_t frameIndex) const {
+        if (frameIndex >= frames.size()) return {};
+        const std::string_view function = frames[frameIndex].module->info->functions[frames[frameIndex].function].name;
+        const auto dot = function.find('.');
+        return dot == std::string_view::npos ? std::string_view() : function.substr(0, dot);
+    }
+
     // A child by name; a method matches without its "()".
     std::optional<Child> FindChild(const Slot& parent, std::string_view name) {
         for (auto& child : Children(Unwrap(parent)))
@@ -560,7 +578,22 @@ struct NativeDebugger::Impl {
         std::optional<Child> current;
         if (const auto local = std::ranges::find(locals, first, &Child::name); local != locals.end()) current = std::move(*local);
         else if (const auto self = std::ranges::find(locals, "this", &Child::name); self != locals.end()) current = FindChild(self->slot, first);
-        if (!current) return fail("'" + first + "' is not a local or a member of this");
+        if (!current) {
+            // A static: "name", a static of the frame's class without "Type.", or "Type.field".
+            const auto statics = StaticSlots(frameIndex);
+            const auto findStatic = [&](std::string_view staticName) -> std::optional<Child> {
+                const auto found = std::ranges::find(statics, staticName, &Child::name);
+                return found == statics.end() ? std::nullopt : std::optional(*found);
+            };
+            current = findStatic(first);
+            if (const auto owner = FrameOwner(frameIndex); !current && !owner.empty()) current = findStatic(std::string(owner) + '.' + first);
+            if (!current && expression.substr(at).starts_with('.')) {
+                const auto mark = at++;
+                current = findStatic(first + '.' + name());
+                if (!current) at = mark;
+            }
+        }
+        if (!current) return fail("'" + first + "' is not a local, a member of this or a static");
         for (skipSpaces(); at < expression.size(); skipSpaces()) {
             if (!current->error.empty()) break;
             std::string member;
@@ -686,6 +719,15 @@ std::vector<NativeDebugVariable> NativeDebugger::Locals(size_t frameIndex) {
     return impl_->OnScriptThread(lock, [&] {
         std::vector<NativeDebugVariable> result;
         for (auto& local : impl_->LocalSlots(frameIndex)) result.push_back(impl_->Describe(std::move(local)));
+        return result;
+    });
+}
+
+std::vector<NativeDebugVariable> NativeDebugger::Statics(size_t frameIndex) {
+    std::unique_lock lock(impl_->mutex);
+    return impl_->OnScriptThread(lock, [&] {
+        std::vector<NativeDebugVariable> result;
+        for (auto& value : impl_->StaticSlots(frameIndex)) result.push_back(impl_->Describe(std::move(value)));
         return result;
     });
 }

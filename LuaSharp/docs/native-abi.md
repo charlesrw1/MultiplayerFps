@@ -343,9 +343,10 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 - Before each statement, `LS_DEBUG(function, statement)` calls the hook when `ls_debug.active` is not zero. A loop runs the hook in its condition, so the hook runs before each test.
 - The hook gets the address of `ls_locals` and the `rbp` of the function. The hook must write the statement id to `ls_statement`. The value is -1 before the first hook, so the debugger can find the line of a caller frame.
 - Each statement has a `#line` directive, so TinyCC errors show `.ls` lines. After each function, a `#line` directive gives the lines of the generated C again.
-- `ls_module_debug()` returns `LS_DebugModule`: the hook state, the code range and locals of each function, and the code range of the module. `NativeModule::Debug()` returns it.
+- `ls_module_debug()` returns `LS_DebugModule`: the hook state, the code range and locals of each function, the code range of the module, and the statics. `NativeModule::Debug()` returns it.
 - Each local has an `LS_FieldInfo`. Its offset is into `ls_locals`. `LS_FIELD_INDIRECT` marks an indirect local. A local of a type without an `LS_KIND` has the kind `LS_SLOT_UNKNOWN`.
 - Each enum has an `LS_EnumInfo`. Enum fields and enum locals point to it.
+- `LS_DebugModule::statics` has an `LS_FieldInfo` for each top-level variable and each static field. The name of a static field is `Type.field`. Its offset is from `statics_base`, the module state.
 - `CCompilationResult::debug` has the names, the line of each statement id, and the locals of each function, in the same order. A local is visible before statements in [`visibleFrom`, `visibleTo`). An indirect local holds a pointer to the value: a cell, an `inout` parameter or the `this` of a struct.
 - Captured variables of a lambda are not locals of the lambda.
 - An instrumented module takes approximately 1.5 times the TinyCC time of a plain module.
@@ -362,10 +363,12 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 - **Caller frames:** a hook records the offset of `ls_locals` from `rbp` for its function. A frame of a function that has not run a hook while attached shows no locals and no line.
 - **Runtime errors:** `NativeRuntime::SetErrorHandler` tells the debugger about each error. The debugger unwinds the C++ frames with `RtlVirtualUnwind` to the first module frame, and stops with the reason `Exception`. Errors that do not come from script code do not stop.
 - **Values:** `Locals` and `Variables` read memory through the `LS_FieldInfo` tables. Objects, structs, lists and tables have children. A child reference is valid until the script resumes. An `any` shows the type of its value.
+- **Statics:** `Statics(frame)` gives the top-level variables and the static fields of the module of the frame, in declaration order: first the top-level variables, then the static fields as `Type.field`.
 - **Extern objects:** an instrumented module has a getter shim (`LS_DebugProperty` in `LS_DebugModule::classes`) for each own field and each `[DebugView]` method of each extern class. A live extern object shows its script fields, then these properties of its class and of its bases. The debugger calls no other host method, because other methods can have side effects. A getter error shows as `<error: message>`. It does not stop the script, and the script does not see it. The summary shows the name from a string property `name`, `get_name()` or `get_editor_name()`, as in `Entity "player"`.
 - **`[DebugView]`:** put it on a method of an extern class that takes no arguments and returns a value. In CsRemake, `REFLECT(debug_view)` on a bound method makes it.
-- **Inspection thread:** `Locals`, `Variables` and `Evaluate` run on the stopped script thread. A call from another thread gives the work to the stop wait and waits for the result. Host getters thus run on the thread of the scripts. Hooks do not stop while a getter runs.
-- **Evaluate:** `Evaluate(frame, expression)` reads a path: a local or a member of `this`, then `.member` (a field, a property, or a `[DebugView]` method with or without `()`) and `[index]`.
+- **Inspection thread:** `Locals`, `Statics`, `Variables` and `Evaluate` run on the stopped script thread. A call from another thread gives the work to the stop wait and waits for the result. Host getters thus run on the thread of the scripts. Hooks do not stop while a getter runs.
+- **Evaluate:** `Evaluate(frame, expression)` reads a path: a local, a member of `this` or a static, then `.member` (a field, a property, or a `[DebugView]` method with or without `()`) and `[index]`.
+- **Static names:** the first name of a path can be a top-level variable, `Type.field`, or `field` in a method of `Type`. A local or a member of `this` with the same name comes first.
 - **Modules:** a module can move after `AddModule`. Remove it before you destroy it.
 
 ## Debug Adapter Protocol server
@@ -376,7 +379,7 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 - **Requests:** `initialize`, `attach`, `setBreakpoints`, `setExceptionBreakpoints`, `configurationDone`, `threads`, `stackTrace`, `scopes`, `variables`, `evaluate` (watch, hover and debug console), `continue`, `next`, `stepIn`, `stepOut`, `pause` and `disconnect`. `launch` fails: the program starts the server, not the client.
 - **Events:** `initialized`, `stopped` (from the stop handler, on the script thread), `output` and `terminated`.
 - **Threads:** one thread, id 1.
-- **Scopes:** each frame has one scope, `Locals`. Its reference is `2^30 + frame`. Value references are less than `2^30`.
+- **Scopes:** each frame has two scopes. The reference of `Locals` is `2^30 + frame`. The reference of `Statics` is `2^31 + frame`. Value references are less than `2^30`.
 - **Exceptions:** the filter `errors` (on by default) is `SetBreakOnErrors`.
 - **Output:** `NativeRuntime::SetPrintHandler` sends `printf` output to the client with `SendOutput`.
 

@@ -77,9 +77,11 @@ public:
     // Inspection of the stopped script; empty while it runs. References stay valid until it resumes.
     [[nodiscard]] std::vector<NativeDebugFrame> StackTrace() const;
     std::vector<NativeDebugVariable> Locals(size_t frame);
+    // The top-level variables and static fields ("Type.field") of the frame's module.
+    std::vector<NativeDebugVariable> Statics(size_t frame);
     std::vector<NativeDebugVariable> Variables(uint64_t reference);
-    // A path in the frame: a local or a field of `this`, then `.member` (a field, a property or a [DebugView] method, with
-    // or without "()") and `[index]`.
+    // A path in the frame: a local, a field of `this` or a static ("name", "Type.field", or "field" in a method of Type), then
+    // `.member` (a field, a property or a [DebugView] method, with or without "()") and `[index]`.
     NativeEvaluation Evaluate(size_t frame, std::string_view expression);
 
 private:

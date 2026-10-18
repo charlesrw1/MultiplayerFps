@@ -451,16 +451,29 @@ struct CEmitter {
             assert(locals.size() == debugFields[i].size());
             if (locals.empty()) continue;
             Line(0, "static const LS_FieldInfo ls_debug_locals_", i, "[] = {");
-            for (size_t local{}; local < locals.size(); ++local) {
-                const auto type = Find(locals[local].type);
-                Line(1, "{\"", locals[local].name, "\", ls_offsetof(LS_DebugLocals_", i, ", ", debugFields[i][local], "), ", [&] {
-                    if (TryKindName(type)) FieldDescriptor(type); else Put("LS_SLOT_UNKNOWN, 0, (const LS_TypeInfo*)0");
-                }, ", ", locals[local].indirect ? "LS_FIELD_INDIRECT" : "0", ", (const char*)0, (const char*)0, ", [&] {
-                    if (IsEnum(type)) Put("&ls_enuminfo_", Id{locals[local].type}); else Put("(const LS_EnumInfo*)0");
-                }, "},");
-            }
+            for (size_t local{}; local < locals.size(); ++local)
+                DebugFieldInfo(locals[local].name, "LS_DebugLocals_" + std::to_string(i), debugFields[i][local], Find(locals[local].type), locals[local].indirect ? "LS_FIELD_INDIRECT" : "0");
             Line(0, "};");
         }
+    }
+    // One entry of a debug LS_FieldInfo table: the member of a C struct. A type without an LS_KIND reads as LS_SLOT_UNKNOWN.
+    void DebugFieldInfo(std::string_view name, std::string_view structName, std::string_view member, TypeId type, std::string_view flags) {
+        Line(1, "{\"", name, "\", ls_offsetof(", structName, ", ", member, "), ", [&] {
+            if (TryKindName(type)) FieldDescriptor(type); else Put("LS_SLOT_UNKNOWN, 0, (const LS_TypeInfo*)0");
+        }, ", ", flags, ", (const char*)0, (const char*)0, ", [&] {
+            if (IsEnum(type)) Put("&ls_enuminfo_", Id{Name(type)}); else Put("(const LS_EnumInfo*)0");
+        }, "},");
+    }
+    // ls_debug_statics: the top-level variables and static fields ("Type.field") in ls_state. Gives the count.
+    size_t DebugStatics() {
+        const auto globals = ModuleGlobals();
+        if (globals.empty() && staticFields.empty()) return 0;
+        Line(0, "static const LS_FieldInfo ls_debug_statics[] = {");
+        for (const auto* statement : globals) DebugFieldInfo(statement->Name(), "LS_ModuleState", Identifier(statement->Name()), statement->type, "0");
+        for (const auto& [owner, field] : staticFields)
+            DebugFieldInfo(owner->name + "." + field->name, "LS_ModuleState", StaticMember(owner->name, field->name), Find(field->type), "0");
+        Line(0, "};");
+        return globals.size() + staticFields.size();
     }
     // ls_debug_classes: for each extern class, a getter shim for each own field and [DebugView] method, so the debugger can
     // read host values (LS_DebugProperty). Other methods can have side effects; the debugger never calls them. Gives the class count.
@@ -507,8 +520,10 @@ struct CEmitter {
             Line(1, "{(const void*)", debugSymbols[i], ", (const void*)ls_debug_end_", i, ", ", [&] { if (debugInfo.functions[i].locals.empty()) Put("(const LS_FieldInfo*)0"); else Put("ls_debug_locals_", i); }, ", ", debugInfo.functions[i].locals.size(), "},");
         Line(0, "};");
         const auto classCount = DebugClasses();
+        const auto staticCount = DebugStatics();
         Line(0, "static const LS_DebugModule ls_debug_module = {&ls_debug, ls_debug_functions, ", debugSymbols.size(), ", (const void*)ls_debug_text_begin, (const void*)ls_debug_text_end, ",
-             [&] { if (classCount) Put("ls_debug_classes"); else Put("(const LS_DebugClass*)0"); }, ", ", classCount, "};");
+             [&] { if (classCount) Put("ls_debug_classes"); else Put("(const LS_DebugClass*)0"); }, ", ", classCount, ", (const void*)&ls_state, ",
+             [&] { if (staticCount) Put("ls_debug_statics"); else Put("(const LS_FieldInfo*)0"); }, ", ", staticCount, "};");
         Line(0, "const LS_DebugModule* ls_module_debug(void) { return &ls_debug_module; }");
         std::string resolved;
         resolved.reserve(output.size());
@@ -664,7 +679,14 @@ struct CEmitter {
         return true;
     }
     // Module-state slot of a static field: "ls_state.ls_static_<Owner>__<name>".
-    auto StaticSlot(std::string_view owner, std::string_view name) { return [this, owner, name] { Put("ls_state.ls_static_", Id{owner}, "__", Id{name}); }; }
+    static std::string StaticMember(std::string_view owner, std::string_view name) { return "ls_static_" + Identifier(owner) + "__" + Identifier(name); }
+    auto StaticSlot(std::string_view owner, std::string_view name) { return [this, owner, name] { Put("ls_state.", StaticMember(owner, name)); }; }
+    // Top-level variables; they live in ls_state.
+    std::vector<const BoundStatement*> ModuleGlobals() const {
+        std::vector<const BoundStatement*> result;
+        for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local) result.push_back(&statement);
+        return result;
+    }
     auto StaticSlot(const BoundExpression& value) {
         assert(value.lowering == Lowering::StaticField && value.symbolIndex);
         const auto& symbol = analysis.symbols[*value.symbolIndex];
@@ -1918,14 +1940,10 @@ struct CEmitter {
         }
         for (const auto name : dynamicNames) Line(0, "static ls_string ls_name_", Id{name}, ';');
         for (const auto name : typeOfTargets) Line(0, "static ", CTypeName{typeOfProvider->type}, " ls_typeof_", Id{name}, ';');
-        const auto globals = [&] {
-            std::vector<const BoundStatement*> result;
-            for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local) result.push_back(&statement);
-            return result;
-        }();
+        const auto globals = ModuleGlobals();
         Line(0, "typedef struct LS_ModuleState {");
         for (const auto* statement : globals) Line(1, Type(statement->type), ' ', Id{statement->Name()}, ';');
-        for (const auto& [owner, field] : staticFields) Line(1, CTypeName{field->type}, " ls_static_", Id{owner->name}, "__", Id{field->name}, ';');
+        for (const auto& [owner, field] : staticFields) Line(1, CTypeName{field->type}, ' ', StaticMember(owner->name, field->name), ';');
         if (globals.empty() && staticFields.empty()) Line(1, "unsigned char _unused;");
         Line(0, "} LS_ModuleState;");
         Line(0, "static LS_ModuleState ls_state;");

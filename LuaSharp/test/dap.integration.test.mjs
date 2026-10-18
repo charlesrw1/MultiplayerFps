@@ -84,6 +84,7 @@ const source = `class Game {
         }
         return total;
     }
+    static int calls = 3;
 }
 int result = Game.run();
 printf("result=%d\\n", result);
@@ -152,6 +153,12 @@ try {
     assert.equal((await client.request("evaluate", { expression: "total", frameId: 1, context: "watch" })).result, "0");
     const missing = await client.response("evaluate", { expression: "nope", frameId: 0, context: "watch" });
     assert.ok(!missing.success && /nope/.test(missing.message), `an unknown name evaluated: ${JSON.stringify(missing)}`);
+    const { scopes } = await client.request("scopes", { frameId: 0 });
+    assert.deepEqual(scopes.map((scope) => scope.name), ["Locals", "Statics"]);
+    const statics = (await client.request("variables", { variablesReference: scopes[1].variablesReference })).variables;
+    assert.deepEqual(statics.map((variable) => [variable.name, variable.value]), [["result", "0"], ["items", "null"], ["bad", "0"], ["Game.calls", "3"]]);
+    assert.equal((await client.request("evaluate", { expression: "Game.calls", frameId: 1, context: "hover" })).result, "3");
+    assert.equal((await client.request("evaluate", { expression: "calls", frameId: 0, context: "watch" })).result, "3");
 
     await client.request("setBreakpoints", { source: { path: script }, breakpoints: [] });
     await client.request("continue", { threadId: 1 });
@@ -160,7 +167,7 @@ try {
     const error = await client.stopped("exception");
     assert.match(error.text, /index out of range/);
     frames = await client.frames();
-    assert.equal(frames[0].line, 17);
+    assert.equal(frames[0].line, 18);
 
     await client.request("continue", { threadId: 1 });
     await client.waitFor((message) => message.event === "output" && message.body.category === "stderr", "stderr output");

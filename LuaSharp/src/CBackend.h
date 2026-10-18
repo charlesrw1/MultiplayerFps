@@ -108,6 +108,9 @@ struct NativeDebugModule {
     const void* textEnd;
     const NativeDebugClass* classes; // the extern classes, each with its own getters
     uint64_t classCount;
+    const void* staticsBase;             // the module state
+    const abi::NativeFieldInfo* statics; // top-level variables and static fields ("Type.field"), at offsets from staticsBase
+    uint64_t staticCount;
 };
 
 struct CEmitOptions {

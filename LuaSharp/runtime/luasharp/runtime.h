@@ -175,6 +175,9 @@ typedef struct LS_DebugModule {
     const void* text_end;
     const LS_DebugClass* classes; /* each extern class of the declarations */
     ls_wrap_bits class_count;
+    const void* statics_base;     /* the module state */
+    const LS_FieldInfo* statics;  /* top-level variables and static fields ("Type.field"), at offsets in the module state */
+    ls_wrap_bits static_count;
 } LS_DebugModule;
 static LS_DebugState ls_debug;
 /* Out of line, so each hook site stays short for TinyCC. Frame 1 is the rbp of the instrumented function. */

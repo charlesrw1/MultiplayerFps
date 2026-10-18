@@ -2736,6 +2736,58 @@ int value = Values.check();
     Require(stops == 1 && *static_cast<long long*>(module.FindGlobal("value")) == 3, "the values script did not stop once");
 }
 
+// Top-level variables and static fields, in the Statics scope and in Evaluate.
+void TestNativeDebuggerStatics() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    constexpr std::string_view source = R"(enum Mode { Idle, Busy }
+struct Point { float x = 1; float y; }
+class Counter {
+    static int count = 4;
+    static Mode mode = Mode.Busy;
+    static Point origin;
+    static int[] history = {7, 8};
+    static int bump() {
+        count += 1;
+        return count;
+    }
+}
+string title = "game";
+int value = Counter.bump();
+)";
+    auto module = CompileDebugModule(source, "statics.ls");
+    luasharp::NativeDebugger debugger(module.Runtime());
+    debugger.AddModule(module);
+    size_t stops{};
+    debugger.SetStopHandler([&](const luasharp::NativeStopEvent&) {
+        ++stops;
+        Require(FrameText(debugger.StackTrace()) == "Counter.bump:10 <top-level>:14 ", "wrong stack: " + FrameText(debugger.StackTrace()));
+        const auto statics = debugger.Statics(0);
+        Require(VariableNames(statics) == std::vector<std::string>{"title", "value", "Counter.count", "Counter.mode", "Counter.origin", "Counter.history"}, "wrong statics");
+        Require(FindVariable(statics, "title").value == "\"game\"" && FindVariable(statics, "value").value == "0", "wrong top-level variables");
+        Require(FindVariable(statics, "Counter.count").value == "5" && FindVariable(statics, "Counter.count").type == "int", "wrong static int");
+        Require(FindVariable(statics, "Counter.mode").value == "Mode.Busy", "wrong static enum: " + FindVariable(statics, "Counter.mode").value);
+        Require(FindVariable(statics, "Counter.origin").value == "Point(1, 0)", "wrong static struct: " + FindVariable(statics, "Counter.origin").value);
+        const auto& history = FindVariable(statics, "Counter.history");
+        Require(history.value == "int[2]" && debugger.Variables(history.children).size() == 2, "wrong static list: " + history.value);
+        Require(VariableNames(debugger.Statics(1)) == VariableNames(statics), "the caller frame shows other statics");
+
+        const auto shown = [&](size_t frame, std::string_view expression) {
+            const auto result = debugger.Evaluate(frame, expression);
+            return result.value ? result.value->value : "<" + result.error + ">";
+        };
+        Require(shown(0, "Counter.count") == "5" && shown(0, "count") == "5", "a static did not evaluate: " + shown(0, "count"));
+        Require(shown(0, "Counter.origin.x") == "1" && shown(0, "Counter.history[1]") == "8", "wrong static path: " + shown(0, "Counter.history[1]"));
+        Require(shown(1, "title") == "\"game\"", "a top-level variable did not evaluate");
+        Require(!debugger.Evaluate(1, "count").value, "a static of another class evaluated without its type");
+        Require(!debugger.Evaluate(0, "Counter.nope").value && !debugger.Evaluate(0, "Counter").value, "an invalid static evaluated");
+        debugger.Continue();
+    });
+    debugger.SetBreakpoints("statics.ls", {10});
+    debugger.Attach();
+    module.Initialize();
+    Require(stops == 1 && *static_cast<long long*>(module.FindGlobal("value")) == 5, "the statics script did not stop once");
+}
+
 // The script thread waits while it is stopped; another thread inspects and resumes it.
 // An extern object in the debugger: its fields and [DebugView] methods, read through host getters on the script thread.
 struct HostProbe { long long hp; HostProbe* parent; void* proxy; };
@@ -2920,6 +2972,7 @@ int main() {
         {"native debugger values", TestNativeDebuggerValues},
         {"native debugger threads", TestNativeDebuggerThreads},
         {"native debugger properties", TestNativeDebuggerProperties},
+        {"native debugger statics", TestNativeDebuggerStatics},
         {"project files", TestProjectFiles},
     };
 

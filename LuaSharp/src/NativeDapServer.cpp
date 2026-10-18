@@ -24,6 +24,7 @@ using json = nlohmann::json;
 
 constexpr int64_t ThreadId = 1;          // scripts run on one thread
 constexpr uint64_t ScopeBase = 1ull << 30; // a frame's locals scope is ScopeBase + frame; value references are below it
+constexpr uint64_t StaticsBase = 2 * ScopeBase; // a frame's statics scope is StaticsBase + frame
 
 struct Winsock {
     Winsock() { WSADATA data{}; if (WSAStartup(MAKEWORD(2, 2), &data) != 0) throw std::runtime_error("WSAStartup failed"); }
@@ -187,12 +188,15 @@ struct NativeDapServer::Impl {
         } else if (command == "scopes") {
             const auto frame = arguments.value("frameId", uint64_t{});
             const json locals = {{"name", "Locals"}, {"presentationHint", "locals"}, {"variablesReference", ScopeBase + frame}, {"expensive", false}};
-            Respond(request, {{"scopes", json::array({locals})}});
+            const json statics = {{"name", "Statics"}, {"variablesReference", StaticsBase + frame}, {"expensive", false}};
+            Respond(request, {{"scopes", json::array({locals, statics})}});
         } else if (command == "evaluate") {
             Evaluate(request, arguments);
         } else if (command == "variables") {
             const auto reference = arguments.value("variablesReference", uint64_t{});
-            const auto variables = reference >= ScopeBase ? debugger.Locals(reference - ScopeBase) : debugger.Variables(reference);
+            const auto variables = reference >= StaticsBase ? debugger.Statics(reference - StaticsBase)
+                                 : reference >= ScopeBase   ? debugger.Locals(reference - ScopeBase)
+                                                            : debugger.Variables(reference);
             auto result = json::array();
             for (const auto& variable : variables) result.push_back(VariableJson(variable));
             Respond(request, {{"variables", std::move(result)}});
