@@ -19,22 +19,33 @@ struct NativeExport {
     std::vector<std::string> parameterTypes;
 };
 
+// The symbol of `size_t f(void* out)`, which writes the value of a constant initializer to out and returns its size.
+// Empty when the initializer is not a constant. A hot reload compares values with it (NativeReload.h).
+using NativeConstantSymbol = std::string;
+
+// symbolName returns the address of the global, symbolName + "__size" its size. A top-level variable also has
+// symbolName + "__reset", which sets the default value of its type.
 struct NativeGlobal {
-    std::string name;
+    std::string name;   // "Type.field" for a static field
     std::string symbolName;
     std::string type;
+    NativeConstantSymbol constant;
 };
 
 struct NativeFieldLayout {
     std::string name;
     std::string type;
-    bool operator==(const NativeFieldLayout&) const = default;
+    NativeConstantSymbol constant;
+    // The layout only: constants do not change it.
+    bool operator==(const NativeFieldLayout& other) const { return name == other.name && type == other.type; }
 };
 
+// A script class or struct; each exports ls_<T>__type (NativeModule::ScriptType).
 struct NativeTypeLayout {
     std::string name;
     std::string baseName;
-    std::vector<NativeFieldLayout> fields;
+    std::vector<NativeFieldLayout> fields; // instance fields
+    bool isStruct{};
     bool operator==(const NativeTypeLayout&) const = default;
 };
 
@@ -183,6 +194,10 @@ public:
     [[nodiscard]] const void* ExternalStructType(std::string_view structName) const;
     // The LS_TypeInfo of a math struct (Vec2, Vec3, ...) or of an external struct; null for other names.
     [[nodiscard]] const void* StructType(std::string_view structName) const;
+    // The LS_TypeInfo of one of Generated().types; null for other names.
+    [[nodiscard]] const void* ScriptType(std::string_view typeName) const;
+    // For a hot reload: runs only the static field initializers, not the top-level code (NativeReload.h).
+    void InitializeStatics();
     [[nodiscard]] std::string LastError() const;
     void ClearError();
     [[nodiscard]] std::shared_ptr<NativeRuntime> Runtime() const;
@@ -195,6 +210,7 @@ public:
 private:
     struct Impl;
     explicit NativeModule(std::unique_ptr<Impl> impl);
+    void RunInitializer(const char* symbol);
     std::unique_ptr<Impl> impl_;
 };
 

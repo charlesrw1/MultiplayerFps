@@ -3,7 +3,7 @@
 #ifndef LUASHARP_RUNTIME_H
 #define LUASHARP_RUNTIME_H
 
-#define LS_ABI_VERSION 13
+#define LS_ABI_VERSION 14
 
 typedef signed long long ls_int;          /* public LuaSharp int: signed 64-bit */
 typedef unsigned long long ls_wrap_bits;  /* internal arithmetic bits; never a LuaSharp value */
@@ -94,6 +94,7 @@ typedef struct LS_TypeInfo {
     ls_wrap_bits flags;                 /* LS_TYPE_* */
     ls_wrap_bits host_override_count;
     const struct LS_HostOverride* host_overrides; /* LS_TYPE_NATIVE_BASE: script overrides of extern virtual methods */
+    void (*trace)(void* context, void* object); /* script classes: the trace function of the objects; a hot reload finds them by it */
 } LS_TypeInfo;
 /* The objects of the type are LS_NativeObject proxies for host objects (extern classes). Type infos with this
    flag match by name; the host's NativeRuntime owns the one its proxies point to. */

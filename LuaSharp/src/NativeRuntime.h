@@ -6,12 +6,13 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace luasharp {
 
 // Must equal LS_ABI_VERSION in runtime/luasharp/runtime.h.
-constexpr unsigned long long NativeAbiVersion = 13;
+constexpr unsigned long long NativeAbiVersion = 14;
 
 using NativeTraceFunction =void (*)(void* runtimeContext, void* object);
 using NativeFinalizeFunction = void (*)(void* object);
@@ -114,6 +115,12 @@ public:
     static size_t HostOverrideCount(const void* object);
     // Links a new object to its host object, before its script constructor runs.
     static void SetNative(void* object, void* native);
+
+    // Hot reload. The live objects of a script class (by LS_TypeInfo), in no fixed order.
+    [[nodiscard]] std::vector<void*> ObjectsOf(const void* type) const;
+    // Gives the objects of each old class its new type info and trace function, and the lists of old elements the
+    // new element type. The layouts must be the same. Returns the number of objects retyped.
+    size_t Retype(const std::unordered_map<const void*, const void*>& types);
 
     void* Intern(std::string_view utf8);
     [[nodiscard]] size_t AllocationCount() const;

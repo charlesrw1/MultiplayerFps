@@ -699,6 +699,47 @@ void NativeRuntime::SetNative(void* object, void* native) {
     static_cast<NativeProxy*>(object)->native = native;
 }
 
+std::vector<void*> NativeRuntime::ObjectsOf(const void* type) const {
+    const auto* info = static_cast<const NativeTypeInfo*>(type);
+    assert(info && info->kind == KindOf(NativeValueKind::Object) && info->trace); // a script class
+    std::scoped_lock lock(impl_->mutex);
+    std::vector<void*> objects;
+    for (auto* current = impl_->allocations; current; current = current->next)
+        if (current->trace == info->trace) {
+            assert(*static_cast<const NativeTypeInfo* const*>(Payload(current)) == info); // each class has its own trace function
+            objects.push_back(Payload(current));
+        }
+    return objects;
+}
+
+size_t NativeRuntime::Retype(const std::unordered_map<const void*, const void*>& types) {
+    std::scoped_lock lock(impl_->mutex);
+    std::unordered_map<NativeTraceFunction, const NativeTypeInfo*> classes; // old trace function -> new type
+    for (const auto& [from, to] : types) {
+        const auto* old = static_cast<const NativeTypeInfo*>(from);
+        if (old->kind != KindOf(NativeValueKind::Object)) continue;
+        assert(old->trace && static_cast<const NativeTypeInfo*>(to)->trace);
+        classes.emplace(old->trace, static_cast<const NativeTypeInfo*>(to));
+    }
+    size_t retyped{};
+    for (auto* current = impl_->allocations; current; current = current->next) {
+        void* object = Payload(current);
+        if (current->trace == TraceList) {
+            auto& list = static_cast<RuntimeList*>(object)->header;
+            if (const auto found = types.find(list.elementType); found != types.end()) list.elementType = found->second;
+            continue;
+        }
+        const auto found = classes.find(current->trace);
+        if (found == classes.end()) continue;
+        auto& header = *static_cast<const NativeTypeInfo**>(object);
+        assert(types.at(header) == found->second);
+        header = found->second;
+        current->trace = found->second->trace;
+        ++retyped;
+    }
+    return retyped;
+}
+
 NativeRef::NativeRef(std::shared_ptr<NativeRuntime> runtime, void* object) : runtime_(std::move(runtime)), object_(object) {
     assert(runtime_);
     runtime_->AddRootSlot(&object_);

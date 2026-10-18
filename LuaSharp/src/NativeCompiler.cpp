@@ -237,11 +237,14 @@ NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompil
     return module;
 }
 
-void NativeModule::Initialize() {
+void NativeModule::Initialize() { RunInitializer("ls_module_init"); }
+void NativeModule::InitializeStatics() { RunInitializer("ls_module_init_statics"); }
+
+void NativeModule::RunInitializer(const char* symbol) {
     if (!impl_) throw std::runtime_error("Cannot initialize an empty native module");
     if (impl_->initialized) throw std::runtime_error("Native module is already initialized");
-    const auto initializer = reinterpret_cast<int (*)()>(impl_->getSymbol(impl_->state, "ls_module_init"));
-    if (!initializer) throw std::runtime_error("TinyCC output did not contain ls_module_init");
+    const auto initializer = reinterpret_cast<int (*)()>(impl_->getSymbol(impl_->state, symbol));
+    if (!initializer) throw std::runtime_error(std::string("TinyCC output did not contain ") + symbol);
     impl_->initialized = true;
     const int result = initializer();
     if (result != 0) throw std::runtime_error("LuaSharp native module initializer returned " + std::to_string(result));
@@ -280,6 +283,12 @@ const void* NativeModule::ExternalStructType(std::string_view structName) const 
 const void* NativeModule::StructType(std::string_view structName) const {
     if (!impl_) return nullptr;
     return IsNativeStruct(structName) ? ExportedType(*this, NativeStructTypes(), structName) : ExternalStructType(structName);
+}
+const void* NativeModule::ScriptType(std::string_view typeName) const {
+    if (!impl_ || std::ranges::find(impl_->generated.types, typeName, &NativeTypeLayout::name) == impl_->generated.types.end()) return nullptr;
+    const auto type = reinterpret_cast<const void* (*)()>(FindSymbol("ls_" + std::string(typeName) + "__type"));
+    assert(type && "the C backend emits ls_<T>__type for each script type");
+    return type ? type() : nullptr;
 }
 
 std::string NativeModule::LastError() const {

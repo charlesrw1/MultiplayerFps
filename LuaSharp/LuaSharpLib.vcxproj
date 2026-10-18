@@ -28,6 +28,7 @@
     <ClCompile Include="src\NativeCompiler.cpp" />
     <ClCompile Include="src\NativeDapServer.cpp" />
     <ClCompile Include="src\NativeDebugger.cpp" />
+    <ClCompile Include="src\NativeReload.cpp" />
     <ClCompile Include="src\NativeRuntime.cpp" />
     <ClCompile Include="src\Semantic.cpp" />
     <ClInclude Include="src\Builtins.h" />
@@ -35,6 +36,7 @@
     <ClInclude Include="src\NativeAbi.h" />
     <ClInclude Include="src\NativeDapServer.h" />
     <ClInclude Include="src\NativeDebugger.h" />
+    <ClInclude Include="src\NativeReload.h" />
     <ClInclude Include="src\NativeRuntime.h" />
     <ClInclude Include="src\Compiler.h" />
     <ClInclude Include="src\Semantic.h" />

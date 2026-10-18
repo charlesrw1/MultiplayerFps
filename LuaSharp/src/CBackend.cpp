@@ -7,6 +7,7 @@
 #include <cctype>
 #include <charconv>
 #include <cstdlib>
+#include <functional>
 #include <iterator>
 #include <stdexcept>
 #include <type_traits>
@@ -738,6 +739,35 @@ struct CEmitter {
         if (IsStruct(type)) return Put("ls_", Id{Name(type)}, "_default()");
         if (type != TypeTable::Unknown && !IsBuiltinType(Name(type))) return Put("((", Type(type), ")0)");
         throw std::runtime_error("Native C backend cannot default-initialize type '" + Name(type) + "'");
+    }
+
+    // Hot reload compares a value with the constant of its initializer (NativeConstantSymbol). Values of these types
+    // have no identity, except strings, which the host compares by text.
+    bool HasConstantValue(TypeId type) const {
+        if (IsDynamic(type) || types.IsFunction(type) || types.IsList(type) || type == TypeTable::Unknown) return false;
+        return !IsStruct(type) || IsNativeStruct(Name(type));
+    }
+    bool IsConstant(const BoundExpression& value) const {
+        using Kind = SyntaxExpression::Kind;
+        const auto constantFrom = [&](size_t first) {
+            for (size_t i = first; i < value.children.count; ++i) if (!IsConstant(Child(value, i))) return false;
+            return true;
+        };
+        switch (value.kind) {
+        case Kind::Missing: case Kind::Number: case Kind::String: case Kind::Boolean: case Kind::Null: return true;
+        case Kind::Parenthesized: case Kind::Unary: case Kind::Binary: return constantFrom(0);
+        case Kind::Member: return value.lowering == Lowering::NativeConstant || (value.lowering == Lowering::None && IsEnum(value.type) && types.Kind(Child(value, 0).type) == TypeKind::Meta);
+        case Kind::Call: return value.lowering == Lowering::Construct && IsNativeStruct(Name(value.type)) && constantFrom(1);
+        default: return false;
+        }
+    }
+    struct Constant { std::string symbol; TypeId type; std::function<void()> value; };
+    std::vector<Constant> constants;
+    // The constant's symbol, or empty when the initializer is not a constant. Missing initializers are the default value.
+    NativeConstantSymbol AddConstant(std::string symbol, TypeId type, const BoundExpression& initializer, std::function<void()> value) {
+        if (!HasConstantValue(type) || !IsConstant(initializer)) return {};
+        constants.push_back({symbol, type, std::move(value)});
+        return symbol;
     }
 
     // Typed C value -> LS_Value.
@@ -1666,12 +1696,13 @@ struct CEmitter {
             methods.size(), ", ", [&] { if (!methods.empty()) Put("ls_methods_", name); else Put("(const LS_MethodInfo*)0"); }, ", ", [&] { if (value.isStruct) Put("sizeof(LS_", name, ")"); else Put('0'); }, ", ",
             value.isStruct ? "LS_KIND_STRUCT" : "LS_KIND_OBJECT", ", ", [&] { if (!baseName.empty()) Put("&ls_type_", Id{baseName}); else Put("(const LS_TypeInfo*)0"); }, ", ",
             [&] { if (slots && !slots->empty()) Put("ls_vtable_", name); else Put("(void* const*)0"); }, [&] {
-                if (!native) return;
-                Put(", LS_TYPE_NATIVE_BASE, ", overrides.size(), ", ");
+                if (value.isStruct) return;
+                Put(native ? ", LS_TYPE_NATIVE_BASE, " : ", 0, ", overrides.size(), ", ");
                 if (!overrides.empty()) Put("ls_host_overrides_", name); else Put("(const LS_HostOverride*)0");
+                Put(", ls_trace_", name);
             }, "};");
-        // The host reads the classes it creates (NativeModule::HostClassType).
-        if (native || value.isExternal) Line(0, "const LS_TypeInfo* ", FunctionName(value.name, "_type"), "(void) { return &ls_type_", name, "; }");
+        // The host reads the classes it creates (NativeModule::HostClassType) and the types a hot reload changes (ScriptType).
+        Line(0, "const LS_TypeInfo* ", FunctionName(value.name, "_type"), "(void) { return &ls_type_", name, "; }");
     }
     // The most-derived script implementation of each extern virtual method that the class or its script bases override.
     std::vector<std::pair<std::string_view, const BoundFunction*>> HostOverrides(const BoundClass& value, const ExternalType& native) const {
@@ -1974,8 +2005,12 @@ struct CEmitter {
         for (const auto* value : orderedClasses) if (NativeBaseOf(*value)) result.hostClasses.push_back(value->name);
         for (const auto& value : program.classes) if (value.isExternal) result.externalStructs.push_back(value.name);
         for (const auto& value : program.classes) {
-            NativeTypeLayout layout; layout.name = value.name; layout.baseName = value.baseName;
-            for (const auto& field : value.fields) if (!field.isStatic) layout.fields.push_back({field.name, field.type});
+            NativeTypeLayout layout; layout.name = value.name; layout.baseName = value.baseName; layout.isStruct = value.isStruct;
+            for (const auto& field : value.fields) {
+                if (field.isStatic) continue;
+                auto constant = value.isStruct ? NativeConstantSymbol{} : AddConstant("ls_constant_" + Identifier(value.name) + "__" + Identifier(field.name), Find(field.type), program.Expression(field.initializer), FieldInitializer(value, field));
+                layout.fields.push_back({field.name, field.type, std::move(constant)});
+            }
             result.types.push_back(std::move(layout));
         }
         result.exports.push_back({"$abi_version", "ls_module_abi_version", "int", {}});
@@ -1983,13 +2018,20 @@ struct CEmitter {
         for (const auto* statement : globals) {
             const auto symbol = "ls_global_" + Identifier(statement->Name());
             Line(0, "void* ", symbol, "(void) { return &ls_state.", Id{statement->Name()}, "; }");
-            result.globals.push_back({statement->Name(), symbol, Name(statement->type)});
+            Line(0, "ls_wrap_bits ", symbol, "__size(void) { return sizeof(ls_state.", Id{statement->Name()}, "); }");
+            const auto& initializer = program.Expression(statement->expression);
+            auto constant = AddConstant("ls_constant_global_" + Identifier(statement->Name()), statement->type, initializer, [this, statement, &initializer] {
+                if (initializer.kind == SyntaxExpression::Kind::Missing) Default(statement->type); else Value(statement->type, initializer, {});
+            });
+            result.globals.push_back({statement->Name(), symbol, Name(statement->type), std::move(constant)});
         }
         // A static field is a global named "Type.field".
         for (const auto& [owner, field] : staticFields) {
             const auto symbol = "ls_global_static_" + Identifier(owner->name) + "__" + Identifier(field->name);
             Line(0, "void* ", symbol, "(void) { return &", StaticSlot(owner->name, field->name), "; }");
-            result.globals.push_back({owner->name + "." + field->name, symbol, field->type});
+            Line(0, "ls_wrap_bits ", symbol, "__size(void) { return sizeof(", StaticSlot(owner->name, field->name), "); }");
+            auto constant = AddConstant("ls_constant_static_" + Identifier(owner->name) + "__" + Identifier(field->name), Find(field->type), program.Expression(field->initializer), FieldInitializer(*owner, *field));
+            result.globals.push_back({owner->name + "." + field->name, symbol, field->type, std::move(constant)});
         }
         for (const auto& value : program.classes) Prototypes(value);
         Line(0);
@@ -2041,11 +2083,19 @@ struct CEmitter {
                 Statements(program.topLevel[file], 1, {}, {}, true); Line(0, '}');
             });
         }
-        Line(0, "int ls_module_init(void) {");
-        // Static fields initialize before top-level code, in declaration order.
+        for (const auto& constant : constants)
+            Line(0, "ls_wrap_bits ", constant.symbol, "(void* out) { *(", Type(constant.type), "*)out = ", constant.value, "; return sizeof(", Type(constant.type), "); }");
+        for (const auto* statement : ModuleGlobals())
+            Line(0, "void ls_global_", Identifier(statement->Name()), "__reset(void) { ls_state.", Id{statement->Name()}, " = ", [&] { Default(statement->type); }, "; }");
+        // Static fields initialize before top-level code, in declaration order. A hot reload runs only them.
+        Line(0, "int ls_module_init_statics(void) {");
         for (const auto& [owner, field] : staticFields) Line(1, StaticSlot(owner->name, field->name), " = ", FieldInitializer(*owner, *field), ';');
+        Line(1, "return 0;"); Line(0, '}');
+        Line(0, "int ls_module_init(void) {");
+        Line(1, "ls_module_init_statics();");
         for (const auto& symbol : fileInits) Line(1, symbol, "();");
         Line(1, "return 0;"); Line(0, '}');
+        result.exports.push_back({"$module_init_statics", "ls_module_init_statics", "int", {}});
         result.exports.push_back({"$module_init", "ls_module_init", "int", {}});
         if (emitOptions.debugHooks) { DebugTables(); result.debug = std::move(debugInfo); }
         result.c = std::move(output); return result;

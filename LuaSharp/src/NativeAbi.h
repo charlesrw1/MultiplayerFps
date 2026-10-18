@@ -51,6 +51,7 @@ struct NativeTypeInfo {
     const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind;
     const NativeTypeInfo* base; void* const* vtable; unsigned long long flags;
     unsigned long long hostOverrideCount; const NativeHostOverride* hostOverrides;
+    NativeTraceFunction trace;
 };
 constexpr unsigned long long TypeNative = 1;     // LS_TYPE_NATIVE
 constexpr unsigned long long TypeNativeBase = 2; // LS_TYPE_NATIVE_BASE

@@ -1,6 +1,8 @@
 #include "Compiler.h"
 #include "CBackend.h"
 #include "NativeDebugger.h"
+#include "NativeReload.h"
+#include "NativeAbi.h"
 #include "Semantic.h"
 #include "Builtins.h"
 #include "Project.h"
@@ -1790,7 +1792,7 @@ void TestDerivedExternClassSemantics() {
     Require(valid.diagnostics.empty(), "a valid derived class produced diagnostics: " + (valid.diagnostics.empty() ? std::string() : valid.diagnostics.front().message));
 
     const auto generated = luasharp::CompileToC(std::string(UnitDeclarations) + "\n" + std::string(UnitScript));
-    for (const auto expected : {"void* ls_native; /* LS_NativeObject.native */", "LS_KIND_OBJECT, &ls_type_Unit, ls_vtable_Guard, LS_TYPE_NATIVE_BASE, 1, ls_host_overrides_Guard};",
+    for (const auto expected : {"void* ls_native; /* LS_NativeObject.native */", "LS_KIND_OBJECT, &ls_type_Unit, ls_vtable_Guard, LS_TYPE_NATIVE_BASE, 1, ls_host_overrides_Guard, ls_trace_Guard};",
                                 "{\"hit\", (void*)ls_Guard_hit},", "{\"name\", (void*)ls_Captain_name},", "extern ls_int ls_native_Unit__base_hit(void* self, ls_int amount);",
                                 "ls_Unit__base_hit((LS_Unit*)self", "LS_Guard* ls_Guard__host_alloc(void)", "ls_Unit__get_hp((LS_Unit*)self)", "ls_Unit__set_hp(", "ls_Unit_plain((LS_Unit*)self)",
                                 "{\"armor\", ls_offsetof(LS_Guard, armor), LS_KIND_INT, 0, (const LS_TypeInfo*)0, 0, (const char*)0, (const char*)0},",
@@ -1887,7 +1889,7 @@ int viaBase = b.f();
 int viaSealed = d.f();
 int inherited = d.g();)");
     for (const auto expected : {"struct LS_D {\n    const LS_TypeInfo* ls_type;\n    ls_int x;\n    ls_int y;\n};", "static void* const ls_vtable_D[] = {", "(void*)ls_D_f, /* f() */",
-                                "&ls_type_B, ls_vtable_D};", "void ls_D__init(LS_D* self) {\n    ls_B__init((LS_B*)self);", "->ls_type->vtable[0])(", "ls_B_f(((LS_B*)self))",
+                                "&ls_type_B, ls_vtable_D, 0, 0, (const LS_HostOverride*)0, ls_trace_D};", "void ls_D__init(LS_D* self) {\n    ls_B__init((LS_B*)self);", "->ls_type->vtable[0])(", "ls_B_f(((LS_B*)self))",
                                 "ls_state.viaSealed = ls_D_f(ls_state.d);", "ls_state.inherited = ls_B_g((LS_B*)ls_state.d);"})
         Require(generated.c.find(expected) != std::string::npos, std::string("missing inheritance lowering: ") + expected);
 }
@@ -2970,6 +2972,153 @@ void TestNativeMultiFileDebugInfo() {
     debugger.RemoveModule(module);
 }
 
+// One program and its hot reloads on one runtime. Old generations stay loaded, as in the engine.
+class ReloadHarness {
+public:
+    explicit ReloadHarness(std::string_view source) { generations_.push_back(Compile(source)); Current().Initialize(); }
+    // Applies the reload when its plan has no errors.
+    luasharp::NativeReloadPlan Reload(std::string_view source, luasharp::NativeReloadResult* applied = nullptr) {
+        auto next = Compile(source);
+        auto plan = luasharp::PlanReload(Current(), *next);
+        if (!plan.errors.empty()) return plan;
+        const auto result = luasharp::ApplyReload(Current(), *next, plan);
+        if (applied) *applied = result;
+        generations_.push_back(std::move(next));
+        return plan;
+    }
+    luasharp::NativeModule& Current() { return *generations_.back(); }
+    luasharp::NativeRuntime& Runtime() { return *runtime_; }
+    template <typename T> T& Global(std::string_view name) {
+        void* global = Current().FindGlobal(name);
+        Require(global != nullptr, "missing global " + std::string(name));
+        return *static_cast<T*>(global);
+    }
+    std::string_view Text(std::string_view name) {
+        const auto* string = Global<const luasharp::abi::RuntimeString*>(name);
+        return string ? std::string_view(string->data, static_cast<size_t>(string->length)) : std::string_view();
+    }
+    // A static method without parameters, by "Type.method".
+    long long Call(std::string_view method) {
+        const auto& exports = Current().Generated().exports;
+        const auto found = std::ranges::find(exports, method, &luasharp::NativeExport::sourceName);
+        Require(found != exports.end(), "missing export " + std::string(method));
+        return reinterpret_cast<long long (*)()>(Current().FindSymbol(found->symbolName))();
+    }
+
+private:
+    std::unique_ptr<luasharp::NativeModule> Compile(std::string_view source) {
+        luasharp::NativeCompileOptions options; options.runtime = runtime_; options.initialize = false;
+        return std::make_unique<luasharp::NativeModule>(luasharp::NativeModule::Compile(source, options));
+    }
+    std::shared_ptr<luasharp::NativeRuntime> runtime_ = luasharp::NativeRuntime::Create();
+    std::vector<std::unique_ptr<luasharp::NativeModule>> generations_;
+};
+
+bool HasMessage(const std::vector<std::string>& messages, std::string_view text) {
+    return std::ranges::any_of(messages, [&](const std::string& message) { return message.find(text) != std::string::npos; });
+}
+
+std::string ZooSource(std::string_view dogSays) {
+    return "class Animal { virtual int speak() { return 1; } }\n"
+           "class Dog : Animal { override int speak() { return " + std::string(dogSays) + "; } }\n"
+           "class Zoo {\n"
+           "    static Animal pet = null;\n"
+           "    static Dog[] dogs = null;\n"
+           "    static int make() { pet = new Dog(); dogs = {new Dog()}; return 0; }\n"
+           "    static int talk() { return pet.speak() + dogs[0].speak(); }\n"
+           "    static int checks() { int result = 0; if (pet is Dog) { result = result + 1; } table boxed = {d = dogs}; if (boxed.d is Dog[]) { result = result + 2; } return result; }\n"
+           "}\n";
+}
+
+void TestNativeReloadCode() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    ReloadHarness program(ZooSource("10"));
+    program.Call("Zoo.make");
+    Require(program.Call("Zoo.talk") == 20, "the first program has the wrong result");
+    luasharp::NativeReloadResult result;
+    const auto plan = program.Reload(ZooSource("30"), &result);
+    Require(plan.errors.empty() && plan.warnings.empty(), "a change of a method body did not reload cleanly");
+    Require(result.retypedObjects == 2, "the reload did not retype the two dogs: " + std::to_string(result.retypedObjects));
+    Require(program.Call("Zoo.talk") == 60, "old objects did not call the new virtual method");
+    Require(program.Call("Zoo.checks") == 3, "old objects or lists failed type checks of the new program");
+    program.Runtime().Collect();
+    Require(program.Call("Zoo.talk") == 60 && program.Call("Zoo.checks") == 3, "a collection after the reload lost the objects");
+}
+
+void TestNativeReloadRejections() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    ReloadHarness program("class Box { int a = 1; static int get() { return 5; } }\n"
+                          "class Gone {}\nclass Unused {}\n"
+                          "class Keep { static table held = {}; static int make() { held.g = new Gone(); return 0; } }\n");
+    program.Call("Keep.make");
+    auto plan = program.Reload("class Box { int a = 1; int b = 2; static int get() { return 6; } }\n"
+                               "class Gone {}\nclass Unused {}\n"
+                               "class Keep { static table held = {}; static int make() { held.g = new Gone(); return 0; } }\n");
+    Require(HasMessage(plan.errors, "class 'Box' changed its fields"), "an added field was not rejected");
+    Require(program.Call("Box.get") == 5, "a rejected reload changed the program");
+    plan = program.Reload("class Box { int a = 1; static int get() { return 6; } }\n"
+                          "class Keep { static table held = {}; static int make() { return 0; } }\n");
+    Require(HasMessage(plan.errors, "class 'Gone' is removed, but 1 of its objects are alive"), "a removed class with an object was not rejected");
+    Require(!HasMessage(plan.errors, "Unused"), "a removed class without objects was rejected");
+    plan = program.Reload("class Box { int a = 1; static int get() { return 6; } }\n"
+                          "class Gone {}\n"
+                          "class Keep { static table held = {}; static int make() { held.g = new Gone(); return 0; } }\n");
+    Require(plan.errors.empty() && program.Call("Box.get") == 6, "removing a class without objects was rejected");
+}
+
+void TestNativeReloadState() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    const std::string settingsV1 = "class Settings {\n    static int speed = 3;\n    static int setSpeed = 3;\n    static int calls = 0;\n"
+                                   "    static int make() { return 40; }\n    static int count() { calls = calls + 1; return calls; }\n    static int bump() { setSpeed = 9; return 0; }\n}\n";
+    ReloadHarness program("int changed = 1;\nint untouched = 2;\nfloat ratio = 0.5;\nstring label = \"old\";\nint computed = Settings.make();\n"
+                          "int runs = Settings.count();\nint kind = 5;\nchanged = 7;\n" + settingsV1);
+    program.Call("Settings.bump");
+    luasharp::NativeReloadResult result;
+    const auto plan = program.Reload("int changed = 100;\nint untouched = 20;\nfloat ratio = 0.5;\nstring label = \"new\";\nint computed = Settings.make() + 1;\n"
+                                     "int runs = Settings.count();\nstring kind = \"x\";\nbool flag = true;\nint later = Settings.make();\nchanged = 7;\n"
+                                     "class Settings {\n    static int speed = 4;\n    static int setSpeed = 4;\n    static int calls = 0;\n    static int added = Settings.make();\n"
+                                     "    static int make() { return 40; }\n    static int count() { calls = calls + 1; return calls; }\n    static int bump() { setSpeed = 9; return 0; }\n}\n",
+                                     &result);
+    Require(plan.errors.empty(), "a reload of values was rejected");
+    Require(program.Global<long long>("changed") == 7, "a value the program changed did not survive");
+    Require(program.Global<long long>("untouched") == 20 && program.Text("label") == "new", "a value at its old default did not get the new default");
+    Require(program.Global<double>("ratio") == 0.5, "an unchanged default changed");
+    Require(program.Global<long long>("computed") == 40, "a value with an expression initializer did not survive");
+    Require(program.Global<long long>("runs") == 1 && program.Global<long long>("Settings.calls") == 1, "top-level code ran again on reload");
+    Require(program.Global<long long>("Settings.speed") == 4 && program.Global<long long>("Settings.setSpeed") == 9, "static fields did not follow the default rule");
+    Require(program.Global<long long>("Settings.added") == 40, "a new static field did not run its initializer");
+    Require(program.Global<unsigned char>("flag") == 1, "a new global did not get its constant");
+    Require(program.Text("kind") == "x" && HasMessage(plan.warnings, "'kind' changed its type"), "a global that changed its type was not reset with a warning");
+    Require(program.Global<long long>("later") == 0 && HasMessage(plan.warnings, "new top-level variable 'later'"), "a new global with an expression was not reported");
+    Require(result.updatedDefaults == 3, "wrong count of updated defaults: " + std::to_string(result.updatedDefaults));
+}
+
+std::string UnitSource(std::string_view hp, std::string_view name, std::string_view at, std::string_view armor) {
+    return "class Unit { int hp = " + std::string(hp) + "; string name = " + std::string(name) + "; Vec3 at = " + std::string(at) + "; int count; }\n"
+           "class Boss : Unit { int armor = " + std::string(armor) + "; }\n"
+           "class World {\n"
+           "    static Unit plain = null;\n    static Unit hurt = null;\n    static Boss boss = null;\n"
+           "    static int make() { plain = new Unit(); hurt = new Unit(); hurt.hp = 3; boss = new Boss(); return 0; }\n"
+           "    static int plainHp() { return plain.hp; }\n    static int hurtHp() { return hurt.hp; }\n"
+           "    static int bossHp() { return boss.hp * 100 + boss.armor; }\n"
+           "    static int plainName() { if (plain.name == \"b\") { return 1; } return 0; }\n"
+           "    static int plainAt() { return int(plain.at.x); }\n"
+           "}\n";
+}
+
+void TestNativeReloadFieldDefaults() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    ReloadHarness program(UnitSource("10", "\"a\"", "Vec3(0, 0, 0)", "5"));
+    program.Call("World.make");
+    luasharp::NativeReloadResult result;
+    const auto plan = program.Reload(UnitSource("20", "\"b\"", "Vec3(2, 0, 0)", "6"), &result);
+    Require(plan.errors.empty(), "a reload of field defaults was rejected");
+    Require(program.Call("World.plainHp") == 20 && program.Call("World.hurtHp") == 3, "instance fields did not follow the default rule");
+    Require(program.Call("World.bossHp") == 2006, "a derived object did not get the new defaults of its class and base");
+    Require(program.Call("World.plainName") == 1 && program.Call("World.plainAt") == 2, "string or struct fields did not get the new default");
+    Require(result.updatedDefaults == 2 + 3 + 3 + 1, "wrong count of updated fields: " + std::to_string(result.updatedDefaults));
+}
+
 int main() {
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests{
         {"invalid syntax", TestInvalidSyntax},
@@ -3053,6 +3202,10 @@ int main() {
         {"multi-file semantics", TestMultiFileSemantics},
         {"native multi-file programs", TestNativeMultiFile},
         {"multi-file debug info", TestNativeMultiFileDebugInfo},
+        {"hot reload of code", TestNativeReloadCode},
+        {"hot reload rejections", TestNativeReloadRejections},
+        {"hot reload of globals and statics", TestNativeReloadState},
+        {"hot reload of field defaults", TestNativeReloadFieldDefaults},
     };
 
     for (const auto& [name, test] : tests) {
