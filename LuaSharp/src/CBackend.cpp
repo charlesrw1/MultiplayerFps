@@ -1082,6 +1082,11 @@ struct CEmitter {
             InstanceLayout(value);
         };
         for (const auto& value : program.classes) if (value.isStruct) define(define, value);
+        // Before the extern class wrappers, which return ls_S_default() on a null receiver.
+        for (const auto& value : program.classes) if (value.isStruct) {
+            Line(0, "LS_", Id{value.name}, " ls_", Id{value.name}, "_default(void);");
+            Line(0, "ls_bool ls_", Id{value.name}, "_eq(LS_", Id{value.name}, " a, LS_", Id{value.name}, " b);");
+        }
     }
     // "struct LS_T { ... };" with the instance fields, inherited ones first; static fields live in module state.
     void InstanceLayout(const BoundClass& value) {
@@ -1152,10 +1157,6 @@ struct CEmitter {
             if (!value.isAbstract && !value.isStruct && NativeBaseOf(value)) Line(0, [&] { HostAllocSignature(value); }, ';');
             else if (!value.isAbstract) Line(0, [&] { ConstructorSignature(value, constructor); }, ';');
             if (!value.isStruct) Line(0, [&] { InitSignature(value, constructor); }, ';');
-        }
-        if (value.isStruct) {
-            Line(0, "LS_", Id{value.name}, " ls_", Id{value.name}, "_default(void);");
-            Line(0, "ls_bool ls_", Id{value.name}, "_eq(LS_", Id{value.name}, " a, LS_", Id{value.name}, " b);");
         }
         for (const auto& function : value.functions) if (!function.isConstructor && !function.isAbstract) Line(0, [&] { MethodSignature(value, function); }, ';');
     }
@@ -1237,7 +1238,7 @@ struct CEmitter {
                 if (!overrides.empty()) Put("ls_host_overrides_", name); else Put("(const LS_HostOverride*)0");
             }, "};");
         // The host reads the classes it creates (NativeModule::HostClassType).
-        if (native) Line(0, "const LS_TypeInfo* ", FunctionName(value.name, "_type"), "(void) { return &ls_type_", name, "; }");
+        if (native || value.isExternal) Line(0, "const LS_TypeInfo* ", FunctionName(value.name, "_type"), "(void) { return &ls_type_", name, "; }");
     }
     // The most-derived script implementation of each extern virtual method that the class or its script bases override.
     std::vector<std::pair<std::string_view, const BoundFunction*>> HostOverrides(const BoundClass& value, const ExternalType& native) const {
@@ -1521,6 +1522,7 @@ struct CEmitter {
         CCompilationResult result;
         for (const auto* value : orderedNatives) result.nativeClasses.push_back({value->name, value->baseType});
         for (const auto* value : orderedClasses) if (NativeBaseOf(*value)) result.hostClasses.push_back(value->name);
+        for (const auto& value : program.classes) if (value.isExternal) result.externalStructs.push_back(value.name);
         for (const auto& value : program.classes) {
             NativeTypeLayout layout; layout.name = value.name; layout.baseName = value.baseName;
             for (const auto& field : value.fields) if (!field.isStatic) layout.fields.push_back({field.name, field.type});
@@ -1597,6 +1599,11 @@ CCompilationResult CompileToC(std::string_view source, const std::vector<Externa
 
 CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes) {
     ThrowFirstError(analysis);
+    for (const auto& type : externalTypes) {
+        if (!type.isStruct || type.isNative) continue;
+        const auto code = std::find_if(type.members.begin(), type.members.end(), [](const auto& member) { return member.kind != SymbolKind::Field || member.isStatic; });
+        if (code != type.members.end()) throw std::runtime_error("A native module can use only external structs with instance fields: '" + type.name + "." + code->name + "' is not one");
+    }
     // Extern classes declared in this source are described to the emitter like external ones.
     auto types = externalTypes;
     for (auto& type : ExportTypes(analysis)) if (type.isNative) types.push_back(std::move(type));
@@ -1607,8 +1614,16 @@ std::vector<ExternalType> DeclarationTypes(const std::vector<std::string>& sourc
     for (const auto& source : sources) {
         const auto analysis = Analyze(source, externalTypes);
         ThrowFirstError(analysis);
-        if (!analysis.bound.classes.empty() || !analysis.bound.Statements(analysis.bound.topLevel).empty())
-            throw std::runtime_error("A declaration source can declare only extern classes and enums");
+        if (!analysis.bound.Statements(analysis.bound.topLevel).empty()) throw std::runtime_error("A declaration source can declare only extern classes, structs and enums");
+        for (const auto& type : analysis.bound.classes) {
+            if (type.isExternal) continue;
+            if (!type.isStruct) throw std::runtime_error("A declaration source can declare only extern classes, structs and enums: class '" + type.name + "' is a script class");
+            if (!type.functions.empty()) throw std::runtime_error("A declared struct has only fields: '" + type.name + "' has a method or constructor");
+            for (const auto& field : type.fields) {
+                if (field.isStatic) throw std::runtime_error("A declared struct has only instance fields: '" + type.name + "." + field.name + "' is static");
+                if (field.initializer) throw std::runtime_error("A field of a declared struct has no initializer: '" + type.name + "." + field.name + "'");
+            }
+        }
         for (auto& type : ExportTypes(analysis)) externalTypes.push_back(std::move(type));
     }
     return externalTypes;

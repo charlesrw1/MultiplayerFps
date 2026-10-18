@@ -50,6 +50,7 @@ struct CCompilationResult {
     std::vector<NativeTypeLayout> types;
     std::vector<NativeClassBinding> nativeClasses; // each after its base
     std::vector<std::string> hostClasses;          // script classes that derive from extern classes, each after its base
+    std::vector<std::string> externalStructs;      // structs of the external types; each exports ls_<S>__type
 };
 
 struct NativeSymbol {
@@ -60,7 +61,7 @@ struct NativeSymbol {
 struct NativeCompileOptions {
     std::string libtccPath;
     std::vector<ExternalType> externalTypes;
-    // Declaration-only sources, such as engine.ls: extern classes and enums. Each sees the ones before it.
+    // Declaration-only sources, such as engine.ls: extern classes, field-only structs and enums. Each sees the ones before it.
     std::vector<std::string> declarations;
     std::vector<NativeSymbol> symbols;
     std::shared_ptr<NativeRuntime> runtime;
@@ -100,6 +101,8 @@ public:
     [[nodiscard]] void* FindGlobal(std::string_view name) const;
     // The LS_TypeInfo of one of Generated().hostClasses; null for other names.
     [[nodiscard]] const void* HostClassType(std::string_view className) const;
+    // The LS_TypeInfo of one of Generated().externalStructs; null for other names.
+    [[nodiscard]] const void* ExternalStructType(std::string_view structName) const;
     [[nodiscard]] std::string LastError() const;
     void ClearError();
     [[nodiscard]] std::shared_ptr<NativeRuntime> Runtime() const;

@@ -160,6 +160,7 @@ public:
                 if (constructor) constructors_[external.name].push_back(index);
                 else result_.members[external.isEnum || staticMember ? "$type:" + external.name : external.name].push_back(index);
             }
+            if (external.isStruct && !external.isNative) result_.bound.classes.push_back(ExternalStruct(external));
         }
     }
 
@@ -185,6 +186,12 @@ private:
         assert(next != lineStarts_.begin());
         const auto line = static_cast<size_t>(next - lineStarts_.begin()) - 1;
         return {line, offset - lineStarts_[line]};
+    }
+    // The C backend emits each external struct the module uses; its fields start zeroed.
+    BoundClass ExternalStruct(const ExternalType& external) const {
+        BoundClass result; result.name = external.name; result.isStruct = true; result.isExternal = true; result.span = {source_.size(), 0};
+        for (const auto& member : external.members) if (member.kind == SymbolKind::Field && !member.isStatic) result.fields.push_back({"public", member.type, member.name});
+        return result;
     }
     size_t PushSymbol(Symbol symbol) {
         const auto index = result_.symbols.size();
@@ -606,10 +613,11 @@ private:
         }
         const auto declared = constructors_.find(name);
         if (declared != constructors_.end()) for (const auto index : declared->second) result.push_back(MakeCallable(index));
-        const bool inSource = FindClass(name) != nullptr && !nativeTypes_.contains(name); // extern classes have no implicit constructor
+        // Structs, external ones too, always have T(); extern classes have no implicit constructor.
+        const bool implicit = structTypes_.contains(name) || (FindClass(name) != nullptr && !nativeTypes_.contains(name));
         const bool hasDefault = std::any_of(result.begin(), result.end(), [](const Callable& item) { return item.parameters.empty(); });
         const bool defaultAllowed = structTypes_.contains(name) ? !hasDefault : result.empty();
-        if (inSource && defaultAllowed) { Callable fallback; fallback.result = types_.Intern(name); result.push_back(fallback); }
+        if (implicit && defaultAllowed) { Callable fallback; fallback.result = types_.Intern(name); result.push_back(fallback); }
         return result;
     }
     void CoerceArguments(const Callable& callable, NodeId arguments, size_t count) {

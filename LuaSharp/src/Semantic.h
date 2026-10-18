@@ -187,6 +187,7 @@ struct BoundClass {
     bool isStruct{};
     bool isAbstract{};
     bool isSealed{};
+    bool isExternal{}; // a struct from the external types: instance fields only, no code
     std::vector<BoundField> fields;
     std::vector<BoundFunction> functions;
     TextSpan span;

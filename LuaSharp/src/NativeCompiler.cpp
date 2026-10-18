@@ -233,13 +233,21 @@ void* NativeModule::FindGlobal(std::string_view name) const {
     return getter ? getter() : nullptr;
 }
 
-const void* NativeModule::HostClassType(std::string_view className) const {
-    if (!impl_) return nullptr;
-    const auto& classes = impl_->generated.hostClasses;
-    if (std::find(classes.begin(), classes.end(), className) == classes.end()) return nullptr;
-    const auto type = reinterpret_cast<const void* (*)()>(impl_->getSymbol(impl_->state, ("ls_" + std::string(className) + "__type").c_str()));
-    assert(type && "the C backend emits ls_<Class>__type for each host class");
+namespace {
+// ls_<name>__type, which the C backend emits for each name in `listed`.
+const void* ExportedType(const NativeModule& module, const std::vector<std::string>& listed, std::string_view name) {
+    if (std::find(listed.begin(), listed.end(), name) == listed.end()) return nullptr;
+    const auto type = reinterpret_cast<const void* (*)()>(module.FindSymbol("ls_" + std::string(name) + "__type"));
+    assert(type && "the C backend emits ls_<T>__type for each listed type");
     return type ? type() : nullptr;
+}
+} // namespace
+
+const void* NativeModule::HostClassType(std::string_view className) const {
+    return impl_ ? ExportedType(*this, impl_->generated.hostClasses, className) : nullptr;
+}
+const void* NativeModule::ExternalStructType(std::string_view structName) const {
+    return impl_ ? ExportedType(*this, impl_->generated.externalStructs, structName) : nullptr;
 }
 
 std::string NativeModule::LastError() const {

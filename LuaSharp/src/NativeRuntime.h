@@ -36,6 +36,12 @@ struct NativeList {
 };
 
 // An [Editable] field (LS_FIELD_EDITABLE) at offset in the objects of its class.
+// A struct value as LS_TypeInfo describes it; offsets are into the value, without the box header.
+struct NativeStructLayout {
+    struct Field { std::string_view name; size_t offset{}; };
+    size_t size{};
+    std::vector<Field> fields;
+};
 struct NativeEditableField {
     std::string_view name;
     size_t offset{};
@@ -89,6 +95,8 @@ public:
     static const void* ScriptBaseType(const void* type);
     // The [Editable] fields the class declares, without those of its base classes.
     static std::vector<NativeEditableField> EditableFields(const void* type);
+    // The layout of a struct type (NativeModule::ExternalStructType).
+    static NativeStructLayout StructLayout(const void* type);
     static void* TypeHostOverride(const void* type, std::string_view method);
     static size_t TypeHostOverrideCount(const void* type);
     // The script implementation of an extern virtual method; null when the class does not override it.

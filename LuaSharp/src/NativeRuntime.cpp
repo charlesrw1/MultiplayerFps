@@ -652,6 +652,14 @@ const void* NativeRuntime::ScriptBaseType(const void* type) {
     assert(base);
     return (base->flags & TypeNativeBase) ? base : nullptr;
 }
+NativeStructLayout NativeRuntime::StructLayout(const void* type) {
+    assert(type);
+    const auto& info = *static_cast<const NativeTypeInfo*>(type);
+    assert(info.kind == KindOf(NativeValueKind::Struct));
+    NativeStructLayout result{static_cast<size_t>(info.size), {}};
+    for (const auto& field : Fields(info)) result.fields.push_back({field.name, static_cast<size_t>(field.offset - StructPayload)});
+    return result;
+}
 std::vector<NativeEditableField> NativeRuntime::EditableFields(const void* type) {
     const auto& info = HostClass(type);
     const auto* base = static_cast<const NativeTypeInfo*>(ScriptBaseType(type));
