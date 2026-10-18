@@ -31,7 +31,7 @@ void BikeCourse::build_from_spawners()
 {
 	auto spawners = GameplayStatic::find_spawners_in_class("bike_waypoint");
 	if (spawners.empty()) {
-		sys_print(Warning, "BikeCourse: no 'bike_waypoint' spawners found in level\n");
+		sys_print(Warning, "BikeCourse: no 'bike_aypoint' spawners found in level\n");
 		return;
 	}
 
