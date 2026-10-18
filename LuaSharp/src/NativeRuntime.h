@@ -42,13 +42,15 @@ struct NativeStructLayout {
     size_t size{};
     std::vector<Field> fields;
 };
+struct NativeEnumMember { std::string_view name; std::int64_t value{}; };
 struct NativeEditableField {
     std::string_view name;
     size_t offset{};
     NativeValueKind kind{};
-    std::string_view typeName; // Struct fields: Vec2, Vec3 or Quat; Object fields: the extern class
+    std::string_view typeName; // Struct fields: Vec2, Vec3 or Quat; Object fields: the extern class; enum fields: the enum
     std::string_view editor;   // [Editor("name")], or empty
     std::string_view former;   // [Former("old")], or empty
+    std::vector<NativeEnumMember> enumMembers; // enum fields (kind Int); empty otherwise
 };
 
 // Shared, non-moving native heap. Collection is stop-the-world: callers must

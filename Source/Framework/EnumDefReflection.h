@@ -32,6 +32,10 @@ private:
 struct EnumTypeInfo
 {
 	EnumTypeInfo(const char* name, const EnumIntPair* values, size_t count);
+	// Not listed in EnumRegistry, so its owner can destroy it (LuaSharp script enums).
+	static EnumTypeInfo make_unregistered(const char* name, const EnumIntPair* values, size_t count) {
+		return EnumTypeInfo(Unregistered{}, name, values, count);
+	}
 
 	EnumIterator begin() const { return EnumIterator(0, this); }
 	EnumIterator end() const { return EnumIterator(str_count, this); }
@@ -42,6 +46,12 @@ struct EnumTypeInfo
 	const char* name = "";
 	const EnumIntPair* strs = nullptr;
 	int str_count = 0;
+
+private:
+	struct Unregistered
+	{};
+	EnumTypeInfo(Unregistered, const char* name, const EnumIntPair* values, size_t count)
+		: name(name), strs(values), str_count(static_cast<int>(count)) {}
 };
 inline const EnumIntPair& EnumIterator::operator*() const {
 	ASSERT(index < owner->str_count && index >= 0);

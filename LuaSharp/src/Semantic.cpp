@@ -468,8 +468,8 @@ private:
                 continue;
             }
             if (field.isStatic || owner.isStruct || owner.isExtern) AddDiagnostic("Only an instance field of a script class can be [Editable] (" + field.name + ")", attribute.span);
-            else if (std::find(editableTypes.begin(), editableTypes.end(), field.type) == editableTypes.end() && !nativeTypes_.contains(field.type))
-                AddDiagnostic("[Editable] field '" + field.name + "' must be bool, int, float, string, Vec2, Vec3, Quat or an extern class", attribute.span);
+            else if (std::find(editableTypes.begin(), editableTypes.end(), field.type) == editableTypes.end() && !nativeTypes_.contains(field.type) && !enumTypes_.contains(field.type))
+                AddDiagnostic("[Editable] field '" + field.name + "' must be bool, int, float, string, Vec2, Vec3, Quat, an enum or an extern class", attribute.span);
         }
     }
     // The nearest extern class that a script class derives from; empty when there is none.

@@ -61,7 +61,15 @@ typedef struct LS_FieldInfo {
     ls_wrap_bits flags;                 /* LS_FIELD_* */
     const char* editor;                 /* [Editor("name")], or null */
     const char* former;                 /* [Former("old")], or null */
+    const struct LS_EnumInfo* enum_info; /* [Editable] enum fields, or null */
 } LS_FieldInfo;
+/* The members of an enum: names[i] has the value values[i]. */
+typedef struct LS_EnumInfo {
+    const char* name;
+    ls_wrap_bits count;
+    const char* const* names;
+    const ls_int* values;
+} LS_EnumInfo;
 /* [Editable]: the host edits and saves the field in place. */
 #define LS_FIELD_EDITABLE 1
 typedef struct LS_MethodInfo {

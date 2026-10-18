@@ -41,7 +41,8 @@ void script_get(const PropertyInfo& p, const void* inst, PropValue& out) {
 	uint8_t* slot = script_slot(p, inst);
 	switch (p.type) {
 	case core_type_id::Bool: out = slot_as<uint8_t>(slot) != 0; break;
-	case core_type_id::Int64: out = slot_as<int64_t>(slot); break;
+	case core_type_id::Int64:
+	case core_type_id::Enum32: out = slot_as<int64_t>(slot); break; // an enum slot is an ls_int
 	case core_type_id::Double: out = slot_as<double>(slot); break;
 	case core_type_id::ScriptString: out = std::string(lsbind::view(slot_as<void*>(slot))); break;
 	case core_type_id::Vec2: out = lsbind::to_glm(slot_as<lsbind::Vec2>(slot)); break;
@@ -60,7 +61,8 @@ void script_set(const PropertyInfo& p, void* inst, const PropValue& in, SetMode)
 	uint8_t* slot = script_slot(p, inst);
 	switch (p.type) {
 	case core_type_id::Bool: slot_as<uint8_t>(slot) = prop_value_get<bool>(in) ? 1 : 0; break;
-	case core_type_id::Int64: slot_as<int64_t>(slot) = prop_value_get<int64_t>(in); break;
+	case core_type_id::Int64:
+	case core_type_id::Enum32: slot_as<int64_t>(slot) = prop_value_get<int64_t>(in); break;
 	case core_type_id::Double: slot_as<double>(slot) = prop_value_get<double>(in); break;
 	case core_type_id::ScriptString: slot_as<void*>(slot) = lsbind::string(prop_value_get<std::string>(in)); break;
 	case core_type_id::Vec2: slot_as<lsbind::Vec2>(slot) = lsbind::to_ls(prop_value_get<glm::vec2>(in)); break;
@@ -123,7 +125,14 @@ private:
 				prop.former_name = keep(field.former);
 			switch (field.kind) {
 			case NativeValueKind::Bool: prop.type = core_type_id::Bool; break;
-			case NativeValueKind::Int: prop.type = core_type_id::Int64; break;
+			case NativeValueKind::Int:
+				if (field.enumMembers.empty())
+					prop.type = core_type_id::Int64;
+				else {
+					prop.type = core_type_id::Enum32;
+					prop.enum_type = &enum_type_of(field);
+				}
+				break;
 			case NativeValueKind::Float: prop.type = core_type_id::Double; break;
 			case NativeValueKind::String: prop.type = core_type_id::ScriptString; break;
 			case NativeValueKind::Struct:
@@ -160,9 +169,29 @@ private:
 									 std::string(extern_class) + "'; an extern-class field must be an asset or an Entity");
 	}
 
+	// An enum field's type, with the LuaSharp values. Names point into the module, which outlives this type.
+	const EnumTypeInfo& enum_type_of(const luasharp::NativeEditableField& field) {
+		ASSERT(!field.enumMembers.empty()); // LuaSharp enums have members
+		for (const auto& existing : enums)
+			if (field.typeName == existing->info.name)
+				return existing->info;
+		auto entry = std::make_unique<ScriptEnum>();
+		for (const auto& member : field.enumMembers)
+			entry->pairs.emplace_back(member.name.data(), member.name.data(), member.value);
+		entry->info = EnumTypeInfo::make_unregistered(field.typeName.data(), entry->pairs.data(), entry->pairs.size());
+		return enums.emplace_back(std::move(entry))->info;
+	}
+
+	struct ScriptEnum
+	{
+		std::vector<EnumIntPair> pairs;
+		EnumTypeInfo info = EnumTypeInfo::make_unregistered("", nullptr, 0);
+	};
+
 	std::string name;
 	std::vector<std::string> prop_strings;
 	std::vector<PropertyInfo> prop_storage;
+	std::vector<std::unique_ptr<ScriptEnum>> enums;
 	PropertyInfoList prop_list;
 };
 

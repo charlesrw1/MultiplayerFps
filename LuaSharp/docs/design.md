@@ -70,7 +70,7 @@ Milestone 4 found these items:
 
 - `PROP_LUA_BACKED` stays. Lua components still keep their fields in its shadow buffer. Remove it when Lua components move to LuaSharp.
 - A script `float` is a C `double` and a script `string` is a GC string. The engine therefore has two new core types: `Double` and `ScriptString`. The editor has an editor for each, and a new `Vec2` editor.
-- The supported `[Editable]` types are `bool`, `int`, `float`, `string`, `Vec2`, `Vec3` and `Quat`. Enums, lists and asset references are not supported yet.
+- The supported `[Editable]` types are `bool`, `int`, `float`, `string`, `Vec2`, `Vec3`, `Quat`, enums, assets and `Entity`. Lists are not supported yet.
 - `LuaSharpEngine::load(name, source)` registers a `ClassTypeInfo` only for a class whose nearest engine class is scriptable. An `[Editable]` field in a class with a base that is not scriptable makes `load` fail.
 - The type infos are unregistered in `~LuaSharpEngine`. No object of a script class can live longer than the engine.
 

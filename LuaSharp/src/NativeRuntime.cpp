@@ -61,7 +61,8 @@ struct RuntimeAbi {
 // Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.
 struct NativeTypeInfo;
 struct NativeHostOverride { const char* name; void* function; }; // LS_HostOverride
-struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; unsigned long long flags; const char* editor; const char* former; };
+struct NativeEnumInfo { const char* name; unsigned long long count; const char* const* names; const long long* values; }; // LS_EnumInfo
+struct NativeFieldInfo { const char* name; unsigned long long offset, kind, elementKind; const NativeTypeInfo* type; unsigned long long flags; const char* editor; const char* former; const NativeEnumInfo* enumInfo; };
 constexpr unsigned long long FieldEditable = 1; // LS_FIELD_EDITABLE
 struct NativeTypeInfo {
     const char* name; unsigned long long fieldCount; const NativeFieldInfo* fields; unsigned long long methodCount; const void* methods; unsigned long long size, kind;
@@ -717,8 +718,13 @@ std::vector<NativeEditableField> NativeRuntime::EditableFields(const void* type)
         const bool typed = field.kind == KindOf(NativeValueKind::Struct) || field.kind == KindOf(NativeValueKind::Object);
         assert(!typed || field.type);
         const auto text = [](const char* s) { return s ? std::string_view(s) : std::string_view(); };
-        result.push_back({field.name, static_cast<size_t>(field.offset), static_cast<NativeValueKind>(field.kind),
+        auto& entry = result.emplace_back(NativeEditableField{field.name, static_cast<size_t>(field.offset), static_cast<NativeValueKind>(field.kind),
                           typed ? std::string_view(field.type->name) : std::string_view(), text(field.editor), text(field.former)});
+        if (const auto* info = field.enumInfo) {
+            assert(field.kind == KindOf(NativeValueKind::Int));
+            entry.typeName = info->name;
+            for (size_t i{}; i < info->count; ++i) entry.enumMembers.push_back({info->names[i], info->values[i]});
+        }
     }
     return result;
 }

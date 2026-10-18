@@ -1738,7 +1738,7 @@ long long UnitHit(void* self, long long amount) {
 void* UnitName(void*) { return g_unitRuntime->Intern("unit"); }
 long long UnitPlain(void*) { return 7; }
 
-constexpr std::string_view UnitDeclarations = "extern class Unit { int hp; virtual int hit(int amount); virtual string name(); int plain(); }\nextern class Gear { }";
+constexpr std::string_view UnitDeclarations = "extern class Unit { int hp; virtual int hit(int amount); virtual string name(); int plain(); }\nextern class Gear { }\nenum Stance { Idle, Alert }";
 constexpr std::string_view UnitScript = R"(class Guard : Unit {
     int armor = 2;
     int made;
@@ -1753,7 +1753,8 @@ constexpr std::string_view UnitScript = R"(class Guard : Unit {
     int get_made() { return made; }
     float get_speed() { return speed; }
 }
-class Captain : Guard { [Editable] bool brave = true; override string name() { return "captain"; } }
+enum Mood { Calm = 2, Angry = 7 }
+class Captain : Guard { [Editable] bool brave = true; [Editable] Mood mood = Mood.Angry; [Editable] Stance stance = Stance.Alert; override string name() { return "captain"; } }
 Unit held;
 auto heldNull = () => held == null;
 auto heldIsGuard = () => held is Guard;
@@ -1781,6 +1782,7 @@ void TestDerivedExternClassSemantics() {
     Require(has("class G : Unit { [Editable, Editor(\"a b\")] int x; }", "must be a name"), "an [Editor] name with a space was accepted");
     Require(has("class G : Unit { [Editable, Editor(x)] int x; }", "Expected a string literal"), "an attribute argument that is not a string was accepted");
     Require(!has("class G : Unit { [Editable] Unit other; }", "must be bool"), "an [Editable] extern-class field was rejected");
+    Require(!has("enum E { A } class G : Unit { [Editable] E e; [Editable] Stance s; }", "must be bool"), "an [Editable] enum field was rejected");
     const auto valid = luasharp::Analyze(std::string(UnitDeclarations) + "\n" + std::string(UnitScript));
     Require(valid.diagnostics.empty(), "a valid derived class produced diagnostics: " + (valid.diagnostics.empty() ? std::string() : valid.diagnostics.front().message));
 
@@ -1791,7 +1793,10 @@ void TestDerivedExternClassSemantics() {
                                 "{\"armor\", ls_offsetof(LS_Guard, armor), LS_KIND_INT, 0, (const LS_TypeInfo*)0, 0, (const char*)0, (const char*)0},",
                                 "{\"home\", ls_offsetof(LS_Guard, home), LS_KIND_STRUCT, 0, &ls_type_Vec3, LS_FIELD_EDITABLE, (const char*)0, (const char*)0},",
                                 "LS_FIELD_EDITABLE, \"Slider\", \"velocity\"},", "{\"gear\", ls_offsetof(LS_Guard, gear), LS_KIND_OBJECT, 0, &ls_type_Gear, LS_FIELD_EDITABLE,",
-                                "const LS_TypeInfo* ls_Captain__type(void) { return &ls_type_Captain; }"})
+                                "const LS_TypeInfo* ls_Captain__type(void) { return &ls_type_Captain; }",
+                                "static const char* const ls_enumnames_Mood[] = {\"Calm\", \"Angry\", };", "static const ls_int ls_enumvalues_Mood[] = {(ls_int)2, (ls_int)7, };",
+                                "static const LS_EnumInfo ls_enuminfo_Mood = {\"Mood\", 2, ls_enumnames_Mood, ls_enumvalues_Mood};", "static const LS_EnumInfo ls_enuminfo_Stance = {\"Stance\", 2,",
+                                "LS_FIELD_EDITABLE, (const char*)0, (const char*)0, &ls_enuminfo_Mood},"})
         Require(generated.c.find(expected) != std::string::npos, std::string("missing derived extern class lowering: ") + expected);
     Require(generated.c.find("ls_Guard_new") == std::string::npos, "a class that derives from an extern class got a script constructor");
     Require(generated.hostClasses == std::vector<std::string>{"Guard", "Captain"}, "the host classes were not listed base first");
@@ -1853,7 +1858,12 @@ void TestNativeDerivedExternClasses() {
                 "the [Editor] and [Former] names were wrong");
         Require(guardFields[4].kind == NativeValueKind::Object && guardFields[4].typeName == "Gear", "an extern-class field did not name its class");
         const auto captainFields = NativeRuntime::EditableFields(captainType);
-        Require(captainFields.size() == 1 && captainFields[0].name == "brave" && captainFields[0].kind == NativeValueKind::Bool, "Captain's editable fields included inherited ones");
+        Require(captainFields.size() == 3 && captainFields[0].name == "brave" && captainFields[0].kind == NativeValueKind::Bool && captainFields[0].enumMembers.empty(), "Captain's editable fields included inherited ones");
+        using Members = std::vector<std::pair<std::string_view, long long>>;
+        const auto members = [](const luasharp::NativeEditableField& field) { Members result; for (const auto& member : field.enumMembers) result.emplace_back(member.name, member.value); return result; };
+        Require(captainFields[1].kind == NativeValueKind::Int && captainFields[1].typeName == "Mood" && members(captainFields[1]) == Members{{"Calm", 2}, {"Angry", 7}}, "a script enum field did not list its members");
+        Require(captainFields[2].typeName == "Stance" && members(captainFields[2]) == Members{{"Idle", 0}, {"Alert", 1}}, "an extern enum field did not list its members");
+        Require(*reinterpret_cast<long long*>(static_cast<char*>(captain) + captainFields[1].offset) == 7, "an editable enum field did not hold its value");
         *reinterpret_cast<double*>(static_cast<char*>(captain) + guardFields[0].offset) = 4.25; // the host edits a field in place
         Require(reinterpret_cast<double (*)(void*)>(module.FindSymbol("ls_Guard_get_speed"))(captain) == 4.25, "an editable field offset was wrong");
         Require(*(static_cast<unsigned char*>(captain) + captainFields[0].offset) == 1, "an editable field initializer did not run");

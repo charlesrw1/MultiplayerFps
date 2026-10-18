@@ -1209,6 +1209,36 @@ struct CEmitter {
         return std::count_if(type.functions.begin(), type.functions.end(), [&](const auto& item) { return item.isConstructor == function.isConstructor && item.name == function.name; }) > 1;
     }
     // Structs in dependency order: a struct is defined after the structs it contains.
+    bool IsEditableEnum(const BoundField& field) const { return field.isEditable && IsEnum(Find(field.type)); }
+    // The members of a script or extern enum and their values.
+    std::vector<std::pair<std::string_view, long long>> EnumMembers(std::string_view name) const {
+        std::vector<std::pair<std::string_view, long long>> result;
+        if (const auto bound = std::ranges::find(program.enums, name, &BoundEnum::name); bound != program.enums.end()) {
+            for (const auto& member : bound->members) result.emplace_back(member.name, member.value);
+            return result;
+        }
+        const auto external = std::ranges::find_if(externalTypes, [&](const ExternalType& type) { return type.isEnum && type.name == name; });
+        assert(external != externalTypes.end());
+        for (size_t i{}; i < external->members.size(); ++i) result.emplace_back(external->members[i].name, external->values.empty() ? static_cast<long long>(i) : external->values[i]);
+        return result;
+    }
+    // ls_enuminfo_<E> (LS_EnumInfo) for each enum that an [Editable] field has: the host shows and saves it by member name.
+    void EnumInfos() {
+        std::vector<std::string_view> emitted;
+        for (const auto* type : orderedClasses) for (const auto& field : type->fields) {
+            if (!IsEditableEnum(field) || std::ranges::find(emitted, field.type) != emitted.end()) continue;
+            emitted.push_back(field.type);
+            const auto members = EnumMembers(field.type);
+            const Id id{field.type};
+            if (!members.empty()) {
+                Line(0, "static const char* const ls_enumnames_", id, "[] = {", [&] { for (const auto& [member, value] : members) Put('"', member, "\", "); }, "};");
+                Line(0, "static const ls_int ls_enumvalues_", id, "[] = {", [&] { for (const auto& [member, value] : members) Put("(ls_int)", value, ", "); }, "};");
+            }
+            Line(0, "static const LS_EnumInfo ls_enuminfo_", id, " = {\"", field.type, "\", ", members.size(), ", ",
+                 [&] { if (members.empty()) Put("(const char* const*)0, (const ls_int*)0"); else Put("ls_enumnames_", id, ", ls_enumvalues_", id); }, "};");
+        }
+        if (!emitted.empty()) Line(0);
+    }
     void StructDefinitions() {
         StringSet emitted;
         const auto define = [&](auto&& self, const BoundClass& value) -> void {
@@ -1344,7 +1374,8 @@ struct CEmitter {
         if (!fields.empty()) {
             Line(0, "static const LS_FieldInfo ls_fields_", name, "[] = {");
             for (const auto* field : fields)
-                Line(1, "{\"", field->name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field->name}, "), ", [&] { FieldDescriptor(Find(field->type)); }, ", ", field->isEditable ? "LS_FIELD_EDITABLE" : "0", ", ", [&] { CName(field->editor); }, ", ", [&] { CName(field->former); }, "},");
+                Line(1, "{\"", field->name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field->name}, "), ", [&] { FieldDescriptor(Find(field->type)); }, ", ", field->isEditable ? "LS_FIELD_EDITABLE" : "0", ", ", [&] { CName(field->editor); }, ", ", [&] { CName(field->former); },
+                     [&] { if (IsEditableEnum(*field)) Put(", &ls_enuminfo_", Id{field->type}); }, "},");
             Line(0, "};");
         }
         if (!methods.empty()) {
@@ -1604,6 +1635,7 @@ struct CEmitter {
                 Line(0, "#define LS_", Id{value.name}, '_', Id{value.members[index].name}, " ((ls_int)", value.values.empty() ? static_cast<long long>(index) : value.values[index], ')');
         }
         if (!program.enums.empty()) Line(0);
+        EnumInfos();
         StructDefinitions();
         NativeDeclarations();
         for (const auto* value : orderedClasses) InstanceLayout(*value);

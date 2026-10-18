@@ -469,6 +469,49 @@ TEST_F(LuaSharpEngineTest, EditableFieldsReadFormerNames) {
 	EXPECT_EQ(get<int64_t>(object->get_type(), *object, "ammo"), 8);
 }
 
+TEST_F(LuaSharpEngineTest, EditableEnumFields) {
+	const auto& module = engine->load("moods", R"(
+enum Mood { Calm = 2, Angry = 7 }
+class Moody : LsTestScriptable {
+	[Editable] Mood mood = Mood.Angry;
+	[Editable] Mood fallback;
+	[Editable] LsTestMode mode = LsTestMode.Slow;
+	override int tick(int dt) {
+		if (mood == Mood.Calm) {
+			return 1;
+		}
+		return 0;
+	}
+}
+)");
+	std::unique_ptr<LsTestScriptable> object(static_cast<LsTestScriptable*>(engine->create(module, "Moody").release()));
+	const ClassTypeInfo& type = object->get_type();
+	const PropertyInfo* mood = find_prop(type, "mood");
+	const PropertyInfo* mode = find_prop(type, "mode");
+	ASSERT_TRUE(mood && mode);
+	ASSERT_EQ(mood->type, core_type_id::Enum32);
+	ASSERT_NE(mood->enum_type, nullptr);
+	EXPECT_STREQ(mood->enum_type->name, "Mood");
+	EXPECT_EQ(mood->enum_type, find_prop(type, "fallback")->enum_type); // one type per enum
+	ASSERT_EQ(mood->enum_type->str_count, 2);
+	EXPECT_STREQ(mood->enum_type->find_for_value(7)->name, "Angry");
+	EXPECT_EQ(EnumRegistry::find_enum_type("Mood"), nullptr); // the class owns it
+	// An engine enum field uses the LuaSharp member values: ordinals.
+	EXPECT_STREQ(mode->enum_type->name, "LsTestMode");
+	EXPECT_STREQ(mode->enum_type->find_for_value(1)->name, "Slow");
+
+	EXPECT_EQ(get<int64_t>(type, *object, "mood"), 7);
+	set(type, *object, "mood", int64_t(2));
+	EXPECT_EQ(object->tick(1), 1); // the script sees the edit
+
+	WriteSerializerBackendJson2 writer("test", *object);
+	nlohmann::json json = writer.get_output();
+	std::unique_ptr<ClassBase> loaded = engine->create(module, "Moody");
+	ReadSerializerBackendJson2 reader("test", json, *loaded);
+	EXPECT_EQ(get<int64_t>(type, *loaded, "mood"), 2);
+	EXPECT_EQ(get<int64_t>(type, *loaded, "mode"), 1);
+}
+
 TEST_F(LuaSharpEngineTest, ExternClassFieldsAreReferences) {
 	const auto& module = engine->load("holders", R"(
 class Holder : LsTestScriptable {
