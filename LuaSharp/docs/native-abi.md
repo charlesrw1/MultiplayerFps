@@ -343,10 +343,25 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 - Before each statement, `LS_DEBUG(function, statement)` calls the hook when `ls_debug.active` is not zero. A loop runs the hook in its condition, so the hook runs before each test.
 - The hook gets the address of `ls_locals` and the `rbp` of the function. The hook must write the statement id to `ls_statement`. The value is -1 before the first hook, so the debugger can find the line of a caller frame.
 - Each statement has a `#line` directive, so TinyCC errors show `.ls` lines. After each function, a `#line` directive gives the lines of the generated C again.
-- `ls_module_debug()` returns `LS_DebugModule`: the hook state, the code range and local offsets of each function, and the code range of the module. `NativeModule::Debug()` returns it.
+- `ls_module_debug()` returns `LS_DebugModule`: the hook state, the code range and locals of each function, and the code range of the module. `NativeModule::Debug()` returns it.
+- Each local has an `LS_FieldInfo`. Its offset is into `ls_locals`. `LS_FIELD_INDIRECT` marks an indirect local. A local of a type without an `LS_KIND` has the kind `LS_SLOT_UNKNOWN`.
+- Each enum has an `LS_EnumInfo`. Enum fields and enum locals point to it.
 - `CCompilationResult::debug` has the names, the line of each statement id, and the locals of each function, in the same order. A local is visible before statements in [`visibleFrom`, `visibleTo`). An indirect local holds a pointer to the value: a cell, an `inout` parameter or the `this` of a struct.
 - Captured variables of a lambda are not locals of the lambda.
 - An instrumented module takes approximately 1.5 times the TinyCC time of a plain module.
+
+## Debugger
+
+`NativeDebugger` (NativeDebugger.h) uses the debug hooks of the instrumented modules of one runtime.
+
+- **Threads:** scripts run on one thread. At a stop, that thread calls the stop handler. Then it waits until a command resumes it. A command in the stop handler resumes at once. Other threads can call all members.
+- **Attach:** hooks run only while the debugger is attached. A detached debugger costs one load and one branch for each statement.
+- **Breakpoints:** a breakpoint binds to the first line at or after its line that has a statement. It stops at each statement of that line, in all functions. Source names match without case and slash differences, and when one is a path that ends with the other. Modules added later get the breakpoints too.
+- **Steps:** step in stops at the next line. Step over stops at the next line of the same frame or of a caller. Step out stops in a caller. The depth of a frame is the address of its `ls_locals`. A step or a breakpoint does not stop again at the next statement of the same line.
+- **Call stack:** the walk follows the `rbp` chain while each return address is in the code of a module. Runtime helpers in the module are not frames. The walk stops at the first C++ frame, so script frames above an engine callback do not show.
+- **Caller frames:** a hook records the offset of `ls_locals` from `rbp` for its function. A frame of a function that has not run a hook while attached shows no locals and no line.
+- **Runtime errors:** `NativeRuntime::SetErrorHandler` tells the debugger about each error. The debugger unwinds the C++ frames with `RtlVirtualUnwind` to the first module frame, and stops with the reason `Exception`. Errors that do not come from script code do not stop.
+- **Values:** `Locals` and `Variables` read memory through the `LS_FieldInfo` tables. Objects, structs, lists and tables have children. A child reference is valid until the script resumes. An `any` shows the type of its value.
 
 ## Command line and printf
 

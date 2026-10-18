@@ -134,6 +134,7 @@ struct CEmitter {
     std::string lineFile; // sourceName as the body of a C string
     NativeDebugInfo debugInfo;
     std::vector<std::string> debugSymbols; // C name of each instrumented function
+    std::vector<std::vector<std::string>> debugFields; // ls_locals field of each debug local, per instrumented function
 
     CEmitter(const Analysis& value, const std::vector<ExternalType>& external, const CEmitOptions& options)
         : analysis(value), program(value.bound), types(value.types), externalTypes(external), emitOptions(options) {
@@ -440,17 +441,36 @@ struct CEmitter {
         output.append(text, open);
         Line(0, LineReset);
         Line(0, "static void ls_debug_end_", index, "(void) {}");
-        if (!frame.layout.empty())
-            Line(0, "static const ls_wrap_bits ls_debug_offsets_", index, "[] = {", [&] { for (const auto& item : frame.layout) Put("ls_offsetof(LS_DebugLocals_", index, ", ", item.second, "), "); }, "};");
+        auto& fields = debugFields.emplace_back();
+        for (auto& item : frame.layout) fields.push_back(std::move(item.second));
+    }
+    // ls_debug_locals_<i>: an LS_FieldInfo for each local of instrumented function i, at its offset in LS_DebugLocals_<i>.
+    void DebugLocalTables() {
+        for (size_t i{}; i < debugFields.size(); ++i) {
+            const auto& locals = debugInfo.functions[i].locals;
+            assert(locals.size() == debugFields[i].size());
+            if (locals.empty()) continue;
+            Line(0, "static const LS_FieldInfo ls_debug_locals_", i, "[] = {");
+            for (size_t local{}; local < locals.size(); ++local) {
+                const auto type = Find(locals[local].type);
+                Line(1, "{\"", locals[local].name, "\", ls_offsetof(LS_DebugLocals_", i, ", ", debugFields[i][local], "), ", [&] {
+                    if (TryKindName(type)) FieldDescriptor(type); else Put("LS_SLOT_UNKNOWN, 0, (const LS_TypeInfo*)0");
+                }, ", ", locals[local].indirect ? "LS_FIELD_INDIRECT" : "0", ", (const char*)0, (const char*)0, ", [&] {
+                    if (IsEnum(type)) Put("&ls_enuminfo_", Id{locals[local].type}); else Put("(const LS_EnumInfo*)0");
+                }, "},");
+            }
+            Line(0, "};");
+        }
     }
     static constexpr std::string_view LineReset = "#line ls_c";
     // The module table (LS_DebugModule). Then each LineReset becomes a #line of the generated C.
     void DebugTables() {
         assert(!debugSymbols.empty());
         Line(0, "static void ls_debug_text_end(void) {}");
+        DebugLocalTables();
         Line(0, "static const LS_DebugFunction ls_debug_functions[] = {");
         for (size_t i{}; i < debugSymbols.size(); ++i)
-            Line(1, "{(const void*)", debugSymbols[i], ", (const void*)ls_debug_end_", i, ", ", [&] { if (debugInfo.functions[i].locals.empty()) Put("(const ls_wrap_bits*)0"); else Put("ls_debug_offsets_", i); }, ", ", debugInfo.functions[i].locals.size(), "},");
+            Line(1, "{(const void*)", debugSymbols[i], ", (const void*)ls_debug_end_", i, ", ", [&] { if (debugInfo.functions[i].locals.empty()) Put("(const LS_FieldInfo*)0"); else Put("ls_debug_locals_", i); }, ", ", debugInfo.functions[i].locals.size(), "},");
         Line(0, "};");
         Line(0, "static const LS_DebugModule ls_debug_module = {&ls_debug, ls_debug_functions, ", debugSymbols.size(), ", (const void*)ls_debug_text_begin, (const void*)ls_debug_text_end};");
         Line(0, "const LS_DebugModule* ls_module_debug(void) { return &ls_debug_module; }");
@@ -1377,7 +1397,8 @@ struct CEmitter {
         return std::count_if(type.functions.begin(), type.functions.end(), [&](const auto& item) { return item.isConstructor == function.isConstructor && item.name == function.name; }) > 1;
     }
     // Structs in dependency order: a struct is defined after the structs it contains.
-    bool IsEditableEnum(const BoundField& field) const { return field.isEditable && IsEnum(Find(field.type)); }
+    // Enum fields get an LS_EnumInfo when [Editable], and always in debug builds.
+    bool HasEnumInfo(const BoundField& field) const { return (field.isEditable || emitOptions.debugHooks) && IsEnum(Find(field.type)); }
     // The members of a script or extern enum and their values.
     std::vector<std::pair<std::string_view, long long>> EnumMembers(std::string_view name) const {
         std::vector<std::pair<std::string_view, long long>> result;
@@ -1391,19 +1412,25 @@ struct CEmitter {
         return result;
     }
     // ls_enuminfo_<E> (LS_EnumInfo) for each enum that an [Editable] field has: the host shows and saves it by member name.
+    // Debug builds have one for each enum, for the debugger.
     void EnumInfos() {
         std::vector<std::string_view> emitted;
-        for (const auto* type : orderedClasses) for (const auto& field : type->fields) {
-            if (!IsEditableEnum(field) || std::ranges::find(emitted, field.type) != emitted.end()) continue;
-            emitted.push_back(field.type);
-            const auto members = EnumMembers(field.type);
-            const Id id{field.type};
+        const auto emit = [&](std::string_view name) {
+            if (std::ranges::find(emitted, name) != emitted.end()) return;
+            emitted.push_back(name);
+            const auto members = EnumMembers(name);
+            const Id id{name};
             if (!members.empty()) {
                 Line(0, "static const char* const ls_enumnames_", id, "[] = {", [&] { for (const auto& [member, value] : members) Put('"', member, "\", "); }, "};");
                 Line(0, "static const ls_int ls_enumvalues_", id, "[] = {", [&] { for (const auto& [member, value] : members) Put("(ls_int)", value, ", "); }, "};");
             }
-            Line(0, "static const LS_EnumInfo ls_enuminfo_", id, " = {\"", field.type, "\", ", members.size(), ", ",
+            Line(0, "static const LS_EnumInfo ls_enuminfo_", id, " = {\"", name, "\", ", members.size(), ", ",
                  [&] { if (members.empty()) Put("(const char* const*)0, (const ls_int*)0"); else Put("ls_enumnames_", id, ", ls_enumvalues_", id); }, "};");
+        };
+        for (const auto* type : orderedClasses) for (const auto& field : type->fields) if (HasEnumInfo(field)) emit(field.type);
+        if (emitOptions.debugHooks) {
+            for (const auto& value : program.enums) emit(value.name);
+            for (const auto& value : externalTypes) if (value.isEnum) emit(value.name);
         }
         if (!emitted.empty()) Line(0);
     }
@@ -1543,7 +1570,7 @@ struct CEmitter {
             Line(0, "static const LS_FieldInfo ls_fields_", name, "[] = {");
             for (const auto* field : fields)
                 Line(1, "{\"", field->name, "\", ", value.isStruct ? "LS_STRUCT_PAYLOAD + " : "", "ls_offsetof(LS_", name, ", ", Id{field->name}, "), ", [&] { FieldDescriptor(Find(field->type)); }, ", ", field->isEditable ? "LS_FIELD_EDITABLE" : "0", ", ", [&] { CName(field->editor); }, ", ", [&] { CName(field->former); },
-                     [&] { if (IsEditableEnum(*field)) Put(", &ls_enuminfo_", Id{field->type}); }, "},");
+                     [&] { if (HasEnumInfo(*field)) Put(", &ls_enuminfo_", Id{field->type}); }, "},");
             Line(0, "};");
         }
         if (!methods.empty()) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Semantic.h"
+#include "NativeAbi.h"
 #include "NativeRuntime.h"
 
 #include <cstdint>
@@ -87,7 +88,7 @@ struct NativeDebugState {
 struct NativeDebugFunctionRange {
     const void* begin;
     const void* end;                // exclusive
-    const uint64_t* localOffsets;   // localCount entries; offsets in the locals struct
+    const abi::NativeFieldInfo* locals; // localCount entries; offsets in the locals struct, FieldIndirect for indirect locals
     uint64_t localCount;
 };
 struct NativeDebugModule {

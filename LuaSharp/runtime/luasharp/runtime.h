@@ -29,6 +29,8 @@ typedef LS_Table* ls_table;
 /* Field slot kinds beyond LS_KIND: packed native components. They never appear in an LS_Value. */
 #define LS_SLOT_FLOAT32 16
 #define LS_SLOT_INT32 17
+/* Debug locals of a type that has no LS_KIND. */
+#define LS_SLOT_UNKNOWN 18
 /* A boxed struct is a GC object: LS_TypeInfo pointer, then the value at this offset. Its fields are traced through that LS_TypeInfo. */
 #define LS_STRUCT_PAYLOAD 16
 /* Element kind of an `any` slot: the slot holds a whole LS_Value. Other slots use the LS_KIND of their type. */
@@ -72,6 +74,8 @@ typedef struct LS_EnumInfo {
 } LS_EnumInfo;
 /* [Editable]: the host edits and saves the field in place. */
 #define LS_FIELD_EDITABLE 1
+/* Debug locals: the slot holds a pointer to the value (cells, inout parameters, struct `this`). */
+#define LS_FIELD_INDIRECT 2
 typedef struct LS_MethodInfo {
     const char* name;
     void (*invoke)(void* self, const LS_Value* arguments, LS_Value* result); /* exactly arity arguments */
@@ -157,8 +161,8 @@ int ls_module_bind(LS_RuntimeApi* runtime) {
    with ls_statement (-1 until the first hook). frame: the function's rbp. */
 typedef void (*LS_DebugHook)(void* context, void* locals, void* frame, ls_wrap_bits function, ls_wrap_bits statement);
 typedef struct LS_DebugState { volatile ls_wrap_bits active; LS_DebugHook hook; void* context; } LS_DebugState;
-/* Code of one instrumented function: [begin, end). local_offsets index the locals struct, in NativeDebugFunction::locals order. */
-typedef struct LS_DebugFunction { const void* begin; const void* end; const ls_wrap_bits* local_offsets; ls_wrap_bits local_count; } LS_DebugFunction;
+/* Code of one instrumented function: [begin, end). locals: offsets in the locals struct, in NativeDebugFunction::locals order. */
+typedef struct LS_DebugFunction { const void* begin; const void* end; const LS_FieldInfo* locals; ls_wrap_bits local_count; } LS_DebugFunction;
 typedef struct LS_DebugModule {
     LS_DebugState* state;
     const LS_DebugFunction* functions;

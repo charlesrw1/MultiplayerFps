@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -119,6 +120,8 @@ public:
     [[nodiscard]] size_t AllocatedBytes() const;
 
     void ReportError(std::string_view message);
+    // Runs on the reporting thread after each ReportError, outside the runtime lock. Empty removes it.
+    void SetErrorHandler(std::function<void(std::string_view)> handler);
     [[nodiscard]] std::string LastError() const;
     void ClearError();
 

@@ -1,5 +1,6 @@
 #include "Compiler.h"
 #include "CBackend.h"
+#include "NativeDebugger.h"
 #include "Semantic.h"
 #include "Builtins.h"
 #include "Project.h"
@@ -13,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -2455,7 +2457,7 @@ DebugTrace g_debug;
 std::optional<long long> DebugInt(const void* locals, uint64_t function, uint64_t statement, size_t local) {
     const auto& info = g_debug.module->Generated().debug.functions[function].locals[local];
     if (info.type != "int" || statement < info.visibleFrom || statement >= info.visibleTo) return std::nullopt;
-    const auto* slot = static_cast<const char*>(locals) + g_debug.module->Debug()->functions[function].localOffsets[local];
+    const auto* slot = static_cast<const char*>(locals) + g_debug.module->Debug()->functions[function].locals[local].offset;
     return info.indirect ? **reinterpret_cast<const long long* const*>(slot) : *reinterpret_cast<const long long*>(slot);
 }
 
@@ -2543,6 +2545,216 @@ for (int i = 0; i < 2; i += 1) { sum += i; }
     g_debug = {};
 }
 
+const luasharp::NativeDebugVariable& FindVariable(const std::vector<luasharp::NativeDebugVariable>& variables, std::string_view name) {
+    const auto found = std::ranges::find(variables, name, &luasharp::NativeDebugVariable::name);
+    Require(found != variables.end(), "no debug variable " + std::string(name));
+    return *found;
+}
+std::vector<std::string> VariableNames(const std::vector<luasharp::NativeDebugVariable>& variables) {
+    std::vector<std::string> names;
+    for (const auto& variable : variables) names.push_back(variable.name);
+    return names;
+}
+std::string FrameText(const std::vector<luasharp::NativeDebugFrame>& frames) {
+    std::string text;
+    for (const auto& frame : frames) text += frame.function + ':' + std::to_string(frame.line) + ' ';
+    return text;
+}
+
+luasharp::NativeModule CompileDebugModule(std::string_view source, std::string sourceName) {
+    luasharp::NativeCompileOptions options;
+    options.initialize = false; options.emitDebugHooks = true; options.sourceName = std::move(sourceName);
+    options.runtime = luasharp::NativeRuntime::Create();
+    return luasharp::NativeModule::Compile(source, options);
+}
+
+void TestNativeDebugger() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    constexpr std::string_view source = R"(enum Color { Red, Green }
+struct Point { float x = 1; float y; }
+class Node {
+    string name = "node";
+    int[] values;
+    Color color = Color.Green;
+    Point at;
+    table extra = {kind = "leaf"};
+}
+class Game {
+    static int helper(int n) {
+        int doubled = n * 2;
+        return doubled;
+    }
+    static int run() {
+        Node node = new Node();
+        node.values = {1, 2, 3};
+        int total = 0;
+        for (int i = 0; i < 2; i += 1) {
+            total += helper(i);
+        }
+        return total;
+    }
+    static int fail() {
+        int[] items = {1};
+        int bad = items[5];
+        return bad;
+    }
+}
+int result = Game.run();
+int failed = Game.fail();
+)";
+    auto module = CompileDebugModule(source, "debug.ls");
+    luasharp::NativeDebugger debugger(module.Runtime());
+    debugger.AddModule(module);
+    Require(debugger.SetBreakpoints("C:\\scripts\\debug.ls", {10, 14, 40}) == std::vector<uint32_t>{12, 16, 0}, "breakpoints bound to the wrong lines");
+    Require(debugger.SetBreakpoints("other.ls", {12}) == std::vector<uint32_t>{0}, "a breakpoint bound in another source");
+    Require(debugger.SetBreakpoints("C:/scripts/DEBUG.ls", {12}) == std::vector<uint32_t>{12}, "the breakpoint did not bind");
+    debugger.SetBreakpoints("C:\\scripts\\debug.ls", {});
+
+    using Reason = luasharp::NativeStopReason;
+    struct Stop { Reason reason; std::string frames; };
+    std::vector<Stop> stops;
+    std::vector<std::function<void()>> actions;
+    debugger.SetStopHandler([&](const luasharp::NativeStopEvent& event) {
+        const auto index = stops.size();
+        stops.push_back({event.reason, FrameText(debugger.StackTrace())});
+        Require(debugger.Stopped(), "the debugger is not stopped in the stop handler");
+        if (event.reason == Reason::Exception) Require(event.message == "list index out of range", "wrong exception message: " + event.message);
+        Require(index < actions.size(), "unexpected stop at " + stops.back().frames);
+        actions[index]();
+    });
+    actions = {
+        [&] {
+            const auto helper = debugger.Locals(0);
+            Require(VariableNames(helper) == std::vector<std::string>{"n"} && helper[0].value == "0" && helper[0].type == "int", "wrong helper locals at the breakpoint");
+            const auto run = debugger.Locals(1);
+            Require(VariableNames(run) == std::vector<std::string>{"node", "total", "i"}, "wrong caller locals");
+            Require(FindVariable(run, "total").value == "0" && FindVariable(run, "i").value == "0", "wrong caller values");
+            const auto& node = FindVariable(run, "node");
+            Require(node.type == "Node" && node.value == "Node" && node.children, "wrong object variable");
+            const auto fields = debugger.Variables(node.children);
+            Require(VariableNames(fields) == std::vector<std::string>{"name", "values", "color", "at", "extra"}, "wrong object fields");
+            Require(FindVariable(fields, "name").value == "\"node\"" && FindVariable(fields, "color").value == "Color.Green", "wrong string or enum field");
+            Require(FindVariable(fields, "at").value == "Point(1, 0)", "wrong struct field: " + FindVariable(fields, "at").value);
+            const auto& values = FindVariable(fields, "values");
+            Require(values.type == "int[]" && values.value == "int[3]", "wrong list field: " + values.type + " " + values.value);
+            const auto elements = debugger.Variables(values.children);
+            Require(VariableNames(elements) == std::vector<std::string>{"[0]", "[1]", "[2]"} && elements[2].value == "3", "wrong list elements");
+            const auto extra = debugger.Variables(FindVariable(fields, "extra").children);
+            Require(extra.size() == 1 && extra[0].name == "kind" && extra[0].value == "\"leaf\"" && extra[0].type == "any: string", "wrong table entries");
+            debugger.StepOver();
+        },
+        [&] {
+            Require(FindVariable(debugger.Locals(0), "doubled").value == "0", "the step did not run the statement");
+            debugger.StepOut();
+        },
+        [&] { debugger.StepIn(); },
+        [&] { debugger.StepIn(); },
+        [&] { Require(FindVariable(debugger.Locals(0), "n").value == "1", "step in reached the wrong call"); debugger.Continue(); },
+        [&] { Require(FindVariable(debugger.Locals(0), "items").value == "int[1]", "wrong locals at the exception"); debugger.Continue(); },
+    };
+    debugger.SetBreakpoints("debug.ls", {12});
+    debugger.Attach();
+    std::string error;
+    try { module.Initialize(); } catch (const std::runtime_error& exception) { error = exception.what(); }
+    Require(error.find("list index out of range") != std::string::npos, "the script did not report its runtime error");
+    const std::vector<std::pair<Reason, std::string>> expected{
+        {Reason::Breakpoint, "Game.helper:12 Game.run:20 <top-level>:30 "},
+        {Reason::Step, "Game.helper:13 Game.run:20 <top-level>:30 "},
+        {Reason::Step, "Game.run:19 <top-level>:30 "},
+        {Reason::Step, "Game.run:20 <top-level>:30 "},
+        {Reason::Step, "Game.helper:12 Game.run:20 <top-level>:30 "},
+        {Reason::Exception, "Game.fail:26 <top-level>:31 "},
+    };
+    Require(stops.size() == expected.size(), "wrong number of stops: " + std::to_string(stops.size()));
+    for (size_t i{}; i < expected.size(); ++i)
+        Require(stops[i].reason == expected[i].first && stops[i].frames == expected[i].second, "wrong stop " + std::to_string(i) + ": " + stops[i].frames);
+    Require(*static_cast<long long*>(module.FindGlobal("result")) == 2, "the debugged script computed the wrong result");
+    Require(!debugger.Stopped() && debugger.StackTrace().empty(), "the debugger is still stopped");
+    debugger.RemoveModule(module);
+}
+
+// Indirect locals (inout, struct `this`, cells), `any`, closures and math structs.
+void TestNativeDebuggerValues() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    constexpr std::string_view source = R"(struct Pair {
+    int a = 1;
+    Vec3 where;
+    int sum(inout int calls) {
+        calls += 1;
+        return a;
+    }
+}
+class Values {
+    static int check() {
+        Pair pair = Pair();
+        int calls = 0;
+        table bag = {x = 5};
+        auto boxed = bag.x;
+        auto nothing = bag.y;
+        int counter = 0;
+        auto bump = n => { counter += n; };
+        bump(2);
+        return pair.sum(calls) + counter;
+    }
+}
+int value = Values.check();
+)";
+    auto module = CompileDebugModule(source, "values.ls");
+    luasharp::NativeDebugger debugger(module.Runtime());
+    debugger.AddModule(module);
+    size_t stops{};
+    debugger.SetStopHandler([&](const luasharp::NativeStopEvent&) {
+        ++stops;
+        Require(FrameText(debugger.StackTrace()) == "Pair.sum:5 Values.check:19 <top-level>:22 ", "wrong stack: " + FrameText(debugger.StackTrace()));
+        const auto sum = debugger.Locals(0);
+        Require(VariableNames(sum) == std::vector<std::string>{"calls", "this"}, "wrong method locals");
+        Require(FindVariable(sum, "calls").value == "0" && FindVariable(sum, "this").value == "Pair(1, Vec3)", "wrong indirect locals: " + FindVariable(sum, "this").value);
+        const auto check = debugger.Locals(1);
+        Require(VariableNames(check) == std::vector<std::string>{"pair", "calls", "bag", "boxed", "nothing", "counter", "bump"}, "wrong caller locals");
+        Require(FindVariable(check, "boxed").type == "any: int" && FindVariable(check, "boxed").value == "5", "wrong any value");
+        Require(FindVariable(check, "nothing").type == "any: null" && FindVariable(check, "nothing").value == "null", "wrong null any");
+        Require(FindVariable(check, "counter").value == "2", "wrong cell value");
+        Require(FindVariable(check, "bump").type == "function" && FindVariable(check, "bump").value == "function", "wrong closure");
+        const auto fields = debugger.Variables(FindVariable(check, "pair").children);
+        Require(VariableNames(fields) == std::vector<std::string>{"a", "where"} && FindVariable(fields, "where").value == "Vec3(0, 0, 0)", "wrong struct fields");
+        const auto components = debugger.Variables(FindVariable(fields, "where").children);
+        Require(components.size() == 3 && components[0].type == "float" && components[0].value == "0", "wrong math struct components");
+        debugger.Continue();
+    });
+    debugger.SetBreakpoints("values.ls", {5});
+    debugger.Attach();
+    module.Initialize();
+    Require(stops == 1 && *static_cast<long long*>(module.FindGlobal("value")) == 3, "the values script did not stop once");
+}
+
+// The script thread waits while it is stopped; another thread inspects and resumes it.
+void TestNativeDebuggerThreads() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    constexpr std::string_view source = R"(int total = 0;
+for (int i = 0; i < 3; i += 1) {
+    total += i;
+}
+)";
+    auto module = CompileDebugModule(source, "threads.ls");
+    luasharp::NativeDebugger debugger(module.Runtime());
+    debugger.AddModule(module);
+    debugger.Attach();
+    debugger.Pause();
+    std::thread script([&] { module.Initialize(); });
+    Require(debugger.WaitUntilStopped(std::chrono::seconds(10)), "the paused script did not stop");
+    Require(FrameText(debugger.StackTrace()) == "<top-level>:1 ", "wrong pause location: " + FrameText(debugger.StackTrace()));
+    debugger.SetBreakpoints("threads.ls", {3});
+    debugger.Continue();
+    for (const auto* expected : {"0", "1", "2"}) {
+        Require(debugger.WaitUntilStopped(std::chrono::seconds(10)), "the breakpoint did not stop the script");
+        Require(FindVariable(debugger.Locals(0), "i").value == expected, "wrong loop variable at the breakpoint");
+        debugger.Continue();
+    }
+    script.join();
+    Require(*static_cast<long long*>(module.FindGlobal("total")) == 3, "the threaded script computed the wrong result");
+    debugger.Detach();
+}
+
 int main() {
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests{
         {"invalid syntax", TestInvalidSyntax},
@@ -2617,6 +2829,9 @@ int main() {
         {"native generic methods", TestNativeGenericMethods},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
         {"native debug hooks", TestNativeDebugHooks},
+        {"native debugger", TestNativeDebugger},
+        {"native debugger values", TestNativeDebuggerValues},
+        {"native debugger threads", TestNativeDebuggerThreads},
         {"project files", TestProjectFiles},
     };
 
