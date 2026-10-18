@@ -1549,6 +1549,8 @@ struct CEmitter {
         Line(0);
         // A class's method table can name its base's invoke thunks, so bases come first.
         for (const auto& value : program.classes) if (value.isStruct) TypeInfo(value);
+        // The host copies these for the lists it makes (NativeModule::StructType).
+        for (const auto& name : NativeStructTypes()) Line(0, "const LS_TypeInfo* ", FunctionName(name, "_type"), "(void) { return &ls_type_", name, "; }");
         for (const auto* value : orderedClasses) TypeInfo(*value);
         if (!program.classes.empty()) Line(0);
         for (const auto& value : program.classes) Definitions(value, result);

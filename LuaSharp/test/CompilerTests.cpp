@@ -2041,6 +2041,76 @@ int heldCount = new Holder().s.count;
     g_shapeRuntime.reset();
 }
 
+// Host thunks make and read lists. Struct element types are runtime copies, so a list outlives the module that gave the type.
+void* NewHostList(luasharp::NativeElementKind kind, size_t size, const void* type, size_t count) { return g_shapeRuntime->NewList(kind, size, type, count); }
+template <typename T> T* HostListData(void* list) { return reinterpret_cast<T*>(static_cast<luasharp::NativeList*>(list)->data); }
+void* ls_native_Bag_hits(void) {
+    void* list = NewHostList(luasharp::NativeElementKind::Struct, sizeof(HostHit), g_shapeRuntime->FindStructType("Hit"), 2);
+    HostListData<HostHit>(list)[1] = {ls_native_Physics_make(), {1, 2, 3}, 1, 8};
+    return list;
+}
+void* ls_native_Bag_names(void) {
+    void* list = NewHostList(luasharp::NativeElementKind::String, sizeof(void*), nullptr, 2);
+    HostListData<void*>(list)[0] = g_shapeRuntime->Intern("ab");
+    HostListData<void*>(list)[1] = g_shapeRuntime->Intern("cd");
+    return list;
+}
+void* ls_native_Bag_points(void) {
+    void* list = NewHostList(luasharp::NativeElementKind::Struct, sizeof(HostVec3), g_shapeRuntime->FindStructType("Vec3"), 1);
+    HostListData<HostVec3>(list)[0] = {4, 5, 6};
+    return list;
+}
+long long ls_native_Bag_sum(void* values) {
+    const auto& list = *static_cast<luasharp::NativeList*>(values);
+    long long total = 0;
+    for (long long i = 0; i < list.count; i++) total += reinterpret_cast<const long long*>(list.data)[i];
+    return total;
+}
+constexpr std::string_view BagDeclarations = R"(extern class Bag { static Hit[] hits(); static string[] names(); static Vec3[] points(); static int sum(int[] values); })";
+
+void TestHostLists() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    g_shapeRuntime = luasharp::NativeRuntime::Create();
+    luasharp::NativeCompileOptions options;
+    options.runtime = g_shapeRuntime; options.declarations = {std::string(PhysicsDeclarations), std::string(BagDeclarations)};
+    options.symbols = {{"ls_native_Physics_make", reinterpret_cast<const void*>(&ls_native_Physics_make)}, {"ls_native_Physics_cast", reinterpret_cast<const void*>(&ls_native_Physics_cast)},
+        {"ls_native_Physics_count", reinterpret_cast<const void*>(&ls_native_Physics_count)}, {"ls_native_Physics_tag", reinterpret_cast<const void*>(&ls_native_Physics_tag)},
+        {"ls_native_Physics__get_last", reinterpret_cast<const void*>(&ls_native_Physics__get_last)}, {"ls_native_Physics__set_last", reinterpret_cast<const void*>(&ls_native_Physics__set_last)}, {"ls_native_Bag_hits", reinterpret_cast<const void*>(&ls_native_Bag_hits)},
+        {"ls_native_Bag_names", reinterpret_cast<const void*>(&ls_native_Bag_names)}, {"ls_native_Bag_points", reinterpret_cast<const void*>(&ls_native_Bag_points)},
+        {"ls_native_Bag_sum", reinterpret_cast<const void*>(&ls_native_Bag_sum)}, {"ls_native_Spot_new", reinterpret_cast<const void*>(&ls_native_Spot_new)}};
+    {
+        const auto giver = luasharp::NativeModule::Compile("int unused = 0;", options);
+        for (const auto* name : {"Hit", "Vec3"}) g_shapeRuntime->AdoptStructType(giver.StructType(name));
+        Require(g_shapeRuntime->AdoptStructType(giver.StructType("Hit")) == g_shapeRuntime->FindStructType("Hit"), "a second adopt did not return the first copy");
+        Require(!giver.StructType("Physics") && giver.StructType("Mat4x4"), "StructType did not cover exactly the structs");
+    }
+    {
+        auto module = luasharp::NativeModule::Compile(R"(Hit[] hits = Bag.hits();
+int count = hits[1].count + hits.size();
+float y = hits[1].pos.y;
+table box = {value = hits};
+Hit[] unboxed = box.value;
+bool sameList = unboxed == hits;
+string[] names = Bag.names();
+string joined = names[0] + names[1];
+Vec3[] points = Bag.points();
+float z = points[0].z;
+points.push_back(Vec3.new(0, 0, 1));
+int sum = Bag.sum({1, 2, 3});
+)", options);
+        Require(module.LastError().empty(), "host list program reported an error: " + module.LastError());
+        Require(NativeGlobal<long long>(module, "count") == 10 && NativeGlobal<double>(module, "y") == 2, "a host list of structs was wrong");
+        Require(NativeGlobal<unsigned char>(module, "sameList") == 1, "a host list of structs did not unbox from any");
+        Require(NativeText(module, "joined") == "abcd" && NativeGlobal<double>(module, "z") == 6, "a host list of strings or Vec3 was wrong");
+        Require(NativeGlobal<long long>(module, "sum") == 6, "the host did not read a script list");
+        g_shapeRuntime->Collect();
+        const auto* hits = NativeGlobal<const luasharp::NativeList*>(module, "hits");
+        Require(luasharp::NativeRuntime::NativeOf(reinterpret_cast<const HostHit*>(hits->data)[1].what) == &g_shape, "the GC did not trace a host struct list");
+        Require(NativeText(module, "joined") == "abcd", "the GC freed a string of a host list");
+    }
+    g_shapeRuntime.reset();
+}
+
 void TestStructEmission() {
     const auto generated = luasharp::CompileToC("struct P { int a; Vec3 v; static int make(int x) { return x; } P(int a) { this.a = a; } }\nP p = P(1);\nint r = P.make(2);");
     for (const auto expected : {"struct LS_P {", "LS_P ls_P_new(ls_int a)", "LS_P ls_P_default(void)", "ls_bool ls_P_eq(LS_P a, LS_P b)", "ls_int ls_P_make(ls_int x)", "((*self)).a = a"})
@@ -2154,6 +2224,7 @@ int main() {
         {"native derived extern classes", TestNativeDerivedExternClasses},
         {"native value type thunks", TestNativeValueTypeThunks},
         {"declared structs", TestDeclaredStructs},
+        {"host lists", TestHostLists},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
         {"project files", TestProjectFiles},
     };

@@ -95,6 +95,13 @@ public:
     static const void* ScriptBaseType(const void* type);
     // The [Editable] fields the class declares, without those of its base classes.
     static std::vector<NativeEditableField> EditableFields(const void* type);
+    // A list of count zeroed elements. elementType is the LS_TypeInfo of object and struct elements: FindNativeClass
+    // or FindStructType, so that the list does not depend on a module.
+    void* NewList(NativeElementKind kind, size_t elementSize, const void* elementType, size_t count);
+    // A runtime-owned copy of a struct type (NativeModule::StructType), found by name later. The first type of a name
+    // wins; later calls return it. Object fields must have extern classes.
+    const void* AdoptStructType(const void* type);
+    [[nodiscard]] const void* FindStructType(std::string_view name) const;
     // The layout of a struct type (NativeModule::ExternalStructType).
     static NativeStructLayout StructLayout(const void* type);
     static void* TypeHostOverride(const void* type, std::string_view method);

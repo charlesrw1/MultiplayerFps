@@ -103,6 +103,8 @@ public:
     [[nodiscard]] const void* HostClassType(std::string_view className) const;
     // The LS_TypeInfo of one of Generated().externalStructs; null for other names.
     [[nodiscard]] const void* ExternalStructType(std::string_view structName) const;
+    // The LS_TypeInfo of a math struct (Vec2, Vec3, ...) or of an external struct; null for other names.
+    [[nodiscard]] const void* StructType(std::string_view structName) const;
     [[nodiscard]] std::string LastError() const;
     void ClearError();
     [[nodiscard]] std::shared_ptr<NativeRuntime> Runtime() const;

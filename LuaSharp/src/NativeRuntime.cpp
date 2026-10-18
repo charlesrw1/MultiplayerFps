@@ -74,6 +74,8 @@ constexpr unsigned long long TypeNativeBase = 2; // LS_TYPE_NATIVE_BASE
 struct NativeProxy { const NativeTypeInfo* type; void* native; };
 // An extern class type info and the name it points to.
 struct NativeClassEntry { std::string name; NativeTypeInfo info{}; };
+// A copy of a module's struct or list type info (AdoptStructType) and the strings it points to.
+struct OwnedTypeEntry { std::string name; std::vector<std::string> fieldNames; std::vector<NativeFieldInfo> fields; NativeTypeInfo info{}; };
 constexpr unsigned long long SlotValue = 0, SlotFloat32 = 16, SlotInt32 = 17, StructPayload = 16;
 constexpr unsigned long long KindOf(NativeValueKind kind) { return static_cast<unsigned long long>(kind); }
 
@@ -260,6 +262,8 @@ struct NativeRuntime::Impl {
     std::unordered_map<size_t, NativeRootTraceFunction> roots;
     std::unordered_set<void**> rootSlots;
     std::unordered_map<std::string, std::unique_ptr<NativeClassEntry>> nativeClasses;
+    std::vector<std::unique_ptr<OwnedTypeEntry>> ownedTypes;
+    std::unordered_map<std::string, const NativeTypeInfo*> structTypes;
     std::unordered_map<std::string, void*> strings;
     std::unordered_map<void*, std::string> stringKeys;
     size_t nextRoot{1};
@@ -625,6 +629,47 @@ void* NativeRuntime::NewNativeProxy(const void* nativeClass, void* native, Nativ
     auto* proxy = static_cast<NativeProxy*>(Allocate(sizeof(NativeProxy), nullptr, finalize));
     if (proxy) { proxy->type = type; proxy->native = native; }
     return proxy;
+}
+void* NativeRuntime::NewList(NativeElementKind kind, size_t elementSize, const void* elementType, size_t count) {
+    auto* list = static_cast<RuntimeList*>(AbiListCreate(this, elementSize, static_cast<unsigned long long>(kind), elementType, count));
+    if (list) list->header.count = static_cast<std::int64_t>(count);
+    return list;
+}
+const void* NativeRuntime::AdoptStructType(const void* type) {
+    std::scoped_lock lock(impl_->mutex);
+    const auto copy = [&](const auto& self, const NativeTypeInfo* source) -> const NativeTypeInfo* {
+        if (!source) return nullptr;
+        if (source->kind == KindOf(NativeValueKind::Object)) {
+            const auto* found = (source->flags & TypeNative) ? FindNativeClass(source->name) : nullptr;
+            if (!found) throw std::runtime_error(std::string("a host struct can hold only extern classes, not '") + source->name + "'");
+            return static_cast<const NativeTypeInfo*>(found);
+        }
+        const bool isStruct = source->kind == KindOf(NativeValueKind::Struct);
+        assert(isStruct || source->kind == KindOf(NativeValueKind::List));
+        if (isStruct) if (const auto found = impl_->structTypes.find(source->name); found != impl_->structTypes.end()) {
+            assert(found->second->size == source->size);
+            return found->second;
+        }
+        auto entry = std::make_unique<OwnedTypeEntry>();
+        entry->name = source->name;
+        for (const auto& field : Fields(*source)) entry->fieldNames.emplace_back(field.name);
+        for (size_t i{}; i < source->fieldCount; ++i) {
+            NativeFieldInfo field = source->fields[i];
+            field.name = entry->fieldNames[i].c_str(); field.type = self(self, field.type); field.editor = nullptr; field.former = nullptr;
+            entry->fields.push_back(field);
+        }
+        entry->info = {entry->name.c_str(), source->fieldCount, entry->fields.data(), 0, nullptr, source->size, source->kind};
+        const auto* info = &entry->info;
+        impl_->ownedTypes.push_back(std::move(entry));
+        if (isStruct) impl_->structTypes.emplace(source->name, info);
+        return info;
+    };
+    return copy(copy, static_cast<const NativeTypeInfo*>(type));
+}
+const void* NativeRuntime::FindStructType(std::string_view name) const {
+    std::scoped_lock lock(impl_->mutex);
+    const auto found = impl_->structTypes.find(std::string(name));
+    return found == impl_->structTypes.end() ? nullptr : found->second;
 }
 void* NativeRuntime::NativeOf(const void* proxy) { return proxy ? static_cast<const NativeProxy*>(proxy)->native : nullptr; }
 void NativeRuntime::DestroyNative(void* proxy) { assert(proxy); static_cast<NativeProxy*>(proxy)->native = nullptr; }

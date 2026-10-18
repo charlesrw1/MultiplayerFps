@@ -1,4 +1,5 @@
 #include "CBackend.h"
+#include "Builtins.h"
 #include "NativeRuntime.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -248,6 +249,10 @@ const void* NativeModule::HostClassType(std::string_view className) const {
 }
 const void* NativeModule::ExternalStructType(std::string_view structName) const {
     return impl_ ? ExportedType(*this, impl_->generated.externalStructs, structName) : nullptr;
+}
+const void* NativeModule::StructType(std::string_view structName) const {
+    if (!impl_) return nullptr;
+    return IsNativeStruct(structName) ? ExportedType(*this, NativeStructTypes(), structName) : ExternalStructType(structName);
 }
 
 std::string NativeModule::LastError() const {
