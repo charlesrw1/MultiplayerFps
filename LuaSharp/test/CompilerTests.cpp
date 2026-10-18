@@ -85,7 +85,8 @@ auto child = new Child();
     Require(syntax.classes[0].fields.size() == 1 && syntax.classes[0].functions.size() == 1, "class members were not parsed into syntax tree");
     Require(syntax.classes[0].functions[0].parameters[0].name == "speed", "function parameter was not parsed into syntax tree");
     Require(tree.Statements(syntax.classes[0].functions[0].body)[0].type == "int", "typed local was not parsed into syntax tree");
-    const auto topLevel = tree.Statements(syntax.topLevel);
+    Require(syntax.topLevel.size() == 1, "a one-file program has one top-level range");
+    const auto topLevel = tree.Statements(syntax.topLevel[0]);
     Require(topLevel.size() == 1 && tree.Expression(topLevel[0].expression).kind == luasharp::SyntaxExpression::Kind::New, "top-level statement was not linked into the syntax tree");
 }
 
@@ -2497,8 +2498,9 @@ for (int i = 0; i < 2; i += 1) { sum += i; }
     const auto plain = luasharp::CompileToC(source);
     Require(plain.debug.functions.empty() && plain.c.find("ls_locals") == std::string::npos && plain.c.find("#line") == std::string::npos, "a plain build has debug hooks");
 
-    const auto analysis = luasharp::Analyze(source);
-    const auto generated = luasharp::CompileToC(analysis, {}, {true, source, "counter.ls"});
+    const luasharp::SourceFile file{"counter.ls", source};
+    const auto analysis = luasharp::Analyze(std::span(&file, 1));
+    const auto generated = luasharp::CompileToC(analysis, {}, {true});
     const auto& functions = generated.debug.functions;
     const auto find = [&](std::string_view name) {
         const auto found = std::ranges::find(functions, name, &luasharp::NativeDebugFunction::name);
@@ -2506,7 +2508,7 @@ for (int i = 0; i < 2; i += 1) { sum += i; }
         return static_cast<uint64_t>(found - functions.begin());
     };
     const auto add = find("Counter.add"), top = find("<top-level>");
-    Require(generated.debug.sourceName == "counter.ls", "the debug info lost the source name");
+    Require(generated.debug.sources == std::vector<std::string>{"counter.ls"} && functions[add].source == 0, "the debug info lost the source name");
     Require(functions[add].lines == std::vector<uint32_t>{4, 5, 6, 7, 8, 10, 11}, "wrong statement lines");
     Require(functions[top].lines == std::vector<uint32_t>{14, 15, 15, 15}, "wrong top-level statement lines");
     Require(generated.c.find("#line 7 \"counter.ls\"") != std::string::npos, "no #line for a statement");
@@ -2894,6 +2896,80 @@ for (int i = 0; i < 3; i += 1) {
     debugger.Detach();
 }
 
+bool HasError(const luasharp::Analysis& analysis, size_t file, std::string_view text) {
+    return std::ranges::any_of(analysis.diagnostics, [&](const luasharp::Diagnostic& diagnostic) {
+        return diagnostic.severity == luasharp::DiagnosticSeverity::Error && diagnostic.file == file && diagnostic.message.find(text) != std::string::npos;
+    });
+}
+
+void TestMultiFileSemantics() {
+    using luasharp::SourceFile;
+    const SourceFile uses[] = {{"a.ls", "class User { Helper h = new Helper(); int get() { return h.value(); } }"},
+                               {"b.ls", "class Helper { int value() { return 7; } }"}};
+    const auto together = luasharp::Analyze(uses);
+    Require(luasharp::FormatErrors(together).empty(), "a file could not use a class of a later file: " + luasharp::FormatErrors(together));
+
+    const SourceFile wrong[] = {{"a.ls", "class A { }\n"}, {"b.ls", "class B { }\nint x = \"text\";\n"}};
+    const auto errors = luasharp::FormatErrors(luasharp::Analyze(wrong));
+    Require(errors.starts_with("b.ls(2,"), "the error does not name the second file and its line: " + errors);
+
+    const SourceFile unclosed[] = {{"a.ls", "class Broken {\n    int f() { return 1; }\n"}, {"b.ls", "class Fine { }\nFine fine = new Fine();\n"}};
+    const auto broken = luasharp::Analyze(unclosed);
+    Require(HasError(broken, 0, "Expected '}'"), "the unclosed class has no error in its file: " + luasharp::FormatErrors(broken));
+    Require(!std::ranges::any_of(broken.diagnostics, [](const auto& diagnostic) { return diagnostic.file == 1; }), "an unclosed class in one file broke the next file: " + luasharp::FormatErrors(broken));
+
+    const SourceFile privateTop[] = {{"a.ls", "int shared = 1;"}, {"b.ls", "int other = shared;"}};
+    Require(HasError(luasharp::Analyze(privateTop), 1, "shared"), "a top-level variable was visible in another file");
+
+    const SourceFile sameName[] = {{"a.ls", "int count = 1;"}, {"b.ls", "int count = 2;"}};
+    Require(HasError(luasharp::Analyze(sameName), 1, "already declared in 'a.ls'"), "two files declared the same top-level variable");
+
+    const SourceFile oneFile[] = {{"a.ls", "int count = 1;\nint count = 2;"}};
+    Require(!HasError(luasharp::Analyze(oneFile), 0, "already declared in 'a.ls'"), "the cross-file check reported a name inside one file");
+}
+
+void TestNativeMultiFile() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    const luasharp::SourceFile files[] = {
+        {"a.ls", "int first = Log.add(1);\nUser user = new User();\nint got = user.get();"},
+        {"b.ls", "class Log { static int value = 0; static int add(int d) { value = value * 10 + d; return value; } }\n"
+                 "class User { int get() { return Log.value; } }"},
+        {"c.ls", "int second = Log.add(2);"}};
+    auto module = luasharp::NativeModule::Compile(files, {});
+    Require(*static_cast<long long*>(module.FindGlobal("first")) == 1 && *static_cast<long long*>(module.FindGlobal("second")) == 12,
+            "the top-level code of the files did not run in file order");
+    Require(*static_cast<long long*>(module.FindGlobal("got")) == 1, "a class did not read a static field of another file");
+}
+
+void TestNativeMultiFileDebugInfo() {
+    const luasharp::SourceFile files[] = {
+        {"a.ls", "int total = Math2.twice(3);\n"},
+        {"b.ls", "class Math2 {\n    static int twice(int n) {\n        int doubled = n * 2;\n        return doubled;\n    }\n}\nint more = 1;\n"}};
+    const auto generated = luasharp::CompileToC(luasharp::Analyze(files), {}, {true});
+    const auto& functions = generated.debug.functions;
+    Require(generated.debug.sources == std::vector<std::string>{"a.ls", "b.ls"}, "the debug info lost the file names");
+    const auto twice = std::ranges::find(functions, "Math2.twice", &luasharp::NativeDebugFunction::name);
+    Require(twice != functions.end() && twice->source == 1 && twice->lines == std::vector<uint32_t>{3, 4}, "a method has the wrong file or lines");
+    Require(std::ranges::count(functions, "<top-level>", &luasharp::NativeDebugFunction::name) == 2, "each file needs its own top-level function");
+    Require(generated.c.find("#line 3 \"b.ls\"") != std::string::npos && generated.c.find("#line 1 \"a.ls\"") != std::string::npos, "#line does not name the file of the statement");
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+
+    luasharp::NativeCompileOptions options; options.initialize = false; options.emitDebugHooks = true;
+    options.runtime = luasharp::NativeRuntime::Create();
+    auto module = luasharp::NativeModule::Compile(files, options);
+    luasharp::NativeDebugger debugger(module.Runtime());
+    debugger.AddModule(module);
+    Require(debugger.SetBreakpoints("a.ls", {3}) == std::vector<uint32_t>{0}, "a breakpoint bound to a line of another file");
+    Require(debugger.SetBreakpoints("b.ls", {3}) == std::vector<uint32_t>{3}, "the breakpoint in the second file did not bind");
+    std::vector<luasharp::NativeDebugFrame> stack;
+    debugger.SetStopHandler([&](const luasharp::NativeStopEvent&) { stack = debugger.StackTrace(); debugger.Continue(); });
+    debugger.Attach();
+    module.Initialize();
+    Require(stack.size() == 2 && stack[0].source == "b.ls" && stack[0].line == 3 && stack[1].source == "a.ls" && stack[1].line == 1,
+            "wrong stack across files: " + FrameText(stack));
+    debugger.RemoveModule(module);
+}
+
 int main() {
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests{
         {"invalid syntax", TestInvalidSyntax},
@@ -2974,6 +3050,9 @@ int main() {
         {"native debugger properties", TestNativeDebuggerProperties},
         {"native debugger statics", TestNativeDebuggerStatics},
         {"project files", TestProjectFiles},
+        {"multi-file semantics", TestMultiFileSemantics},
+        {"native multi-file programs", TestNativeMultiFile},
+        {"multi-file debug info", TestNativeMultiFileDebugInfo},
     };
 
     for (const auto& [name, test] : tests) {

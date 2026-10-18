@@ -43,18 +43,39 @@ const std::vector<luasharp::ExternalType>& ProjectTypes(const std::filesystem::p
     return cache.emplace(key, luasharp::DeclarationTypes(sources)).first->second;
 }
 
-bool ReportDiagnostics(const std::filesystem::path& input, const luasharp::Analysis& analysis) {
+// The host types of the files, which must belong to one luasharp.json project (or none).
+const std::vector<luasharp::ExternalType>& ProgramTypes(const std::vector<std::filesystem::path>& inputs) {
+    const auto key = [](const std::filesystem::path& input) { const auto file = luasharp::FindProjectFile(input); return file ? luasharp::PathKey(*file) : std::string{}; };
+    for (const auto& input : inputs)
+        if (key(input) != key(inputs.front())) throw std::runtime_error(input.string() + " is not in the luasharp.json project of " + inputs.front().string());
+    return ProjectTypes(inputs.front());
+}
+
+// The program's files; each name is how diagnostics and the debugger show it.
+struct Program {
+    std::vector<std::string> texts;
+    std::vector<luasharp::SourceFile> files;
+};
+Program ReadProgram(const std::vector<std::filesystem::path>& inputs, bool fullPaths) {
+    Program program;
+    for (const auto& input : inputs) program.texts.push_back(ReadSource(input));
+    for (size_t i{}; i < inputs.size(); ++i)
+        program.files.push_back({fullPaths ? std::filesystem::absolute(inputs[i]).string() : inputs[i].string(), program.texts[i]});
+    return program;
+}
+
+bool ReportDiagnostics(const luasharp::Analysis& analysis) {
     bool failed = false;
     for (const auto& diagnostic : analysis.diagnostics) {
         const bool error = diagnostic.severity == luasharp::DiagnosticSeverity::Error;
-        std::cerr << input.string() << '(' << diagnostic.line + 1 << ',' << diagnostic.character + 1 << "): " << (error ? "error: " : "warning: ") << diagnostic.message << '\n';
+        std::cerr << analysis.sources.Name(diagnostic.file) << '(' << diagnostic.line + 1 << ',' << diagnostic.character + 1 << "): " << (error ? "error: " : "warning: ") << diagnostic.message << '\n';
         failed = failed || error;
     }
     return failed;
 }
 
 struct RunOptions {
-    std::filesystem::path input;
+    std::vector<std::filesystem::path> inputs; // one program
     std::filesystem::path output;
     bool execute{true};
     bool debugHooks{};
@@ -63,11 +84,12 @@ struct RunOptions {
 };
 
 RunOptions ParseRunOptions(int argc, char** argv, int start, bool execute) {
-    if (argc <= start) throw std::runtime_error("Expected <file.ls>");
     RunOptions options;
-    options.input = argv[start];
     options.execute = execute;
-    for (int index = start + 1; index < argc; ++index) {
+    int index = start;
+    for (; index < argc && !std::string_view(argv[index]).starts_with('-'); ++index) options.inputs.emplace_back(argv[index]);
+    if (options.inputs.empty()) throw std::runtime_error("Expected <file.ls>");
+    for (; index < argc; ++index) {
         const std::string_view argument = argv[index];
         const auto value = [&] {
             if (index + 1 >= argc) throw std::runtime_error("Expected a value after " + std::string(argument));
@@ -80,7 +102,8 @@ RunOptions ParseRunOptions(int argc, char** argv, int start, bool execute) {
         else throw std::runtime_error("Unknown option " + std::string(argument));
     }
     if (options.debug && !execute) throw std::runtime_error("--debug needs run");
-    if (options.output.empty()) options.output = options.input.parent_path() / (options.input.stem().string() + ".c");
+    const auto& first = options.inputs.front();
+    if (options.output.empty()) options.output = first.parent_path() / (first.stem().string() + ".c");
     return options;
 }
 
@@ -114,16 +137,14 @@ int RunDebug(luasharp::CCompilationResult generated, uint16_t port) {
 int CompileNative(const RunOptions& run, std::chrono::steady_clock::time_point cliStart) {
     using Clock = std::chrono::steady_clock;
     const auto milliseconds = [](Clock::time_point from, Clock::time_point to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
-    const auto& input = run.input;
-    const auto source = ReadSource(input);
+    // A client sets breakpoints by full path.
+    const auto program = ReadProgram(run.inputs, run.debug);
     // A standalone run has no host to give the declared functions.
     static const std::vector<luasharp::ExternalType> none;
-    const auto& types = run.execute ? none : ProjectTypes(input);
-    const auto analysis = luasharp::Analyze(source, types);
-    if (ReportDiagnostics(input, analysis)) return 1;
-    // A client sets breakpoints by full path.
-    const auto sourceName = run.debug ? std::filesystem::absolute(input).string() : input.filename().string();
-    auto generated = luasharp::CompileToC(analysis, types, {run.debugHooks, source, sourceName});
+    const auto& types = run.execute ? none : ProgramTypes(run.inputs);
+    const auto analysis = luasharp::Analyze(program.files, types);
+    if (ReportDiagnostics(analysis)) return 1;
+    auto generated = luasharp::CompileToC(analysis, types, {run.debugHooks});
     const auto frontendEnd = Clock::now();
     WriteOutput(run.output, generated.c);
     const auto writeEnd = Clock::now();
@@ -137,13 +158,14 @@ int CompileNative(const RunOptions& run, std::chrono::steady_clock::time_point c
                   << milliseconds(cliStart, frontendEnd) << " ms, write C " << milliseconds(frontendEnd, writeEnd) << " ms, tcc "
                   << milliseconds(writeEnd, tccEnd) << " ms)" << std::endl;
         module.Initialize();
-        std::cout << "\nRan " << input.string() << '\n';
+        std::cout << "\nRan " << run.inputs.front().string() << (run.inputs.size() > 1 ? " and the other files" : "") << '\n';
     }
     return 0;
 }
 
 void Usage() {
     std::cerr << "Usage:\n"
+              << "  Several .ls files compile as one program: each sees the types of the others.\n"
               << "  luasharp <file.ls> [-o generated.c]       Emit C, compile, and run\n"
               << "  luasharp run <file.ls> [-o generated.c]   Emit C, compile, and run\n"
               << "  luasharp emit-c <file.ls> [-o output.c]   Emit C only\n"
@@ -160,13 +182,9 @@ int main(int argc, char** argv) {
         if (argc < 2) { Usage(); return 2; }
         if (std::string_view(argv[1]) == "check") {
             if (argc < 3) { Usage(); return 2; }
-            bool failed = false;
-            for (int index = 2; index < argc; ++index) {
-                const std::filesystem::path input = argv[index];
-                try { failed = ReportDiagnostics(input, luasharp::Analyze(ReadSource(input), ProjectTypes(input))) || failed; }
-                catch (const std::exception& error) { std::cerr << "luasharp: " << error.what() << '\n'; failed = true; }
-            }
-            return failed ? 1 : 0;
+            const std::vector<std::filesystem::path> inputs(argv + 2, argv + argc);
+            const auto program = ReadProgram(inputs, false);
+            return ReportDiagnostics(luasharp::Analyze(program.files, ProgramTypes(inputs))) ? 1 : 0;
         }
         const auto command = std::string_view(argv[1]);
         if (command == "emit-c" || command == "run-native" || command == "run") {

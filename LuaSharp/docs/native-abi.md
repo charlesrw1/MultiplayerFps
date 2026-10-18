@@ -96,7 +96,7 @@ Interning is weak: identical live strings share one object, but the intern table
 
 ## Module state
 
-Top-level variables and static fields live in a generated `LS_ModuleState`, persist after `ls_module_init`, and are discoverable through generated address getters. A static field is the global `Type.field` (C getter `ls_global_static_Type__field`). Static fields initialize at the start of `ls_module_init`, in declaration order. `NativeModule::FindGlobal` resolves those getters using compiler-generated metadata.
+Top-level variables and static fields live in a generated `LS_ModuleState`, persist after `ls_module_init`, and are discoverable through generated address getters. A static field is the global `Type.field` (C getter `ls_global_static_Type__field`). Static fields initialize at the start of `ls_module_init`, in declaration order. Then `ls_module_init` calls `ls_module_init__N` for each file `N` that has top-level code, in file order. `NativeModule::FindGlobal` resolves those getters using compiler-generated metadata.
 
 Module state remains inside the TinyCC module and therefore dies when that module is destroyed. Reload validates global types but does not migrate their values yet.
 
@@ -342,7 +342,8 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 - Each script function, constructor, lambda and the top-level code keeps its parameters, `this` and its locals in the struct `ls_locals`. The first field is `ls_statement`.
 - Before each statement, `LS_DEBUG(function, statement)` calls the hook when `ls_debug.active` is not zero. A loop runs the hook in its condition, so the hook runs before each test.
 - The hook gets the address of `ls_locals` and the `rbp` of the function. The hook must write the statement id to `ls_statement`. The value is -1 before the first hook, so the debugger can find the line of a caller frame.
-- Each statement has a `#line` directive, so TinyCC errors show `.ls` lines. After each function, a `#line` directive gives the lines of the generated C again.
+- Each statement has a `#line` directive with the name of its file, so TinyCC errors show `.ls` lines. After each function, a `#line` directive gives the lines of the generated C again.
+- A function is in one file. `NativeDebugInfo::sources` has the file names, and `NativeDebugFunction::source` is the index of the function's file. The top-level code of each file is a separate `<top-level>` function. Breakpoints and stack frames use the file of the function.
 - `ls_module_debug()` returns `LS_DebugModule`: the hook state, the code range and locals of each function, the code range of the module, and the statics. `NativeModule::Debug()` returns it.
 - Each local has an `LS_FieldInfo`. Its offset is into `ls_locals`. `LS_FIELD_INDIRECT` marks an indirect local. A local of a type without an `LS_KIND` has the kind `LS_SLOT_UNKNOWN`.
 - Each enum has an `LS_EnumInfo`. Enum fields and enum locals point to it.

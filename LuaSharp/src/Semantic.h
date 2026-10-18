@@ -107,6 +107,7 @@ struct Symbol {
     bool isTypeOf{};    // Methods: [TypeOf], the static extern method that typeof(T) calls with the name of T
     bool isDebugView{}; // Methods: [DebugView], an extern getter without side effects that the debugger can call
     std::string typeParameter; // Generic methods: the name of the type parameter. `type` is its constraint.
+    size_t file{}; // index into Analysis::sources; line and character are in this file
 };
 // A generic method's symbol takes the type info first; `x.f<A>(...)` passes typeof(A) there.
 inline constexpr std::string_view GenericTypeParameterName = "type";
@@ -132,6 +133,7 @@ struct Diagnostic {
     size_t character{};
     DiagnosticSeverity severity{DiagnosticSeverity::Error};
     TextSpan span;
+    size_t file{}; // index into Analysis::sources; line and character are in this file
 };
 // name views the syntax tree or a literal; valid while the owning Analysis lives.
 struct VariableBinding {
@@ -228,7 +230,7 @@ struct BoundEnum {
 struct BoundProgram {
     std::vector<BoundEnum> enums;
     std::vector<BoundClass> classes;
-    NodeRange topLevel;
+    std::vector<NodeRange> topLevel; // one range for each file, in file order
     TextSpan span;
     std::vector<BoundExpression> expressions; // [0] is the shared missing expression
     std::vector<BoundStatement> statements;
@@ -246,6 +248,7 @@ private:
 };
 // Bound nodes point into syntax, so an Analysis can move but not copy.
 struct Analysis {
+    SourceMap sources;
     SyntaxTree syntax;
     BoundProgram bound;
     TypeTable types;
@@ -267,6 +270,11 @@ struct Analysis {
 
 Analysis Analyze(std::string_view source);
 Analysis Analyze(std::string_view source, const std::vector<ExternalType>& externalTypes);
+// One program from several files: each sees the types of the others. Top-level variables are visible only in the
+// top-level code of their own file, but their names must differ across files (the host finds globals by name).
+Analysis Analyze(std::span<const SourceFile> files, const std::vector<ExternalType>& externalTypes = {});
+// Every error, one per line: "file(line,col): message". Empty when there is none.
+std::string FormatErrors(const Analysis& analysis);
 // The classes and enums an analysis declares, as other sources see them. Inherited members are included.
 std::vector<ExternalType> ExportTypes(const Analysis& analysis);
 std::optional<std::string> ResolveVariableType(const Analysis& analysis, std::string_view name, size_t position);

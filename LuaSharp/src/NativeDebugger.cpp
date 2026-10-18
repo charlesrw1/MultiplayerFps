@@ -114,11 +114,16 @@ struct NativeDebugger::Impl {
                 if (address >= tables->functions[i].begin && address < tables->functions[i].end) return i;
             return std::nullopt;
         }
-        // The line that a breakpoint on line binds to: the first statement line at or after it; 0 when none.
-        uint32_t BindLine(uint32_t line) const {
+        bool InSource(const NativeDebugFunction& function, std::string_view source) const {
+            assert(function.source < info->sources.size());
+            return SameSource(source, info->sources[function.source]);
+        }
+        // The line that a breakpoint on line of source binds to: the first statement line at or after it; 0 when none.
+        uint32_t BindLine(std::string_view source, uint32_t line) const {
             uint32_t best = 0;
             for (const auto& function : info->functions)
-                for (const auto statementLine : function.lines)
+                if (InSource(function, source))
+                    for (const auto statementLine : function.lines)
                     if (statementLine >= line && (best == 0 || statementLine < best)) best = statementLine;
             return best;
         }
@@ -299,11 +304,11 @@ struct NativeDebugger::Impl {
         size_t count = module.firstStatement.empty() ? 0 : module.firstStatement.back() + module.info->functions.back().lines.size();
         for (size_t i{}; i < count; ++i) module.breakpoints[i] = 0;
         for (const auto& [source, lines] : requestedBreakpoints) {
-            if (!SameSource(source, module.info->sourceName)) continue;
             for (const auto line : lines) {
-                const auto bound = module.BindLine(line);
+                const auto bound = module.BindLine(source, line);
                 if (!bound) continue;
                 for (size_t function{}; function < module.info->functions.size(); ++function) {
+                    if (!module.InSource(module.info->functions[function], source)) continue;
                     const auto& statementLines = module.info->functions[function].lines;
                     for (size_t statement{}; statement < statementLines.size(); ++statement)
                         if (statementLines[statement] == bound) module.breakpoints[module.firstStatement[function] + statement] = 1;
@@ -680,9 +685,8 @@ std::vector<uint32_t> NativeDebugger::SetBreakpoints(std::string_view source, co
     std::vector<uint32_t> bound(lines.size());
     for (const auto& module : impl_->modules) {
         impl_->ApplyBreakpoints(*module);
-        if (!SameSource(source, module->info->sourceName)) continue;
         for (size_t i{}; i < lines.size(); ++i)
-            if (const auto line = module->BindLine(lines[i]); line && (!bound[i] || line < bound[i])) bound[i] = line;
+            if (const auto line = module->BindLine(source, lines[i]); line && (!bound[i] || line < bound[i])) bound[i] = line;
     }
     return bound;
 }
@@ -709,7 +713,7 @@ std::vector<NativeDebugFrame> NativeDebugger::StackTrace() const {
     for (const auto& frame : impl_->frames) {
         const auto& function = frame.module->info->functions[frame.function];
         const uint32_t line = frame.statement < function.lines.size() ? function.lines[frame.statement] : 0;
-        result.push_back({function.name, frame.module->info->sourceName, line});
+        result.push_back({function.name, frame.module->info->sources[function.source], line});
     }
     return result;
 }

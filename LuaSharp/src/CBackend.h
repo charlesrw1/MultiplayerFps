@@ -57,13 +57,14 @@ struct NativeDebugLocal {
 
 struct NativeDebugFunction {
     std::string name;             // "Type.method", "Type.new", "<lambda>" or "<top-level>"
+    uint32_t source{};            // index into NativeDebugInfo::sources
     std::vector<uint32_t> lines;  // 1-based source line of each statement id
     std::vector<NativeDebugLocal> locals;
 };
 
 // Debug tables of an instrumented module. Index i matches NativeDebugModule::functions[i].
 struct NativeDebugInfo {
-    std::string sourceName;
+    std::vector<std::string> sources; // the file names of the program
     std::vector<NativeDebugFunction> functions;
 };
 
@@ -115,9 +116,8 @@ struct NativeDebugModule {
 
 struct CEmitOptions {
     // Instrumented build: locals live in a struct, and a hook can run before each statement.
+    // The file names in debug info and #line come from Analysis::sources; each must not be empty.
     bool debugHooks{};
-    std::string_view source;  // debugHooks: the text that was analyzed, for line numbers
-    std::string sourceName;   // debugHooks: the file name in debug info and #line
 };
 
 struct NativeSymbol {
@@ -134,7 +134,7 @@ struct NativeCompileOptions {
     std::shared_ptr<NativeRuntime> runtime;
     bool initialize{true}; // false: caller runs NativeModule::Initialize() itself
     bool emitDebugHooks{};  // see CEmitOptions::debugHooks
-    std::string sourceName;
+    std::string sourceName; // the file name of a single-source Compile, for debug info
 };
 
 // Emits C11 from the same checked bound tree used by the Lua backend.
@@ -146,6 +146,13 @@ CCompilationResult CompileToC(std::string_view source, const std::vector<Externa
 CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes = {}, const CEmitOptions& options = {});
 // The types of declaration sources, after externalTypes. Throws on a diagnostic error, or when a source declares code.
 std::vector<ExternalType> DeclarationTypes(const std::vector<std::string>& sources, std::vector<ExternalType> externalTypes = {});
+
+// Milliseconds of each compile phase. The frontend parses and analyzes.
+struct NativeCompileTimes {
+    double frontend{};
+    double emitC{};
+    double tcc{};
+};
 
 class NativeModule {
 public:
@@ -160,6 +167,8 @@ public:
     // libtccPath may name libtcc.dll or be empty to use normal discovery.
     static NativeModule Compile(std::string_view source, std::string_view libtccPath = {});
     static NativeModule Compile(std::string_view source, const NativeCompileOptions& options);
+    // One program from several files (see Analyze). options.sourceName is not used.
+    static NativeModule Compile(std::span<const SourceFile> files, const NativeCompileOptions& options);
     // Same as Compile, for C already produced by CompileToC.
     static NativeModule Load(CCompilationResult generated, const NativeCompileOptions& options);
     static bool IsLibTccAvailable(std::string_view libtccPath = {});
@@ -180,6 +189,8 @@ public:
     [[nodiscard]] const CCompilationResult& Generated() const;
     // The debug tables of an instrumented module; null for other modules.
     [[nodiscard]] const NativeDebugModule* Debug() const;
+    // Load measures only tcc.
+    [[nodiscard]] const NativeCompileTimes& Times() const;
 
 private:
     struct Impl;

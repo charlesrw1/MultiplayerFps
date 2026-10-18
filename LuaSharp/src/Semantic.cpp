@@ -132,9 +132,9 @@ constexpr TypeId InferReturn = std::numeric_limits<TypeId>::max(); // lambda bod
 
 class Analyzer {
 public:
-    Analyzer(std::string_view source, SyntaxTree syntax, const std::vector<ExternalType>& externalTypes = {}) : source_(source), types_(result_.types) {
-        lineStarts_.push_back(0);
-        for (size_t at{}; (at = source_.find('\n', at)) != std::string_view::npos; ++at) lineStarts_.push_back(at + 1);
+    Analyzer(SourceMap sources, SyntaxTree syntax, const std::vector<ExternalType>& externalTypes = {}) : types_(result_.types) {
+        result_.sources = std::move(sources);
+        end_ = result_.sources.End();
         result_.syntax = std::move(syntax);
         // Estimates from token count; the pools still grow if a program exceeds them.
         result_.bound.expressions.reserve(result_.syntax.tokens.size() + 1);
@@ -148,13 +148,13 @@ public:
             knownTypes_.insert(external.name); declaredTypes_.insert(external.name);
             if (external.isEnum) enumTypes_.insert(external.name);
             if (external.isStruct) structTypes_.insert(external.name);
-            Symbol typeSymbol{external.name, external.name, external.isEnum ? SymbolKind::Enum : SymbolKind::Class, 0, 0, {source_.size(), 0}, {}, external.name, "public"};
+            Symbol typeSymbol{external.name, external.name, external.isEnum ? SymbolKind::Enum : SymbolKind::Class, 0, 0, {end_, 0}, {}, external.name, "public"};
             typeSymbol.isStruct = external.isStruct; typeSymbol.isNative = external.isNative; typeSymbol.hostDefault = external.hostDefault;
             if (external.isNative) nativeTypes_.insert(external.name);
             PushSymbol(std::move(typeSymbol));
             if (!external.baseType.empty()) result_.baseTypes[external.name] = external.baseType;
             for (auto member : external.members) {
-                member.span = {source_.size(), 0}; member.implicit = true;
+                member.span = {end_, 0}; member.implicit = true;
                 const bool constructor = member.kind == SymbolKind::Method && member.name == external.name;
                 const auto staticMember = member.isStatic;
                 const auto typeOf = member.isTypeOf;
@@ -183,16 +183,10 @@ private:
     bool IsOpen(TypeId type) const { return type == TypeTable::Table || type == TypeTable::Any; }
     const std::string& Name(TypeId type) const { return types_.Name(type); }
     const SyntaxTree& Syntax() const { return result_.syntax; }
-    std::pair<size_t, size_t> Position(size_t offset) const {
-        offset = (std::min)(offset, source_.size());
-        const auto next = std::upper_bound(lineStarts_.begin(), lineStarts_.end(), offset);
-        assert(next != lineStarts_.begin());
-        const auto line = static_cast<size_t>(next - lineStarts_.begin()) - 1;
-        return {line, offset - lineStarts_[line]};
-    }
+    SourceLocation Position(size_t offset) const { return result_.sources.Locate(offset); }
     // The C backend emits each external struct the module uses; its fields start zeroed, or the host makes T().
     BoundClass ExternalStruct(const ExternalType& external) const {
-        BoundClass result; result.name = external.name; result.isStruct = true; result.isExternal = true; result.hostDefault = external.hostDefault; result.span = {source_.size(), 0};
+        BoundClass result; result.name = external.name; result.isStruct = true; result.isExternal = true; result.hostDefault = external.hostDefault; result.span = {end_, 0};
         for (const auto& member : external.members) if (member.kind == SymbolKind::Field && !member.isStatic) result.fields.push_back({"public", member.type, member.name});
         return result;
     }
@@ -203,11 +197,13 @@ private:
         return index;
     }
     size_t AddSymbol(std::string name, std::string type, SymbolKind kind, TextSpan span, std::vector<std::string> parameters = {}) {
-        const auto [line, character] = Position(span.offset);
-        return PushSymbol({std::move(name), std::move(type), kind, line, character, span, std::move(parameters)});
+        const auto at = Position(span.offset);
+        Symbol symbol{std::move(name), std::move(type), kind, at.line, at.character, span, std::move(parameters)};
+        symbol.file = at.file;
+        return PushSymbol(std::move(symbol));
     }
     void AddDiagnostic(std::string message, TextSpan span, DiagnosticSeverity severity = DiagnosticSeverity::Error) {
-        const auto [line, character] = Position(span.offset); result_.diagnostics.push_back({std::move(message), line, character, severity, span});
+        const auto at = Position(span.offset); result_.diagnostics.push_back({std::move(message), at.line, at.character, severity, span, at.file});
     }
     void CheckType(TypeId type, TextSpan span) {
         const auto base = types_.Base(type);
@@ -221,7 +217,7 @@ private:
     void RegisterBuiltinType(std::string type) { // by value: interning below can move TypeTable names
         if (!registeredBuiltins_.insert(type).second) return;
         const auto add = [&](const BuiltinMember& member, const std::string& key) {
-            Symbol symbol{member.name, member.returnType, member.kind, 0, 0, {source_.size(), 0}, ParameterLabels(member), type};
+            Symbol symbol{member.name, member.returnType, member.kind, 0, 0, {end_, 0}, ParameterLabels(member), type};
             symbol.implicit = true; symbol.isStatic = member.isStatic;
             const auto index = PushSymbol(std::move(symbol));
             result_.members[key].push_back(index);
@@ -1152,7 +1148,7 @@ private:
         if (const auto existing = builtinSymbols_.find(&builtin); existing != builtinSymbols_.end()) return existing->second;
         std::vector<std::string> parameters; for (const auto& parameter : builtin.parameters) parameters.push_back(parameter.type + " " + parameter.name);
         if (builtin.variadic) parameters.push_back("any values...");
-        const auto index = AddSymbol(builtin.name, builtin.returnType, SymbolKind::Function, {source_.size(), 0}, std::move(parameters));
+        const auto index = AddSymbol(builtin.name, builtin.returnType, SymbolKind::Function, {end_, 0}, std::move(parameters));
         builtinSymbols_.emplace(&builtin, index);
         return index;
     }
@@ -1308,7 +1304,29 @@ private:
             }
             result_.bound.classes.push_back(std::move(boundClass));
         }
-        std::vector<Local> locals; result_.bound.topLevel = AnalyzeStatements(result_.syntax.root.topLevel, locals, nullptr, TypeTable::Void, source_.size(), 0);
+        const auto& files = result_.syntax.root.topLevel;
+        assert(files.size() == (std::max)(result_.sources.FileCount(), size_t{1}));
+        for (size_t file{}; file < files.size(); ++file) {
+            std::vector<Local> locals; // top-level variables belong to their file
+            const auto end = result_.sources.FileCount() ? result_.sources.FileEnd(file) : end_;
+            result_.bound.topLevel.push_back(AnalyzeStatements(files[file], locals, nullptr, TypeTable::Void, end, 0));
+        }
+        CheckGlobalNames();
+    }
+    // Top-level variables are module globals, and the host finds them by name.
+    void CheckGlobalNames() {
+        std::unordered_map<std::string_view, size_t> fileOf;
+        for (size_t file{}; file < result_.syntax.root.topLevel.size(); ++file)
+            for (const auto& statement : Syntax().Statements(result_.syntax.root.topLevel[file])) {
+                if (statement.kind != SyntaxStatement::Kind::Local) continue;
+                const auto [found, added] = fileOf.emplace(statement.name, file);
+                if (!added && found->second != file)
+                    AddDiagnostic("Top-level variable '" + statement.name + "' is already declared in " + FileLabel(found->second), statement.nameSpan);
+            }
+    }
+    std::string FileLabel(size_t file) const {
+        const auto& name = file < result_.sources.FileCount() ? result_.sources.Name(file) : std::string{};
+        return name.empty() ? "another file" : "'" + name + "'";
     }
     // The base class has a constructor that takes no arguments (declared or implicit). External and extern bases are not checked:
     // the host makes the object of an extern base.
@@ -1351,8 +1369,7 @@ private:
         return false;
     }
 
-    std::string_view source_;
-    std::vector<size_t> lineStarts_;
+    size_t end_{}; // end of the offset space; implicit symbols have spans here
     Analysis result_;
     TypeTable& types_;
     std::vector<TypeId> symbolTypes_; // parallel to result_.symbols
@@ -1393,8 +1410,25 @@ std::string MakeParameterLabel(const SyntaxParameter& parameter) {
     return (parameter.isInout ? "inout " : "") + parameter.type + " " + parameter.name;
 }
 
-Analysis Analyze(std::string_view source) { auto syntax = ParseTree(source); return Analyzer(source, std::move(syntax)).Run(); }
-Analysis Analyze(std::string_view source, const std::vector<ExternalType>& externalTypes) { auto syntax = ParseTree(source); return Analyzer(source, std::move(syntax), externalTypes).Run(); }
+Analysis Analyze(std::string_view source) { return Analyze(source, {}); }
+Analysis Analyze(std::string_view source, const std::vector<ExternalType>& externalTypes) {
+    const SourceFile file{{}, source};
+    return Analyze(std::span(&file, 1), externalTypes);
+}
+Analysis Analyze(std::span<const SourceFile> files, const std::vector<ExternalType>& externalTypes) {
+    auto syntax = ParseTree(files);
+    return Analyzer(SourceMap(files), std::move(syntax), externalTypes).Run();
+}
+
+std::string FormatErrors(const Analysis& analysis) {
+    std::string result;
+    for (const auto& diagnostic : analysis.diagnostics) {
+        if (diagnostic.severity != DiagnosticSeverity::Error) continue;
+        const auto& name = diagnostic.file < analysis.sources.FileCount() ? analysis.sources.Name(diagnostic.file) : std::string{};
+        result += name + '(' + std::to_string(diagnostic.line + 1) + ',' + std::to_string(diagnostic.character + 1) + "): " + diagnostic.message + '\n';
+    }
+    return result;
+}
 
 std::vector<ExternalType> ExportTypes(const Analysis& analysis) {
     std::vector<ExternalType> result;

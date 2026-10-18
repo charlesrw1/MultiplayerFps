@@ -18,6 +18,36 @@ struct TextSpan {
     [[nodiscard]] bool Contains(size_t position) const { return position >= offset && position <= End(); }
 };
 
+// One file of a program. text must outlive the analysis of the program.
+struct SourceFile {
+    std::string name;
+    std::string_view text;
+};
+struct SourceLocation {
+    size_t file{};      // index into the program's files
+    size_t line{};      // 0-based
+    size_t character{}; // 0-based
+};
+// The files of a program share one offset space, so TextSpans stay plain offsets.
+// A file starts one past the end of the file before it.
+class SourceMap {
+public:
+    SourceMap() = default;
+    explicit SourceMap(std::span<const SourceFile> files);
+    [[nodiscard]] size_t FileCount() const { return files_.size(); }
+    [[nodiscard]] const std::string& Name(size_t file) const { assert(file < files_.size()); return files_[file].name; }
+    [[nodiscard]] size_t Base(size_t file) const { assert(file < files_.size()); return files_[file].base; }
+    [[nodiscard]] size_t FileEnd(size_t file) const { assert(file < files_.size()); return files_[file].base + files_[file].size; }
+    // One past the last file. Spans of implicit symbols start here.
+    [[nodiscard]] size_t End() const { return files_.empty() ? 0 : FileEnd(files_.size() - 1); }
+    [[nodiscard]] size_t FileOf(size_t offset) const;
+    [[nodiscard]] SourceLocation Locate(size_t offset) const;
+
+private:
+    struct File { std::string name; size_t base{}; size_t size{}; std::vector<size_t> lineStarts; };
+    std::vector<File> files_;
+};
+
 enum class SyntaxTokenKind { Identifier, Number, String, Keyword, Symbol, EndOfFile, Bad };
 struct SyntaxToken {
     SyntaxTokenKind kind{SyntaxTokenKind::Bad};
@@ -155,7 +185,7 @@ struct SyntaxEnum {
 struct SyntaxProgram {
     std::vector<SyntaxEnum> enums;
     std::vector<SyntaxClass> classes;
-    NodeRange topLevel;
+    std::vector<NodeRange> topLevel; // one range for each file, in file order
     TextSpan span;
 };
 // Nodes never move after parsing, so pointers into the pools stay valid while the tree lives.
@@ -192,6 +222,9 @@ struct ExpressionTree {
 
 // ParseTree is error-tolerant and is the entry point for editor tooling.
 SyntaxTree ParseTree(std::string_view source);
+// Spans use the offset space of SourceMap(files). Each file ends its own declarations, so an unclosed
+// brace does not continue into the next file.
+SyntaxTree ParseTree(std::span<const SourceFile> files);
 // Helpers for callers that require valid syntax; they throw on the first syntax error.
 SyntaxTree ParseSyntax(std::string_view source);
 ExpressionTree ParseExpression(const std::vector<SyntaxToken>& tokens);

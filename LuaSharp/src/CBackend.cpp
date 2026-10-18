@@ -130,8 +130,7 @@ struct CEmitter {
         std::optional<uint32_t> statement;                       // the last statement id
     };
     std::optional<DebugFrame> debugFrame;
-    std::vector<size_t> lineStarts;
-    std::string lineFile; // sourceName as the body of a C string
+    std::vector<std::string> lineFiles; // each source name as the body of a C string
     NativeDebugInfo debugInfo;
     std::vector<std::string> debugSymbols; // C name of each instrumented function
     std::vector<std::vector<std::string>> debugFields; // ls_locals field of each debug local, per instrumented function
@@ -139,11 +138,14 @@ struct CEmitter {
     CEmitter(const Analysis& value, const std::vector<ExternalType>& external, const CEmitOptions& options)
         : analysis(value), program(value.bound), types(value.types), externalTypes(external), emitOptions(options) {
         if (options.debugHooks) {
-            assert(!options.source.empty() && !options.sourceName.empty());
-            lineStarts.push_back(0);
-            for (size_t i{}; i < options.source.size(); ++i) if (options.source[i] == '\n') lineStarts.push_back(i + 1);
-            for (const char character : options.sourceName) { if (character == '\\' || character == '"') lineFile += '\\'; lineFile += character; }
-            debugInfo.sourceName = options.sourceName;
+            assert(value.sources.FileCount() > 0);
+            for (size_t file{}; file < value.sources.FileCount(); ++file) {
+                const auto& name = value.sources.Name(file);
+                assert(!name.empty());
+                debugInfo.sources.push_back(name);
+                auto& escaped = lineFiles.emplace_back();
+                for (const char character : name) { if (character == '\\' || character == '"') escaped += '\\'; escaped += character; }
+            }
         }
         for (const auto& item : program.enums) enums.insert(item.name);
         for (const auto& item : NativeStructTypes()) structNames.insert(item);
@@ -168,7 +170,7 @@ struct CEmitter {
         }
         for (const auto& item : program.classes) for (const auto& function : item.functions) for (const auto& parameter : function.parameters)
             if (const auto* binding = ParameterBinding(parameter); binding && parameter.isInout) inoutSymbols.insert(binding->symbolIndex);
-        for (const auto& statement : program.Statements(program.topLevel)) {
+        for (const auto range : program.topLevel) for (const auto& statement : program.Statements(range)) {
             if (statement.kind != SyntaxStatement::Kind::Local) continue;
             if (const auto* binding = BindingAt(statement.syntax->nameSpan.offset)) globalSymbols.insert(binding->symbolIndex);
         }
@@ -311,7 +313,7 @@ struct CEmitter {
                 self(self, statement.initializer); self(self, statement.body); self(self, statement.elseBody);
             }
         };
-        statements(statements, program.topLevel);
+        for (const auto range : program.topLevel) statements(statements, range);
         for (const auto& type : program.classes) {
             owner = type.name;
             for (const auto& field : type.fields) expression(expression, program.Expression(field.initializer));
@@ -348,7 +350,7 @@ struct CEmitter {
     }
 
     // ---- debug builds ----
-    uint32_t SourceLine(size_t offset) const { return static_cast<uint32_t>(std::upper_bound(lineStarts.begin(), lineStarts.end(), offset) - lineStarts.begin()); }
+    SourceLocation At(size_t offset) const { return analysis.sources.Locate(offset); }
     size_t DebugFunctionIndex() const { assert(debugFrame); return debugInfo.functions.size() - 1; }
     const std::string* DebugField(size_t symbol) const {
         if (!debugFrame) return nullptr;
@@ -386,12 +388,20 @@ struct CEmitter {
     }
     uint32_t NewStatement(size_t offset) {
         assert(debugFrame);
-        auto& lines = debugInfo.functions.back().lines;
-        lines.push_back(SourceLine(offset));
+        auto& function = debugInfo.functions.back();
+        auto& lines = function.lines;
+        const auto at = At(offset);
+        if (lines.empty()) function.source = static_cast<uint32_t>(at.file);
+        assert(function.source == at.file); // a function is in one file
+        lines.push_back(static_cast<uint32_t>(at.line + 1));
         debugFrame->statement = static_cast<uint32_t>(lines.size() - 1);
         return *debugFrame->statement;
     }
-    void LineDirective(size_t offset) { if (debugFrame) Line(0, "#line ", SourceLine(offset), " \"", lineFile, '"'); }
+    void LineDirective(size_t offset) {
+        if (!debugFrame) return;
+        const auto at = At(offset);
+        Line(0, "#line ", at.line + 1, " \"", lineFiles[at.file], '"');
+    }
     void HookCall(uint32_t statement) { Put("LS_DEBUG(", DebugFunctionIndex(), ", ", statement, ')'); }
     // The hook before a statement.
     void DebugStatement(size_t depth, size_t offset) {
@@ -531,7 +541,7 @@ struct CEmitter {
         for (size_t start{}; start < output.size();) {
             const auto end = output.find('\n', start);
             const auto line = std::string_view(output).substr(start, end == std::string::npos ? std::string::npos : end - start);
-            if (line == LineReset) resolved += "#line " + std::to_string(physicalLine + 1) + " \"" + lineFile + ".c\"";
+            if (line == LineReset) resolved += "#line " + std::to_string(physicalLine + 1) + " \"" + lineFiles.front() + ".c\"";
             else resolved += line;
             if (end == std::string::npos) break;
             resolved += '\n'; start = end + 1; ++physicalLine;
@@ -684,7 +694,8 @@ struct CEmitter {
     // Top-level variables; they live in ls_state.
     std::vector<const BoundStatement*> ModuleGlobals() const {
         std::vector<const BoundStatement*> result;
-        for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local) result.push_back(&statement);
+        for (const auto range : program.topLevel)
+            for (const auto& statement : program.Statements(range)) if (statement.kind == SyntaxStatement::Kind::Local) result.push_back(&statement);
         return result;
     }
     auto StaticSlot(const BoundExpression& value) {
@@ -2020,12 +2031,21 @@ struct CEmitter {
             });
         }
         if (!lambdas.empty()) Line(0);
-        DebugFunction("<top-level>", "ls_module_init", [&] {
-            Line(0, "int ls_module_init(void) {");
-            // Static fields initialize before top-level code, in declaration order.
-            for (const auto& [owner, field] : staticFields) Line(1, StaticSlot(owner->name, field->name), " = ", FieldInitializer(*owner, *field), ';');
-            Statements(program.topLevel, 1, {}, {}, true); Line(1, "return 0;"); Line(0, '}');
-        });
+        // The top-level code of each file is its own function, so a debug function stays in one file.
+        std::vector<std::string> fileInits;
+        for (size_t file{}; file < program.topLevel.size(); ++file) {
+            if (program.topLevel[file].count == 0) continue;
+            const auto& symbol = fileInits.emplace_back("ls_module_init__" + std::to_string(file));
+            DebugFunction("<top-level>", symbol, [&] {
+                Line(0, "static void ", symbol, "(void) {");
+                Statements(program.topLevel[file], 1, {}, {}, true); Line(0, '}');
+            });
+        }
+        Line(0, "int ls_module_init(void) {");
+        // Static fields initialize before top-level code, in declaration order.
+        for (const auto& [owner, field] : staticFields) Line(1, StaticSlot(owner->name, field->name), " = ", FieldInitializer(*owner, *field), ';');
+        for (const auto& symbol : fileInits) Line(1, symbol, "();");
+        Line(1, "return 0;"); Line(0, '}');
         result.exports.push_back({"$module_init", "ls_module_init", "int", {}});
         if (emitOptions.debugHooks) { DebugTables(); result.debug = std::move(debugInfo); }
         result.c = std::move(output); return result;
@@ -2033,10 +2053,9 @@ struct CEmitter {
 };
 
 std::runtime_error SyntaxError(const SyntaxDiagnostic& diagnostic) { return std::runtime_error(diagnostic.message + " at " + std::to_string(diagnostic.span.offset)); }
-void ThrowFirstError(const Analysis& analysis) {
-    if (!analysis.syntax.diagnostics.empty()) throw SyntaxError(analysis.syntax.diagnostics.front());
-    const auto error = std::find_if(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& value) { return value.severity == DiagnosticSeverity::Error; });
-    if (error != analysis.diagnostics.end()) throw std::runtime_error(error->message + " at " + std::to_string(error->span.offset));
+// Syntax diagnostics are also analysis diagnostics.
+void ThrowErrors(const Analysis& analysis) {
+    if (auto errors = FormatErrors(analysis); !errors.empty()) { errors.pop_back(); throw std::runtime_error(errors); }
 }
 
 } // namespace
@@ -2050,7 +2069,7 @@ CCompilationResult CompileToC(std::string_view source, const std::vector<Externa
 }
 
 CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes, const CEmitOptions& options) {
-    ThrowFirstError(analysis);
+    ThrowErrors(analysis);
     for (const auto& type : externalTypes) {
         if (!type.isStruct || type.isNative) continue;
         const auto code = std::find_if(type.members.begin(), type.members.end(), [](const auto& member) { return member.kind != SymbolKind::Field || member.isStatic; });
@@ -2065,8 +2084,8 @@ CCompilationResult CompileToC(const Analysis& analysis, const std::vector<Extern
 std::vector<ExternalType> DeclarationTypes(const std::vector<std::string>& sources, std::vector<ExternalType> externalTypes) {
     for (const auto& source : sources) {
         const auto analysis = Analyze(source, externalTypes);
-        ThrowFirstError(analysis);
-        if (!analysis.bound.Statements(analysis.bound.topLevel).empty()) throw std::runtime_error("A declaration source can declare only extern classes, structs and enums");
+        ThrowErrors(analysis);
+        if (std::ranges::any_of(analysis.bound.topLevel, [](NodeRange range) { return range.count != 0; })) throw std::runtime_error("A declaration source can declare only extern classes, structs and enums");
         for (const auto& type : analysis.bound.classes) {
             if (type.isExternal) continue;
             if (!type.isStruct) throw std::runtime_error("A declaration source can declare only extern classes, structs and enums: class '" + type.name + "' is a script class");

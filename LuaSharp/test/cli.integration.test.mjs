@@ -50,7 +50,20 @@ try {
     assert.equal(plainRun.status, 0, `run in a project must not link the host declarations:\n${plainRun.stderr}`);
     assert.match(plainRun.stdout, /plain=7/);
 
-    console.log("PASS LuaSharp CLI: diagnostics, C emission, native compilation, execution, printf, and luasharp.json projects");
+    // Several files are one program: each sees the classes of the others.
+    const main = path.join(directory, "main.ls");
+    const helper = path.join(directory, "helper.ls");
+    fs.writeFileSync(main, 'printf("sum=%d\\n", Helper.add(2, 3));\n');
+    fs.writeFileSync(helper, "class Helper { static int add(int a, int b) { return a + b; } }\nint broken = \"text\";\n");
+    const brokenProgram = spawnSync(executable, ["check", main, helper], { encoding: "utf8" });
+    assert.equal(brokenProgram.status, 1, "check accepted an error in the second file");
+    assert.match(brokenProgram.stderr, /helper\.ls\(2,\d+\): error: Cannot assign/);
+    fs.writeFileSync(helper, "class Helper { static int add(int a, int b) { return a + b; } }\n");
+    const program = spawnSync(executable, ["run", main, helper, "-o", path.join(directory, "program.c")], { encoding: "utf8" });
+    assert.equal(program.status, 0, `a file could not use a class of another file:\n${program.stderr}`);
+    assert.match(program.stdout, /sum=5/);
+
+    console.log("PASS LuaSharp CLI: diagnostics, C emission, native compilation, execution, printf, multi-file programs, and luasharp.json projects");
 } finally {
     fs.rmSync(directory, { recursive: true, force: true });
 }

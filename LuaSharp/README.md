@@ -14,6 +14,16 @@ Build the `LuaSharp` project in Visual Studio, or from the repository root:
 
 Passing a `.ls` file directly checks it, prints all errors and warnings with line/column locations, writes generated C beside the script (or to `-o`), compiles it in memory with libtcc, and runs its module initializer. `run` and `run-native` are explicit aliases for that workflow. `emit-c` only writes the generated C.
 
+## Programs of several files
+
+Give several `.ls` files to compile them as one program: `luasharp run main.ls helper.ls`. `check` does the same. The host uses `Analyze(std::span<const SourceFile>)` and `NativeModule::Compile(std::span<const SourceFile>, options)`. The CsRemake engine compiles all files of its `scripts` folder as one module.
+
+- Each file can use the classes, structs and enums of all other files, in any order.
+- A top-level variable is visible only in the top-level code of its file. Use a static field to share a value between files. Two files cannot declare top-level variables with the same name, because the host finds globals by name.
+- The top-level code of each file runs in the order of the files.
+- Each file ends its own declarations, so an unclosed brace gives an error in that file only.
+- Diagnostics have the file (`Diagnostic::file`) and a line in that file. `FormatErrors` gives `file(line,col): message`.
+
 The compiler supports the syntax in `example.ls`: classes and inheritance, enums with inferred or explicit integer values, expression-bodied and multiline brace-bodied lambdas, enforced public/private sections, typed fields, parameters and locals, constructors, methods, `auto`, `if`/`else if`/`else`, `while`, C-style `for`, value or zero-based index/value iteration over lists, key/value iteration over tables, inclusive integer ranges such as `1..10`, `break`, `continue`, `return`, `new`, `null`, arrays, indexing/slices, populated list literals, and Lua-style positional/keyed table values.
 
 ## Native backend

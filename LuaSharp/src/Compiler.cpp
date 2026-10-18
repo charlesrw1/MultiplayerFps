@@ -122,15 +122,19 @@ public:
 
     SyntaxTree Run() {
         tree_.root.span = {0, sourceLength_};
-        const auto mark = scratch_.size();
-        while (!AtEnd()) {
-            const size_t before = index_;
-            if (Is("class") || Is("struct") || Is("abstract") || Is("sealed") || Is("extern")) { auto value = ParseClass(); tree_.root.classes.push_back(std::move(value)); }
-            else if (Is("enum")) { auto value = ParseEnum(); tree_.root.enums.push_back(std::move(value)); }
-            else { const auto statement = ParseStatement(); scratch_.push_back(statement); }
-            if (index_ == before) Advance();
+        for (;;) { // each file ends with its own EndOfFile token
+            const auto mark = scratch_.size();
+            while (!AtEnd()) {
+                const size_t before = index_;
+                if (Is("class") || Is("struct") || Is("abstract") || Is("sealed") || Is("extern")) { auto value = ParseClass(); tree_.root.classes.push_back(std::move(value)); }
+                else if (Is("enum")) { auto value = ParseEnum(); tree_.root.enums.push_back(std::move(value)); }
+                else { const auto statement = ParseStatement(); scratch_.push_back(statement); }
+                if (index_ == before) Advance();
+            }
+            tree_.root.topLevel.push_back(Link(mark));
+            if (index_ + 1 >= tree_.tokens.size()) break;
+            ++index_;
         }
-        tree_.root.topLevel = Link(mark);
         return Take();
     }
 
@@ -580,8 +584,50 @@ std::runtime_error SyntaxError(const SyntaxDiagnostic& diagnostic) {
 
 } // namespace
 
+SourceMap::SourceMap(std::span<const SourceFile> files) {
+    size_t base{};
+    for (const auto& file : files) {
+        File entry{file.name, base, file.text.size(), {base}};
+        for (size_t at{}; (at = file.text.find('\n', at)) != std::string_view::npos; ++at) entry.lineStarts.push_back(base + at + 1);
+        files_.push_back(std::move(entry));
+        base += file.text.size() + 1;
+    }
+}
+
+size_t SourceMap::FileOf(size_t offset) const {
+    assert(!files_.empty());
+    const auto next = std::upper_bound(files_.begin(), files_.end(), offset, [](size_t value, const File& file) { return value < file.base; });
+    return next == files_.begin() ? 0 : static_cast<size_t>(next - files_.begin()) - 1;
+}
+
+SourceLocation SourceMap::Locate(size_t offset) const {
+    if (files_.empty()) return {};
+    const auto index = FileOf(offset);
+    const auto& file = files_[index];
+    offset = (std::min)(offset, file.base + file.size);
+    const auto next = std::upper_bound(file.lineStarts.begin(), file.lineStarts.end(), offset);
+    assert(next != file.lineStarts.begin());
+    const auto line = static_cast<size_t>(next - file.lineStarts.begin()) - 1;
+    return {index, line, offset - file.lineStarts[line]};
+}
+
 SyntaxTree ParseTree(std::string_view source) {
     return Parser(Lexer(source).Run(), source.size()).Run();
+}
+
+SyntaxTree ParseTree(std::span<const SourceFile> files) {
+    if (files.empty()) return ParseTree(std::string_view{});
+    const SourceMap map(files);
+    SyntaxTree joined;
+    for (size_t i{}; i < files.size(); ++i) {
+        auto lexed = Lexer(files[i].text).Run();
+        const auto base = map.Base(i);
+        for (auto& token : lexed.tokens) token.span.offset += base;
+        for (auto& diagnostic : lexed.diagnostics) diagnostic.span.offset += base;
+        joined.tokens.insert(joined.tokens.end(), std::make_move_iterator(lexed.tokens.begin()), std::make_move_iterator(lexed.tokens.end()));
+        joined.diagnostics.insert(joined.diagnostics.end(), lexed.diagnostics.begin(), lexed.diagnostics.end());
+    }
+    return Parser(std::move(joined), map.End()).Run();
 }
 
 SyntaxTree ParseSyntax(std::string_view source) {

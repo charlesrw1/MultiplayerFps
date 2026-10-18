@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <mutex>
@@ -127,6 +128,7 @@ struct NativeModule::Impl {
     size_t rootRegistration{};
     const NativeDebugModule* debug{};
     bool initialized{};
+    NativeCompileTimes times;
 
     ~Impl() {
         if (runtime && rootRegistration) runtime->UnregisterRoots(rootRegistration);
@@ -152,10 +154,23 @@ NativeModule NativeModule::Compile(std::string_view source, std::string_view lib
 }
 
 NativeModule NativeModule::Compile(std::string_view source, const NativeCompileOptions& options) {
+    const SourceFile file{options.sourceName.empty() ? "module.ls" : options.sourceName, source};
+    return Compile(std::span(&file, 1), options);
+}
+
+NativeModule NativeModule::Compile(std::span<const SourceFile> files, const NativeCompileOptions& options) {
+    using Clock = std::chrono::steady_clock;
+    const auto milliseconds = [](Clock::time_point from, Clock::time_point to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
     const auto types = DeclarationTypes(options.declarations, options.externalTypes);
-    if (!options.emitDebugHooks) return Load(CompileToC(source, types), options);
-    CEmitOptions emit{true, source, options.sourceName.empty() ? "module.ls" : options.sourceName};
-    return Load(CompileToC(Analyze(source, types), types, emit), options);
+    const auto start = Clock::now();
+    const auto analysis = Analyze(files, types);
+    const auto analyzed = Clock::now();
+    auto generated = CompileToC(analysis, types, {options.emitDebugHooks});
+    const auto emitted = Clock::now();
+    auto module = Load(std::move(generated), options);
+    module.impl_->times.frontend = milliseconds(start, analyzed);
+    module.impl_->times.emitC = milliseconds(analyzed, emitted);
+    return module;
 }
 
 NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompileOptions& options) {
@@ -196,10 +211,12 @@ NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompil
         if (addSymbol(impl->state, symbol.name.c_str(), symbol.address) < 0)
             throw std::runtime_error("tcc_add_symbol(" + symbol.name + ") failed" + (errors.empty() ? std::string{} : ": " + errors));
     }
+    const auto tccStart = std::chrono::steady_clock::now();
     if (compile(impl->state, impl->generated.c.c_str()) < 0)
         throw std::runtime_error("TinyCC compilation failed" + (errors.empty() ? std::string{} : ":\n" + errors));
     if (relocate(impl->state, reinterpret_cast<void*>(1)) < 0)
         throw std::runtime_error("TinyCC relocation failed" + (errors.empty() ? std::string{} : ":\n" + errors));
+    impl->times.tcc = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tccStart).count();
 
     const auto abiVersion = reinterpret_cast<long long (*)()>(impl->getSymbol(impl->state, "ls_module_abi_version"));
     if (!abiVersion || abiVersion() != static_cast<long long>(NativeAbiVersion)) throw std::runtime_error("LuaSharp native module ABI version mismatch");
@@ -281,6 +298,7 @@ const CCompilationResult& NativeModule::Generated() const {
 }
 
 const NativeDebugModule* NativeModule::Debug() const { return impl_ ? impl_->debug : nullptr; }
+const NativeCompileTimes& NativeModule::Times() const { assert(impl_); return impl_->times; }
 
 struct NativeFunctionSlot::State {
     std::atomic<void*> address{};
