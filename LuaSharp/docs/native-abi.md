@@ -137,7 +137,7 @@ Rules:
 - A field has no initializer. An extern class has no static fields.
 - An extern class has one constructor or none. Methods are not overloaded. Without a constructor, `new T()` is an error.
 - An extern class can derive only from an extern class. A script class can derive from an extern class (see below).
-- Declarations can be in the module source or in `NativeCompileOptions::declarations`. A declaration source can contain only extern classes and enums. `DeclarationTypes()` converts declaration sources to `ExternalType` values.
+- Declarations can be in the module source or in `NativeCompileOptions::declarations`. A declaration source can contain only extern classes, enums and declared structs (see Declared structs). `DeclarationTypes()` converts declaration sources to `ExternalType` values.
 
 ### Proxies
 
@@ -217,6 +217,26 @@ Editable fields:
 - Other attributes, a duplicate attribute, a missing or extra argument, and attributes on methods are errors.
 - `NativeRuntime::EditableFields(type)` gives the name, offset, kind, type name (structs and extern classes), editor and former name of each editable field that the class declares. It does not give the fields of its base classes.
 
+### Declared structs
+
+A declared struct is a value type that the host and the script both use. The host passes it to thunks and gets it from thunks by value.
+
+```
+struct Hit { Entity what; Vec3 pos; bool hit; }
+extern class Physics { Hit last; static Hit cast(Vec3 from, float range); }
+```
+
+Rules:
+
+- A declared struct has only instance fields. A field has no initializer. A declared struct has no methods, constructors or static fields.
+- Script code makes a value with `T()`. All fields start at zero, false or null.
+- The struct has the C layout of a script struct (see Structs). Fields are in declaration order. `int` is `ls_int`, `float` is `double`, `bool` is `ls_bool`, `string` is `LS_String*`, an enum is `ls_int`, and Vec3 is three 32-bit floats.
+- A field of an extern class type holds the proxy, not the host pointer. A thunk parameter of an extern class type is the host pointer (see Host thunks). Do not mix the two.
+- A thunk takes and returns the struct as `LS_S` by value. On Win64, MSVC and TinyCC pass a C aggregate the same way: in a register for 1, 2, 4 or 8 bytes, else through a pointer.
+- Each module emits the layout, `ls_S_default`, `ls_S_eq` and the type info of each declared struct.
+- Each module exports `const LS_TypeInfo* ls_S__type(void)` for each declared struct. `CCompilationResult::externalStructs` lists them. `NativeModule::ExternalStructType(name)` calls the function, and `NativeRuntime::StructLayout(type)` gives the size and the offset of each field. The host uses these to check its own copy of the layout.
+- A native module can use an external struct only when it has only instance fields. `CompileToC` reports an error for other external structs.
+
 ### External enums
 
 - An enum in `NativeCompileOptions::declarations` or in other external types gets the C constant `LS_E_M`, the same as an enum in the module.
@@ -233,6 +253,12 @@ The engine binds its reflected classes with generated code (`Scripts/codegen_lua
 - `LuaSharpEngine::proxy_of` makes one proxy for each `ClassBase` and keeps it in `ClassBase::script_proxy`, which is a root slot. The type of the proxy is the nearest bound class of the object.
 - `~ClassBase` calls `DestroyNative` on the proxy and removes the root slot.
 - A `REFLECT(script_read)` field has a setter that reports a runtime error.
+- A `STRUCT_BODY()` struct is a declared struct with its bindable `REF` fields. The declaration lists each other field as a `// skipped` comment. The pass that owns the header declares the struct.
+- Each pass that uses a struct writes a C++ mirror with the C layout, and functions that convert each field: `ls_to_ls_S` (C++ to script), `ls_assign_S` and `ls_to_cpp_S` (script to C++). These are before the classes, because the `ScriptImpl_X` slot calls use them.
+- A method argument and a slot result start from `T{}`. Fields that script cannot see get their default values. A field setter of struct type assigns in place, so those fields keep their values.
+- `obj<T>` is the proxy of `T`, the same as `T*`.
+- The owning pass registers the layout of the mirror (`lsbind::StructLayout`). `LuaSharpEngine::compile` compares the layout of each declared struct in the module with it. A different size, field name or field offset is a compile error.
+- Struct methods and `std::vector<T>` fields do not cross.
 
 A script class can derive from a bound class `X`:
 
