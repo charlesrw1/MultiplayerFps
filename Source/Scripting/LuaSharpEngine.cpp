@@ -1,6 +1,7 @@
 #include "Scripting/LuaSharpEngine.h"
 #include "Scripting/LuaSharpBinding.h"
 #include "../../LuaSharp/src/CBackend.h"
+#include "../../LuaSharp/src/Builtins.h"
 #include "Framework/ClassBase.h"
 #include "Framework/ClassTypeInfo.h"
 #include "Framework/ReflectionProp.h"
@@ -240,6 +241,19 @@ int64_t enum_ordinal(const int64_t* values, size_t count, int64_t value) {
 	report_error("C++ enum value has no LuaSharp member");
 	return 0;
 }
+List* new_list(ElementKind kind, const char* type, size_t element_size, size_t count) {
+	ASSERT(LuaSharpEngine::inst);
+	auto& runtime = LuaSharpEngine::inst->runtime();
+	const void* element_type = nullptr;
+	if (kind == ElementKind::Object)
+		element_type = runtime.FindNativeClass(type);
+	else if (kind == ElementKind::Struct)
+		element_type = runtime.FindStructType(type);
+	ASSERT((kind != ElementKind::Object && kind != ElementKind::Struct) || element_type); // compile() adopts every struct type
+	auto* list = static_cast<List*>(runtime.NewList(static_cast<luasharp::NativeElementKind>(kind), element_size, element_type, count));
+	ASSERT(list);
+	return list;
+}
 void report_error(const char* message) {
 	ASSERT(LuaSharpEngine::inst);
 	LuaSharpEngine::inst->runtime().ReportError(message);
@@ -297,8 +311,11 @@ luasharp::NativeModule LuaSharpEngine::compile(std::string_view source) {
 	options.externalTypes = types_;
 	options.symbols = symbols_;
 	options.runtime = runtime_;
+	options.initialize = false; // top-level code can call thunks that need the adopted struct types
 	auto module = luasharp::NativeModule::Compile(source, options);
 	check_struct_layouts(module);
+	adopt_struct_types(module);
+	module.Initialize();
 	return module;
 }
 
@@ -317,6 +334,13 @@ void LuaSharpEngine::check_struct_layouts(const luasharp::NativeModule& module) 
 			if (script.fields[i].name != host.fields[i].name || script.fields[i].offset != host.fields[i].offset)
 				mismatch("field '" + std::string(host.fields[i].name) + "'");
 	}
+}
+
+void LuaSharpEngine::adopt_struct_types(const luasharp::NativeModule& module) {
+	for (const std::string& name : luasharp::NativeStructTypes())
+		runtime_->AdoptStructType(module.StructType(name));
+	for (const std::string& name : module.Generated().externalStructs)
+		runtime_->AdoptStructType(module.StructType(name));
 }
 
 void* LuaSharpEngine::proxy_of(const ClassBase* object) {

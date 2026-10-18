@@ -7,6 +7,8 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include "Framework/ClassBase.h"
@@ -57,6 +59,44 @@ int64_t enum_value(const int64_t* values, size_t count, int64_t ordinal);
 int64_t enum_ordinal(const int64_t* values, size_t count, int64_t value);
 
 void report_error(const char* message);
+
+// LS_List in runtime/luasharp/runtime.h. Lists cross by copy: to_list makes a new list, from_list a new vector.
+struct List
+{
+	int64_t count;
+	int64_t capacity;
+	uint64_t element_size;
+	uint64_t element_kind;
+	const void* element_type;
+	void* data;
+};
+// LS_KIND of the elements.
+enum class ElementKind : uint64_t { Int = 1, Float = 2, Bool = 3, String = 4, Object = 5, Struct = 9 };
+// A list of count zeroed elements. type names the extern class of Object elements and the struct of Struct elements.
+List* new_list(ElementKind kind, const char* type, size_t element_size, size_t count);
+
+// E is the element as the LuaSharp C layout stores it; convert makes one from an item.
+template <typename E, typename Items, typename Convert>
+void* to_list(const Items& items, ElementKind kind, const char* type, Convert convert) {
+	List* list = new_list(kind, type, sizeof(E), items.size());
+	E* data = static_cast<E*>(list->data);
+	for (const auto& item : items)
+		*data++ = convert(item);
+	return list;
+}
+// A null list is empty.
+template <typename E, typename Convert> auto from_list(const void* list, Convert convert) {
+	std::vector<decltype(convert(std::declval<const E&>()))> result;
+	if (!list)
+		return result;
+	const auto& header = *static_cast<const List*>(list);
+	ASSERT(header.element_size == sizeof(E));
+	const E* data = static_cast<const E*>(header.data);
+	result.reserve(static_cast<size_t>(header.count));
+	for (int64_t i = 0; i < header.count; i++)
+		result.push_back(convert(data[i]));
+	return result;
+}
 
 struct Symbol
 {

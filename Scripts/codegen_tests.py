@@ -603,6 +603,8 @@ public:
     REF static Dog* find(const std::string& name);
     REF glm::vec3 where(Mode m, Animal* other);
     REF std::vector<int> bones();
+    REF std::vector<Hit> hits(const std::vector<Animal*>& pack);
+    REF std::vector<std::vector<int>> grid();
     REF Hit probe(const Hit& h);
     REF obj<Animal> leader;
     REF Hit last;
@@ -637,9 +639,9 @@ public:
         declarations = self.generate().declarations
         self.assertIn("enum Mode { Off, On }", declarations)
         self.assertIn("extern class Animal : ClassBase {\n    virtual Wrap wrap(Wrap w);\n    virtual void speak(int times);\n    virtual Animal best(string tag);\n    int legs;\n", declarations)
-        self.assertIn("extern class Dog : Animal {\n    static Dog find(string name);\n    Vec3 where(Mode m, Animal other);\n    Hit probe(Hit h);\n    Animal leader;\n    Hit last;\n    void bark();\n    float speed;\n", declarations)
+        self.assertIn("extern class Dog : Animal {\n    static Dog find(string name);\n    Vec3 where(Mode m, Animal other);\n    int[] bones();\n    Hit[] hits(Animal[] pack);\n    Hit probe(Hit h);\n    Animal leader;\n    Hit last;\n    void bark();\n    float speed;\n", declarations)
         self.assertNotIn("void speak", declarations.split("extern class Dog")[1])  # the Animal thunk dispatches the override
-        self.assertIn("// skipped bones(): std::vector<int>", declarations)
+        self.assertIn("// skipped grid(): std::vector<std::vector<int>>", declarations)  # nested lists do not cross
         self.assertIn("// skipped bark(): overload", declarations)
         self.assertIn("// skipped in(): name is a LuaSharp keyword", declarations)
         self.assertNotIn("hidden", declarations)
@@ -678,7 +680,7 @@ public:
 
     def test_struct_declarations(self):
         declarations = self.generate().declarations
-        self.assertIn("extern struct Hit {\n    Animal who; // = nullptr\n    Animal owner;\n    Mode mode; // = Mode::Off\n    float dist; // = 0\n    // skipped tags: std::vector<int>\n}", declarations)
+        self.assertIn("extern struct Hit {\n    Animal who; // = nullptr\n    Animal owner;\n    Mode mode; // = Mode::Off\n    float dist; // = 0\n    int[] tags;\n}", declarations)
         self.assertIn("extern struct Wrap {\n    Hit inner;\n    int n; // = 3\n}", declarations)  # the C++ initializer as a comment
         self.assertIn("    Hit probe(Hit h);\n    Animal leader;\n    Hit last;\n", declarations)
         self.assertIn("    virtual Wrap wrap(Wrap w);\n", declarations)
@@ -686,7 +688,7 @@ public:
     def test_struct_marshaling(self):
         out = self.generate()
         cpp = out.prelude + out.cpp
-        self.assertIn("struct ls_S_Hit { void* who; void* owner; int64_t mode; double dist; };", cpp)
+        self.assertIn("struct ls_S_Hit { void* who; void* owner; int64_t mode; double dist; void* tags; };", cpp)
         self.assertIn("struct ls_S_Wrap { ls_S_Hit inner; int64_t n; };", cpp)
         self.assertLess(cpp.index("struct ls_S_Hit"), cpp.index("struct ls_S_Wrap"))  # contained structs first
         self.assertIn("r.who = lsbind::proxy_of(v.who); r.owner = lsbind::proxy_of(v.owner.get()); r.mode = lsbind::enum_ordinal(ls_enum_Mode, std::size(ls_enum_Mode), static_cast<int64_t>(v.mode));", cpp)
@@ -698,6 +700,16 @@ public:
         self.assertIn("= obj<Animal>(lsbind::object<Animal>(value)); }", cpp)
         self.assertIn("\t{\"Hit\", sizeof(ls_S_Hit), ls_layout_Hit},\n", cpp)
         self.assertIn("\t{\"dist\", offsetof(ls_S_Hit, dist)},\n", cpp)
+
+    def test_lists(self):
+        out = self.generate()
+        cpp = out.prelude + out.cpp
+        self.assertIn("return lsbind::to_list<int64_t>(lsbind::object<Dog>(self)->bones(), lsbind::ElementKind::Int, nullptr, [](const auto& item) { return static_cast<int64_t>(item); });", cpp)
+        self.assertIn("static void* ls_native_Dog_hits(void* self, void* pack) { return lsbind::to_list<ls_S_Hit>(lsbind::object<Dog>(self)->hits("
+                      "lsbind::from_list<void*>(pack, [](const auto& item) { return lsbind::object<Animal>(lsbind::native_of(item)); })), "
+                      "lsbind::ElementKind::Struct, \"Hit\", [](const auto& item) { return ls_to_ls_Hit(item); }); }", cpp)
+        self.assertIn("r.tags = lsbind::to_list<int64_t>(v.tags, lsbind::ElementKind::Int, nullptr,", cpp)  # a struct field
+        self.assertIn("out.tags = lsbind::from_list<int64_t>(v.tags, [](const auto& item) { return static_cast<int>(item); });", cpp)
         self.assertIn("static ls_S_Hit ls_native_Hit_new() { return ls_to_ls_Hit(Hit{}); }", cpp)  # T() is the C++ default
         self.assertIn("{\"ls_native_Hit_new\", reinterpret_cast<const void*>(&ls_native_Hit_new)}", cpp)
         self.assertIn("ls_classes, ls_scriptables, ls_structs};", cpp)

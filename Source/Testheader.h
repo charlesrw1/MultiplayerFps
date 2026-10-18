@@ -21,7 +21,7 @@ NEWENUM(LsTestMode, uint8_t){
 	Fast = 9,
 };
 
-// Crosses LuaSharp by value. Script cannot see `hidden`, and `tags` does not bind.
+// Crosses LuaSharp by value. Script cannot see `hidden`.
 struct LsTestPoint
 {
 	STRUCT_BODY();
@@ -72,7 +72,23 @@ public:
 	REF void set_partner(LsTestThing* p) { partner = p; }
 	REF bool is_partner(const LsTestThing* other) { return other == partner; }
 	REF int get_secret() { return secret; }
-	REF std::vector<int> numbers() { return {}; } // not bound in this milestone
+	REF std::vector<int> numbers() { return {1, 2, 3}; }
+	REF int sum(const std::vector<int>& values) {
+		int total = 0;
+		for (int v : values)
+			total += v;
+		return total;
+	}
+	REF std::vector<LsTestThing*> pair() { return {this, partner}; }
+	REF std::vector<LsTestPoint> shifted_points(const std::vector<LsTestPoint>& points) {
+		std::vector<LsTestPoint> result = points;
+		for (LsTestPoint& p : result)
+			p.pos.x += 1;
+		return result;
+	}
+	REF std::vector<std::string> words = {"a", "b"};
+	REF std::vector<glm::vec3> path;
+	REF std::vector<LsTestMode> modes = {LsTestMode::Off, LsTestMode::Fast};
 	REF LsTestPoint point;
 	REF LsTestPoint moved(const LsTestPoint& p, glm::vec3 by) {
 		LsTestPoint r = p;
@@ -104,6 +120,8 @@ public:
 	REF virtual void notify(LsTestThing* other) { last = other; }
 	REF virtual LsTestThing* pick() { return nullptr; }
 	REF virtual LsTestPoint adjust(LsTestPoint p) { return p; }
+	REF virtual int count_all(std::vector<int> values) { return -1; }
+	REF virtual std::vector<std::string> names() { return {}; }
 	REF int call_tick(int dt) { return tick(dt); } // a virtual call from C++
 	REF int hp = 100;
 	LsTestThing* last = nullptr;

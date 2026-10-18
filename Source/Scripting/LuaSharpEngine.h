@@ -80,6 +80,8 @@ private:
 	void* const* slots_of(const void* script_type, const lsbind::Scriptable& scriptable);
 	// Throws std::runtime_error when a declared struct in the module differs from its C++ mirror.
 	void check_struct_layouts(const luasharp::NativeModule& module) const;
+	// Copies the math and external struct types into the runtime, for the lists that thunks make (lsbind::new_list).
+	void adopt_struct_types(const luasharp::NativeModule& module);
 
 	std::shared_ptr<luasharp::NativeRuntime> runtime_;
 	std::unordered_map<std::string_view, const lsbind::Scriptable*> scriptables_;

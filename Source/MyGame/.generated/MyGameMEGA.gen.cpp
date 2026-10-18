@@ -604,6 +604,7 @@ static void ls_native_fpsFlickeringLightScript__set_offset(void* self, double va
 static uint16_t ls_offset_fpsFlickeringLightScript_octaves() { static const uint16_t offset = lsbind::field_offset(fpsFlickeringLightScript::get_props(), "octaves"); return offset; }
 static int64_t ls_native_fpsFlickeringLightScript__get_octaves(void* self) { return static_cast<int64_t>(lsbind::field<int>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_octaves())); }
 static void ls_native_fpsFlickeringLightScript__set_octaves(void* self, int64_t value) { lsbind::field<int>(lsbind::object<fpsFlickeringLightScript>(self), ls_offset_fpsFlickeringLightScript_octaves()) = static_cast<int>(value); }
+static void* ls_native_fpsPlayer_get_blah_components(void* self) { return lsbind::to_list<void*>(lsbind::object<fpsPlayer>(self)->get_blah_components(), lsbind::ElementKind::Object, "Component", [](const auto& item) { return lsbind::proxy_of(item); }); }
 static uint16_t ls_offset_PhysicsLayerTesterObject_collider_type() { static const uint16_t offset = lsbind::field_offset(PhysicsLayerTesterObject::get_props(), "collider_type"); return offset; }
 static int64_t ls_native_PhysicsLayerTesterObject__get_collider_type(void* self) { return static_cast<int64_t>(lsbind::field<int>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_collider_type())); }
 static void ls_native_PhysicsLayerTesterObject__set_collider_type(void* self, int64_t value) { lsbind::field<int>(lsbind::object<PhysicsLayerTesterObject>(self), ls_offset_PhysicsLayerTesterObject_collider_type()) = static_cast<int>(value); }
@@ -745,7 +746,7 @@ extern class fpsFlickeringLightScript : Component {
 )ls",
 	R"ls(// fpsPlayer (fpsObjects.h)
 extern class fpsPlayer : Component {
-    // skipped get_blah_components(): const std::vector<Component*>
+    Component[] get_blah_components();
 }
 )ls",
 	R"ls(// PhysicsLayerTesterTriggerScript (fpsTestObjects.h)
@@ -878,6 +879,7 @@ static lsbind::Symbol const ls_symbols[] = {
 	{"ls_native_fpsFlickeringLightScript__set_offset", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__set_offset)},
 	{"ls_native_fpsFlickeringLightScript__get_octaves", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__get_octaves)},
 	{"ls_native_fpsFlickeringLightScript__set_octaves", reinterpret_cast<const void*>(&ls_native_fpsFlickeringLightScript__set_octaves)},
+	{"ls_native_fpsPlayer_get_blah_components", reinterpret_cast<const void*>(&ls_native_fpsPlayer_get_blah_components)},
 	{"ls_native_PhysicsLayerTesterObject__get_collider_type", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__get_collider_type)},
 	{"ls_native_PhysicsLayerTesterObject__set_collider_type", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__set_collider_type)},
 	{"ls_native_PhysicsLayerTesterObject__get_bodytype", reinterpret_cast<const void*>(&ls_native_PhysicsLayerTesterObject__get_bodytype)},

@@ -77,7 +77,6 @@ protected:
 
 TEST_F(LuaSharpEngineTest, DeclarationsCompile) {
 	EXPECT_NE(engine->declarations().find("extern class Entity : BaseUpdater"), std::string::npos);
-	EXPECT_NE(engine->declarations().find("// skipped numbers(): std::vector<int>"), std::string::npos);
 	auto module = engine->compile("int x = 1;");
 	EXPECT_EQ(global<int64_t>(module, "x"), 1);
 }
@@ -504,7 +503,7 @@ TEST_F(LuaSharpEngineTest, LoadErrors) {
 
 // A STRUCT_BODY struct is a LuaSharp struct. Values copy through the thunks field by field.
 TEST_F(LuaSharpEngineTest, StructsCrossByValue) {
-	EXPECT_NE(engine->declarations().find("extern struct LsTestPoint {\n    Vec3 pos; // = glm::vec3(0, 1, 0)\n    LsTestMode mode; // = LsTestMode::Fast\n    string name; // = \"unnamed\"\n    // skipped tags: std::vector<int>\n}"), std::string::npos);
+	EXPECT_NE(engine->declarations().find("extern struct LsTestPoint {\n    Vec3 pos; // = glm::vec3(0, 1, 0)\n    LsTestMode mode; // = LsTestMode::Fast\n    string name; // = \"unnamed\"\n    int[] tags;\n}"), std::string::npos);
 	LsTestThing thing;
 	LsTestThing::first = &thing;
 	thing.point = {glm::vec3(1, 2, 3), LsTestMode::Fast, "start", {1, 2}, 9};
@@ -565,6 +564,97 @@ class Adjuster : LsTestScriptable {
 	EXPECT_EQ(result.name, "p!");
 	EXPECT_EQ(result.mode, LsTestMode::Fast);
 	EXPECT_EQ(result.hidden, 5); // a slot result starts from T{}
+	EXPECT_EQ(module.LastError(), "");
+}
+
+// std::vector<T> crosses as a copy in a T[] list.
+TEST_F(LuaSharpEngineTest, ListsCrossByCopy) {
+	EXPECT_NE(engine->declarations().find("    int[] numbers();\n"), std::string::npos);
+	EXPECT_NE(engine->declarations().find("    LsTestPoint[] shifted_points(LsTestPoint[] points);\n"), std::string::npos);
+	EXPECT_NE(engine->declarations().find("    int[] tags;\n"), std::string::npos);
+	LsTestThing thing, partner;
+	thing.partner = &partner;
+	LsTestThing::first = &thing;
+	thing.point.tags = {4, 5};
+	auto module = engine->compile(R"(
+LsTestThing t = LsTestThing.find_first();
+int[] numbers = t.numbers();
+int numberSum = numbers[0] + numbers[1] + numbers[2] + numbers.size();
+int sum = t.sum({1, 2, 3, 4});
+LsTestThing[] pair = t.pair();
+bool pairOk = pair[0] == t && pair[1] == t.get_partner();
+string[] words = t.words;
+string joined = words[0] + words[1];
+words.push_back("c");
+t.words = words;
+t.path = {Vec3.new(1, 2, 3)};
+Vec3[] path = t.path;
+float pathZ = path[0].z;
+LsTestMode[] modes = t.modes;
+bool modesOk = modes[0] == LsTestMode.Off && modes[1] == LsTestMode.Fast;
+t.modes = {LsTestMode.Slow};
+LsTestPoint p = LsTestPoint();
+p.name = "in";
+LsTestPoint[] shifted = t.shifted_points({p, p});
+float shiftedX = shifted[1].pos.x;
+string shiftedName = shifted[0].name;
+int tag = t.point.tags[1];
+LsTestPoint q = t.point;
+q.tags.push_back(6);
+t.point = q;
+)");
+	EXPECT_EQ(module.LastError(), "");
+	EXPECT_EQ(global<int64_t>(module, "numberSum"), 9);
+	EXPECT_EQ(global<int64_t>(module, "sum"), 10);
+	EXPECT_EQ(global<uint8_t>(module, "pairOk"), 1u);
+	EXPECT_EQ(text(module, "joined"), "ab");
+	EXPECT_EQ(thing.words, (std::vector<std::string>{"a", "b", "c"}));
+	EXPECT_EQ(thing.path, (std::vector<glm::vec3>{glm::vec3(1, 2, 3)}));
+	EXPECT_DOUBLE_EQ(global<double>(module, "pathZ"), 3.0);
+	EXPECT_EQ(global<uint8_t>(module, "modesOk"), 1u);
+	EXPECT_EQ(thing.modes, (std::vector<LsTestMode>{LsTestMode::Slow}));
+	EXPECT_DOUBLE_EQ(global<double>(module, "shiftedX"), 1.0);
+	EXPECT_EQ(text(module, "shiftedName"), "in");
+	EXPECT_EQ(global<int64_t>(module, "tag"), 5);
+	EXPECT_EQ(thing.point.tags, (std::vector<int>{4, 5, 6}));
+	engine->collect();
+	EXPECT_EQ(text(module, "joined"), "ab");
+	const auto* shifted = static_cast<const lsbind::List*>(global<void*>(module, "shifted"));
+	ASSERT_NE(shifted, nullptr);
+	EXPECT_EQ(shifted->count, 2);
+	EXPECT_EQ(lsbind::view(global<void*>(module, "shiftedName")), "in"); // the GC traced the struct elements
+}
+
+// A list is a copy: changing it in script does not change the C++ vector until script assigns it back.
+TEST_F(LuaSharpEngineTest, ListFieldIsACopy) {
+	LsTestThing thing;
+	LsTestThing::first = &thing;
+	auto module = engine->compile(R"(
+LsTestThing t = LsTestThing.find_first();
+t.words.push_back("c");
+int count = t.words.size();
+)");
+	EXPECT_EQ(module.LastError(), "");
+	EXPECT_EQ(global<int64_t>(module, "count"), 2);
+	EXPECT_EQ(thing.words.size(), 2u);
+}
+
+TEST_F(LuaSharpEngineTest, ScriptOverrideTakesAndReturnsList) {
+	auto module = engine->compile(R"(
+class Lister : LsTestScriptable {
+    override int count_all(int[] values) {
+        int total = 0;
+        for (v in values) { total += v; }
+        return total;
+    }
+    override string[] names() { return {"x", "y"}; }
+}
+)");
+	std::unique_ptr<ClassBase> object = engine->create(module, "Lister");
+	auto* lister = dynamic_cast<LsTestScriptable*>(object.get());
+	ASSERT_NE(lister, nullptr);
+	EXPECT_EQ(lister->count_all({2, 3}), 5);
+	EXPECT_EQ(lister->names(), (std::vector<std::string>{"x", "y"}));
 	EXPECT_EQ(module.LastError(), "");
 }
 

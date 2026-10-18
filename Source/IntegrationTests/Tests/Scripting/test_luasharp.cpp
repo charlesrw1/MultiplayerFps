@@ -314,3 +314,32 @@ GameplayStatic.debug_sphere(hit.pos, 0.5, 0.1, color);
 	co_return;
 }
 GAME_TEST("luasharp/struct_hit_result", 10.f, test_luasharp_struct_hit_result);
+
+// A std::vector<obj<Entity>> result crosses as a copy in an Entity[] list.
+static TestTask test_luasharp_list_overlap(TestContext& t) {
+	eng->load_level("");
+	Entity* box = eng->get_level()->spawn_entity();
+	box->set_ws_position(glm::vec3(0.f));
+	box->create_component<BoxComponent>();
+	co_await t.wait_ticks(1);
+
+	const luasharp::NativeModule module = LuaSharpEngine::inst->compile(R"(
+Entity[] near = GameplayStatic.sphere_overlap(Vec3.new(0, 0, 0), 2.0, -1);
+int nearCount = near.size();
+Entity first = null;
+if (nearCount > 0) { first = near[0]; }
+int farCount = GameplayStatic.sphere_overlap(Vec3.new(100, 0, 0), 1.0, -1).size();
+)");
+	const auto global = [&]<typename T>(const char* name, T) {
+		const auto* value = static_cast<const T*>(module.FindGlobal(name));
+		ASSERT(value);
+		return *value;
+	};
+	t.check(module.LastError().empty(), "the script ran without a runtime error");
+	t.check(global("nearCount", int64_t{}) == 1, "the sphere overlaps the box");
+	t.check(luasharp::NativeRuntime::NativeOf(global("first", static_cast<void*>(nullptr))) == static_cast<ClassBase*>(box),
+			"the list element is the proxy of the box entity");
+	t.check(global("farCount", int64_t{}) == 0, "a sphere away from the box overlaps nothing");
+	co_return;
+}
+GAME_TEST("luasharp/list_overlap", 10.f, test_luasharp_list_overlap);

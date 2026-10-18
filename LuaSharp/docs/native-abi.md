@@ -260,7 +260,12 @@ The engine binds its reflected classes with generated code (`Scripts/codegen_lua
 - A method argument and a slot result start from `T{}`. Fields that script cannot see get their default values. A field setter of struct type assigns in place, so those fields keep their values.
 - `obj<T>` is the proxy of `T`, the same as `T*`.
 - The owning pass registers the layout of the mirror (`lsbind::StructLayout`). `LuaSharpEngine::compile` compares the layout of each declared struct in the module with it. A different size, field name or field offset is a compile error.
-- Struct methods and `std::vector<T>` fields do not cross.
+- Struct methods do not cross.
+- `std::vector<T>` is `T[]` when `T` binds: a scalar, a string, an enum, a class pointer, `obj<T>`, a math type or an engine struct. A nested list and a list of a type that does not bind are skipped.
+- A list crosses as a copy. C++ to script makes a new list (`lsbind::to_list`), and script to C++ makes a new vector (`lsbind::from_list`). A null list is an empty vector. A change to the list in script does not change the C++ vector. To change a list field, assign the list back to the field.
+- A list element has the C layout of a struct field, so an object element is the proxy.
+- A list of objects or structs needs an element type that stays valid after its module unloads. `NativeRuntime::AdoptStructType` keeps a runtime copy of a struct type, and `FindStructType` finds it by name. `LuaSharpEngine::compile` adopts the math types and the external structs of each module before it runs the module initializer. Each module exports `ls_<Math>__type` for the math types, and `NativeModule::StructType(name)` returns a math or external struct type. Object elements use `FindNativeClass`.
+- `NativeRuntime::NewList` makes a list of zeroed elements for host code.
 
 A script class can derive from a bound class `X`:
 
