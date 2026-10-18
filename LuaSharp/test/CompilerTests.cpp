@@ -2349,7 +2349,7 @@ void TestGenericMethodSemantics() {
     const auto analysis = luasharp::Analyze("Body b = Body.make(); Mesh m = b.get<Mesh>(); ClassInfo t = typeof(Light);", declared);
     Require(analysis.diagnostics.empty(), "declared generic methods did not resolve: " + (analysis.diagnostics.empty() ? std::string() : analysis.diagnostics.front().message));
     const auto generated = luasharp::CompileToC("Body b = Body.make(); Mesh m = b.get<Mesh>();", declared);
-    for (const auto expected : {"ls_ClassInfo_find(ls_intern(\"Mesh\"))", "ls_object_as(", "&ls_type_Mesh"})
+    for (const auto expected : {"ls_ClassInfo_find(ls_intern(\"Mesh\"))", "ls_object_as(", "&ls_type_Mesh", "static LS_ClassInfo* ls_typeof_Mesh;", "ls_runtime->mark(runtime_context, (void**)&ls_typeof_Mesh);"})
         Require(generated.c.find(expected) != std::string::npos, std::string("missing generic call lowering: ") + expected);
 }
 
@@ -2361,6 +2361,7 @@ struct HostGenerics {
     std::vector<void*> typeProxies;
     int body{}, mesh{}, light{};
     void* bodyProxy{}; void* meshProxy{}; void* lightProxy{};
+    long long finds{}; // calls of the [TypeOf] method
 };
 HostGenerics g_generics;
 void* HostProxy(void*& proxy, std::string_view type, void* native) {
@@ -2369,6 +2370,7 @@ void* HostProxy(void*& proxy, std::string_view type, void* native) {
 }
 void* TypeInfoFind(void* name) {
     const auto* text = static_cast<const NativeString*>(name);
+    ++g_generics.finds;
     const std::string_view wanted(text->data, static_cast<size_t>(text->length));
     for (size_t i{}; i < g_generics.types.size(); ++i) if (g_generics.types[i]->name == wanted) return g_generics.typeProxies[i];
     auto& info = g_generics.types.emplace_back(std::make_unique<HostTypeInfo>(HostTypeInfo{std::string(wanted)}));
@@ -2410,12 +2412,16 @@ bool wrongNull = wrong == null;
 bool firstMesh = Body.first<Mesh>() != null;
 string meshName = typeof(Mesh).name();
 bool sameInfo = typeof(Light) == typeof(Light);
+auto meshAgain = () => typeof(Mesh) == typeof(Mesh);
 )", options);
         Require(module.LastError().empty(), "generic calls reported a runtime error: " + module.LastError());
         Require(NativeGlobal<long long>(module, "verts") == 12 && NativeGlobal<unsigned char>(module, "lightOk") == 1, "a generic call did not pass typeof of its type argument");
         Require(NativeGlobal<unsigned char>(module, "partIsMesh") == 1, "a generic method without a type argument was wrong");
         Require(NativeGlobal<unsigned char>(module, "wrongNull") == 1 && NativeGlobal<unsigned char>(module, "firstMesh") == 1, "a generic result of the wrong type was not null");
         Require(NativeText(module, "meshName") == "Mesh" && NativeGlobal<unsigned char>(module, "sameInfo") == 1, "typeof gave the wrong type info");
+        Require(g_generics.finds == 2, "typeof did not keep the type info of each type: " + std::to_string(g_generics.finds) + " lookups");
+        g_generics.runtime->Collect();
+        Require(CallGlobalClosure(module, "meshAgain").as.boolean == 1 && g_generics.finds == 2, "a collection lost the type info that typeof keeps");
     }
     g_generics = {};
 }

@@ -198,7 +198,7 @@ MeshComponent mesh = e.get_component<MeshComponent>();
 Component any = e.get_component(typeof(MeshComponent)); // without a type argument, the result is the constraint
 ```
 
-- `[TypeOf]` marks one static method of an extern class. It takes a `string` and returns an extern class. `typeof(T)` calls it with the name of `T`.
+- `[TypeOf]` marks one static method of an extern class. It takes a `string` and returns an extern class. The first `typeof(T)` in a module calls it with the name of `T`. The module keeps the result in a slot that the collector traces, so later `typeof(T)` reads the slot. When the host destroys that type info, the next `typeof(T)` calls the method again.
 - `typeof(T)` needs an extern class, or a script class that derives from one. The host has no type info for other types.
 - The first parameter of a generic method has the result type of the `[TypeOf]` method. The call `x.f<A>(args)` passes `typeof(A)` for it, then `args`.
 - The type argument must derive from the constraint. The call has the type of the type argument.

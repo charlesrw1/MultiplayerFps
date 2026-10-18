@@ -109,6 +109,8 @@ struct CEmitter {
     StringMap<bool> structReferences;            // memo for HasReferences
     std::vector<std::pair<const BoundClass*, const BoundField*>> staticFields; // declaration order
     std::vector<std::string_view> dynamicNames;  // member names used on table/any values
+    std::vector<std::string_view> typeOfTargets; // types named by typeof: each has a slot "ls_typeof_<T>" that the module traces
+    const Symbol* typeOfProvider{};              // the [TypeOf] method that fills those slots
     std::vector<std::pair<const ExternalType*, const Symbol*>> baseThunks; // `base.m()` of extern virtual methods: (nearest extern class, m)
     std::optional<size_t> activeLambda;
     // Arguments of the inout call being emitted, already in ls_argument_<label>_<i>.
@@ -164,6 +166,11 @@ struct CEmitter {
             const bool keyedEntry = item.kind == SyntaxExpression::Kind::TableEntry && !item.Text().empty();
             if ((dynamicMember || keyedEntry) && std::find(dynamicNames.begin(), dynamicNames.end(), item.Text()) == dynamicNames.end()) dynamicNames.push_back(item.Text());
             if (const auto thunk = NativeBaseCall(item); thunk.first && std::find(baseThunks.begin(), baseThunks.end(), thunk) == baseThunks.end()) baseThunks.push_back(thunk);
+            if (item.kind == SyntaxExpression::Kind::TypeOf && std::find(typeOfTargets.begin(), typeOfTargets.end(), item.Text()) == typeOfTargets.end()) {
+                assert(item.symbolIndex && analysis.symbols[*item.symbolIndex].isTypeOf);
+                typeOfProvider = &analysis.symbols[*item.symbolIndex];
+                typeOfTargets.push_back(item.Text());
+            }
         }
     }
     // `base.m()` where m is an extern virtual method: the host calls the extern implementation without virtual dispatch.
@@ -743,9 +750,10 @@ struct CEmitter {
         case SyntaxExpression::Kind::Slice: return Put("ls_list_slice(", child(0), ", ", child(1), ", ", child(2), ')');
         case SyntaxExpression::Kind::Is: case SyntaxExpression::Kind::As: return TypeTest(value, owner);
         case SyntaxExpression::Kind::TypeOf: {
-            assert(value.symbolIndex && analysis.symbols[*value.symbolIndex].isTypeOf);
-            const auto& provider = analysis.symbols[*value.symbolIndex];
-            return Put(Fn{provider.owner, provider.name}, "(ls_intern(\"", text, "\"))");
+            // The host finds the type info the first time; later reads use the slot. A destroyed type info is found again.
+            assert(typeOfProvider);
+            const auto slot = [&] { Put("ls_typeof_", Id{text}); };
+            return Put("(ls_object_alive(", slot, ") ? ", slot, " : (", slot, " = ", Fn{typeOfProvider->owner, typeOfProvider->name}, "(ls_intern(\"", text, "\"))))");
         }
         case SyntaxExpression::Kind::TableEntry: case SyntaxExpression::Kind::Range:
             throw std::runtime_error("Native C backend does not support this expression kind yet (type '" + Name(value.type) + "')");
@@ -1627,6 +1635,7 @@ struct CEmitter {
             Line(0, '}');
         }
         for (const auto name : dynamicNames) Line(0, "static ls_string ls_name_", Id{name}, ';');
+        for (const auto name : typeOfTargets) Line(0, "static ", CTypeName{typeOfProvider->type}, " ls_typeof_", Id{name}, ';');
         const auto globals = [&] {
             std::vector<const BoundStatement*> result;
             for (const auto& statement : program.Statements(program.topLevel)) if (statement.kind == SyntaxStatement::Kind::Local) result.push_back(&statement);
@@ -1639,8 +1648,9 @@ struct CEmitter {
         Line(0, "} LS_ModuleState;");
         Line(0, "static LS_ModuleState ls_state;");
         Line(0, "void ls_module_trace_roots(void* runtime_context) {");
-        bool tracesGlobal = !dynamicNames.empty();
+        bool tracesGlobal = !dynamicNames.empty() || !typeOfTargets.empty();
         for (const auto name : dynamicNames) Line(1, "ls_runtime->mark(runtime_context, (void**)&ls_name_", Id{name}, ");");
+        for (const auto name : typeOfTargets) Line(1, "ls_runtime->mark(runtime_context, (void**)&ls_typeof_", Id{name}, ");");
         for (const auto* statement : globals) tracesGlobal = MarkSlot(1, Name(statement->type), [&] { Put("ls_state.", Id{statement->Name()}); }) || tracesGlobal;
         for (const auto& [owner, field] : staticFields) tracesGlobal = MarkSlot(1, field->type, StaticSlot(owner->name, field->name)) || tracesGlobal;
         if (!tracesGlobal) Line(1, "(void)runtime_context;");
