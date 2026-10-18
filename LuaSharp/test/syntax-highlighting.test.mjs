@@ -29,7 +29,7 @@ for (const keyword of ["for", "in", "break", "continue"]) {
 for (const keyword of ["virtual", "override", "abstract", "sealed", "extern", "inout"]) {
     assert.ok(grammar.repository.keywords.patterns.some(pattern => pattern.name === "storage.modifier.luasharp" && pattern.match.includes(keyword)), `${keyword} must be highlighted as a modifier`);
 }
-assert.ok(grammar.repository.keywords.patterns.some(pattern => pattern.match.includes("is|as|typeof")), "is, as and typeof must be highlighted");
+assert.ok(grammar.repository.keywords.patterns.some(pattern => pattern.match.includes("is|as|typeof") && pattern.name.startsWith("keyword.operator.expression.")), "is, as and typeof must use the scope themes color as keywords");
 assert.ok(grammar.repository.operators.patterns.some(pattern => pattern.match.includes("\\.\\.")), "integer range operator must be highlighted");
 assert.ok(grammar.repository.operators.patterns.some(pattern => pattern.match.includes("=>")), "lambda arrow must be highlighted");
 
