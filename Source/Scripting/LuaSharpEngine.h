@@ -65,6 +65,8 @@ public:
 	// Serves the script debugger (DAP) on 127.0.0.1:port; 0 selects a free port. Modules that load() after it are
 	// instrumented. Throws std::runtime_error when it cannot listen.
 	void start_debugger(uint16_t port);
+	// Blocks until a client has set its breakpoints (DAP configurationDone). Needs start_debugger.
+	void wait_for_debugger();
 	// 0 when the debugger is off.
 	uint16_t debugger_port() const;
 

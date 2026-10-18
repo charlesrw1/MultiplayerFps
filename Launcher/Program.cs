@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace CsRemakeLauncher;
@@ -28,8 +29,7 @@ internal sealed class LauncherForm : Form
     private readonly string _repoRoot;
     private readonly ComboBox _configuration = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 82 };
     private readonly CheckBox _launchWithDebugger = new() { Text = "Launch with debugger", AutoSize = true };
-    private readonly CheckBox _luaDebugger = new() { Text = "Enable Lua debugger", AutoSize = true };
-    private readonly CheckBox _waitForLuaDebugger = new() { Text = "Wait for Lua attach", AutoSize = true };
+    private readonly ComboBox _lsDebug = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110 };
     private readonly ComboBox _integrationMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 82 };
     private readonly TextBox _integrationPattern = new() { PlaceholderText = "Test pattern (optional)", Width = 160 };
     private readonly ListView _instances = new() { Dock = DockStyle.Fill, FullRowSelect = true, GridLines = true, MultiSelect = false, View = View.Details };
@@ -39,7 +39,7 @@ internal sealed class LauncherForm : Form
     private readonly Button _cancelBuild = new() { Text = "Cancel build", AutoSize = true, Enabled = false };
     private readonly Button _viewTestResults = new() { Text = "View failures", AutoSize = true, Enabled = false };
     private Button? _attachVisualStudio;
-    private Button? _attachLuaDebugger;
+    private Button? _attachLsDebugger;
     private Button? _restartSelected;
     private Button? _stopSelected;
     private readonly Dictionary<int, LaunchSettings> _knownInstances = [];
@@ -63,7 +63,8 @@ internal sealed class LauncherForm : Form
         _integrationMode.Items.AddRange(["All", "Game", "Editor"]);
         _integrationMode.SelectedIndex = 0;
         _integrationMode.SelectedIndexChanged += (_, _) => UpdateIntegrationModeColor();
-        _waitForLuaDebugger.CheckedChanged += (_, _) => { if (_waitForLuaDebugger.Checked) _luaDebugger.Checked = true; };
+        _lsDebug.Items.AddRange(["None", "Debug", "Wait For Debug"]);
+        _lsDebug.SelectedIndex = 0;
 
         _instances.Columns.Add("Instance", 780);
         _instances.DoubleClick += async (_, _) => await AttachDebuggerAsync();
@@ -83,8 +84,8 @@ internal sealed class LauncherForm : Form
         buildControls.Controls.Add(runGame);
         buildControls.Controls.Add(runEditor);
         buildControls.Controls.Add(_launchWithDebugger);
-        buildControls.Controls.Add(_luaDebugger);
-        buildControls.Controls.Add(_waitForLuaDebugger);
+        buildControls.Controls.Add(new Label { Text = "L# debug", AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
+        buildControls.Controls.Add(_lsDebug);
 
         var testControls = new WrappingFlowPanel();
         testControls.Controls.Add(AddOperationButton("Unit tests", RunUnitTestsAsync));
@@ -99,11 +100,11 @@ internal sealed class LauncherForm : Form
 
         var instanceControls = new WrappingFlowPanel();
         _attachVisualStudio = AddOperationButton("Attach Visual Studio", AttachDebuggerAsync);
-        _attachLuaDebugger = AddOperationButton("Attach Lua debugger", AttachLuaDebuggerAsync);
+        _attachLsDebugger = AddOperationButton("Attach L# debugger", AttachLsDebuggerAsync);
         _restartSelected = AddOperationButton("Restart selected", RestartSelectedAsync);
         _stopSelected = AddOperationButton("Stop selected", StopSelectedAsync);
         instanceControls.Controls.Add(_attachVisualStudio);
-        instanceControls.Controls.Add(_attachLuaDebugger);
+        instanceControls.Controls.Add(_attachLsDebugger);
         instanceControls.Controls.Add(_restartSelected);
         instanceControls.Controls.Add(_stopSelected);
         var refresh = new Button { Text = "Refresh", AutoSize = true };
@@ -222,7 +223,7 @@ internal sealed class LauncherForm : Form
     private Task RunAppAsync(bool editor)
     {
         if (!File.Exists(AppPath)) throw new FileNotFoundException("App.exe was not found. Build App first.", AppPath);
-        var settings = new LaunchSettings(AppPath, Config, editor, _launchWithDebugger.Checked, _luaDebugger.Checked || _waitForLuaDebugger.Checked, _waitForLuaDebugger.Checked);
+        var settings = new LaunchSettings(AppPath, Config, editor, _launchWithDebugger.Checked, (LsDebugMode)_lsDebug.SelectedIndex);
         var process = StartEngineProcess(settings.Executable, settings.Arguments());
         _knownInstances[process.Id] = settings;
         Log($"Started App.exe in {settings.Mode} mode (PID {process.Id}).");
@@ -316,18 +317,19 @@ internal sealed class LauncherForm : Form
         if (_knownInstances.TryGetValue(process.Id, out var settings)) _knownInstances[process.Id] = settings with { LaunchWithDebugger = true };
     }
 
-    private async Task AttachLuaDebuggerAsync()
+    private Task AttachLsDebuggerAsync()
     {
         var process = SelectedProcess();
-        if (process is null) return;
-        var settings = CaptureSettings(process);
-        if (!settings.LuaDebugger)
+        if (process is null) return Task.CompletedTask;
+        if (CaptureSettings(process).LsDebug == LsDebugMode.None)
         {
-            Log("Lua debugging was not enabled for this instance. Relaunch it with 'Enable Lua debugger' selected.");
-            return;
+            Log("L# debugging was not enabled for this instance. Relaunch it with 'L# debug' set to Debug or Wait For Debug.");
+            return Task.CompletedTask;
         }
-        Log("Opening VS Code's lua-debug attach configuration (127.0.0.1:9966)...");
-        await RunConsoleProcessAsync("code", $"--reuse-window \"{_repoRoot}\" --command workbench.action.debug.start");
+        // The LuaSharp extension handles this URI: it starts a luasharp attach session.
+        Log($"Attaching VS Code's LuaSharp debugger (127.0.0.1:{LsDebugPort})...");
+        Process.Start(new ProcessStartInfo($"vscode://charl.luasharp/attach?port={LsDebugPort}") { UseShellExecute = true })?.Dispose();
+        return Task.CompletedTask;
     }
 
     private async Task StopSelectedAsync()
@@ -429,9 +431,15 @@ internal sealed class LauncherForm : Form
         var commandLine = GetCommandLine(process.Id);
         var executable = GetProcessPath(process) ?? throw new InvalidOperationException("Could not resolve process executable.");
         var config = executable.Contains("\\Release\\", StringComparison.OrdinalIgnoreCase) ? "Release" : "Debug";
-        var settings = new LaunchSettings(executable, config, HasArgument(commandLine, "--editor"), HasArgument(commandLine, "--wait-for-debugger") || IsDebuggerAttached(process), HasArgument(commandLine, "--lua_debug"), HasArgument(commandLine, "--lua_debug_wait"));
+        var settings = new LaunchSettings(executable, config, HasArgument(commandLine, "--editor"), HasArgument(commandLine, "--wait-for-debugger") || IsDebuggerAttached(process), ParseLsDebug(commandLine));
         _knownInstances[process.Id] = settings;
         return settings;
+    }
+
+    private static LsDebugMode ParseLsDebug(string commandLine)
+    {
+        var match = Regex.Match(commandLine, @"-ls_debug\s+(\d)");
+        return match.Success ? (LsDebugMode)Math.Clamp(int.Parse(match.Groups[1].Value), 0, 2) : LsDebugMode.None;
     }
 
     private static bool HasArgument(string commandLine, string argument) => commandLine.Contains(argument, StringComparison.OrdinalIgnoreCase);
@@ -466,7 +474,7 @@ internal sealed class LauncherForm : Form
             var settings = CaptureSettings(process);
             var details = new List<string> { settings.Mode, settings.Configuration };
             if (IsDebuggerAttached(process)) details.Add("Debugger");
-            if (settings.LuaDebugger) details.Add(settings.WaitForLuaDebugger ? "Lua debugger (waiting)" : "Lua debugger");
+            if (settings.LsDebug != LsDebugMode.None) details.Add(settings.LsDebug == LsDebugMode.WaitForDebug ? "L# debugger (wait)" : "L# debugger");
             var item = new ListViewItem($"{process.ProcessName}.exe (PID {process.Id}) — {string.Join(", ", details)}")
             { Tag = process.Id, Selected = selectedPid == process.Id };
             _instances.Items.Add(item); process.Dispose();
@@ -478,20 +486,20 @@ internal sealed class LauncherForm : Form
     private void UpdateInstanceButtons()
     {
         var selected = _instances.SelectedItems.Count == 1;
-        var luaAvailable = false;
+        var lsDebugAvailable = false;
         if (selected)
         {
             try
             {
                 using var process = Process.GetProcessById((int)_instances.SelectedItems[0].Tag!);
-                luaAvailable = CaptureSettings(process).LuaDebugger;
+                lsDebugAvailable = CaptureSettings(process).LsDebug != LsDebugMode.None;
             }
             catch { selected = false; }
         }
         if (_attachVisualStudio is not null) _attachVisualStudio.Enabled = !_operationRunning && selected;
         if (_restartSelected is not null) _restartSelected.Enabled = !_operationRunning && selected;
         if (_stopSelected is not null) _stopSelected.Enabled = !_operationRunning && selected;
-        if (_attachLuaDebugger is not null) _attachLuaDebugger.Enabled = !_operationRunning && selected && luaAvailable;
+        if (_attachLsDebugger is not null) _attachLsDebugger.Enabled = !_operationRunning && selected && lsDebugAvailable;
     }
 
     private void Log(string message)
@@ -512,7 +520,11 @@ internal sealed class LauncherForm : Form
         process.Kill(entireProcessTree: true);
     }
 
-    private sealed record LaunchSettings(string Executable, string Configuration, bool Editor, bool LaunchWithDebugger, bool LuaDebugger, bool WaitForLuaDebugger)
+    // The engine's ls_debug values: Debug serves the LuaSharp debugger; WaitForDebug also waits for VS Code before scripts load.
+    private enum LsDebugMode { None = 0, Debug = 1, WaitForDebug = 2 }
+    private const int LsDebugPort = 4711; // ls_debug_port default
+
+    private sealed record LaunchSettings(string Executable, string Configuration, bool Editor, bool LaunchWithDebugger, LsDebugMode LsDebug)
     {
         public string Mode => Editor ? "Editor" : "Game";
         public string Arguments()
@@ -520,8 +532,7 @@ internal sealed class LauncherForm : Form
             var arguments = new List<string>();
             if (Editor) arguments.Add("--editor");
             if (LaunchWithDebugger) arguments.Add("--wait-for-debugger");
-            if (LuaDebugger) arguments.Add("--lua_debug");
-            if (WaitForLuaDebugger) arguments.Add("--lua_debug_wait");
+            if (LsDebug != LsDebugMode.None) arguments.Add($"-ls_debug {(int)LsDebug}");
             return string.Join(' ', arguments);
         }
     }

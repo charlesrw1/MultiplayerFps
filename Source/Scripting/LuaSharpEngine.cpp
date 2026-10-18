@@ -381,6 +381,14 @@ void LuaSharpEngine::start_debugger(uint16_t port) {
 	sys_print(Info, "LuaSharp: debugger listens on port %d\n", int(dap_server_->Port()));
 }
 
+void LuaSharpEngine::wait_for_debugger() {
+	ASSERT(dap_server_);
+	sys_print(Info, "LuaSharp: waiting for a debugger on port %d\n", int(dap_server_->Port()));
+	while (!dap_server_->WaitUntilConfigured(std::chrono::hours(1))) {
+	}
+	sys_print(Info, "LuaSharp: debugger attached\n");
+}
+
 uint16_t LuaSharpEngine::debugger_port() const { return dap_server_ ? dap_server_->Port() : 0; }
 
 void LuaSharpEngine::check_struct_layouts(const luasharp::NativeModule& module) const {

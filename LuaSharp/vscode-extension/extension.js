@@ -18,6 +18,14 @@ function registerDebugger(context) {
         vscode.debug.registerDebugConfigurationProvider("luasharp", {
             resolveDebugConfiguration: (folder, config) =>
                 config.type ? config : { type: "luasharp", request: "attach", name: "Attach to LuaSharp", port: DefaultDebugPort },
+        }),
+        // vscode://charl.luasharp/attach?port=N starts an attach session (the engine launcher opens it).
+        vscode.window.registerUriHandler({
+            handleUri: uri => {
+                if (uri.path !== "/attach") return;
+                const port = Number(new URLSearchParams(uri.query).get("port")) || DefaultDebugPort;
+                vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], { type: "luasharp", request: "attach", name: "Attach to LuaSharp", port });
+            },
         }));
 }
 

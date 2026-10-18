@@ -84,8 +84,9 @@ extern ConfigVar developer_mode;
 extern ConfigVar g_startup_project;
 extern ConfigVar g_editor_cfg_folder;
 extern ConfigVar g_project_base;
-static ConfigVar ls_debug("ls_debug", "0", CVAR_BOOL,
-						  "compile LuaSharp scripts instrumented and serve the script debugger (DAP, VS Code attach)");
+static ConfigVar ls_debug("ls_debug", "0", CVAR_INTEGER,
+						  "LuaSharp script debugger (DAP, VS Code attach): 0 off, 1 on, 2 on and wait for a client before scripts load",
+						  0, 2);
 static ConfigVar ls_debug_port("ls_debug_port", "4711", CVAR_INTEGER | CVAR_UNBOUNDED, "the LuaSharp debugger port");
 double GetTime();
 double TimeSinceStart();
@@ -506,9 +507,11 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	if (luasharp::NativeModule::IsLibTccAvailable()) {
 		printf("..................................\n\n");
 		luasharp = std::make_unique<LuaSharpEngine>();
-		if (ls_debug.get_bool()) {
+		if (ls_debug.get_integer() != 0) {
 			try {
 				luasharp->start_debugger(static_cast<uint16_t>(ls_debug_port.get_integer()));
+				if (ls_debug.get_integer() == 2)
+					luasharp->wait_for_debugger();
 			} catch (const std::exception& error) {
 				sys_print(Error, "LuaSharp: %s\n", error.what());
 			}

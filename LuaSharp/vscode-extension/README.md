@@ -17,7 +17,9 @@ The extension associates `.ls` with LuaSharp and launches the native LuaSharp la
 The `luasharp` debug type attaches to a program that serves the LuaSharp debugger:
 
 - `LuaSharp.exe run <file.ls> --debug [--port N]`
-- the engine with `ls_debug 1` (EngineVars.ini, or `-ls_debug 1` on the command line)
+- the engine with `ls_debug 1` (EngineVars.ini, or `-ls_debug 1` on the command line). `ls_debug 2` also waits for VS Code before scripts load.
+
+The URI `vscode://charl.luasharp/attach?port=N` also starts an attach session. The engine launcher uses it.
 
 Start the program, then press F5. Without a `launch.json`, the extension attaches to port 4711. To use a different port, add this configuration:
 

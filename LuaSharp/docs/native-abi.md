@@ -379,7 +379,8 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 ### Use
 
 - **Without the engine:** `LuaSharp run <file.ls> --debug [--port N]`. The default port is 4711, and port 0 selects a free port. The CLI prints `Waiting for a debugger on port N`. The module starts after `configurationDone`. At the end, the CLI sends `terminated`.
-- **In the engine:** set `ls_debug 1` (and `ls_debug_port`, default 4711) in `EngineVars.ini`, or give `-ls_debug 1` on the command line. The engine then compiles all scripts instrumented. Hooks stay off until a client attaches. `LuaSharpEngine::start_debugger` starts the server; modules that load after it are instrumented.
+- **In the engine:** set `ls_debug 1` (and `ls_debug_port`, default 4711) in `EngineVars.ini`, or give `-ls_debug 1` on the command line. The engine then compiles all scripts instrumented. Hooks stay off until a client attaches. With `ls_debug 2`, startup also waits for a client (`configurationDone`) before scripts load, so breakpoints in top-level code and in the first frames stop. `LuaSharpEngine::start_debugger` starts the server; modules that load after it are instrumented.
+- **Engine launcher:** the **L# debug** list sets `-ls_debug`: None, Debug (1) or Wait For Debug (2). **Attach L# debugger** opens `vscode://charl.luasharp/attach?port=4711`. The extension then starts a `luasharp` attach session.
 - **Sources:** with the debugger on, the source name of a module is its full path, so VS Code can open the file of a frame.
 - **Paused engine:** while a script is stopped, the main thread waits. Windows can then mark the window as not responding.
 

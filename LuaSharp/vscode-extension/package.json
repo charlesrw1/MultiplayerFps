@@ -2,11 +2,11 @@
   "name": "luasharp",
   "publisher": "charl",
   "displayName": "LuaSharp",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "engines": { "vscode": "^1.95.0" },
   "categories": ["Programming Languages", "Debuggers"],
-  "activationEvents": ["onLanguage:luasharp", "onDebugResolve:luasharp"],
+  "activationEvents": ["onLanguage:luasharp", "onDebugResolve:luasharp", "onUri"],
   "main": "./extension.js",
   "scripts": {
     "test:integration": "node ../test/lsp.integration.test.mjs",
