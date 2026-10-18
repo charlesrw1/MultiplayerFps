@@ -504,9 +504,16 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		ScriptManager::inst->load_test_scripts();
 	print_time("script init");
 
-	if (luasharp::NativeModule::IsLibTccAvailable()) {
+	const bool has_libtcc = luasharp::NativeModule::IsLibTccAvailable();
+	if (has_libtcc) {
 		printf("..................................\n\n");
-		luasharp = std::make_unique<LuaSharpEngine>();
+		try {
+			luasharp = std::make_unique<LuaSharpEngine>();
+		} catch (const std::exception& error) {
+			sys_print(Error, "LuaSharp: cannot start, .ls scripts are not loaded: %s\n", error.what());
+		}
+	}
+	if (luasharp) {
 		if (ls_debug.get_integer() != 0) {
 			try {
 				luasharp->start_debugger(static_cast<uint16_t>(ls_debug_port.get_integer()));
@@ -522,7 +529,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 			luasharp->load_script_files("scripts/tests");
 		print_time("luasharp init");
 		printf("\n..............................\n");
-	} else {
+	} else if (!has_libtcc) {
 		sys_print(Warning, "LuaSharp: libtcc.dll is not deployed; .ls scripts are not loaded\n");
 	}
 

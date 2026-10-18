@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Core", "Source\Core.vcxproj", "{359193A0-4260-402D-968F-060546D8C049}"
 	ProjectSection(ProjectDependencies) = postProject
 		{B5F2A3C1-D4E6-4F8A-9B0C-1D2E3F4A5B6C} = {B5F2A3C1-D4E6-4F8A-9B0C-1D2E3F4A5B6C}
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13} = {6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "App", "Source\App\App.vcxproj", "{FE7DD3AB-5396-4F37-8912-301151683844}"
@@ -55,8 +56,14 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cscli", "CLI\cscli.vcxproj", "{2E4B7A10-6C3D-4F19-9E2A-8B1C6D4F0A72}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharp", "LuaSharp\LuaSharp.vcxproj", "{E8D827C3-2CC4-4F21-9D4B-9A7EC669B5B9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13} = {6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharpTests", "LuaSharp\LuaSharpTests.vcxproj", "{B1C23C02-188D-48D8-B536-5CECEFAAB67B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13} = {6D3F1C8A-52B7-4E0D-9A41-7C2E5B8F0D13}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LuaSharpLsp", "LuaSharp\LuaSharpLsp.vcxproj", "{F4C743BF-7E25-4B3F-B5EA-AF1C1AE3903D}"
 EndProject
