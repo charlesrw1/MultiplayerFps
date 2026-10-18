@@ -5,7 +5,24 @@ const fs = require("fs");
 
 let client;
 
+const DefaultDebugPort = 4711;
+
+// The debugger runs in the program (LuaSharp.exe --debug, or the engine). VS Code attaches to its DAP port.
+function registerDebugger(context) {
+    context.subscriptions.push(
+        vscode.debug.registerDebugAdapterDescriptorFactory("luasharp", {
+            createDebugAdapterDescriptor: session =>
+                new vscode.DebugAdapterServer(session.configuration.port || DefaultDebugPort, session.configuration.host || "127.0.0.1"),
+        }),
+        // F5 without a launch.json attaches to the default port.
+        vscode.debug.registerDebugConfigurationProvider("luasharp", {
+            resolveDebugConfiguration: (folder, config) =>
+                config.type ? config : { type: "luasharp", request: "attach", name: "Attach to LuaSharp", port: DefaultDebugPort },
+        }));
+}
+
 function activate(context) {
+    registerDebugger(context);
     const output = vscode.window.createOutputChannel("LuaSharp");
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
     const configured = vscode.workspace.getConfiguration("luasharp").get("languageServerPath");

@@ -2,11 +2,11 @@
   "name": "luasharp",
   "publisher": "charl",
   "displayName": "LuaSharp",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "engines": { "vscode": "^1.95.0" },
-  "categories": ["Programming Languages"],
-  "activationEvents": ["onLanguage:luasharp"],
+  "categories": ["Programming Languages", "Debuggers"],
+  "activationEvents": ["onLanguage:luasharp", "onDebugResolve:luasharp"],
   "main": "./extension.js",
   "scripts": {
     "test:integration": "node ../test/lsp.integration.test.mjs",
@@ -18,6 +18,26 @@
       "aliases": ["LuaSharp", "luasharp"],
       "extensions": [".ls"],
       "configuration": "./language-configuration.json"
+    }],
+    "breakpoints": [{ "language": "luasharp" }],
+    "debuggers": [{
+      "type": "luasharp",
+      "label": "LuaSharp",
+      "languages": ["luasharp"],
+      "configurationAttributes": {
+        "attach": {
+          "properties": {
+            "port": { "type": "number", "default": 4711, "description": "The DAP port: `LuaSharp.exe run <file.ls> --debug --port N`, or the engine with ls_debug." },
+            "host": { "type": "string", "default": "127.0.0.1" }
+          }
+        }
+      },
+      "initialConfigurations": [{ "type": "luasharp", "request": "attach", "name": "Attach to LuaSharp", "port": 4711 }],
+      "configurationSnippets": [{
+        "label": "LuaSharp: Attach",
+        "description": "Attach to a LuaSharp program or the engine.",
+        "body": { "type": "luasharp", "request": "attach", "name": "Attach to LuaSharp", "port": 4711 }
+      }]
     }],
     "grammars": [{
       "language": "luasharp",

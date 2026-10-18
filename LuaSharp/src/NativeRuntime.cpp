@@ -13,6 +13,7 @@
 #include <mutex>
 #include <new>
 #include <span>
+#include <sstream>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -219,6 +220,7 @@ struct NativeRuntime::Impl {
     size_t nextRoot{1};
     std::string error;
     std::function<void(std::string_view)> errorHandler;
+    std::function<void(std::string_view)> printHandler;
     RuntimeAbi abi;
 };
 
@@ -266,42 +268,47 @@ void* AbiTableCreate(void* context, unsigned long long count, const NativeValue*
     for (unsigned long long i{}; i < count; ++i) AbiTableSet(context, table, &pairs[i * 2], &pairs[i * 2 + 1]);
     return table;
 }
-void AbiPrint(void* context, void* formatObject, unsigned long long count, const NativeValue* arguments) {
-    auto& runtime = *static_cast<NativeRuntime*>(context);
-    const auto* format = static_cast<const RuntimeString*>(formatObject);
-    if (!format) { runtime.ReportError("printf format cannot be null"); return; }
+// Formats into out; stops at the first error.
+void FormatPrint(NativeRuntime& runtime, const RuntimeString* format, unsigned long long count, const NativeValue* arguments, std::ostringstream& out) {
     unsigned long long argument{};
     for (std::int64_t i{}; i < format->length; ++i) {
         const char character = format->data[i];
-        if (character != '%' || i + 1 >= format->length) { std::cout.put(character); continue; }
+        if (character != '%' || i + 1 >= format->length) { out.put(character); continue; }
         const char specifier = format->data[++i];
-        if (specifier == '%') { std::cout.put('%'); continue; }
+        if (specifier == '%') { out.put('%'); continue; }
         if (argument >= count) { runtime.ReportError("printf has fewer values than format specifiers"); return; }
         const auto& value = arguments[argument++];
         switch (specifier) {
         case 'd': case 'i':
             if (value.kind != NativeValueKind::Int) { runtime.ReportError("printf %d expects an int"); return; }
-            std::cout << value.as.integer; break;
+            out << value.as.integer; break;
         case 'f':
-            if (value.kind == NativeValueKind::Int) std::cout << static_cast<double>(value.as.integer);
-            else if (value.kind == NativeValueKind::Float) std::cout << value.as.number;
+            if (value.kind == NativeValueKind::Int) out << static_cast<double>(value.as.integer);
+            else if (value.kind == NativeValueKind::Float) out << value.as.number;
             else { runtime.ReportError("printf %f expects an int or float"); return; }
             break;
         case 's': {
             if (value.kind != NativeValueKind::String || !value.as.pointer) { runtime.ReportError("printf %s expects a string"); return; }
-            const auto* string = static_cast<const RuntimeString*>(value.as.pointer); std::cout.write(string->data, string->length); break;
+            const auto* string = static_cast<const RuntimeString*>(value.as.pointer); out.write(string->data, string->length); break;
         }
         case 'b':
             if (value.kind != NativeValueKind::Bool) { runtime.ReportError("printf %b expects a bool"); return; }
-            std::cout << (value.as.boolean ? "true" : "false"); break;
+            out << (value.as.boolean ? "true" : "false"); break;
         case 'p':
             if (!IsManaged(value) && value.kind != NativeValueKind::Null) { runtime.ReportError("printf %p expects a reference"); return; }
-            std::cout << value.as.pointer; break;
+            out << value.as.pointer; break;
         default: runtime.ReportError(std::string("unsupported printf format specifier %") + specifier); return;
         }
     }
     if (argument != count) runtime.ReportError("printf has more values than format specifiers");
-    std::cout.flush();
+}
+void AbiPrint(void* context, void* formatObject, unsigned long long count, const NativeValue* arguments) {
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    const auto* format = static_cast<const RuntimeString*>(formatObject);
+    if (!format) { runtime.ReportError("printf format cannot be null"); return; }
+    std::ostringstream out;
+    FormatPrint(runtime, format, count, arguments, out);
+    runtime.Print(out.str());
 }
 void AbiReportError(void* context, const char* message) { static_cast<NativeRuntime*>(context)->ReportError(message ? message : "unknown native runtime error"); }
 
@@ -736,6 +743,14 @@ void NativeRuntime::ReportError(std::string_view message) {
     if (handler) handler(message);
 }
 void NativeRuntime::SetErrorHandler(std::function<void(std::string_view)> handler) { std::scoped_lock lock(impl_->mutex); impl_->errorHandler = std::move(handler); }
+void NativeRuntime::SetPrintHandler(std::function<void(std::string_view)> handler) { std::scoped_lock lock(impl_->mutex); impl_->printHandler = std::move(handler); }
+void NativeRuntime::Print(std::string_view text) {
+    std::function<void(std::string_view)> handler;
+    { std::scoped_lock lock(impl_->mutex); handler = impl_->printHandler; }
+    if (handler) { handler(text); return; }
+    std::cout.write(text.data(), static_cast<std::streamsize>(text.size()));
+    std::cout.flush();
+}
 std::string NativeRuntime::LastError() const { std::scoped_lock lock(impl_->mutex); return impl_->error; }
 void NativeRuntime::ClearError() { std::scoped_lock lock(impl_->mutex); impl_->error.clear(); }
 void* NativeRuntime::Abi() { return &impl_->abi; }

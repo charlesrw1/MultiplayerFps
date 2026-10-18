@@ -87,7 +87,6 @@ bool IsProxy(const NativeTypeInfo& type) { return (type.flags & (TypeNative | Ty
 struct NativeDebugger::Impl {
     struct Module {
         Impl* debugger{};
-        const NativeModule* module{};
         const NativeDebugModule* tables{};
         const NativeDebugInfo* info{};
         std::vector<size_t> firstStatement;                    // per function: its statement 0 in breakpoints
@@ -437,7 +436,6 @@ void NativeDebugger::AddModule(const NativeModule& module) {
     std::scoped_lock lock(impl_->mutex);
     auto record = std::make_unique<Impl::Module>();
     record->debugger = impl_.get();
-    record->module = &module;
     record->tables = tables;
     record->info = &module.Generated().debug;
     size_t statements{};
@@ -451,7 +449,7 @@ void NativeDebugger::AddModule(const NativeModule& module) {
 
 void NativeDebugger::RemoveModule(const NativeModule& module) {
     std::scoped_lock lock(impl_->mutex);
-    const auto found = std::ranges::find(impl_->modules, &module, [](const auto& record) { return record->module; });
+    const auto found = std::ranges::find(impl_->modules, module.Debug(), [](const auto& record) { return record->tables; });
     assert(found != impl_->modules.end());
     assert(!impl_->stopped || std::ranges::none_of(impl_->frames, [&](const Impl::Frame& frame) { return frame.module == found->get(); }));
     *(*found)->tables->state = {};

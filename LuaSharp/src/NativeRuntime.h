@@ -122,6 +122,9 @@ public:
     void ReportError(std::string_view message);
     // Runs on the reporting thread after each ReportError, outside the runtime lock. Empty removes it.
     void SetErrorHandler(std::function<void(std::string_view)> handler);
+    // Script output (printf). It goes to the print handler, or to stdout when there is none.
+    void Print(std::string_view text);
+    void SetPrintHandler(std::function<void(std::string_view)> handler);
     [[nodiscard]] std::string LastError() const;
     void ClearError();
 

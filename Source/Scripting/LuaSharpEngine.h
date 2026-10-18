@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <set>
@@ -15,6 +16,8 @@ class LuaSharpClassTypeInfo;
 namespace luasharp {
 class NativeRuntime;
 class NativeModule;
+class NativeDebugger;
+class NativeDapServer;
 struct ExternalType;
 struct NativeSymbol;
 } // namespace luasharp
@@ -59,6 +62,12 @@ public:
 	// All generated declarations as one source, for tools.
 	const std::string& declarations() const { return declarations_; }
 
+	// Serves the script debugger (DAP) on 127.0.0.1:port; 0 selects a free port. Modules that load() after it are
+	// instrumented. Throws std::runtime_error when it cannot listen.
+	void start_debugger(uint16_t port);
+	// 0 when the debugger is off.
+	uint16_t debugger_port() const;
+
 	// From ~ClassBase, when the object has a proxy.
 	static void on_object_destroyed(ClassBase* object);
 
@@ -69,6 +78,9 @@ private:
 		std::vector<std::unique_ptr<LuaSharpClassTypeInfo>> classes; // base classes first
 	};
 	friend class LuaSharpClassTypeInfo;
+
+	// Compiles without Initialize(). The debugger needs the module before its top-level code runs.
+	luasharp::NativeModule compile_module(std::string_view source, bool debug, std::string_view source_name);
 
 	std::unique_ptr<ClassBase> make(const luasharp::NativeModule& module, std::string_view script_class,
 									const LuaSharpClassTypeInfo* type);
@@ -84,6 +96,8 @@ private:
 	void adopt_struct_types(const luasharp::NativeModule& module);
 
 	std::shared_ptr<luasharp::NativeRuntime> runtime_;
+	std::unique_ptr<luasharp::NativeDebugger> debugger_;	// null unless start_debugger
+	std::unique_ptr<luasharp::NativeDapServer> dap_server_;
 	std::unordered_map<std::string_view, const lsbind::Scriptable*> scriptables_;
 	std::unordered_map<std::string_view, const lsbind::StructLayout*> struct_layouts_;
 	std::set<std::vector<void*>> slot_tables_; // ScriptImpl_X::ls_slots; elements do not move

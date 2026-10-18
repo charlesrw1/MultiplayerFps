@@ -362,11 +362,32 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 - **Caller frames:** a hook records the offset of `ls_locals` from `rbp` for its function. A frame of a function that has not run a hook while attached shows no locals and no line.
 - **Runtime errors:** `NativeRuntime::SetErrorHandler` tells the debugger about each error. The debugger unwinds the C++ frames with `RtlVirtualUnwind` to the first module frame, and stops with the reason `Exception`. Errors that do not come from script code do not stop.
 - **Values:** `Locals` and `Variables` read memory through the `LS_FieldInfo` tables. Objects, structs, lists and tables have children. A child reference is valid until the script resumes. An `any` shows the type of its value.
+- **Modules:** a module can move after `AddModule`. Remove it before you destroy it.
+
+## Debug Adapter Protocol server
+
+`NativeDapServer` (NativeDapServer.h) serves the Debug Adapter Protocol for a `NativeDebugger` on TCP `127.0.0.1`. VS Code connects to it with the `luasharp` debug type (an `attach` configuration with a `port`).
+
+- **Clients:** one client at a time. `attach` attaches the debugger. A `disconnect`, or a closed connection, detaches it and resumes a stopped script. The server then accepts the next client.
+- **Requests:** `initialize`, `attach`, `setBreakpoints`, `setExceptionBreakpoints`, `configurationDone`, `threads`, `stackTrace`, `scopes`, `variables`, `continue`, `next`, `stepIn`, `stepOut`, `pause` and `disconnect`. `launch` fails: the program starts the server, not the client.
+- **Events:** `initialized`, `stopped` (from the stop handler, on the script thread), `output` and `terminated`.
+- **Threads:** one thread, id 1.
+- **Scopes:** each frame has one scope, `Locals`. Its reference is `2^30 + frame`. Value references are less than `2^30`.
+- **Exceptions:** the filter `errors` (on by default) is `SetBreakOnErrors`.
+- **Output:** `NativeRuntime::SetPrintHandler` sends `printf` output to the client with `SendOutput`.
+
+### Use
+
+- **Without the engine:** `LuaSharp run <file.ls> --debug [--port N]`. The default port is 4711, and port 0 selects a free port. The CLI prints `Waiting for a debugger on port N`. The module starts after `configurationDone`. At the end, the CLI sends `terminated`.
+- **In the engine:** set `ls_debug 1` (and `ls_debug_port`, default 4711) in `EngineVars.ini`, or give `-ls_debug 1` on the command line. The engine then compiles all scripts instrumented. Hooks stay off until a client attaches. `LuaSharpEngine::start_debugger` starts the server; modules that load after it are instrumented.
+- **Sources:** with the debugger on, the source name of a module is its full path, so VS Code can open the file of a frame.
+- **Paused engine:** while a script is stopped, the main thread waits. Windows can then mark the window as not responding.
 
 ## Command line and printf
 
 - `LuaSharp <file.ls> [-o out.c]` checks the file, writes the C output, compiles it with libtcc, and runs the module initializer. `run` and `run-native` do the same.
 - `emit-c` only writes the generated C.
 - `--debug-hooks` after the file name makes an instrumented build (see Debug hooks).
+- `run <file.ls> --debug [--port N]` runs the module under the DAP server (see Debug Adapter Protocol server).
 - The CLI exits with a non-zero code when a diagnostic is an error.
 - `printf(format, values...)` does not append a newline. It accepts `%d`/`%i` (int), `%f` (numeric), `%s` (string), `%b` (bool), `%p` (managed reference), and `%%`.

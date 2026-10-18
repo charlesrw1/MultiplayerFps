@@ -247,4 +247,7 @@ Remaining features that need an explicit language design are explicit imports/mo
 ```powershell
 node LuaSharp/test/lsp.integration.test.mjs
 node LuaSharp/test/cli.integration.test.mjs
+node LuaSharp/test/dap.integration.test.mjs
 ```
+
+The DAP test runs `LuaSharp run <file.ls> --debug` and debugs it as VS Code does. See `docs/native-abi.md` (Debug Adapter Protocol server).

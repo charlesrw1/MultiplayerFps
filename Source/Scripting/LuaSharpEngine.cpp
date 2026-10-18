@@ -2,6 +2,8 @@
 #include "Scripting/LuaSharpBinding.h"
 #include "../../LuaSharp/src/CBackend.h"
 #include "../../LuaSharp/src/Builtins.h"
+#include "../../LuaSharp/src/NativeDapServer.h"
+#include "../../LuaSharp/src/NativeDebugger.h"
 #include "Framework/ClassBase.h"
 #include "Framework/ClassTypeInfo.h"
 #include "Framework/ReflectionProp.h"
@@ -326,6 +328,14 @@ LuaSharpEngine::LuaSharpEngine() : runtime_(luasharp::NativeRuntime::Create()) {
 
 LuaSharpEngine::~LuaSharpEngine() {
 	ASSERT(inst == this);
+	if (debugger_) {
+		runtime_->SetPrintHandler({});
+		dap_server_.reset(); // detaches a client, so no script is stopped
+		for (auto& [name, loaded] : modules_)
+			if (loaded.module->Debug())
+				debugger_->RemoveModule(*loaded.module);
+		debugger_.reset();
+	}
 	for ([[maybe_unused]] ClassBase* object : proxied_)
 		ASSERT(!dynamic_cast<const LuaSharpClassTypeInfo*>(&object->get_type()) && "an object of a loaded script class outlives the engine");
 	while (!proxied_.empty())
@@ -336,17 +346,42 @@ LuaSharpEngine::~LuaSharpEngine() {
 }
 
 luasharp::NativeModule LuaSharpEngine::compile(std::string_view source) {
+	auto module = compile_module(source, false, {});
+	module.Initialize();
+	return module;
+}
+
+luasharp::NativeModule LuaSharpEngine::compile_module(std::string_view source, bool debug, std::string_view source_name) {
 	luasharp::NativeCompileOptions options;
 	options.externalTypes = types_;
 	options.symbols = symbols_;
 	options.runtime = runtime_;
 	options.initialize = false; // top-level code can call thunks that need the adopted struct types
+	options.emitDebugHooks = debug;
+	options.sourceName = source_name;
 	auto module = luasharp::NativeModule::Compile(source, options);
 	check_struct_layouts(module);
 	adopt_struct_types(module);
-	module.Initialize();
 	return module;
 }
+
+void LuaSharpEngine::start_debugger(uint16_t port) {
+	ASSERT(!debugger_);
+	debugger_ = std::make_unique<luasharp::NativeDebugger>(runtime_);
+	try {
+		dap_server_ = std::make_unique<luasharp::NativeDapServer>(*debugger_, port);
+	} catch (...) {
+		debugger_.reset();
+		throw;
+	}
+	runtime_->SetPrintHandler([server = dap_server_.get()](std::string_view text) {
+		fwrite(text.data(), 1, text.size(), stdout);
+		server->SendOutput(text);
+	});
+	sys_print(Info, "LuaSharp: debugger listens on port %d\n", int(dap_server_->Port()));
+}
+
+uint16_t LuaSharpEngine::debugger_port() const { return dap_server_ ? dap_server_->Port() : 0; }
 
 void LuaSharpEngine::check_struct_layouts(const luasharp::NativeModule& module) const {
 	for (const std::string& name : module.Generated().externalStructs) {
@@ -460,8 +495,19 @@ const luasharp::NativeModule& LuaSharpEngine::load(const std::string& name, std:
 	if (modules_.contains(name))
 		throw std::runtime_error("LuaSharp module '" + name + "' is already loaded");
 	LoadedModule loaded;
-	loaded.module = std::make_unique<luasharp::NativeModule>(compile(source));
-	register_classes(loaded); // throws before the module is kept
+	// A client sets breakpoints by the path of the file.
+	const std::string source_name = debugger_ ? FileSys::get_full_path_from_game_path(name) : name;
+	loaded.module = std::make_unique<luasharp::NativeModule>(compile_module(source, debugger_ != nullptr, source_name));
+	if (debugger_)
+		debugger_->AddModule(*loaded.module);
+	try {
+		loaded.module->Initialize();
+		register_classes(loaded); // throws before the module is kept
+	} catch (...) {
+		if (debugger_)
+			debugger_->RemoveModule(*loaded.module);
+		throw;
+	}
 	return *modules_.emplace(name, std::move(loaded)).first->second.module;
 }
 

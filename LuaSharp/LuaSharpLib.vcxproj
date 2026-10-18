@@ -26,12 +26,14 @@
     <ClCompile Include="src\CBackend.cpp" />
     <ClCompile Include="src\Compiler.cpp" />
     <ClCompile Include="src\NativeCompiler.cpp" />
+    <ClCompile Include="src\NativeDapServer.cpp" />
     <ClCompile Include="src\NativeDebugger.cpp" />
     <ClCompile Include="src\NativeRuntime.cpp" />
     <ClCompile Include="src\Semantic.cpp" />
     <ClInclude Include="src\Builtins.h" />
     <ClInclude Include="src\CBackend.h" />
     <ClInclude Include="src\NativeAbi.h" />
+    <ClInclude Include="src\NativeDapServer.h" />
     <ClInclude Include="src\NativeDebugger.h" />
     <ClInclude Include="src\NativeRuntime.h" />
     <ClInclude Include="src\Compiler.h" />

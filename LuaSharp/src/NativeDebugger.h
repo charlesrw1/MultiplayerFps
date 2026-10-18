@@ -40,7 +40,7 @@ public:
     NativeDebugger(const NativeDebugger&) = delete;
     NativeDebugger& operator=(const NativeDebugger&) = delete;
 
-    // The module must be instrumented, use the runtime of the debugger, and stay loaded until RemoveModule.
+    // The module must be instrumented, use the runtime of the debugger, and stay loaded until RemoveModule. It can move.
     void AddModule(const NativeModule& module);
     // Not while a script of the module is stopped.
     void RemoveModule(const NativeModule& module);

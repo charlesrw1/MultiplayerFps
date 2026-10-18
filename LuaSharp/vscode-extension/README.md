@@ -11,3 +11,18 @@ Set these workspace settings to the built executables:
 ```
 
 The extension associates `.ls` with LuaSharp and launches the native LuaSharp language server. It does not launch or depend on LuaLS.
+
+## Debugging
+
+The `luasharp` debug type attaches to a program that serves the LuaSharp debugger:
+
+- `LuaSharp.exe run <file.ls> --debug [--port N]`
+- the engine with `ls_debug 1` (EngineVars.ini, or `-ls_debug 1` on the command line)
+
+Start the program, then press F5. Without a `launch.json`, the extension attaches to port 4711. To use a different port, add this configuration:
+
+```json
+{ "type": "luasharp", "request": "attach", "name": "Attach to LuaSharp", "port": 4711 }
+```
+
+You can set breakpoints in `.ls` files, step, and examine the call stack and the locals. Runtime errors stop as exceptions. Visual Studio can stay attached to the engine at the same time.
