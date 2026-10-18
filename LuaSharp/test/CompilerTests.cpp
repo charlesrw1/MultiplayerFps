@@ -1622,7 +1622,8 @@ void TestExternClassSemantics() {
     Require(has(luasharp::Analyze("extern class A { abstract void f(); }"), "can only be 'static' or 'virtual'"), "extern method modifier was not diagnosed");
     Require(has(luasharp::Analyze("class B {} extern class A : B {}"), "can only derive from an extern class"), "extern class with a script base was not diagnosed");
     Require(has(luasharp::Analyze("extern class A {} A a = new A();"), "declares no constructor"), "extern class without a constructor was constructed");
-    Require(has(luasharp::Analyze("extern struct A {}"), "Only a class can be 'extern'"), "extern struct was not diagnosed");
+    Require(luasharp::Analyze("extern struct A { int a; }").diagnostics.empty(), "an extern struct was diagnosed");
+    Require(has(luasharp::Analyze("extern struct A { int a; int f(); }"), "declares only fields"), "an extern struct method was not diagnosed");
     Require(luasharp::Analyze("extern class A { int x; A(int x); virtual int f(); static A g(); } A a = new A(1); int y = a.f() + a.x; a.x = 2;").diagnostics.empty(), "valid extern class use produced diagnostics");
     const auto generated = luasharp::CompileToC(std::string(EntityDeclarations) + "\nEntity e = new Entity(1);\nint h = e.health;\ne.health = 2;\nbool alive = e != null;");
     for (const auto expected : {"typedef LS_NativeObject LS_Entity;", "LS_KIND_OBJECT, &ls_type_Entity, (void* const*)0, LS_TYPE_NATIVE};","extern ls_int ls_native_Entity__get_health(void* self);",
@@ -1949,9 +1950,13 @@ HostTag ls_native_Physics_tag(HostTag t) { return {{t.v.y, t.v.x}}; }
 HostHit ls_native_Physics__get_last(void*) { return g_lastHit; }
 void ls_native_Physics__set_last(void*, HostHit h) { g_lastHit = h; }
 void* ls_native_Physics_make(void) { return g_shapeRuntime->NewNativeProxy(g_shapeRuntime->NativeClass("Physics"), &g_shape); }
+// An extern struct: the host makes T().
+struct HostSpot { long long count; HostVec3 at; };
+HostSpot ls_native_Spot_new(void) { return {5, {0, 1, 0}}; }
 
 constexpr std::string_view PhysicsDeclarations = R"(struct Hit { Physics what; Vec3 pos; bool hit; int count; }
 struct Tag { Vec2 v; }
+extern struct Spot { int count; Vec3 at; }
 extern class Physics { Hit last; static Hit cast(Vec3 from, float range); static int count(Hit h); static Tag tag(Tag t); static Physics make(); })";
 
 void TestDeclaredStructs() {
@@ -1965,8 +1970,11 @@ void TestDeclaredStructs() {
     Require(rejects("struct S { int a; S(int v) { a = v; } }", "only fields"), "a declared struct constructor was accepted");
     Require(rejects("struct S { static int a; }", "only instance fields"), "a declared struct static field was accepted");
     Require(rejects("class C {}", "script class"), "a declared script class was accepted");
+    Require(rejects("extern struct S { int a; S() {} }", "only fields"), "an extern struct constructor was accepted");
+    Require(rejects("extern struct S { int a = 1; }", "cannot have an initializer"), "an extern struct field initializer was accepted");
     const auto types = luasharp::DeclarationTypes({std::string(PhysicsDeclarations)});
-    Require(std::any_of(types.begin(), types.end(), [](const auto& type) { return type.name == "Hit" && type.isStruct && type.members.size() == 4; }), "the declared struct was not exported");
+    Require(std::any_of(types.begin(), types.end(), [](const auto& type) { return type.name == "Hit" && type.isStruct && type.members.size() == 4 && !type.hostDefault; }), "the declared struct was not exported");
+    Require(std::any_of(types.begin(), types.end(), [](const auto& type) { return type.name == "Spot" && type.isStruct && !type.isNative && type.hostDefault; }), "the extern struct was not exported");
     const auto has = [&](std::string_view source, std::string_view message) {
         const auto analysis = luasharp::Analyze(source, types);
         return std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [&](const auto& item) { return item.message.find(message) != std::string::npos; });
@@ -1986,7 +1994,8 @@ void TestDeclaredStructs() {
         options.runtime = g_shapeRuntime; options.declarations = {std::string(PhysicsDeclarations)};
         options.symbols = {{"ls_native_Physics_cast", reinterpret_cast<const void*>(&ls_native_Physics_cast)}, {"ls_native_Physics_count", reinterpret_cast<const void*>(&ls_native_Physics_count)},
             {"ls_native_Physics_tag", reinterpret_cast<const void*>(&ls_native_Physics_tag)}, {"ls_native_Physics__get_last", reinterpret_cast<const void*>(&ls_native_Physics__get_last)},
-            {"ls_native_Physics__set_last", reinterpret_cast<const void*>(&ls_native_Physics__set_last)}, {"ls_native_Physics_make", reinterpret_cast<const void*>(&ls_native_Physics_make)}};
+            {"ls_native_Physics__set_last", reinterpret_cast<const void*>(&ls_native_Physics__set_last)}, {"ls_native_Physics_make", reinterpret_cast<const void*>(&ls_native_Physics_make)},
+            {"ls_native_Spot_new", reinterpret_cast<const void*>(&ls_native_Spot_new)}};
         auto module = luasharp::NativeModule::Compile(R"(Hit h = Physics.cast(Vec3.new(1, 2, 3), 4.0);
 float z = h.pos.z;
 bool hit = h.hit;
@@ -2011,6 +2020,9 @@ Hit unboxed = box.value;
 int unboxedCount = unboxed.count;
 Hit[] list = {h, made};
 int listCount = list[1].count;
+bool spotDefault = Spot().count == 5 && Spot().at.y == 1.0;
+class Holder { Spot s; }
+int heldCount = new Holder().s.count;
 )", options);
         Require(module.LastError().empty(), "declared struct program reported an error: " + module.LastError());
         Require(NativeGlobal<double>(module, "z") == 7 && NativeGlobal<unsigned char>(module, "hit") == 1 && NativeGlobal<long long>(module, "count") == 7, "a declared struct did not return from the host by value");
@@ -2019,7 +2031,8 @@ int listCount = list[1].count;
         Require(NativeGlobal<long long>(module, "readBack") == 11, "an extern field of a declared struct type did not get and set");
         Require(NativeGlobal<unsigned char>(module, "zeroed") == 1, "a declared struct did not start zeroed");
         Require(NativeGlobal<long long>(module, "unboxedCount") == 7 && NativeGlobal<long long>(module, "listCount") == 9, "a declared struct did not box or go in a list");
-        Require(module.Generated().externalStructs == std::vector<std::string>{"Hit", "Tag"}, "the declared structs were not listed");
+        Require(NativeGlobal<unsigned char>(module, "spotDefault") == 1 && NativeGlobal<long long>(module, "heldCount") == 5, "an extern struct did not get T() from the host");
+        Require(module.Generated().externalStructs == std::vector<std::string>{"Hit", "Tag", "Spot"}, "the declared structs were not listed");
         const auto layout = luasharp::NativeRuntime::StructLayout(module.ExternalStructType("Hit"));
         Require(layout.size == sizeof(HostHit) && layout.fields.size() == 4 && layout.fields[0].name == "what" && layout.fields[0].offset == offsetof(HostHit, what) &&
                 layout.fields[1].offset == offsetof(HostHit, pos) && layout.fields[2].offset == offsetof(HostHit, hit) && layout.fields[3].offset == offsetof(HostHit, count), "the declared struct layout did not match the host C layout");

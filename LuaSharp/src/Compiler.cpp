@@ -330,7 +330,6 @@ private:
         const bool isStruct = Is("struct"); if (!isStruct) Match("class"); else Advance();
         const auto name = Identifier(isStruct ? "struct name" : "class name"); SyntaxClass result; result.name = name.text; result.span = name.span; result.isStruct = isStruct;
         result.isAbstract = classModifiers.isAbstract; result.isSealed = classModifiers.isSealed; result.isExtern = isExtern;
-        if (isExtern && isStruct) tree_.diagnostics.push_back({"Only a class can be 'extern'", name.span});
         if (classModifiers.isStatic || classModifiers.isVirtual || classModifiers.isOverride) tree_.diagnostics.push_back({"Only 'abstract' and 'sealed' can modify a class", name.span});
         if (Is(":")) {
             Advance(); result.baseName = Identifier("base type").text;

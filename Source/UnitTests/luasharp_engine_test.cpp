@@ -504,7 +504,7 @@ TEST_F(LuaSharpEngineTest, LoadErrors) {
 
 // A STRUCT_BODY struct is a LuaSharp struct. Values copy through the thunks field by field.
 TEST_F(LuaSharpEngineTest, StructsCrossByValue) {
-	EXPECT_NE(engine->declarations().find("struct LsTestPoint {\n    Vec3 pos;\n    LsTestMode mode;\n    string name;\n    // skipped tags: std::vector<int>\n}"), std::string::npos);
+	EXPECT_NE(engine->declarations().find("extern struct LsTestPoint {\n    Vec3 pos;\n    LsTestMode mode;\n    string name;\n    // skipped tags: std::vector<int>\n}"), std::string::npos);
 	LsTestThing thing;
 	LsTestThing::first = &thing;
 	thing.point = {glm::vec3(1, 2, 3), LsTestMode::Fast, "start", {1, 2}, 9};
@@ -523,7 +523,11 @@ float mx = m.pos.x;
 int hiddenArg = t.hidden_of(p);
 LsTestSegment s = t.segment();
 float segX = s.b.pos.x;
-bool freshZero = LsTestPoint().mode == LsTestMode.Off && LsTestPoint().pos.x == 0.0;
+LsTestPoint fresh = LsTestPoint();
+bool freshDefaults = fresh.mode == LsTestMode.Fast && fresh.pos.y == 1.0 && fresh.name == "unnamed";
+bool nestedDefaults = LsTestSegment().b.name == "unnamed";
+class Holder { LsTestPoint p; }
+string heldName = new Holder().p.name;
 )");
 	EXPECT_EQ(module.LastError(), "");
 	EXPECT_DOUBLE_EQ(global<double>(module, "x"), 1.0);
@@ -537,7 +541,9 @@ bool freshZero = LsTestPoint().mode == LsTestMode.Off && LsTestPoint().pos.x == 
 	EXPECT_DOUBLE_EQ(global<double>(module, "mx"), 8.0);
 	EXPECT_EQ(global<int64_t>(module, "hiddenArg"), 5); // an argument starts from T{}
 	EXPECT_DOUBLE_EQ(global<double>(module, "segX"), 7.0);
-	EXPECT_EQ(global<uint8_t>(module, "freshZero"), 1u);
+	EXPECT_EQ(global<uint8_t>(module, "freshDefaults"), 1u); // T() is the C++ default value
+	EXPECT_EQ(global<uint8_t>(module, "nestedDefaults"), 1u);
+	EXPECT_EQ(text(module, "heldName"), "unnamed");
 }
 
 TEST_F(LuaSharpEngineTest, ScriptOverrideTakesAndReturnsStruct) {

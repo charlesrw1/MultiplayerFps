@@ -25,9 +25,9 @@ NEWENUM(LsTestMode, uint8_t){
 struct LsTestPoint
 {
 	STRUCT_BODY();
-	REF glm::vec3 pos = glm::vec3(0);
-	REF LsTestMode mode = LsTestMode::Off;
-	REF std::string name;
+	REF glm::vec3 pos = glm::vec3(0, 1, 0);
+	REF LsTestMode mode = LsTestMode::Fast;
+	REF std::string name = "unnamed";
 	REF std::vector<int> tags;
 	int hidden = 5;
 };

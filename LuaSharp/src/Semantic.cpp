@@ -148,7 +148,7 @@ public:
             if (external.isEnum) enumTypes_.insert(external.name);
             if (external.isStruct) structTypes_.insert(external.name);
             Symbol typeSymbol{external.name, external.name, external.isEnum ? SymbolKind::Enum : SymbolKind::Class, 0, 0, {source_.size(), 0}, {}, external.name, "public"};
-            typeSymbol.isStruct = external.isStruct; typeSymbol.isNative = external.isNative;
+            typeSymbol.isStruct = external.isStruct; typeSymbol.isNative = external.isNative; typeSymbol.hostDefault = external.hostDefault;
             if (external.isNative) nativeTypes_.insert(external.name);
             PushSymbol(std::move(typeSymbol));
             if (!external.baseType.empty()) result_.baseTypes[external.name] = external.baseType;
@@ -187,9 +187,9 @@ private:
         const auto line = static_cast<size_t>(next - lineStarts_.begin()) - 1;
         return {line, offset - lineStarts_[line]};
     }
-    // The C backend emits each external struct the module uses; its fields start zeroed.
+    // The C backend emits each external struct the module uses; its fields start zeroed, or the host makes T().
     BoundClass ExternalStruct(const ExternalType& external) const {
-        BoundClass result; result.name = external.name; result.isStruct = true; result.isExternal = true; result.span = {source_.size(), 0};
+        BoundClass result; result.name = external.name; result.isStruct = true; result.isExternal = true; result.hostDefault = external.hostDefault; result.span = {source_.size(), 0};
         for (const auto& member : external.members) if (member.kind == SymbolKind::Field && !member.isStatic) result.fields.push_back({"public", member.type, member.name});
         return result;
     }
@@ -242,8 +242,9 @@ private:
             if (value.isStruct) structTypes_.insert(value.name);
             const auto index = AddSymbol(value.name, value.name, SymbolKind::Class, value.span);
             auto& symbol = result_.symbols[index];
-            symbol.owner = value.name; symbol.isStruct = value.isStruct; symbol.isAbstract = value.isAbstract; symbol.isSealed = value.isSealed; symbol.isNative = value.isExtern;
-            if (value.isExtern) nativeTypes_.insert(value.name);
+            symbol.owner = value.name; symbol.isStruct = value.isStruct; symbol.isAbstract = value.isAbstract; symbol.isSealed = value.isSealed;
+            symbol.isNative = value.isExtern && !value.isStruct; symbol.hostDefault = value.isExtern && value.isStruct;
+            if (symbol.isNative) nativeTypes_.insert(value.name);
             if (value.isStruct && (value.isAbstract || value.isSealed)) AddDiagnostic("Structs cannot be 'abstract' or 'sealed'", value.span);
             if (value.isAbstract && value.isSealed) AddDiagnostic("Class '" + value.name + "' cannot be both 'abstract' and 'sealed'", value.span);
             if (!value.baseName.empty()) result_.baseTypes[value.name] = value.baseName;
@@ -253,7 +254,7 @@ private:
             CheckType(types_.Intern(value.baseName), value.span);
             if (structTypes_.contains(value.baseName) || enumTypes_.contains(value.baseName)) AddDiagnostic("Class '" + value.name + "' cannot derive from " + (enumTypes_.contains(value.baseName) ? "enum" : "struct") + " '" + value.baseName + "'", value.span);
             else if (const auto* base = FindClass(value.baseName); base && base->isSealed) AddDiagnostic("Class '" + value.name + "' cannot derive from sealed class '" + value.baseName + "'", value.span);
-            else if (value.isExtern && knownTypes_.contains(value.baseName) && !nativeTypes_.contains(value.baseName)) AddDiagnostic("Extern class '" + value.name + "' can only derive from an extern class", value.span);
+            else if (value.isExtern && !value.isStruct && knownTypes_.contains(value.baseName) && !nativeTypes_.contains(value.baseName)) AddDiagnostic("Extern class '" + value.name + "' can only derive from an extern class", value.span);
         }
     }
     void DeclareMembers() {
@@ -278,7 +279,7 @@ private:
                 if (field.type == "void") AddDiagnostic("Field '" + field.name + "' cannot be 'void'", field.span);
                 if (std::any_of(declared.begin(), declared.end(), [&](const Declared& item) { return item.name == field.name; })) AddDiagnostic("Member '" + field.name + "' is already declared on " + value.name, field.span);
                 declared.push_back({field.name, false, {}});
-                if (value.isExtern && field.isStatic) AddDiagnostic("Extern class '" + value.name + "' cannot declare static field '" + field.name + "'", field.span);
+                if (value.isExtern && field.isStatic) AddDiagnostic(std::string(value.isStruct ? "Extern struct '" : "Extern class '") + value.name + "' cannot declare static field '" + field.name + "'", field.span);
                 if (value.isExtern && field.initializer) AddDiagnostic("Extern field '" + field.name + "' cannot have an initializer", field.span);
                 CheckAttributes(value, field);
                 const auto index = AddSymbol(field.name, field.type, SymbolKind::Field, field.span);
@@ -286,6 +287,7 @@ private:
                 (field.isStatic ? statics : members).push_back(index);
             }
             for (const auto& function : value.functions) {
+                if (value.isExtern && value.isStruct) AddDiagnostic("Extern struct '" + value.name + "' declares only fields: the host makes its default value", function.span);
                 if (function.isConstructor && function.name != value.name) AddDiagnostic("Constructor name must match " + std::string(value.isStruct ? "struct" : "class") + " '" + value.name + "'", function.span);
                 if (!function.isConstructor) CheckType(types_.Intern(function.returnType), function.span);
                 std::vector<std::string> parameters, parameterTypes;
@@ -1128,11 +1130,11 @@ private:
             result_.bound.enums.push_back(std::move(boundEnum));
         }
         for (const auto& value : result_.syntax.root.classes) {
-            if (value.isExtern) continue; // no code; ExportTypes describes it to the C backend
+            if (value.isExtern && !value.isStruct) continue; // no code; ExportTypes describes it to the C backend
             const bool hasConstructor = std::any_of(value.functions.begin(), value.functions.end(), [](const auto& function) { return function.isConstructor; });
             if (!hasConstructor) RequireDefaultBaseConstructor(value, value.span);
             BoundClass boundClass; boundClass.name = value.name; boundClass.baseName = value.baseName; boundClass.span = value.span; boundClass.isStruct = value.isStruct;
-            boundClass.isAbstract = value.isAbstract; boundClass.isSealed = value.isSealed;
+            boundClass.isAbstract = value.isAbstract; boundClass.isSealed = value.isSealed; boundClass.hostDefault = value.isExtern;
             for (const auto& field : value.fields) {
                 BoundField boundField; boundField.access = field.access; boundField.type = field.type; boundField.name = field.name; boundField.span = field.span; boundField.isStatic = field.isStatic;
                 boundField.isEditable = IsEditable(field);
@@ -1246,7 +1248,7 @@ std::vector<ExternalType> ExportTypes(const Analysis& analysis) {
     for (const auto& symbol : analysis.symbols) {
         if ((symbol.kind != SymbolKind::Class && symbol.kind != SymbolKind::Enum) || !symbol.span.length) continue; // declared in this source
         ExternalType type{symbol.name};
-        type.isEnum = symbol.kind == SymbolKind::Enum; type.isStruct = symbol.isStruct; type.isNative = symbol.isNative;
+        type.isEnum = symbol.kind == SymbolKind::Enum; type.isStruct = symbol.isStruct; type.isNative = symbol.isNative; type.hostDefault = symbol.hostDefault;
         if (const auto base = analysis.baseTypes.find(symbol.name); base != analysis.baseTypes.end()) type.baseType = base->second;
         if (const auto members = analysis.members.find(type.isEnum ? "$type:" + symbol.name : symbol.name); members != analysis.members.end()) for (const auto index : members->second) type.members.push_back(analysis.symbols[index]);
         if (type.isEnum) {

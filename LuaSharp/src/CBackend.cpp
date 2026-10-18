@@ -1086,6 +1086,7 @@ struct CEmitter {
         for (const auto& value : program.classes) if (value.isStruct) {
             Line(0, "LS_", Id{value.name}, " ls_", Id{value.name}, "_default(void);");
             Line(0, "ls_bool ls_", Id{value.name}, "_eq(LS_", Id{value.name}, " a, LS_", Id{value.name}, " b);");
+            if (value.hostDefault) Line(0, "extern LS_", Id{value.name}, " ls_native_", Id{value.name}, "_new(void);");
         }
     }
     // "struct LS_T { ... };" with the instance fields, inherited ones first; static fields live in module state.
@@ -1399,11 +1400,14 @@ struct CEmitter {
             exportConstructor(constructor);
         };
         if (value.isStruct) {
-            Line(0, "LS_", name, " ls_", name, "_default(void) {");
-            Line(1, "LS_", name, " ls_value = {0}; LS_", name, "* self = &ls_value; (void)self;");
-            functionReturn = TypeTable::Void;
-            FieldInitializers(value);
-            Line(1, "return ls_value;"); Line(0, '}');
+            if (value.hostDefault) Line(0, "LS_", name, " ls_", name, "_default(void) { return ls_native_", name, "_new(); }");
+            else {
+                Line(0, "LS_", name, " ls_", name, "_default(void) {");
+                Line(1, "LS_", name, " ls_value = {0}; LS_", name, "* self = &ls_value; (void)self;");
+                functionReturn = TypeTable::Void;
+                FieldInitializers(value);
+                Line(1, "return ls_value;"); Line(0, '}');
+            }
             Line(0, "ls_bool ls_", name, "_eq(LS_", name, " a, LS_", name, " b) {");
             // Same rule as ls_struct_equal: numbers by value, references by identity (strings are interned).
             Line(1, "return 1", [&] { for (const auto& field : value.fields) {

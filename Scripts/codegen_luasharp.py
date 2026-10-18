@@ -236,7 +236,7 @@ def declare_class(bound: BoundClass) -> str:
 
 def declare_struct(bound: BoundStruct) -> str:
     c = bound.cdef
-    out = f"// {c.classname} ({c.source_file})\nstruct {bound.name} {{\n"
+    out = f"// {c.classname} ({c.source_file})\nextern struct {bound.name} {{\n"
     for t, name in bound.fields:
         out += f"    {t.ls} {name};\n"
     for s in bound.skipped:
@@ -398,6 +398,12 @@ def write_struct(s: BoundStruct) -> str:
     return out
 
 
+def write_default_thunk(s: BoundStruct) -> tuple[str, str]:
+    """ls_native_<S>_new: T() in script is the C++ default value."""
+    symbol = thunk_symbol(s.name, "new")
+    return f"static {s.mirror} {symbol}() {{ return ls_to_ls_{s.name}({s.cdef.classname}{{}}); }}\n", symbol
+
+
 def struct_layout(s: BoundStruct) -> tuple[str, str]:
     """The field table, and the lsbind::StructLayout entry that LuaSharpEngine compares with each module's type info."""
     fields = static_array("lsbind::StructField", f"ls_layout_{s.name}", [f"{{\"{f}\", offsetof({s.mirror}, {f})}}" for _, f in s.fields])
@@ -504,6 +510,9 @@ def generate(pass_classes: list[ClassDef], all_types: dict[str, ClassDef], pass_
         fields, entry = struct_layout(st)
         cpp += fields
         layouts.append(entry)
+        text, symbol = write_default_thunk(st)
+        cpp += text
+        symbols.append(symbol)
     cpp += static_array("const char*", "ls_declarations", [raw_string(c) for c in chunks])
     cpp += static_array("lsbind::Symbol", "ls_symbols", [f"{{\"{s}\", reinterpret_cast<const void*>(&{s})}}" for s in symbols])
     cpp += static_array("lsbind::Class", "ls_classes", [f"{{\"{b.cdef.classname}\", \"{b.base}\"}}" for b in classes])

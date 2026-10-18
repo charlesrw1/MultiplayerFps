@@ -93,6 +93,7 @@ struct Symbol {
     bool isAbstract{}; // Methods without a body; Class symbols that cannot be constructed
     bool isSealed{};   // Methods that cannot be overridden; Class symbols that cannot be derived from
     bool isNative{};   // Class symbols: an `extern class`; its objects are host proxies (LS_NativeObject)
+    bool hostDefault{}; // Class symbols: an `extern struct`; the host makes T() (ls_native_T_new)
 };
 struct ExternalType {
     std::string name;
@@ -101,6 +102,7 @@ struct ExternalType {
     bool isEnum{};
     bool isStruct{};
     bool isNative{}; // an `extern class`: the host implements its members (see docs/native-abi.md)
+    bool hostDefault{}; // an `extern struct`: the host makes T()
     std::vector<long long> values; // enums: the value of each member; empty means ordinals
 };
 enum class DiagnosticSeverity { Error, Warning };
@@ -188,6 +190,7 @@ struct BoundClass {
     bool isAbstract{};
     bool isSealed{};
     bool isExternal{}; // a struct from the external types: instance fields only, no code
+    bool hostDefault{}; // an `extern struct`: ls_T_default calls the host thunk ls_native_T_new
     std::vector<BoundField> fields;
     std::vector<BoundFunction> functions;
     TextSpan span;

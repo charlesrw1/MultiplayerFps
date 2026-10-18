@@ -125,7 +125,7 @@ struct SyntaxClass {
     bool isStruct{};
     bool isAbstract{};
     bool isSealed{};
-    bool isExtern{}; // declared by the host: members have no bodies
+    bool isExtern{}; // declared by the host: members have no bodies; an extern struct gets T() from the host
     std::vector<SyntaxField> fields;
     std::vector<SyntaxFunction> functions;
     TextSpan span;     // the name

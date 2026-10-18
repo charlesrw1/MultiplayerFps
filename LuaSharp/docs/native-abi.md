@@ -230,6 +230,7 @@ Rules:
 
 - A declared struct has only instance fields. A field has no initializer. A declared struct has no methods, constructors or static fields.
 - Script code makes a value with `T()`. All fields start at zero, false or null.
+- An `extern struct` gets `T()` from the host. `ls_S_default` calls the host thunk `LS_S ls_native_S_new(void)`. Every default value of the struct uses it, also the default value of a field of that type. The rules for fields are the same as for a declared struct.
 - The struct has the C layout of a script struct (see Structs). Fields are in declaration order. `int` is `ls_int`, `float` is `double`, `bool` is `ls_bool`, `string` is `LS_String*`, an enum is `ls_int`, and Vec3 is three 32-bit floats.
 - A field of an extern class type holds the proxy, not the host pointer. A thunk parameter of an extern class type is the host pointer (see Host thunks). Do not mix the two.
 - A thunk takes and returns the struct as `LS_S` by value. On Win64, MSVC and TinyCC pass a C aggregate the same way: in a register for 1, 2, 4 or 8 bytes, else through a pointer.
@@ -255,6 +256,7 @@ The engine binds its reflected classes with generated code (`Scripts/codegen_lua
 - A `REFLECT(script_read)` field has a setter that reports a runtime error.
 - A `STRUCT_BODY()` struct is a declared struct with its bindable `REF` fields. The declaration lists each other field as a `// skipped` comment. The pass that owns the header declares the struct.
 - Each pass that uses a struct writes a C++ mirror with the C layout, and functions that convert each field: `ls_to_ls_S` (C++ to script), `ls_assign_S` and `ls_to_cpp_S` (script to C++). These are before the classes, because the `ScriptImpl_X` slot calls use them.
+- Each engine struct is an `extern struct`. The owning pass registers `ls_native_S_new`, which returns `ls_to_ls_S(S{})`, so `T()` in script has the C++ default values.
 - A method argument and a slot result start from `T{}`. Fields that script cannot see get their default values. A field setter of struct type assigns in place, so those fields keep their values.
 - `obj<T>` is the proxy of `T`, the same as `T*`.
 - The owning pass registers the layout of the mirror (`lsbind::StructLayout`). `LuaSharpEngine::compile` compares the layout of each declared struct in the module with it. A different size, field name or field offset is a compile error.

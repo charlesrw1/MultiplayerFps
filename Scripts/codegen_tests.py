@@ -678,8 +678,8 @@ public:
 
     def test_struct_declarations(self):
         declarations = self.generate().declarations
-        self.assertIn("struct Hit {\n    Animal who;\n    Animal owner;\n    Mode mode;\n    float dist;\n    // skipped tags: std::vector<int>\n}", declarations)
-        self.assertIn("struct Wrap {\n    Hit inner;\n    int n;\n}", declarations)
+        self.assertIn("extern struct Hit {\n    Animal who;\n    Animal owner;\n    Mode mode;\n    float dist;\n    // skipped tags: std::vector<int>\n}", declarations)
+        self.assertIn("extern struct Wrap {\n    Hit inner;\n    int n;\n}", declarations)
         self.assertIn("    Hit probe(Hit h);\n    Animal leader;\n    Hit last;\n", declarations)
         self.assertIn("    virtual Wrap wrap(Wrap w);\n", declarations)
 
@@ -698,6 +698,8 @@ public:
         self.assertIn("= obj<Animal>(lsbind::object<Animal>(value)); }", cpp)
         self.assertIn("\t{\"Hit\", sizeof(ls_S_Hit), ls_layout_Hit},\n", cpp)
         self.assertIn("\t{\"dist\", offsetof(ls_S_Hit, dist)},\n", cpp)
+        self.assertIn("static ls_S_Hit ls_native_Hit_new() { return ls_to_ls_Hit(Hit{}); }", cpp)  # T() is the C++ default
+        self.assertIn("{\"ls_native_Hit_new\", reinterpret_cast<const void*>(&ls_native_Hit_new)}", cpp)
         self.assertIn("ls_classes, ls_scriptables, ls_structs};", cpp)
 
     def test_struct_conversions_come_before_classes(self):
