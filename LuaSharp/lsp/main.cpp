@@ -319,7 +319,7 @@ json MemberCompletion(const luasharp::Symbol& member) {
     const auto signature = member.kind == luasharp::SymbolKind::Method ? "(" + [&] { std::string value; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) value += ", "; value += member.parameters[i]; } return value; }() + ")" : "";
     json item{{"label", member.name + signature}, {"kind", member.kind == luasharp::SymbolKind::Method ? 2 : 5}, {"detail", member.type + signature}};
     if (member.kind == luasharp::SymbolKind::Method) {
-        std::string insert = member.name + "("; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) insert += ", "; auto nameAt = member.parameters[i].find(' '); auto name = nameAt == std::string::npos ? "value" : member.parameters[i].substr(nameAt + 1); if (name.ends_with('?')) name.pop_back(); insert += "${" + std::to_string(i + 1) + ":" + name + "}"; } insert += ")";
+        std::string insert = member.name + "("; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) insert += ", "; const auto label = luasharp::SplitParameterLabel(member.parameters[i]); const auto name = label.name.empty() ? std::string("value") : std::string(label.name); if (label.isInout) insert += "inout "; insert += "${" + std::to_string(i + 1) + ":" + name + "}"; } insert += ")";
         item["insertTextFormat"] = 2; item["insertText"] = insert;
     }
     return item;
@@ -381,7 +381,7 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         return result;
     }
     const char* words[] = {"class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return", "void", "null",
-                           "virtual", "override", "abstract", "sealed", "extern", "is", "as", "base"};
+                           "virtual", "override", "abstract", "sealed", "extern", "inout", "is", "as", "base"};
     for (const auto* word : words) result.push_back({{"label", word}, {"kind", 14}});
     for (const auto& type : luasharp::BuiltinTypes()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in type"}});
     for (const auto& type : luasharp::BuiltinStaticClasses()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in static class"}});

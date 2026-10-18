@@ -103,6 +103,29 @@ class Counter {
 
 Methods, constructors and static methods can be overloaded. The compiler chooses the overload at compile time. An exact type match is best. After that it prefers `int` to `float`, a derived class to its base class, `null`, and last a conversion through `any`. If two overloads match equally well, the call is an error, unless an argument has the type `any`. The first overload of a name keeps the plain C name (`ls_Util_twice`). Later overloads get a suffix (`ls_Util_twice__1`). Their export names include the parameter types (`Util.twice(float)`). Overloaded methods are not reachable through `any`.
 
+## Inout parameters
+
+An `inout` parameter copies the argument in when the call starts. When the function returns, the call writes the final value back to the argument. There are no references: the function changes only its copy, so the argument does not change until the return. Use `inout` to return several values, or to change a value in place.
+
+```
+class Util {
+    static void divmod(int a, int b, inout int q, inout int r) { q = 0; while (a >= b) { a -= b; q += 1; } r = a; }
+    static void scale(inout Vec3 v, float k) { v = v * k; }
+}
+int q; int r;
+Util.divmod(17, 5, inout q, inout r);   // q is 3, r is 2
+Util.scale(inout particles[i].pos, 2);
+```
+
+- Write `inout` before the parameter and before the argument. An inout parameter takes only an inout argument, and a value parameter takes no inout argument. Thus `f(int)` and `f(inout int)` are different overloads.
+- The argument must be storage: a local, a parameter, a field, a static field, a list element, a struct member of storage, or an extern-class field. A temporary, a constant, a method, or a `table` or `any` entry is an error.
+- The argument type must be the same as the parameter type.
+- The call evaluates all arguments from left to right before the function starts. It evaluates a list and its index one time. After the return, it writes the copies back in argument order. If you pass the same storage two times, the last write stays. A list element is found again for the write, so the function can add items to that list.
+- If the call stops with a runtime error, there is no write back.
+- A lambda cannot capture an inout parameter.
+- Extern members, lambdas, builtin functions and calls through `any` cannot have inout parameters. `any` code cannot call a method that has inout parameters.
+- In C, an inout parameter is a pointer to the caller's copy (`ls_int* x`). Export names spell it `inout int`.
+
 ## Inheritance
 
 A class can derive from one other class. Methods are not virtual unless you mark them, as in C#.

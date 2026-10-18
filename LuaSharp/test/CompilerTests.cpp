@@ -2158,6 +2158,139 @@ void TestProjectFiles() {
     fs::remove_all(root);
 }
 
+void TestInoutSemantics() {
+    constexpr std::string_view util = "class Util { static void inc(inout int x) { x += 1; } static Vec3 make() { return Vec3(0, 0, 0); } static void f(inout float v) {} }\n";
+    const auto with = [&](std::string_view body) { return std::string(util) + std::string(body); };
+    RequireClean(with("int a = 1; Util.inc(inout a); int[] list = {1}; Util.inc(inout list[0]); Vec3 v; Util.f(inout v.x);"), "valid inout calls");
+    RequireClean("class A { static int pick(int x) { return 1; } static int pick(inout int x) { return 2; } } int a; int r = A.pick(a) + A.pick(inout a);", "inout and value overloads are distinct");
+    RequireDiagnostic(with("int a = 1; Util.inc(a);"), "is an inout parameter: write 'inout'");
+    RequireDiagnostic(with("class B { static void g(int x) {} } int a = 1; B.g(inout a);"), "is not an inout parameter: remove 'inout'");
+    RequireDiagnostic(with("float a = 1; Util.inc(inout a);"), "must be exactly 'int'");
+    RequireDiagnostic(with("Util.inc(inout 1 + 2);"), "An inout argument must be a variable, a field or a list element");
+    RequireDiagnostic(with("Util.f(inout Util.make().x);"), "An inout argument must be a variable, a field or a list element");
+    RequireDiagnostic(with("table t = {}; Util.inc(inout t.x);"), "An inout argument must be a variable, a field or a list element");
+    RequireDiagnostic(with("Util.inc(inout Util.inc);"), "An inout argument must be a variable, a field or a list element");
+    RequireDiagnostic("class A { A(inout int x) {} } class B : A { B(int z) : base(inout z) {} }", "'inout' can only mark an argument of a method call");
+    RequireDiagnostic("class A { static void f(inout int x) { auto g = () => x; } }", "A lambda cannot capture inout parameter 'x'");
+    RequireDiagnostic("extern class E { void f(inout int x); }", "Extern method 'f' cannot have inout parameters");
+    RequireDiagnostic("int a = 1; printf(\"%d\", inout a);", "cannot be inout");
+    RequireDiagnostic("int a = 1; auto g = (x) => x; g(inout a);", "cannot be inout");
+    {
+        const auto analysis = luasharp::Analyze("class A { virtual void f(inout int x) {} } class B : A { override void f(int x) {} }");
+        Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& item) { return item.severity == luasharp::DiagnosticSeverity::Error; }), "an override without inout matched an inout method");
+    }
+    const auto generated = luasharp::CompileToC("class A { static int pick(int x) { return 1; } static int pick(inout int x) { return 2; } }");
+    Require(std::any_of(generated.exports.begin(), generated.exports.end(), [](const auto& item) { return item.sourceName == "A.pick(inout int)"; }), "inout overload export name was wrong");
+}
+
+void TestNativeInout() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(struct Particle { Vec3 pos; float mass = 1; }
+class Util {
+    static int counter = 0;
+    static int calls = 0;
+    static void divmod(int a, int b, inout int q, inout int r) { q = 0; while (a >= b) { a -= b; q += 1; } r = a; }
+    static void scale(inout Vec3 v, float k) { v = v * k; }
+    static void inc(inout int x) { x += 1; }
+    static void twice(inout int x) { inc(inout x); inc(inout x); }
+    static int bump(inout int x) { x += 1; return x * 10; }
+    static void swap(inout string a, inout string b) { string t = a; a = b; b = t; }
+    static int peek(inout int x) { x = 7; return counter; }
+    static void grow(inout int x, int[] list) { for (int i = 0; i < 100; i += 1) { list.push_back(i); } x = 99; }
+    static int index() { calls += 1; return 0; }
+    static int pick(int x) { return 1; }
+    static int pick(inout int x) { return 2; }
+    static void order(inout int a, int b) { a = a * 10 + b; }
+}
+class Box {
+    int n = 1;
+    virtual void add(inout int x) { x += n; }
+}
+class Big : Box {
+    override void add(inout int x) { x += 100; }
+}
+class Counter { Counter(inout int made) { made += 1; } }
+struct Tag { int id; Tag(inout int next) { id = next; next += 1; } }
+struct Acc { int total = 3; void bumpSelf() { Util.inc(inout total); } }
+int q; int r;
+Util.divmod(17, 5, inout q, inout r);
+Vec3 v = Vec3(1, 2, 3);
+Util.scale(inout v, 2);
+int t = 1;
+Util.twice(inout t);
+int bumped = Util.bump(inout t);
+string left = "a"; string right = "b";
+Util.swap(inout left, inout right);
+bool swapped = left == "b" && right == "a";
+int peeked = Util.peek(inout Util.counter);
+int counterAfter = Util.counter;
+Particle[] ps = {Particle(), Particle()};
+ps[1].pos = Vec3(1, 2, 3);
+Util.scale(inout ps[1].pos, 3);
+float psY = ps[1].pos.y;
+int[] nums = {5};
+Util.grow(inout nums[0], nums);
+int grown = nums[0];
+int grownSize = nums.size();
+Util.inc(inout nums[Util.index()]);
+int indexCalls = Util.calls;
+int afterIndex = nums[0];
+Box b = new Big();
+int boxed = 1;
+b.add(inout boxed);
+b.add(inout b.n);
+int boxN = b.n;
+int picks = Util.pick(boxed) * 10 + Util.pick(inout boxed);
+int made = 0;
+Counter c1 = new Counter(inout made);
+Counter c2 = new Counter(inout made);
+int nextId = 5;
+Tag t1 = Tag(inout nextId);
+Tag t2 = Tag(inout nextId);
+int tagSum = t1.id * 10 + t2.id;
+Acc acc;
+acc.bumpSelf();
+int accTotal = acc.total;
+int seen = 0;
+auto seenLater = () => seen;
+Util.inc(inout seen);
+int o = 1;
+Util.order(inout o, 2);
+)");
+    Require(module.LastError().empty(), "inout program reported a runtime error: " + module.LastError());
+    Require(NativeGlobal<long long>(module, "q") == 3 && NativeGlobal<long long>(module, "r") == 2, "inout parameters did not return several results");
+    const auto v = NativeGlobal<NativeVec3>(module, "v");
+    Require(Near(v.x, 2) && Near(v.y, 4) && Near(v.z, 6), "inout struct was not transformed");
+    Require(NativeGlobal<long long>(module, "t") == 4 && NativeGlobal<long long>(module, "bumped") == 40, "inout forwarding or result value was wrong");
+    Require(NativeGlobal<unsigned char>(module, "swapped") == 1, "inout strings were not swapped");
+    Require(NativeGlobal<long long>(module, "peeked") == 0 && NativeGlobal<long long>(module, "counterAfter") == 7, "inout did not copy in and out (the callee saw the original change)");
+    Require(NativeGlobal<double>(module, "psY") == 6.0, "inout struct member of a list element was not written back");
+    Require(NativeGlobal<long long>(module, "grown") == 99 && NativeGlobal<long long>(module, "grownSize") == 101, "inout list element was lost when the call grew the list");
+    Require(NativeGlobal<long long>(module, "indexCalls") == 1 && NativeGlobal<long long>(module, "afterIndex") == 100, "inout list index was not evaluated once");
+    Require(NativeGlobal<long long>(module, "boxed") == 101 && NativeGlobal<long long>(module, "boxN") == 101, "inout through a virtual call or class field was wrong");
+    Require(NativeGlobal<long long>(module, "picks") == 12, "inout overload was not chosen by the call-site marker");
+    Require(NativeGlobal<long long>(module, "made") == 2 && NativeGlobal<long long>(module, "tagSum") == 56, "inout constructor arguments were wrong");
+    Require(NativeGlobal<long long>(module, "accTotal") == 4, "inout field of a struct receiver was not written back");
+    Require(CallGlobalClosure(module, "seenLater").as.integer == 1, "a captured local passed as inout was not shared with the lambda");
+    Require(NativeGlobal<long long>(module, "o") == 12, "inout argument order was wrong");
+}
+
+void TestNativeInoutExternField() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    g_world = {}; g_world.runtime = luasharp::NativeRuntime::Create();
+    luasharp::NativeCompileOptions options;
+    options.runtime = g_world.runtime; options.declarations = {std::string(EntityDeclarations)}; options.symbols = EntitySymbols();
+    {
+        auto module = luasharp::NativeModule::Compile(R"(class Util { static void add(inout int x, int amount) { x += amount; } }
+Entity e = new Entity(10);
+Util.add(inout e.health, 5);
+int hp = e.health;
+)", options);
+        Require(module.LastError().empty() && NativeGlobal<long long>(module, "hp") == 15, "inout extern field did not use its accessors");
+    }
+    g_world = {};
+}
+
 int main() {
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests{
         {"invalid syntax", TestInvalidSyntax},
@@ -2225,6 +2358,9 @@ int main() {
         {"native value type thunks", TestNativeValueTypeThunks},
         {"declared structs", TestDeclaredStructs},
         {"host lists", TestHostLists},
+        {"inout semantics", TestInoutSemantics},
+        {"native inout", TestNativeInout},
+        {"native inout extern field", TestNativeInoutExternField},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
         {"project files", TestProjectFiles},
     };

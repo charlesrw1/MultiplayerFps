@@ -105,11 +105,15 @@ struct CEmitter {
     std::vector<std::vector<const VariableBinding*>> lambdaCaptures;
     std::vector<std::string_view> lambdaOwners;  // enclosing class of each lambda, empty at top level
     std::unordered_set<size_t> cellSymbols;      // captured locals that are also assigned
+    std::unordered_set<size_t> inoutSymbols;     // inout parameters: C pointers to the caller's copy
     StringMap<bool> structReferences;            // memo for HasReferences
     std::vector<std::pair<const BoundClass*, const BoundField*>> staticFields; // declaration order
     std::vector<std::string_view> dynamicNames;  // member names used on table/any values
     std::vector<std::pair<const ExternalType*, const Symbol*>> baseThunks; // `base.m()` of extern virtual methods: (nearest extern class, m)
     std::optional<size_t> activeLambda;
+    // Arguments of the inout call being emitted, already in ls_argument_<label>_<i>.
+    struct HoistedArguments { const BoundExpression* call{}; size_t label{}; std::vector<bool> inout; };
+    HoistedArguments hoisted;
     std::string_view constructorResult;         // variable a bare `return;` yields inside a constructor
     TypeId functionReturn = TypeTable::Unknown; // return type of the method being emitted
     std::string output;
@@ -137,6 +141,8 @@ struct CEmitter {
             if (!bindingsBySymbol[binding.symbolIndex]) bindingsBySymbol[binding.symbolIndex] = &binding;
             bindingAt.emplace(binding.declaration.offset, &binding);
         }
+        for (const auto& item : program.classes) for (const auto& function : item.functions) for (const auto& parameter : function.parameters)
+            if (const auto* binding = ParameterBinding(parameter); binding && parameter.isInout) inoutSymbols.insert(binding->symbolIndex);
         for (const auto& statement : program.Statements(program.topLevel)) {
             if (statement.kind != SyntaxStatement::Kind::Local) continue;
             if (const auto* binding = BindingAt(statement.syntax->nameSpan.offset)) globalSymbols.insert(binding->symbolIndex);
@@ -148,8 +154,8 @@ struct CEmitter {
         // A captured struct may be changed through its members or methods, so it always lives in a shared cell.
         for (const auto symbol : captured) if (const auto* binding = Binding(symbol); binding && IsStruct(binding->type)) cellSymbols.insert(symbol);
         for (const auto& item : program.expressions) {
-            if (item.kind == SyntaxExpression::Kind::Assignment) {
-                const auto& target = Child(item, 0);
+            if (item.kind == SyntaxExpression::Kind::Assignment || item.kind == SyntaxExpression::Kind::Inout) {
+                const auto& target = Unparenthesized(Child(item, 0));
                 if (target.kind == SyntaxExpression::Kind::Identifier && target.symbolIndex && captured.contains(*target.symbolIndex)) cellSymbols.insert(*target.symbolIndex);
             }
             const bool dynamicMember = item.kind == SyntaxExpression::Kind::Member && IsDynamic(Child(item, 0).type);
@@ -233,7 +239,7 @@ struct CEmitter {
     }
     static std::string SlotKey(const BoundFunction& function) {
         std::string key = function.name + '(';
-        for (const auto& parameter : function.parameters) { key += parameter.type; key += ','; }
+        for (const auto& parameter : function.parameters) { if (parameter.isInout) key += "inout "; key += parameter.type; key += ','; }
         return key + ')';
     }
     // A class starts with its base's slots. An override replaces the entry of its slot; a new virtual method appends one.
@@ -475,11 +481,7 @@ struct CEmitter {
     // External parameters are spelled "Type name", with an optional '?' suffix on the type.
     std::vector<TypeId> ParameterTypes(const Symbol* member) const {
         std::vector<TypeId> result;
-        if (member) for (const auto& parameter : member->parameters) {
-            auto type = std::string_view(parameter).substr(0, parameter.find(' '));
-            if (type.ends_with('?')) type.remove_suffix(1);
-            result.push_back(Find(type));
-        }
+        if (member) for (const auto& parameter : member->parameters) result.push_back(Find(SplitParameterLabel(parameter).type));
         return result;
     }
 
@@ -562,6 +564,7 @@ struct CEmitter {
         for (size_t i = first; i < value.children.count; ++i) {
             if (i != first || leadingComma) Put(", ");
             const size_t index = i - first;
+            if (hoisted.call == &value) { HoistedArgument(index); continue; }
             if (index < parameters.size()) Value(parameters[index], Child(value, i), owner); else Expression(Child(value, i), owner);
         }
     }
@@ -600,6 +603,7 @@ struct CEmitter {
 
     // A local, parameter or captured variable. Cells are dereferenced.
     void Variable(size_t symbol, std::string_view name) {
+        if (inoutSymbols.contains(symbol)) return Put("(*", Id{name}, ')');
         const bool cell = cellSymbols.contains(symbol);
         if (cell) Put("(*");
         if (CapturedByActive(symbol)) Put("ls_env->", Id{name});
@@ -644,7 +648,7 @@ struct CEmitter {
         case SyntaxExpression::Kind::Boolean: return Put(text == "true" ? '1' : '0');
         case SyntaxExpression::Kind::Null: return Put("((void*)0)");
         case SyntaxExpression::Kind::Parenthesized: return Put('(', child(0), ')');
-        case SyntaxExpression::Kind::New: return Construction(value, text, 0, owner);
+        case SyntaxExpression::Kind::New: return IsInoutCall(value) ? InoutCall(value, owner) : Construction(value, text, 0, owner);
         case SyntaxExpression::Kind::Member: {
             const auto target = Child(value, 0).type;
             if (value.lowering == Lowering::NativeConstant) return Put(value.nativeMember->cName);
@@ -658,7 +662,8 @@ struct CEmitter {
                 throw std::runtime_error("Native C backend cannot directly access field '" + text + "' on opaque external type '" + Name(target) + "'");
             return Put(child(0), "->", Id{text});
         }
-        case SyntaxExpression::Kind::Call: return Call(value, owner);
+        case SyntaxExpression::Kind::Call: return IsInoutCall(value) ? InoutCall(value, owner) : Call(value, owner);
+        case SyntaxExpression::Kind::Inout: throw std::runtime_error("Native C backend reached an inout argument outside its call");
         case SyntaxExpression::Kind::Unary:
             if (value.nativeOperator) return Put(Id{value.nativeOperator->cName}, '(', child(0), ')');
             if (Child(value, 0).type == TypeTable::Any) return Put(text == "!" ? "(!ls_value_truthy(" : "ls_value_negate(", child(0), text == "!" ? "))" : ")");
@@ -932,6 +937,103 @@ struct CEmitter {
         Put(')');
     }
 
+    // Storage of an inout argument. Hoisting evaluates its containers once; the write finds the slot again,
+    // because the call can grow a list that holds it.
+    struct InoutPlace {
+        enum class Kind { Direct, ListElement, ObjectField, Accessor } kind{};
+        const BoundExpression* target{};
+        const BoundExpression* root{}; // target without its struct members and parentheses
+        std::string_view fieldOwner;   // Accessor: the extern class of the field
+        size_t label{}, index{};
+    };
+    auto ArgumentTemp(std::string_view name, size_t label, size_t index) { return [this, name, label, index] { Put("ls_", name, '_', label, '_', index); }; }
+    auto PlaceTemp(const InoutPlace& place, std::string_view name) { return ArgumentTemp(name, place.label, place.index); }
+    const BoundExpression& Unparenthesized(const BoundExpression& value) const { return value.kind == SyntaxExpression::Kind::Parenthesized ? Unparenthesized(Child(value, 0)) : value; }
+    bool IsInoutCall(const BoundExpression& call) const {
+        const auto arguments = program.Children(call);
+        return std::any_of(arguments.begin(), arguments.end(), [](const BoundExpression& argument) { return argument.kind == SyntaxExpression::Kind::Inout; });
+    }
+    InoutPlace HoistPlace(const BoundExpression& target, size_t label, size_t index, std::string_view owner) {
+        InoutPlace place{InoutPlace::Kind::Direct, &target, &target, NativeFieldOwner(target), label, index};
+        if (!place.fieldOwner.empty()) {
+            place.kind = InoutPlace::Kind::Accessor;
+            Put("LS_", Id{place.fieldOwner}, "* ", PlaceTemp(place, "object"), " = ", NativeFieldObject(target, place.fieldOwner, owner), "; ");
+            return place;
+        }
+        const auto isStructMember = [&](const BoundExpression& value) { return value.kind == SyntaxExpression::Kind::Member && IsStruct(Child(value, 0).type); };
+        while (place.root->kind == SyntaxExpression::Kind::Parenthesized || isStructMember(*place.root)) place.root = &Child(*place.root, 0);
+        const auto& root = *place.root;
+        if (root.kind == SyntaxExpression::Kind::Index) {
+            assert(root.lowering == Lowering::ListIndex);
+            place.kind = InoutPlace::Kind::ListElement;
+            Put("LS_List* ", PlaceTemp(place, "list"), " = ", Emitted(Child(root, 0), owner), "; ls_int ", PlaceTemp(place, "index"), " = ", Converted(TypeTable::Int, Child(root, 1), owner), "; ");
+        } else if (root.kind == SyntaxExpression::Kind::Member && root.lowering != Lowering::StaticField) {
+            assert(IsObject(Child(root, 0).type));
+            place.kind = InoutPlace::Kind::ObjectField;
+            Put(Type(Child(root, 0).type), ' ', PlaceTemp(place, "object"), " = ", Emitted(Child(root, 0), owner), "; ");
+        }
+        return place;
+    }
+    // The target as a C lvalue, with its root read from the hoisted temps.
+    void PlaceLvalue(const InoutPlace& place, const BoundExpression& node, std::string_view owner) {
+        if (&node == place.root) {
+            switch (place.kind) {
+            case InoutPlace::Kind::ListElement: return Put("(*(", Type(node.type), "*)ls_list_at(", PlaceTemp(place, "list"), ", ", PlaceTemp(place, "index"), "))");
+            case InoutPlace::Kind::ObjectField: return Put(PlaceTemp(place, "object"), "->", Id{node.Text()});
+            default: return Expression(node, owner);
+            }
+        }
+        if (node.kind == SyntaxExpression::Kind::Parenthesized) return PlaceLvalue(place, Child(node, 0), owner);
+        Put('(', [&] { PlaceLvalue(place, Child(node, 0), owner); }, ")." , Id{node.Text()});
+    }
+    void ReadPlace(const InoutPlace& place, std::string_view owner) {
+        if (place.kind == InoutPlace::Kind::Accessor) return Put(Accessor(place.fieldOwner, "get", place.target->Text()), '(', PlaceTemp(place, "object"), ')');
+        PlaceLvalue(place, *place.target, owner);
+    }
+    template <typename Part> void WritePlace(const InoutPlace& place, const Part& value, std::string_view owner) {
+        if (place.kind == InoutPlace::Kind::Accessor) return Put(Accessor(place.fieldOwner, "set", place.target->Text()), '(', PlaceTemp(place, "object"), ", ", value, ')');
+        Put([&] { PlaceLvalue(place, *place.target, owner); }, " = ", value);
+    }
+    // Copy-in, copy-out: evaluates every argument in order into ls_argument_<label>_<i>, passes each inout copy
+    // by address, then writes the copies back in argument order.
+    void InoutCall(const BoundExpression& value, std::string_view owner) {
+        const auto* ref = FindFunctionRef(value);
+        if (!ref) throw std::runtime_error("Native C backend can pass inout arguments only to methods of this module");
+        const bool constructing = value.kind == SyntaxExpression::Kind::New;
+        const size_t first = constructing ? 0 : 1;
+        const auto parameters = ParameterTypes(ref->function);
+        assert(value.children.count - first == parameters.size());
+        const auto label = nextLabel++;
+        HoistedArguments arguments{&value, label, {}};
+        std::vector<std::optional<InoutPlace>> places;
+        Put("({ ");
+        for (size_t i{}; i < parameters.size(); ++i) {
+            const auto& argument = Child(value, first + i);
+            const bool inout = argument.kind == SyntaxExpression::Kind::Inout;
+            assert(inout == ref->function->parameters[i].isInout);
+            arguments.inout.push_back(inout);
+            places.push_back(inout ? std::optional(HoistPlace(Child(argument, 0), label, i, owner)) : std::nullopt);
+            Put(Type(parameters[i]), ' ', ArgumentTemp("argument", label, i), " = ");
+            if (inout) ReadPlace(*places.back(), owner); else Value(parameters[i], argument, owner);
+            Put("; ");
+        }
+        const bool returns = value.type != TypeTable::Void;
+        const auto result = Temp("result", label);
+        const auto saved = std::exchange(hoisted, std::move(arguments));
+        if (returns) Put(Type(value.type), ' ', result, " = ");
+        if (constructing) Construction(value, value.Text(), 0, owner); else Call(value, owner);
+        Put("; ");
+        hoisted = saved;
+        for (size_t i{}; i < places.size(); ++i) if (places[i]) { WritePlace(*places[i], ArgumentTemp("argument", label, i), owner); Put("; "); }
+        if (returns) Put(result); else Put("(void)0");
+        Put("; })");
+    }
+    void HoistedArgument(size_t index) {
+        assert(index < hoisted.inout.size());
+        if (hoisted.inout[index]) Put('&');
+        Put(ArgumentTemp("argument", hoisted.label, index));
+    }
+
     // Calls a function declared in this module: instance (receiver first), static, or implicit-this.
     void UserCall(const BoundExpression& value, const BoundExpression& callee, const FunctionRef& ref, std::string_view owner) {
         const auto& function = *ref.function;
@@ -956,7 +1058,7 @@ struct CEmitter {
             const Id introducer{entry.introducer->name};
             const auto temp = Temp("receiver", nextLabel++);
             Put("({ LS_", introducer, "* ", temp, " = (LS_", introducer, "*)", receiver, "; ((", CTypeName{function.returnType}, " (*)(LS_", introducer, '*');
-            for (const auto& parameter : function.parameters) Put(", ", CTypeName{parameter.type});
+            for (const auto& parameter : function.parameters) Put(", ", CTypeName{parameter.type}, parameter.isInout ? "*" : "");
             Put("))", temp, "->ls_type->vtable[", slot->second, "])(", temp); Arguments(parameters, value, 1, true, owner);
             return Put("); })");
         }
@@ -1107,7 +1209,7 @@ struct CEmitter {
     }
     void InitSignature(const BoundClass& type, const BoundFunction* constructor) {
         Put("void ", InitName(type, constructor), "(LS_", Id{type.name}, "* self");
-        if (constructor) for (const auto& parameter : constructor->parameters) Put(", ", CTypeName{parameter.type}, ' ', Id{parameter.name});
+        if (constructor) for (const auto& parameter : constructor->parameters) Put(", ", [&] { ParameterDeclaration(parameter); });
         Put(')');
     }
     // The base constructor that `constructor` (null: the implicit one) runs: the one `: base(...)` chose, else the parameterless one.
@@ -1116,11 +1218,13 @@ struct CEmitter {
         const auto found = std::find_if(base.functions.begin(), base.functions.end(), [](const auto& item) { return item.isConstructor && item.parameters.empty(); });
         return found == base.functions.end() ? nullptr : &*found;
     }
+    // An inout parameter is a pointer to the caller's copy.
+    void ParameterDeclaration(const SyntaxParameter& parameter) { Put(CTypeName{parameter.type}, parameter.isInout ? "* " : " ", Id{parameter.name}); }
     void Parameters(const BoundFunction& function) {
         if (function.parameters.empty()) return Put("void");
         for (size_t i{}; i < function.parameters.size(); ++i) {
             if (i) Put(", ");
-            Put(CTypeName{function.parameters[i].type}, ' ', Id{function.parameters[i].name});
+            ParameterDeclaration(function.parameters[i]);
         }
     }
     // Moves captured-and-assigned parameters into cells at the top of a body.
@@ -1141,7 +1245,7 @@ struct CEmitter {
         if (function.isStatic) Parameters(function);
         else {
             Put("LS_", Id{type.name}, "* self");
-            for (const auto& parameter : function.parameters) Put(", ", CTypeName{parameter.type}, ' ', Id{parameter.name});
+            for (const auto& parameter : function.parameters) Put(", ", [&] { ParameterDeclaration(parameter); });
         }
         Put(')');
     }
@@ -1165,7 +1269,7 @@ struct CEmitter {
     bool IsDynamicCallable(const BoundFunction& function) const {
         const auto result = Find(function.returnType);
         if (result != TypeTable::Void && !TryKindName(result)) return false;
-        return std::all_of(function.parameters.begin(), function.parameters.end(), [&](const auto& parameter) { return TryKindName(Find(parameter.type)).has_value(); });
+        return std::all_of(function.parameters.begin(), function.parameters.end(), [&](const auto& parameter) { return !parameter.isInout && TryKindName(Find(parameter.type)).has_value(); });
     }
     // A method gets an `any` thunk ("ls_invoke_<Owner>_<name>") when it has a body, is not overloaded in its class, and its types can cross as LS_Value.
     bool HasInvokeThunk(const BoundClass& type, const BoundFunction& function) const {
@@ -1253,10 +1357,8 @@ struct CEmitter {
     }
     // "Type name" or "Type? name" of an external parameter.
     static std::pair<std::string_view, std::string_view> SplitParameter(std::string_view parameter) {
-        const auto split = parameter.find(' ');
-        auto type = parameter.substr(0, split);
-        if (type.ends_with('?')) type.remove_suffix(1);
-        return {type, split == std::string_view::npos ? std::string_view("argument") : parameter.substr(split + 1)};
+        const auto label = SplitParameterLabel(parameter);
+        return {label.type, label.name.empty() ? std::string_view("argument") : label.name};
     }
     // Host thunks take the host pointer for an extern class (null when null or destroyed), other types as they are.
     void HostType(std::string_view type) { if (natives.contains(type)) Put("void*"); else Put(CTypeName{type}); }
@@ -1326,11 +1428,12 @@ struct CEmitter {
     }
 
     // Source name of an export: overloads after the first carry their parameter types.
+    static std::string ExportParameter(const SyntaxParameter& parameter) { return (parameter.isInout ? "inout " : "") + parameter.type; }
     std::string ExportName(const BoundClass& type, const BoundFunction& function) const {
         auto name = type.name + "." + (function.isConstructor ? "new" : function.name);
         if (RefOf(function).ordinal) {
             name += '(';
-            for (size_t i{}; i < function.parameters.size(); ++i) { if (i) name += ','; name += function.parameters[i].type; }
+            for (size_t i{}; i < function.parameters.size(); ++i) { if (i) name += ','; name += ExportParameter(function.parameters[i]); }
             name += ')';
         }
         return name;
@@ -1351,7 +1454,7 @@ struct CEmitter {
         const auto constructors = Constructors(value);
         const auto exportConstructor = [&](const BoundFunction* constructor) {
             std::vector<std::string> parameters;
-            if (constructor) for (const auto& parameter : constructor->parameters) parameters.push_back(parameter.type);
+            if (constructor) for (const auto& parameter : constructor->parameters) parameters.push_back(ExportParameter(parameter));
             result.exports.push_back({constructor ? ExportName(value, *constructor) : value.name + ".new", constructor ? RefOf(*constructor).cName : FunctionName(value.name, "new"), value.name, std::move(parameters)});
         };
         // Structs build a value in place: field initializers, then the body.
@@ -1428,7 +1531,7 @@ struct CEmitter {
             functionReturn = TypeTable::Unknown;
             std::vector<std::string> parameters;
             if (!function.isStatic) parameters.push_back(value.name);
-            for (const auto& p : function.parameters) parameters.push_back(p.type);
+            for (const auto& p : function.parameters) parameters.push_back(ExportParameter(p));
             result.exports.push_back({ExportName(value, function), RefOf(function).cName, function.returnType, std::move(parameters)});
         }
     }
@@ -1452,11 +1555,8 @@ struct CEmitter {
             const auto parameters = [&] {
                 Put("LS_", Id{value.name}, "* self");
                 for (const auto& parameter : member.parameters) {
-                    const auto split = parameter.find(' ');
-                    auto parameterType = std::string_view(parameter).substr(0, split);
-                    if (parameterType.ends_with('?')) parameterType.remove_suffix(1);
-                    const auto parameterName = split == std::string::npos ? std::string_view("argument") : std::string_view(parameter).substr(split + 1);
-                    Put(", ", CTypeName{parameterType}, ' ', Id{parameterName});
+                    const auto [type, name] = SplitParameter(parameter);
+                    Put(", ", CTypeName{type}, SplitParameterLabel(parameter).isInout ? "* " : " ", Id{name});
                 }
             };
             Line(0, "extern ", CTypeName{member.type}, ' ', Fn{value.name, member.name}, '(', parameters, ");");

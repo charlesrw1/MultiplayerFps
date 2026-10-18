@@ -125,6 +125,7 @@ struct Local {
     TypeId type{};
     size_t symbolIndex{};
     size_t depth{};
+    bool isInout{}; // an inout parameter
 };
 
 constexpr TypeId InferReturn = std::numeric_limits<TypeId>::max(); // lambda bodies infer their return type
@@ -291,7 +292,7 @@ private:
                 if (function.isConstructor && function.name != value.name) AddDiagnostic("Constructor name must match " + std::string(value.isStruct ? "struct" : "class") + " '" + value.name + "'", function.span);
                 if (!function.isConstructor) CheckType(types_.Intern(function.returnType), function.span);
                 std::vector<std::string> parameters, parameterTypes;
-                for (const auto& parameter : function.parameters) { CheckType(types_.Intern(parameter.type), ParameterNameSpan(parameter)); parameters.push_back(parameter.type + " " + parameter.name); parameterTypes.push_back(parameter.type); }
+                for (const auto& parameter : function.parameters) { CheckType(types_.Intern(parameter.type), ParameterNameSpan(parameter)); parameters.push_back(MakeParameterLabel(parameter)); parameterTypes.push_back((parameter.isInout ? "inout " : "") + parameter.type); }
                 if (function.isConstructor) {
                     const bool duplicate = std::any_of(constructors.begin(), constructors.end(), [&](size_t other) { return SameParameterTypes(result_.symbols[other].parameters, parameters); });
                     if (duplicate) AddDiagnostic("Constructor with the same parameters is already declared on " + value.name, function.span);
@@ -319,7 +320,10 @@ private:
     }
     static bool SameParameterTypes(const std::vector<std::string>& left, const std::vector<std::string>& right) {
         if (left.size() != right.size()) return false;
-        for (size_t i{}; i < left.size(); ++i) if (std::string_view(left[i]).substr(0, left[i].find(' ')) != std::string_view(right[i]).substr(0, right[i].find(' '))) return false;
+        for (size_t i{}; i < left.size(); ++i) {
+            const auto a = SplitParameterLabel(left[i]), b = SplitParameterLabel(right[i]);
+            if (a.type != b.type || a.isInout != b.isInout) return false;
+        }
         return true;
     }
     void CheckMethodModifiers(const SyntaxClass& owner, const SyntaxFunction& function) {
@@ -330,6 +334,7 @@ private:
             if (function.hasBody) AddDiagnostic("Extern method " + name + " cannot have a body", function.span);
             if (function.hasBaseCall) AddDiagnostic("Extern constructor of '" + owner.name + "' cannot call ': base(...)'", function.span);
             if (modifiers.isOverride || modifiers.isAbstract || modifiers.isSealed) AddDiagnostic("Extern method " + name + " can only be 'static' or 'virtual'", function.span);
+            if (std::any_of(function.parameters.begin(), function.parameters.end(), [](const auto& parameter) { return parameter.isInout; })) AddDiagnostic("Extern method " + name + " cannot have inout parameters", function.span);
             return;
         }
         if (function.isConstructor) { if (!function.hasBody) AddDiagnostic("Constructor of '" + owner.name + "' must have a body", function.span); return; }
@@ -513,6 +518,7 @@ private:
     // One overload of a method, constructor, static function or native member.
     struct Callable {
         std::vector<TypeId> parameters;
+        std::vector<bool> inout; // per parameter
         size_t required{};
         TypeId result{};
         std::optional<size_t> symbol;            // null for the implicit default constructor
@@ -523,9 +529,9 @@ private:
         const auto& symbol = result_.symbols[symbolIndex];
         Callable callable; callable.symbol = symbolIndex; callable.result = symbolTypes_[symbolIndex]; callable.isStatic = symbol.isStatic;
         for (const auto& label : symbol.parameters) {
-            auto type = std::string_view(label).substr(0, label.find(' '));
-            if (type.ends_with('?')) type.remove_suffix(1);
-            callable.parameters.push_back(types_.Intern(type));
+            const auto parameter = SplitParameterLabel(label);
+            callable.parameters.push_back(types_.Intern(parameter.type));
+            callable.inout.push_back(parameter.isInout);
         }
         callable.required = callable.parameters.size();
         if (const auto builtin = symbolBuiltins_.find(symbolIndex); builtin != symbolBuiltins_.end()) {
@@ -536,7 +542,7 @@ private:
     }
     std::string Signature(std::string_view name, const Callable& callable) const {
         std::string text(name); text += '(';
-        for (size_t i{}; i < callable.parameters.size(); ++i) { if (i) text += ", "; text += Name(callable.parameters[i]); if (i >= callable.required) text += '?'; }
+        for (size_t i{}; i < callable.parameters.size(); ++i) { if (i) text += ", "; if (IsInoutParameter(callable, i)) text += "inout "; text += Name(callable.parameters[i]); if (i >= callable.required) text += '?'; }
         return text + ')';
     }
     // Cost of passing an argument of type actual for a parameter of type expected; negative when it cannot convert.
@@ -550,12 +556,22 @@ private:
         if (types_.IsList(expected) || expected == TypeTable::Table) return 4;
         return 1; // derived to base
     }
+    static bool IsInoutParameter(const Callable& callable, size_t index) { return index < callable.inout.size() && callable.inout[index]; }
+    bool IsInoutArgument(NodeId argument) { return Node(argument).kind == SyntaxExpression::Kind::Inout; }
+    // An inout parameter takes only an inout argument of exactly its type; other parameters take no inout argument.
+    int ArgumentCost(const Callable& callable, size_t index, NodeId argument) {
+        const bool inout = IsInoutParameter(callable, index);
+        if (inout != IsInoutArgument(argument)) return -1;
+        const auto expected = callable.parameters[index], actual = Node(argument).type;
+        if (inout) return expected == actual || actual == TypeTable::Unknown ? 0 : -1;
+        return ConversionCost(expected, actual);
+    }
     // Total conversion cost of the arguments for one overload, or -1 when it does not apply.
     int Score(const Callable& callable, NodeId arguments, size_t count) {
         if (count < callable.required || count > callable.parameters.size()) return -1;
         int total = static_cast<int>(callable.parameters.size() - count);
         for (size_t i{}; i < count; ++i) {
-            const auto cost = ConversionCost(callable.parameters[i], Node(arguments + static_cast<NodeId>(i)).type);
+            const auto cost = ArgumentCost(callable, i, arguments + static_cast<NodeId>(i));
             if (cost < 0) return -1;
             total += cost;
         }
@@ -588,14 +604,24 @@ private:
                 return -1;
             }
             for (size_t i{}; i < count; ++i) {
-                const auto actual = Node(arguments + static_cast<NodeId>(i)).type;
-                if (ConversionCost(only.parameters[i], actual) < 0)
+                const auto argument = arguments + static_cast<NodeId>(i);
+                const auto actual = Node(argument).type;
+                const auto ordinal = std::to_string(i + 1);
+                if (IsInoutParameter(only, i) && !IsInoutArgument(argument)) AddDiagnostic("Argument " + ordinal + " of '" + std::string(name) + "' is an inout parameter: write 'inout' before the argument", argumentSpan(i));
+                else if (!IsInoutParameter(only, i) && IsInoutArgument(argument)) AddDiagnostic("Argument " + ordinal + " of '" + std::string(name) + "' is not an inout parameter: remove 'inout'", argumentSpan(i));
+                else if (IsInoutParameter(only, i) && ArgumentCost(only, i, argument) < 0) AddDiagnostic("Inout argument " + ordinal + " of '" + std::string(name) + "' must be exactly '" + Name(only.parameters[i]) + "', got " + DisplayType(actual), argumentSpan(i));
+                else if (ArgumentCost(only, i, argument) < 0)
                     AddDiagnostic(std::string(constructor ? "Constructor argument " : "Argument ") + std::to_string(i + 1) + (constructor ? " for '" : " of '") + std::string(name) + "' expects '" + Name(only.parameters[i]) + "', got " + DisplayType(actual), argumentSpan(i));
             }
             return -1;
         }
         std::string message = "No overload of '" + std::string(name) + "' accepts (";
-        for (size_t i{}; i < count; ++i) { if (i) message += ", "; message += Name(Node(arguments + static_cast<NodeId>(i)).type); }
+        for (size_t i{}; i < count; ++i) {
+            const auto argument = arguments + static_cast<NodeId>(i);
+            if (i) message += ", ";
+            if (IsInoutArgument(argument)) message += "inout ";
+            message += Name(Node(argument).type);
+        }
         message += "). Candidates: ";
         for (size_t i{}; i < candidates.size(); ++i) { if (i) message += "; "; message += Signature(name, candidates[i]); }
         AddDiagnostic(std::move(message), callSpan);
@@ -623,7 +649,7 @@ private:
         return result;
     }
     void CoerceArguments(const Callable& callable, NodeId arguments, size_t count) {
-        for (size_t i{}; i < count && i < callable.parameters.size(); ++i) Accepts(callable.parameters[i], arguments + static_cast<NodeId>(i));
+        for (size_t i{}; i < count && i < callable.parameters.size(); ++i) if (!IsInoutParameter(callable, i)) Accepts(callable.parameters[i], arguments + static_cast<NodeId>(i));
     }
     void ApplyNative(const Callable& chosen, bool constructing, Lowering& lowering, const BuiltinMember*& nativeMember) {
         nativeMember = chosen.builtin;
@@ -675,6 +701,7 @@ private:
             methodsOf(owner->name, callee.text); methodsOf("$type:" + owner->name, callee.text);
         }
         if (candidates.empty()) {
+            RejectInoutArguments(callee.text, arguments, argumentCount);
             if (type != TypeTable::Unknown && type != TypeTable::Any) AddDiagnostic("Expression of type " + DisplayType(type) + " is not callable", callee.span);
             return;
         }
@@ -719,7 +746,31 @@ private:
         default: return false;
         }
     }
+    // Only calls of declared functions take inout arguments.
+    void RejectInoutArguments(std::string_view name, NodeId arguments, size_t count) {
+        for (size_t i{}; i < count; ++i) if (IsInoutArgument(arguments + static_cast<NodeId>(i)))
+            AddDiagnostic("Argument " + std::to_string(i + 1) + " of '" + std::string(name) + "' cannot be inout: only declared methods have inout parameters", Node(arguments + static_cast<NodeId>(i)).span);
+    }
+    // True when the bound expression names storage that a call can copy out of and back into.
+    bool IsInoutTarget(NodeId id) {
+        const auto& node = Node(id);
+        using Kind = SyntaxExpression::Kind;
+        const bool method = node.symbolIndex && result_.symbols[*node.symbolIndex].kind == SymbolKind::Method;
+        switch (node.kind) {
+        case Kind::Identifier: return !method && node.lowering != Lowering::Base && node.Text() != "this" && types_.Kind(node.type) != TypeKind::Meta && types_.Kind(node.type) != TypeKind::Builtin;
+        case Kind::Parenthesized: return IsInoutTarget(node.children.first);
+        case Kind::Member: {
+            const auto receiver = Node(node.children.first).type;
+            if (method || node.lowering == Lowering::NativeConstant || receiver == TypeTable::Table || receiver == TypeTable::Any) return false;
+            if (types_.Kind(receiver) == TypeKind::Meta) return node.lowering == Lowering::StaticField;
+            return IsStructType(receiver) ? IsAddressable(node.children.first) : true;
+        }
+        case Kind::Index: return node.lowering == Lowering::ListIndex;
+        default: return false;
+        }
+    }
     void CheckBuiltinArguments(std::string_view name, std::span<const BuiltinParameter> parameters, bool variadic, const SyntaxExpression& call, NodeId arguments, size_t count) {
+        RejectInoutArguments(name, arguments, count);
         const size_t required = static_cast<size_t>(std::count_if(parameters.begin(), parameters.end(), [](const auto& value) { return !value.optional; }));
         if (count < required || (!variadic && count > parameters.size())) {
             const auto range = variadic ? " or more" : required == parameters.size() ? "" : " to " + std::to_string(parameters.size());
@@ -741,6 +792,7 @@ private:
     TypeId Infer(const SyntaxExpression& expression, std::vector<Local>& locals, const SyntaxClass* owner, NodeId slot) {
         using Kind = SyntaxExpression::Kind;
         const bool baseAllowed = std::exchange(baseAllowed_, false); // only the target of a member access may be `base`
+        const bool inoutAllowed = std::exchange(inoutAllowed_, false); // only a call argument may be `inout`
         const size_t childCount = expression.children.count;
         const NodeId first = AllocateExpressions(childCount);
         NodeId visited{};
@@ -765,7 +817,7 @@ private:
             type = TypeTable::Any; break;
         case Kind::New: {
             type = types_.Intern(expression.text); CheckType(type, expression.span);
-            for (size_t i{}; i < childCount; ++i) child(i);
+            for (size_t i{}; i < childCount; ++i) { inoutAllowed_ = true; child(i); }
             if (enumTypes_.contains(expression.text)) AddDiagnostic("Enum type '" + expression.text + "' cannot be constructed", expression.span);
             else if (IsBuiltinType(expression.text) && !IsNativeStruct(expression.text)) AddDiagnostic("Type '" + expression.text + "' cannot be constructed with 'new'", expression.span);
             else ResolveConstruction(expression, first, childCount, type, symbol, lowering, nativeMember);
@@ -775,6 +827,7 @@ private:
             if (expression.text == "this" && staticContext_) AddDiagnostic("'this' cannot be used in " + std::string(staticContextName_), expression.span);
             if (const auto* local = FindLocal(locals, expression.text)) {
                 type = local->type; symbol = local->symbolIndex;
+                if (local->isInout && lambdaNesting_ > 0) AddDiagnostic("A lambda cannot capture inout parameter '" + expression.text + "'", expression.span);
                 if (expression.text == "this") CheckStructLambdaCapture(owner, expression.span);
             }
             // `base` is not reserved: a local or member with that name wins.
@@ -806,6 +859,11 @@ private:
             break;
         }
         case Kind::Parenthesized: type = child(0); break;
+        case Kind::Inout:
+            type = child(0);
+            if (!inoutAllowed) AddDiagnostic("'inout' can only mark an argument of a method call", expression.span);
+            else if (type != TypeTable::Unknown && !IsInoutTarget(first)) AddDiagnostic("An inout argument must be a variable, a field or a list element", Syntax().Child(expression, 0).span);
+            break;
         case Kind::Member: {
             baseAllowed_ = true;
             const auto target = child(0);
@@ -831,12 +889,13 @@ private:
                 break;
             }
             type = child(0);
-            for (size_t i = 1; i < childCount; ++i) child(i);
+            for (size_t i = 1; i < childCount; ++i) { inoutAllowed_ = true; child(i); }
             if (callee.kind == Kind::Identifier) if (const auto* builtin = FindBuiltinFunction(callee.text)) {
                 CheckBuiltinArguments(builtin->name, builtin->parameters, builtin->variadic, expression, arguments, argumentCount);
                 type = types_.Intern(builtin->returnType); lowering = builtin->lowering; break;
             }
             if (types_.IsFunction(type)) {
+                RejectInoutArguments("lambda", arguments, argumentCount);
                 const auto expected = types_.Arity(type);
                 if (argumentCount != expected) AddDiagnostic("Expected " + std::to_string(expected) + " argument(s) for lambda, got " + std::to_string(argumentCount), expression.span);
                 type = types_.Element(type); break;
@@ -1161,6 +1220,7 @@ private:
                     const auto nameSpan = ParameterNameSpan(parameter);
                     if (!parameterNames.insert(parameter.name).second) AddDiagnostic("Parameter '" + parameter.name + "' is already declared", nameSpan);
                     AddLocal(locals, parameter.name, types_.Intern(parameter.type), SymbolKind::Parameter, nameSpan, {nameSpan.offset, scopeEnd - nameSpan.offset}, 0);
+                    locals.back().isInout = parameter.isInout;
                 }
                 if (function.isConstructor) BindBaseCall(value, function, locals, boundFunction);
                 staticContext_ = function.isStatic;
@@ -1229,6 +1289,7 @@ private:
     std::string_view staticContextName_ = DefaultStaticContext; // where `this` is unavailable, for messages
     bool baseAllowed_{};
     size_t lambdaNesting_{};
+    bool inoutAllowed_{};
     std::unordered_map<std::string_view, const SyntaxClass*> classes_; // first declaration wins
     std::unordered_map<const BuiltinFunction*, size_t> builtinSymbols_;
     StringSet knownTypes_;
@@ -1239,6 +1300,21 @@ private:
 };
 
 } // namespace
+
+ParameterLabel SplitParameterLabel(std::string_view label) {
+    ParameterLabel result;
+    constexpr std::string_view inout = "inout ";
+    if (label.starts_with(inout)) { result.isInout = true; label.remove_prefix(inout.size()); }
+    const auto split = label.find(' ');
+    result.type = label.substr(0, split);
+    if (split != std::string_view::npos) result.name = label.substr(split + 1);
+    if (result.type.ends_with('?')) { result.isOptional = true; result.type.remove_suffix(1); }
+    if (result.name.ends_with('?')) { result.isOptional = true; result.name.remove_suffix(1); }
+    return result;
+}
+std::string MakeParameterLabel(const SyntaxParameter& parameter) {
+    return (parameter.isInout ? "inout " : "") + parameter.type + " " + parameter.name;
+}
 
 Analysis Analyze(std::string_view source) { auto syntax = ParseTree(source); return Analyzer(source, std::move(syntax)).Run(); }
 Analysis Analyze(std::string_view source, const std::vector<ExternalType>& externalTypes) { auto syntax = ParseTree(source); return Analyzer(source, std::move(syntax), externalTypes).Run(); }

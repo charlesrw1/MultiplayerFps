@@ -11,7 +11,7 @@ namespace {
 
 const std::unordered_set<std::string> Keywords{
     "class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return",
-    "null", "true", "false", "virtual", "override", "abstract", "sealed", "is", "as", "extern"
+    "null", "true", "false", "virtual", "override", "abstract", "sealed", "is", "as", "extern", "inout"
 };
 
 TextSpan Cover(TextSpan first, TextSpan last) {
@@ -285,8 +285,9 @@ private:
         result.modifiers = modifiers; result.isStatic = modifiers.isStatic;
         Match("(");
         while (!AtEnd() && !Is(")")) {
+            const bool inout = Is("inout"); if (inout) Advance();
             auto [type, typeSpan] = ParseType(); const auto parameterName = Identifier("parameter name");
-            result.parameters.push_back({std::move(type), parameterName.text, Cover(typeSpan, parameterName.span)});
+            result.parameters.push_back({std::move(type), parameterName.text, Cover(typeSpan, parameterName.span), inout});
             if (!Is(",")) break; Advance();
         }
         Match(")");
@@ -481,7 +482,12 @@ private:
     size_t PushArguments() {
         Match("("); size_t count{};
         while (!AtEnd() && !Is(")")) {
-            const auto argument = ParseExpression(); scratch_.push_back(argument); ++count;
+            NodeId argument{};
+            if (Is("inout")) {
+                const auto keyword = Advance().span; const auto target = ParseExpression();
+                argument = Add(SyntaxExpression::Kind::Inout, {}, Cover(keyword, Span(target)), Link({target}));
+            } else argument = ParseExpression();
+            scratch_.push_back(argument); ++count;
             if (!Is(",")) break; Advance();
         }
         Match(")"); return count;

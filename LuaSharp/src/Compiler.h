@@ -57,13 +57,14 @@ private:
     std::span<const NodeId> ids_;
 };
 
-struct SyntaxParameter { std::string type; std::string name; TextSpan span; };
+struct SyntaxParameter { std::string type; std::string name; TextSpan span; bool isInout{}; };
 // Ranges index SyntaxTree::links (child ids) or SyntaxTree::parameters.
 struct SyntaxExpression {
     enum class Kind {
         Missing, Identifier, Number, String, Null, Boolean, Table, TableEntry, New,
         Member, Call, Index, Slice, Range, Lambda, Unary, Binary, Assignment, Parenthesized,
-        Is, As // text is the type name; one child, the operand
+        Is, As, // text is the type name; one child, the operand
+        Inout   // `inout x` call argument; one child, the target
     } kind{Kind::Missing};
     std::string text;
     TextSpan span;

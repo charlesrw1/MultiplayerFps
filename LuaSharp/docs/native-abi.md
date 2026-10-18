@@ -297,6 +297,10 @@ The native types in `vecmath.h` follow the same rules. `Vec2`/`Vec3` use `float`
 
 The first declaration of a name keeps the symbol `ls_Type_name`. Each later overload gets `ls_Type_name__N`, where `N` is its declaration order. Export names of later overloads include the parameter types, for example `Type.name(float)`. A static method has no `self` parameter. Reload treats each overload as a separate function. A static field is the module-state member `ls_static_Type__field`, and it is not part of the instance layout.
 
+## Inout parameters
+
+An inout parameter `inout T x` is the C parameter `T* x`. It points to a copy that the caller owns. The function body reads and writes `(*x)`. The caller evaluates its arguments into temporaries, passes the address of each inout temporary, and assigns the temporaries back to the arguments after the return. A host that calls such a function through `FindSymbol` must do the same. The export parameter types and the export names spell the parameter `inout T`.
+
 ## Closures and current limits
 
 A native closure object contains an invoke pointer, an optional GC-managed environment and its arity. Parameters and results cross the closure boundary as `LS_Value`. A call through a typed closure variable has its arity checked at compile time. A call through `any` pads missing arguments with nil.

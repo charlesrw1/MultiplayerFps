@@ -74,6 +74,16 @@ enum class Lowering : uint8_t {
 };
 std::string_view LoweringName(Lowering lowering);
 
+// Symbol::parameters spell each parameter "[inout ]Type[?] name".
+struct ParameterLabel {
+    std::string_view type; // without "inout " and '?'
+    std::string_view name; // empty when the label has none
+    bool isInout{};
+    bool isOptional{};
+};
+ParameterLabel SplitParameterLabel(std::string_view label);
+std::string MakeParameterLabel(const SyntaxParameter& parameter);
+
 enum class SymbolKind { Class, Enum, Type, Field, Method, Function, Variable, Parameter };
 struct Symbol {
     std::string name;
