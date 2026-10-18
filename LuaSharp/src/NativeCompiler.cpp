@@ -125,6 +125,7 @@ struct NativeModule::Impl {
     CCompilationResult generated;
     std::shared_ptr<NativeRuntime> runtime;
     size_t rootRegistration{};
+    const NativeDebugModule* debug{};
     bool initialized{};
 
     ~Impl() {
@@ -151,7 +152,10 @@ NativeModule NativeModule::Compile(std::string_view source, std::string_view lib
 }
 
 NativeModule NativeModule::Compile(std::string_view source, const NativeCompileOptions& options) {
-    return Load(CompileToC(source, DeclarationTypes(options.declarations, options.externalTypes)), options);
+    const auto types = DeclarationTypes(options.declarations, options.externalTypes);
+    if (!options.emitDebugHooks) return Load(CompileToC(source, types), options);
+    CEmitOptions emit{true, source, options.sourceName.empty() ? "module.ls" : options.sourceName};
+    return Load(CompileToC(Analyze(source, types), types, emit), options);
 }
 
 NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompileOptions& options) {
@@ -204,6 +208,12 @@ NativeModule NativeModule::Load(CCompilationResult generated, const NativeCompil
     const auto traceRoots = reinterpret_cast<NativeRootTraceFunction>(impl->getSymbol(impl->state, "ls_module_trace_roots"));
     if (!traceRoots) throw std::runtime_error("TinyCC output did not contain ls_module_trace_roots");
     impl->rootRegistration = impl->runtime->RegisterRoots(traceRoots);
+    if (!impl->generated.debug.functions.empty()) {
+        const auto debug = reinterpret_cast<const NativeDebugModule* (*)()>(impl->getSymbol(impl->state, "ls_module_debug"));
+        if (!debug) throw std::runtime_error("TinyCC output did not contain ls_module_debug");
+        impl->debug = debug();
+        assert(impl->debug->functionCount == impl->generated.debug.functions.size());
+    }
 
     NativeModule module(std::move(impl));
     if (options.initialize) module.Initialize();
@@ -269,6 +279,8 @@ const CCompilationResult& NativeModule::Generated() const {
     if (!impl_) throw std::runtime_error("Native module is empty");
     return impl_->generated;
 }
+
+const NativeDebugModule* NativeModule::Debug() const { return impl_ ? impl_->debug : nullptr; }
 
 struct NativeFunctionSlot::State {
     std::atomic<void*> address{};

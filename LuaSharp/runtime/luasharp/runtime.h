@@ -150,6 +150,30 @@ int ls_module_bind(LS_RuntimeApi* runtime) {
     return 0;
 }
 
+#ifdef LS_DEBUG_HOOKS
+/* ---- debug hooks (instrumented modules). Mirrored by NativeDebugModule in CBackend.h. ---- */
+
+/* Runs before a statement while active, and stores statement in ls_statement. locals: the function's locals struct, which starts
+   with ls_statement (-1 until the first hook). frame: the function's rbp. */
+typedef void (*LS_DebugHook)(void* context, void* locals, void* frame, ls_wrap_bits function, ls_wrap_bits statement);
+typedef struct LS_DebugState { volatile ls_wrap_bits active; LS_DebugHook hook; void* context; } LS_DebugState;
+/* Code of one instrumented function: [begin, end). local_offsets index the locals struct, in NativeDebugFunction::locals order. */
+typedef struct LS_DebugFunction { const void* begin; const void* end; const ls_wrap_bits* local_offsets; ls_wrap_bits local_count; } LS_DebugFunction;
+typedef struct LS_DebugModule {
+    LS_DebugState* state;
+    const LS_DebugFunction* functions;
+    ls_wrap_bits function_count;
+    const void* text_begin;
+    const void* text_end;
+} LS_DebugModule;
+static LS_DebugState ls_debug;
+/* Out of line, so each hook site stays short for TinyCC. Frame 1 is the rbp of the instrumented function. */
+static void ls_debug_call(void* locals, ls_wrap_bits function, ls_wrap_bits statement) {
+    ls_debug.hook(ls_debug.context, locals, __builtin_frame_address(1), function, statement);
+}
+#define LS_DEBUG(function, statement) (ls_debug.active ? ls_debug_call(&ls_locals, function, statement) : (void)0)
+#endif
+
 /* ---- errors and allocation ---- */
 
 static void ls_report_error(const char* message) {

@@ -335,9 +335,23 @@ Module-global values are not migrated yet, and retired generations are intention
 
 Type infos and vtables live in each module. An object keeps the type info of the generation that created it, so its virtual calls use the code of that generation. [`design.md`](design.md) describes the planned change: one type info for each class, owned by the runtime and updated in place.
 
+## Debug hooks
+
+An instrumented build is for the script debugger (#49). Set `NativeCompileOptions::emitDebugHooks`, or `CEmitOptions::debugHooks` for `CompileToC`. Plain builds do not change.
+
+- Each script function, constructor, lambda and the top-level code keeps its parameters, `this` and its locals in the struct `ls_locals`. The first field is `ls_statement`.
+- Before each statement, `LS_DEBUG(function, statement)` calls the hook when `ls_debug.active` is not zero. A loop runs the hook in its condition, so the hook runs before each test.
+- The hook gets the address of `ls_locals` and the `rbp` of the function. The hook must write the statement id to `ls_statement`. The value is -1 before the first hook, so the debugger can find the line of a caller frame.
+- Each statement has a `#line` directive, so TinyCC errors show `.ls` lines. After each function, a `#line` directive gives the lines of the generated C again.
+- `ls_module_debug()` returns `LS_DebugModule`: the hook state, the code range and local offsets of each function, and the code range of the module. `NativeModule::Debug()` returns it.
+- `CCompilationResult::debug` has the names, the line of each statement id, and the locals of each function, in the same order. A local is visible before statements in [`visibleFrom`, `visibleTo`). An indirect local holds a pointer to the value: a cell, an `inout` parameter or the `this` of a struct.
+- Captured variables of a lambda are not locals of the lambda.
+- An instrumented module takes approximately 1.5 times the TinyCC time of a plain module.
+
 ## Command line and printf
 
 - `LuaSharp <file.ls> [-o out.c]` checks the file, writes the C output, compiles it with libtcc, and runs the module initializer. `run` and `run-native` do the same.
 - `emit-c` only writes the generated C.
+- `--debug-hooks` after the file name makes an instrumented build (see Debug hooks).
 - The CLI exits with a non-zero code when a diagnostic is an error.
 - `printf(format, values...)` does not append a newline. It accepts `%d`/`%i` (int), `%f` (numeric), `%s` (string), `%b` (bool), `%p` (managed reference), and `%%`.

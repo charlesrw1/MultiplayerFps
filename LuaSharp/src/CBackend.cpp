@@ -120,8 +120,30 @@ struct CEmitter {
     TypeId functionReturn = TypeTable::Unknown; // return type of the method being emitted
     std::string output;
     size_t nextLabel{};
+    // Debug builds: the instrumented function being emitted. Its text goes to a buffer until its locals struct is known.
+    const CEmitOptions& emitOptions;
+    struct DebugFrame {
+        std::string savedOutput;
+        std::string prologue;                                    // after the ls_locals declaration: parameter copies
+        std::unordered_map<size_t, std::string> fields;          // symbol -> field of ls_locals
+        std::vector<std::pair<std::string, std::string>> layout; // C type and field of each debug local, in order
+        std::optional<uint32_t> statement;                       // the last statement id
+    };
+    std::optional<DebugFrame> debugFrame;
+    std::vector<size_t> lineStarts;
+    std::string lineFile; // sourceName as the body of a C string
+    NativeDebugInfo debugInfo;
+    std::vector<std::string> debugSymbols; // C name of each instrumented function
 
-    CEmitter(const Analysis& value, const std::vector<ExternalType>& external) : analysis(value), program(value.bound), types(value.types), externalTypes(external) {
+    CEmitter(const Analysis& value, const std::vector<ExternalType>& external, const CEmitOptions& options)
+        : analysis(value), program(value.bound), types(value.types), externalTypes(external), emitOptions(options) {
+        if (options.debugHooks) {
+            assert(!options.source.empty() && !options.sourceName.empty());
+            lineStarts.push_back(0);
+            for (size_t i{}; i < options.source.size(); ++i) if (options.source[i] == '\n') lineStarts.push_back(i + 1);
+            for (const char character : options.sourceName) { if (character == '\\' || character == '"') lineFile += '\\'; lineFile += character; }
+            debugInfo.sourceName = options.sourceName;
+        }
         for (const auto& item : program.enums) enums.insert(item.name);
         for (const auto& item : NativeStructTypes()) structNames.insert(item);
         for (const auto& item : program.classes) {
@@ -322,6 +344,128 @@ struct CEmitter {
             scanExpression(scanExpression, *lambda);
             lambdaCaptures.push_back(std::move(captured));
         }
+    }
+
+    // ---- debug builds ----
+    uint32_t SourceLine(size_t offset) const { return static_cast<uint32_t>(std::upper_bound(lineStarts.begin(), lineStarts.end(), offset) - lineStarts.begin()); }
+    size_t DebugFunctionIndex() const { assert(debugFrame); return debugInfo.functions.size() - 1; }
+    const std::string* DebugField(size_t symbol) const {
+        if (!debugFrame) return nullptr;
+        const auto found = debugFrame->fields.find(symbol);
+        return found == debugFrame->fields.end() ? nullptr : &found->second;
+    }
+    std::string CType(std::string_view type) const { std::string result; AppendCType(result, type, enums, structNames); return result; }
+    // Adds a field to ls_locals, visible from the next statement. symbol is empty for `this`.
+    const std::string& AddDebugLocal(std::optional<size_t> symbol, std::string_view name, std::string cType, std::string_view type, bool indirect) {
+        assert(debugFrame);
+        auto field = symbol ? Identifier(name) + "__" + std::to_string(*symbol) : std::string("ls_self");
+        debugFrame->layout.emplace_back(std::move(cType), field);
+        const uint32_t from = debugFrame->statement ? *debugFrame->statement + 1 : 0;
+        debugInfo.functions.back().locals.push_back({std::string(name), std::string(type), from, UINT32_MAX, indirect});
+        if (!symbol) return debugFrame->layout.back().second;
+        const auto [entry, added] = debugFrame->fields.emplace(*symbol, std::move(field));
+        assert(added);
+        return entry->second;
+    }
+    // Parameters are copied into ls_locals; ParameterCells adds the cells.
+    void DebugParameters(const std::vector<SyntaxParameter>& parameters) {
+        if (!debugFrame) return;
+        for (const auto& parameter : parameters) {
+            const auto* binding = ParameterBinding(parameter);
+            if (!binding || IsCell(binding)) continue;
+            const auto& field = AddDebugLocal(binding->symbolIndex, parameter.name, CType(parameter.type) + (parameter.isInout ? "*" : ""), parameter.type, parameter.isInout);
+            debugFrame->prologue += "    ls_locals." + field + " = " + Identifier(parameter.name) + ";\n";
+        }
+    }
+    // `self` as the local `this`; after `self` is declared.
+    void DebugSelf(size_t depth, std::string cType, std::string_view type, bool indirect) {
+        if (!debugFrame) return;
+        AddDebugLocal(std::nullopt, "this", std::move(cType), type, indirect);
+        Line(depth, "ls_locals.ls_self = self;");
+    }
+    uint32_t NewStatement(size_t offset) {
+        assert(debugFrame);
+        auto& lines = debugInfo.functions.back().lines;
+        lines.push_back(SourceLine(offset));
+        debugFrame->statement = static_cast<uint32_t>(lines.size() - 1);
+        return *debugFrame->statement;
+    }
+    void LineDirective(size_t offset) { if (debugFrame) Line(0, "#line ", SourceLine(offset), " \"", lineFile, '"'); }
+    void HookCall(uint32_t statement) { Put("LS_DEBUG(", DebugFunctionIndex(), ", ", statement, ')'); }
+    // The hook before a statement.
+    void DebugStatement(size_t depth, size_t offset) {
+        if (!debugFrame) return;
+        LineDirective(offset);
+        const auto statement = NewStatement(offset);
+        Line(depth, [&] { HookCall(statement); }, ';');
+    }
+    // A loop condition that runs the hook before each test.
+    template <typename Test> auto LoopCondition(size_t offset, const Test& condition) {
+        return [this, offset, &condition] {
+            if (!debugFrame) return condition();
+            const auto statement = NewStatement(offset);
+            Put('(', [&] { HookCall(statement); }, ", ", condition, ')');
+        };
+    }
+    // Locals added after the mark stop being visible at the next statement id.
+    size_t DebugScope() const { return debugFrame ? debugInfo.functions.back().locals.size() : 0; }
+    void CloseDebugScope(size_t mark) {
+        if (!debugFrame) return;
+        auto& function = debugInfo.functions.back();
+        for (size_t i = mark; i < function.locals.size(); ++i) if (function.locals[i].visibleTo == UINT32_MAX) function.locals[i].visibleTo = static_cast<uint32_t>(function.lines.size());
+    }
+    // Emits one function. In debug builds its locals live in "LS_DebugLocals_<i> ls_locals", declared after the first line of its text.
+    template <typename Body> void DebugFunction(std::string name, std::string symbol, const Body& body) {
+        if (!emitOptions.debugHooks) return body();
+        assert(!debugFrame);
+        debugInfo.functions.push_back({std::move(name), {}, {}});
+        debugSymbols.push_back(std::move(symbol));
+        debugFrame.emplace();
+        debugFrame->savedOutput = std::exchange(output, {});
+        body();
+        CloseDebugScope(0);
+        auto frame = std::move(*debugFrame);
+        debugFrame.reset();
+        const auto text = std::exchange(output, std::move(frame.savedOutput));
+        const auto index = debugInfo.functions.size() - 1;
+        Line(0, "typedef struct LS_DebugLocals_", index, " {");
+        Line(1, "ls_wrap_bits ls_statement;");
+        for (const auto& [type, field] : frame.layout) Line(1, type, ' ', field, ';');
+        Line(0, "} LS_DebugLocals_", index, ';');
+        const auto open = text.find('\n') + 1;
+        assert(open > 0);
+        output.append(text, 0, open);
+        Line(1, "LS_DebugLocals_", index, " ls_locals; ls_locals.ls_statement = (ls_wrap_bits)-1;");
+        output += frame.prologue;
+        output.append(text, open);
+        Line(0, LineReset);
+        Line(0, "static void ls_debug_end_", index, "(void) {}");
+        if (!frame.layout.empty())
+            Line(0, "static const ls_wrap_bits ls_debug_offsets_", index, "[] = {", [&] { for (const auto& item : frame.layout) Put("ls_offsetof(LS_DebugLocals_", index, ", ", item.second, "), "); }, "};");
+    }
+    static constexpr std::string_view LineReset = "#line ls_c";
+    // The module table (LS_DebugModule). Then each LineReset becomes a #line of the generated C.
+    void DebugTables() {
+        assert(!debugSymbols.empty());
+        Line(0, "static void ls_debug_text_end(void) {}");
+        Line(0, "static const LS_DebugFunction ls_debug_functions[] = {");
+        for (size_t i{}; i < debugSymbols.size(); ++i)
+            Line(1, "{(const void*)", debugSymbols[i], ", (const void*)ls_debug_end_", i, ", ", [&] { if (debugInfo.functions[i].locals.empty()) Put("(const ls_wrap_bits*)0"); else Put("ls_debug_offsets_", i); }, ", ", debugInfo.functions[i].locals.size(), "},");
+        Line(0, "};");
+        Line(0, "static const LS_DebugModule ls_debug_module = {&ls_debug, ls_debug_functions, ", debugSymbols.size(), ", (const void*)ls_debug_text_begin, (const void*)ls_debug_text_end};");
+        Line(0, "const LS_DebugModule* ls_module_debug(void) { return &ls_debug_module; }");
+        std::string resolved;
+        resolved.reserve(output.size());
+        size_t physicalLine = 1;
+        for (size_t start{}; start < output.size();) {
+            const auto end = output.find('\n', start);
+            const auto line = std::string_view(output).substr(start, end == std::string::npos ? std::string::npos : end - start);
+            if (line == LineReset) resolved += "#line " + std::to_string(physicalLine + 1) + " \"" + lineFile + ".c\"";
+            else resolved += line;
+            if (end == std::string::npos) break;
+            resolved += '\n'; start = end + 1; ++physicalLine;
+        }
+        output = std::move(resolved);
     }
 
     // Appends each part to output. Invocable parts emit themselves.
@@ -612,29 +756,37 @@ struct CEmitter {
 
     // A local, parameter or captured variable. Cells are dereferenced.
     void Variable(size_t symbol, std::string_view name) {
-        if (inoutSymbols.contains(symbol)) return Put("(*", Id{name}, ')');
+        if (inoutSymbols.contains(symbol)) return Put("(*", [&] { LocalStorage(symbol, name, false); }, ')');
         const bool cell = cellSymbols.contains(symbol);
         if (cell) Put("(*");
         if (CapturedByActive(symbol)) Put("ls_env->", Id{name});
-        else if (cell) Put("ls_cell_", Id{name});
-        else Put(Id{name});
+        else LocalStorage(symbol, name, cell);
         if (cell) Put(')');
+    }
+    // The C variable of a local or parameter: the pointer of a cell; a field of ls_locals in debug builds.
+    void LocalStorage(size_t symbol, std::string_view name, bool cell) {
+        if (const auto* field = DebugField(symbol)) return Put("ls_locals.", *field);
+        if (cell) Put("ls_cell_");
+        Put(Id{name});
     }
     // The value a new closure environment stores for a capture: the cell itself for shared captures.
     void CaptureSource(const VariableBinding& binding) {
         if (binding.name == "this") return Put("self");
         if (CapturedByActive(binding.symbolIndex)) return Put("ls_env->", Id{binding.name});
-        if (IsCell(&binding)) return Put("ls_cell_", Id{binding.name});
-        Put(Id{binding.name});
+        LocalStorage(binding.symbolIndex, binding.name, IsCell(&binding));
     }
     // Declares a local; a cell local lives on the GC heap.
     void Declare(size_t depth, const VariableBinding* binding, TypeId type, std::string_view name, const auto& initializer) {
-        if (!IsCell(binding)) return Line(depth, Type(type), ' ', Id{name}, " = ", initializer, ';');
+        const bool cell = IsCell(binding);
+        const auto* field = debugFrame && binding ? &AddDebugLocal(binding->symbolIndex, name, CType(Name(type)) + (cell ? "*" : ""), Name(type), cell) : nullptr;
+        const auto storage = [&] { if (field) Put("ls_locals.", *field); else Put(cell ? "ls_cell_" : "", Id{name}); };
+        const auto declared = [&] { if (!field) Put(Type(type), cell ? "* " : " "); storage(); };
+        if (!cell) return Line(depth, declared, " = ", initializer, ';');
         const auto create = [&] {
             if (IsTracedStruct(Name(type))) Put("ls_alloc(sizeof(", Type(type), "), ls_trace_cell_", Id{Name(type)}, ')');
             else Put("ls_cell_create(sizeof(", Type(type), "), ", KindName(type), ')');
         };
-        Line(depth, Type(type), "* ls_cell_", Id{name}, " = (", Type(type), "*)", create, "; *ls_cell_", Id{name}, " = ", initializer, ';');
+        Line(depth, declared, " = (", Type(type), "*)", create, "; *", storage, " = ", initializer, ';');
     }
 
     void Expression(const BoundExpression& value, std::string_view owner = {}) {
@@ -1113,10 +1265,19 @@ struct CEmitter {
         Put(')');
     }
 
+    // A block: its locals go out of scope after it.
     void Statements(NodeRange statements, size_t depth, std::string_view owner = {}, std::optional<size_t> continueLabel = {}, bool moduleTopLevel = false) {
+        const auto scope = DebugScope();
+        StatementList(statements, depth, owner, continueLabel, moduleTopLevel);
+        CloseDebugScope(scope);
+    }
+    void StatementList(NodeRange statements, size_t depth, std::string_view owner, std::optional<size_t> continueLabel, bool moduleTopLevel) {
         for (const auto& statement : program.Statements(statements)) {
             const auto& expression = program.Expression(statement.expression);
             const auto condition = [&] { Condition(expression, owner); };
+            const size_t offset = statement.syntax->span.offset;
+            // Loops run the hook in their condition.
+            if (statement.kind != SyntaxStatement::Kind::While && statement.kind != SyntaxStatement::Kind::For) DebugStatement(depth, offset);
             switch (statement.kind) {
             case SyntaxStatement::Kind::Local:
             {
@@ -1141,17 +1302,22 @@ struct CEmitter {
                 if (statement.elseBody.count) { Line(depth, "else {"); Statements(statement.elseBody, depth + 1, owner, continueLabel); Line(depth, '}'); }
                 break;
             case SyntaxStatement::Kind::While:
-                Line(depth, "while (", condition, ") {"); Statements(statement.body, depth + 1, owner); Line(depth, '}'); break;
+                LineDirective(offset);
+                Line(depth, "while (", LoopCondition(offset, condition), ") {"); Statements(statement.body, depth + 1, owner); Line(depth, '}'); break;
             case SyntaxStatement::Kind::For:
             {
                 const auto label = nextLabel++;
                 const auto& increment = program.Expression(statement.increment);
-                Line(depth, '{'); Statements(statement.initializer, depth + 1, owner);
-                Line(depth + 1, "while (", condition, ") {");
+                const auto scope = DebugScope(); // the initializer's locals
+                Line(depth, '{'); StatementList(statement.initializer, depth + 1, owner, {}, false);
+                LineDirective(offset);
+                Line(depth + 1, "while (", LoopCondition(offset, condition), ") {");
                 Statements(statement.body, depth + 2, owner, label);
                 Line(depth + 2, "ls_continue_", label, ":;");
                 if (increment.kind != SyntaxExpression::Kind::Missing) Line(depth + 2, Emitted(increment, owner), ';');
-                Line(depth + 1, '}'); Line(depth, '}'); break;
+                Line(depth + 1, '}'); Line(depth, '}');
+                CloseDebugScope(scope);
+                break;
             }
             case SyntaxStatement::Kind::ForEach: ForEach(statement, depth, owner); break;
             }
@@ -1165,6 +1331,7 @@ struct CEmitter {
         const auto& secondName = statement.SecondName();
         const auto* first = BindingAt(statement.syntax->nameSpan.offset);
         const auto* second = secondName.empty() ? nullptr : BindingAt(statement.syntax->secondNameSpan.offset);
+        const auto scope = DebugScope(); // the loop variables
         Line(depth, '{');
         if (iterable.kind == SyntaxExpression::Kind::Range) {
             // Inclusive bounds, evaluated once; the counter is separate so the body cannot change the iteration.
@@ -1198,6 +1365,7 @@ struct CEmitter {
         } else throw std::runtime_error("Native C backend cannot iterate a value of type '" + Name(iterable.type) + "'");
         Line(depth + 1, '}');
         Line(depth, '}');
+        CloseDebugScope(scope);
     }
     const FunctionRef& RefOf(const BoundFunction& function) const { return functionRefs.at(function.symbolIndex); }
     static std::vector<const BoundFunction*> Constructors(const BoundClass& type) {
@@ -1523,32 +1691,42 @@ struct CEmitter {
         };
         // Structs build a value in place: field initializers, then the body.
         const auto emitStructConstructor = [&](const BoundFunction* constructor) {
-            Line(0, [&] { ConstructorSignature(value, constructor); }, " {");
-            Line(1, "LS_", name, " ls_value = ls_", name, "_default();");
-            Line(1, "LS_", name, "* self = &ls_value; (void)self;");
-            constructorResult = "ls_value"; functionReturn = TypeTable::Void;
-            if (constructor) { ParameterCells(constructor->parameters, 1); Statements(constructor->body, 1, value.name); }
-            Line(1, "return ls_value;"); Line(0, '}');
-            constructorResult = {};
+            assert(constructor);
+            DebugFunction(ExportName(value, *constructor), RefOf(*constructor).cName, [&] {
+                Line(0, [&] { ConstructorSignature(value, constructor); }, " {");
+                DebugParameters(constructor->parameters);
+                Line(1, "LS_", name, " ls_value = ls_", name, "_default();");
+                Line(1, "LS_", name, "* self = &ls_value; (void)self;");
+                constructorResult = "ls_value"; functionReturn = TypeTable::Void;
+                ParameterCells(constructor->parameters, 1);
+                DebugSelf(1, CType(value.name) + "*", value.name, true);
+                Statements(constructor->body, 1, value.name);
+                Line(1, "return ls_value;"); Line(0, '}');
+                constructorResult = {};
+            });
             exportConstructor(constructor);
         };
         // Classes split construction: ls_T_new allocates and sets the type, so virtual calls dispatch to T while every
         // ls_*__init up the chain runs (base constructor, then own field initializers, then the body).
         const auto emitClassConstructor = [&](const BoundFunction* constructor) {
-            Line(0, [&] { InitSignature(value, constructor); }, " {");
-            functionReturn = TypeTable::Void;
-            if (constructor) ParameterCells(constructor->parameters, 1);
-            if (const auto* base = BaseOf(value)) {
-                const auto* target = BaseConstructor(*base, constructor);
-                const auto parameters = ParameterTypes(target);
-                Line(1, InitName(*base, target), "((LS_", Id{base->name}, "*)self", [&] {
-                    if (!constructor) return;
-                    for (NodeId i{}; i < constructor->baseArguments.count; ++i) Put(", ", Converted(i < parameters.size() ? parameters[i] : TypeTable::Unknown, program.expressions[constructor->baseArguments.first + i], value.name));
-                }, ");");
-            }
-            FieldInitializers(value);
-            if (constructor) Statements(constructor->body, 1, value.name);
-            Line(0, '}');
+            const auto init = [&] {
+                Line(0, [&] { InitSignature(value, constructor); }, " {");
+                functionReturn = TypeTable::Void;
+                if (constructor) { DebugParameters(constructor->parameters); ParameterCells(constructor->parameters, 1); }
+                if (const auto* base = BaseOf(value)) {
+                    const auto* target = BaseConstructor(*base, constructor);
+                    const auto parameters = ParameterTypes(target);
+                    Line(1, InitName(*base, target), "((LS_", Id{base->name}, "*)self", [&] {
+                        if (!constructor) return;
+                        for (NodeId i{}; i < constructor->baseArguments.count; ++i) Put(", ", Converted(i < parameters.size() ? parameters[i] : TypeTable::Unknown, program.expressions[constructor->baseArguments.first + i], value.name));
+                    }, ");");
+                }
+                FieldInitializers(value);
+                if (constructor) { DebugSelf(1, CType(value.name), value.name, false); Statements(constructor->body, 1, value.name); }
+                Line(0, '}');
+            };
+            // The implicit constructor has no statements to debug.
+            if (constructor) DebugFunction(ExportName(value, *constructor), InitName(value, constructor), init); else init();
             if (value.isAbstract) return;
             const auto allocate = [&] {
                 Line(1, "LS_", name, "* self = (LS_", name, "*)ls_alloc(sizeof(LS_", name, "), ls_trace_", name, ");");
@@ -1588,11 +1766,15 @@ struct CEmitter {
         } else for (const auto* constructor : ClassConstructors(value)) emitClassConstructor(constructor);
         for (const auto& function : value.functions) {
             if (function.isConstructor || function.isAbstract) continue;
-            Line(0, [&] { MethodSignature(value, function); }, " {");
-            functionReturn = Find(function.returnType);
-            ParameterCells(function.parameters, 1);
-            Statements(function.body, 1, value.name); Line(0, '}');
-            functionReturn = TypeTable::Unknown;
+            DebugFunction(ExportName(value, function), RefOf(function).cName, [&] {
+                Line(0, [&] { MethodSignature(value, function); }, " {");
+                functionReturn = Find(function.returnType);
+                DebugParameters(function.parameters);
+                ParameterCells(function.parameters, 1);
+                if (!function.isStatic) DebugSelf(1, CType(value.name) + (value.isStruct ? "*" : ""), value.name, value.isStruct);
+                Statements(function.body, 1, value.name); Line(0, '}');
+                functionReturn = TypeTable::Unknown;
+            });
             std::vector<std::string> parameters;
             if (!function.isStatic) parameters.push_back(value.name);
             for (const auto& p : function.parameters) parameters.push_back(ExportParameter(p));
@@ -1602,6 +1784,11 @@ struct CEmitter {
 
     CCompilationResult Run() {
         Line(0, "/* generated by LuaSharp; C11 */");
+        if (emitOptions.debugHooks) {
+            // Before the runtime functions: the stack walk can follow rbp through every function of the module.
+            Line(0, "static void ls_debug_text_begin(void) {}");
+            Line(0, "#define LS_DEBUG_HOOKS");
+        }
         Line(0, "#include <luasharp/runtime.h>");
         Line(0);
         for (const auto& value : program.classes) Line(0, "typedef struct LS_", Id{value.name}, " LS_", Id{value.name}, ';');
@@ -1724,31 +1911,42 @@ struct CEmitter {
         for (size_t i{}; i < lambdas.size(); ++i) {
             const auto& lambda = *lambdas[i];
             const auto owner = lambdaOwners[i];
-            Line(0, "static void ls_lambda_", i, "(void* environment, const LS_Value* arguments, LS_Value* result) {");
-            if (lambdaCaptures[i].empty()) Line(1, "(void)environment;");
-            else {
-                Line(1, "LS_LambdaEnv_", i, "* ls_env = (LS_LambdaEnv_", i, "*)environment;");
-                const auto self = std::find_if(lambdaCaptures[i].begin(), lambdaCaptures[i].end(), [](const auto* value) { return value->name == "this"; });
-                if (self != lambdaCaptures[i].end()) Line(1, Type((*self)->type), " self = ls_env->", Id{(*self)->name}, ';');
-            }
-            Line(1, "(void)arguments; (void)result;");
-            const auto parameters = analysis.syntax.Parameters(*lambda.syntax);
-            for (size_t parameter{}; parameter < parameters.size(); ++parameter)
-                Declare(1, ParameterBinding(parameters[parameter]), TypeTable::Any, parameters[parameter].name, [&] { Put("arguments[", parameter, ']'); });
-            const auto returnType = types.Element(lambda.type);
-            activeLambda = i;
-            if (lambda.LambdaIsBlock()) Statements(lambda.lambdaBody, 1, owner);
-            else if (returnType == TypeTable::Void) Line(1, Emitted(Child(lambda, 0), owner), ';');
-            else Line(1, "*result = ", Boxed(Child(lambda, 0), owner), ';');
-            activeLambda.reset();
-            Line(0, '}');
+            DebugFunction(owner.empty() ? std::string("<lambda>") : std::string(owner) + ".<lambda>", "ls_lambda_" + std::to_string(i), [&] {
+                Line(0, "static void ls_lambda_", i, "(void* environment, const LS_Value* arguments, LS_Value* result) {");
+                if (lambdaCaptures[i].empty()) Line(1, "(void)environment;");
+                else {
+                    Line(1, "LS_LambdaEnv_", i, "* ls_env = (LS_LambdaEnv_", i, "*)environment;");
+                    const auto self = std::find_if(lambdaCaptures[i].begin(), lambdaCaptures[i].end(), [](const auto* value) { return value->name == "this"; });
+                    if (self != lambdaCaptures[i].end()) {
+                        Line(1, Type((*self)->type), " self = ls_env->", Id{(*self)->name}, ';');
+                        DebugSelf(1, CType(Name((*self)->type)), Name((*self)->type), false);
+                    }
+                }
+                Line(1, "(void)arguments; (void)result;");
+                const auto parameters = analysis.syntax.Parameters(*lambda.syntax);
+                for (size_t parameter{}; parameter < parameters.size(); ++parameter)
+                    Declare(1, ParameterBinding(parameters[parameter]), TypeTable::Any, parameters[parameter].name, [&] { Put("arguments[", parameter, ']'); });
+                const auto returnType = types.Element(lambda.type);
+                activeLambda = i;
+                if (lambda.LambdaIsBlock()) Statements(lambda.lambdaBody, 1, owner);
+                else {
+                    DebugStatement(1, Child(lambda, 0).span.offset);
+                    if (returnType == TypeTable::Void) Line(1, Emitted(Child(lambda, 0), owner), ';');
+                    else Line(1, "*result = ", Boxed(Child(lambda, 0), owner), ';');
+                }
+                activeLambda.reset();
+                Line(0, '}');
+            });
         }
         if (!lambdas.empty()) Line(0);
-        Line(0, "int ls_module_init(void) {");
-        // Static fields initialize before top-level code, in declaration order.
-        for (const auto& [owner, field] : staticFields) Line(1, StaticSlot(owner->name, field->name), " = ", FieldInitializer(*owner, *field), ';');
-        Statements(program.topLevel, 1, {}, {}, true); Line(1, "return 0;"); Line(0, '}');
+        DebugFunction("<top-level>", "ls_module_init", [&] {
+            Line(0, "int ls_module_init(void) {");
+            // Static fields initialize before top-level code, in declaration order.
+            for (const auto& [owner, field] : staticFields) Line(1, StaticSlot(owner->name, field->name), " = ", FieldInitializer(*owner, *field), ';');
+            Statements(program.topLevel, 1, {}, {}, true); Line(1, "return 0;"); Line(0, '}');
+        });
         result.exports.push_back({"$module_init", "ls_module_init", "int", {}});
+        if (emitOptions.debugHooks) { DebugTables(); result.debug = std::move(debugInfo); }
         result.c = std::move(output); return result;
     }
 };
@@ -1770,7 +1968,7 @@ CCompilationResult CompileToC(std::string_view source, const std::vector<Externa
     return CompileToC(Analyze(source, externalTypes), externalTypes);
 }
 
-CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes) {
+CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes, const CEmitOptions& options) {
     ThrowFirstError(analysis);
     for (const auto& type : externalTypes) {
         if (!type.isStruct || type.isNative) continue;
@@ -1780,7 +1978,7 @@ CCompilationResult CompileToC(const Analysis& analysis, const std::vector<Extern
     // Extern classes declared in this source are described to the emitter like external ones.
     auto types = externalTypes;
     for (auto& type : ExportTypes(analysis)) if (type.isNative) types.push_back(std::move(type));
-    return CEmitter(analysis, types).Run();
+    return CEmitter(analysis, types, options).Run();
 }
 
 std::vector<ExternalType> DeclarationTypes(const std::vector<std::string>& sources, std::vector<ExternalType> externalTypes) {

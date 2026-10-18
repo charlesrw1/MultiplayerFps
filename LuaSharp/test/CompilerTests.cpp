@@ -2439,6 +2439,110 @@ auto meshAgain = () => typeof(Mesh) == typeof(Mesh);
     g_generics = {};
 }
 
+struct DebugHit {
+    uint64_t function, statement;
+    uint64_t previousStatement; // ls_statement before this hook
+    ptrdiff_t frameOffset;      // locals - frame
+    std::vector<std::optional<long long>> ints; // each visible int local
+};
+struct DebugTrace {
+    const luasharp::NativeModule* module{};
+    std::vector<DebugHit> hits;
+};
+DebugTrace g_debug;
+
+// The value of an int local, read through the module's offset table; empty when it is not visible.
+std::optional<long long> DebugInt(const void* locals, uint64_t function, uint64_t statement, size_t local) {
+    const auto& info = g_debug.module->Generated().debug.functions[function].locals[local];
+    if (info.type != "int" || statement < info.visibleFrom || statement >= info.visibleTo) return std::nullopt;
+    const auto* slot = static_cast<const char*>(locals) + g_debug.module->Debug()->functions[function].localOffsets[local];
+    return info.indirect ? **reinterpret_cast<const long long* const*>(slot) : *reinterpret_cast<const long long*>(slot);
+}
+
+void DebugHook(void*, void* locals, void* frame, uint64_t function, uint64_t statement) {
+    DebugHit hit{function, statement, *static_cast<uint64_t*>(locals), static_cast<char*>(locals) - static_cast<char*>(frame), {}};
+    *static_cast<uint64_t*>(locals) = statement;
+    for (size_t i{}; i < g_debug.module->Generated().debug.functions[function].locals.size(); ++i) hit.ints.push_back(DebugInt(locals, function, statement, i));
+    g_debug.hits.push_back(std::move(hit));
+}
+
+void TestNativeDebugHooks() {
+    constexpr std::string_view source = R"(class Counter {
+    int total = 0;
+    int add(int amount, inout int calls) {
+        calls += 1;
+        int before = total;
+        if (amount > 1) {
+            int doubled = amount * 2;
+            total += doubled;
+        }
+        total += amount;
+        return before;
+    }
+}
+int sum = 0;
+for (int i = 0; i < 2; i += 1) { sum += i; }
+)";
+    const auto plain = luasharp::CompileToC(source);
+    Require(plain.debug.functions.empty() && plain.c.find("ls_locals") == std::string::npos && plain.c.find("#line") == std::string::npos, "a plain build has debug hooks");
+
+    const auto analysis = luasharp::Analyze(source);
+    const auto generated = luasharp::CompileToC(analysis, {}, {true, source, "counter.ls"});
+    const auto& functions = generated.debug.functions;
+    const auto find = [&](std::string_view name) {
+        const auto found = std::ranges::find(functions, name, &luasharp::NativeDebugFunction::name);
+        Require(found != functions.end(), "no debug function " + std::string(name));
+        return static_cast<uint64_t>(found - functions.begin());
+    };
+    const auto add = find("Counter.add"), top = find("<top-level>");
+    Require(generated.debug.sourceName == "counter.ls", "the debug info lost the source name");
+    Require(functions[add].lines == std::vector<uint32_t>{4, 5, 6, 7, 8, 10, 11}, "wrong statement lines");
+    Require(functions[top].lines == std::vector<uint32_t>{14, 15, 15, 15}, "wrong top-level statement lines");
+    Require(generated.c.find("#line 7 \"counter.ls\"") != std::string::npos, "no #line for a statement");
+    struct Expected { std::string_view name; uint32_t from, to; bool indirect; };
+    const std::vector<Expected> expected{{"amount", 0, 7, false}, {"calls", 0, 7, true}, {"this", 0, 7, false}, {"before", 2, 7, false}, {"doubled", 4, 5, false}};
+    Require(functions[add].locals.size() == expected.size(), "wrong number of debug locals");
+    for (size_t i{}; i < expected.size(); ++i) {
+        const auto& local = functions[add].locals[i];
+        Require(local.name == expected[i].name && local.visibleFrom == expected[i].from && local.visibleTo == expected[i].to && local.indirect == expected[i].indirect,
+                "wrong debug local " + local.name + " [" + std::to_string(local.visibleFrom) + ", " + std::to_string(local.visibleTo) + ")");
+    }
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+
+    luasharp::NativeCompileOptions options; options.initialize = false; options.emitDebugHooks = true; options.sourceName = "counter.ls";
+    auto module = luasharp::NativeModule::Compile(source, options);
+    const auto* debug = module.Debug();
+    Require(debug && debug->functionCount == functions.size(), "the module has no debug tables");
+    Require(debug->functions[add].begin == module.FindSymbol("ls_Counter_add") && debug->functions[add].begin < debug->functions[add].end, "wrong function range");
+    Require(debug->textBegin < debug->functions[add].begin && debug->functions[top].end <= debug->textEnd, "a function lies outside the module text");
+    g_debug = {&module, {}};
+    debug->state->hook = DebugHook;
+    debug->state->active = 1;
+    module.Initialize();
+    const auto statements = [&](uint64_t function) { std::vector<uint64_t> result; for (const auto& hit : g_debug.hits) if (hit.function == function) result.push_back(hit.statement); return result; };
+    Require(statements(top) == std::vector<uint64_t>{0, 1, 2, 3, 2, 3, 2}, "loop hooks ran in the wrong order");
+    Require(*static_cast<long long*>(module.FindGlobal("sum")) == 1, "the instrumented top level computed the wrong result");
+
+    g_debug.hits.clear();
+    const auto counter = reinterpret_cast<void* (*)()>(module.FindSymbol("ls_Counter_new"))();
+    const auto call = reinterpret_cast<long long (*)(void*, long long, long long*)>(module.FindSymbol("ls_Counter_add"));
+    long long calls = 0;
+    Require(call(counter, 3, &calls) == 0 && call(counter, 1, &calls) == 9 && calls == 2, "the instrumented method computed the wrong result");
+    Require(statements(add) == std::vector<uint64_t>{0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 5, 6}, "statement hooks ran in the wrong order");
+    const auto& hits = g_debug.hits;
+    Require(hits[0].previousStatement == UINT64_MAX && hits[1].previousStatement == 0, "ls_statement did not start at -1");
+    Require(std::ranges::all_of(hits, [&](const DebugHit& hit) { return hit.frameOffset == hits[0].frameOffset && hit.frameOffset < 0; }), "the locals moved relative to the frame");
+    // amount, calls, this, before, doubled
+    Require(hits[4].ints == std::vector<std::optional<long long>>{3, 1, std::nullopt, 0, 6}, "wrong locals inside the if");
+    Require(hits[11].ints == std::vector<std::optional<long long>>{1, 2, std::nullopt, 9, std::nullopt}, "wrong locals at the second return");
+
+    g_debug.hits.clear();
+    debug->state->active = 0;
+    static_cast<void>(call(counter, 1, &calls));
+    Require(g_debug.hits.empty(), "a hook ran while the debugger was not active");
+    g_debug = {};
+}
+
 int main() {
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests{
         {"invalid syntax", TestInvalidSyntax},
@@ -2512,6 +2616,7 @@ int main() {
         {"generic method semantics", TestGenericMethodSemantics},
         {"native generic methods", TestNativeGenericMethods},
         {"native registry matches header", TestNativeRegistryMatchesHeader},
+        {"native debug hooks", TestNativeDebugHooks},
         {"project files", TestProjectFiles},
     };
 

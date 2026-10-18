@@ -3,6 +3,7 @@
 #include "Semantic.h"
 #include "NativeRuntime.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -43,6 +44,28 @@ struct NativeClassBinding {
     std::string baseName;
 };
 
+// One local of an instrumented function, at its offset in the function's locals struct.
+// Visible before statements [visibleFrom, visibleTo). An indirect local holds a pointer to the value (cells, inout, struct `this`).
+struct NativeDebugLocal {
+    std::string name;
+    std::string type;
+    uint32_t visibleFrom{};
+    uint32_t visibleTo{};
+    bool indirect{};
+};
+
+struct NativeDebugFunction {
+    std::string name;             // "Type.method", "Type.new", "<lambda>" or "<top-level>"
+    std::vector<uint32_t> lines;  // 1-based source line of each statement id
+    std::vector<NativeDebugLocal> locals;
+};
+
+// Debug tables of an instrumented module. Index i matches NativeDebugModule::functions[i].
+struct NativeDebugInfo {
+    std::string sourceName;
+    std::vector<NativeDebugFunction> functions;
+};
+
 struct CCompilationResult {
     std::string c;
     std::vector<NativeExport> exports;
@@ -51,6 +74,35 @@ struct CCompilationResult {
     std::vector<NativeClassBinding> nativeClasses; // each after its base
     std::vector<std::string> hostClasses;          // script classes that derive from extern classes, each after its base
     std::vector<std::string> externalStructs;      // structs of the external types; each exports ls_<S>__type
+    NativeDebugInfo debug;                         // empty unless CEmitOptions::debugHooks
+};
+
+// Mirrors of the runtime.h debug structs (LS_DEBUG_HOOKS).
+using NativeDebugHook = void (*)(void* context, void* locals, void* frame, uint64_t function, uint64_t statement);
+struct NativeDebugState {
+    volatile uint64_t active;
+    NativeDebugHook hook;
+    void* context;
+};
+struct NativeDebugFunctionRange {
+    const void* begin;
+    const void* end;                // exclusive
+    const uint64_t* localOffsets;   // localCount entries; offsets in the locals struct
+    uint64_t localCount;
+};
+struct NativeDebugModule {
+    NativeDebugState* state;
+    const NativeDebugFunctionRange* functions;
+    uint64_t functionCount;
+    const void* textBegin;          // all generated code of the module lies in [textBegin, textEnd)
+    const void* textEnd;
+};
+
+struct CEmitOptions {
+    // Instrumented build: locals live in a struct, and a hook can run before each statement.
+    bool debugHooks{};
+    std::string_view source;  // debugHooks: the text that was analyzed, for line numbers
+    std::string sourceName;   // debugHooks: the file name in debug info and #line
 };
 
 struct NativeSymbol {
@@ -66,6 +118,8 @@ struct NativeCompileOptions {
     std::vector<NativeSymbol> symbols;
     std::shared_ptr<NativeRuntime> runtime;
     bool initialize{true}; // false: caller runs NativeModule::Initialize() itself
+    bool emitDebugHooks{};  // see CEmitOptions::debugHooks
+    std::string sourceName;
 };
 
 // Emits C11 from the same checked bound tree used by the Lua backend.
@@ -74,7 +128,7 @@ struct NativeCompileOptions {
 CCompilationResult CompileToC(std::string_view source);
 CCompilationResult CompileToC(std::string_view source, const std::vector<ExternalType>& externalTypes);
 // For an analysis the caller already has; externalTypes must match the ones it was analyzed with.
-CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes = {});
+CCompilationResult CompileToC(const Analysis& analysis, const std::vector<ExternalType>& externalTypes = {}, const CEmitOptions& options = {});
 // The types of declaration sources, after externalTypes. Throws on a diagnostic error, or when a source declares code.
 std::vector<ExternalType> DeclarationTypes(const std::vector<std::string>& sources, std::vector<ExternalType> externalTypes = {});
 
@@ -109,6 +163,8 @@ public:
     void ClearError();
     [[nodiscard]] std::shared_ptr<NativeRuntime> Runtime() const;
     [[nodiscard]] const CCompilationResult& Generated() const;
+    // The debug tables of an instrumented module; null for other modules.
+    [[nodiscard]] const NativeDebugModule* Debug() const;
 
 private:
     struct Impl;

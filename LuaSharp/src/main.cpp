@@ -57,7 +57,9 @@ std::filesystem::path OutputArgument(int argc, char** argv, int start, const std
     throw std::runtime_error("Expected -o <output-file>");
 }
 
-int CompileNative(const std::filesystem::path& input, const std::filesystem::path& output, bool execute, std::chrono::steady_clock::time_point cliStart) {
+bool IsDebugFlag(int argc, char** argv, int index) { return argc > index && std::string_view(argv[index]) == "--debug-hooks"; }
+
+int CompileNative(const std::filesystem::path& input, const std::filesystem::path& output, bool execute, bool debugHooks, std::chrono::steady_clock::time_point cliStart) {
     using Clock = std::chrono::steady_clock;
     const auto milliseconds = [](Clock::time_point from, Clock::time_point to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
     const auto source = ReadSource(input);
@@ -66,7 +68,7 @@ int CompileNative(const std::filesystem::path& input, const std::filesystem::pat
     const auto& types = execute ? none : ProjectTypes(input);
     const auto analysis = luasharp::Analyze(source, types);
     if (ReportDiagnostics(input, analysis)) return 1;
-    auto generated = luasharp::CompileToC(analysis, types);
+    auto generated = luasharp::CompileToC(analysis, types, {debugHooks, source, input.filename().string()});
     const auto frontendEnd = Clock::now();
     WriteOutput(output, generated.c);
     const auto writeEnd = Clock::now();
@@ -89,6 +91,7 @@ void Usage() {
               << "  luasharp <file.ls> [-o generated.c]       Emit C, compile, and run\n"
               << "  luasharp run <file.ls> [-o generated.c]   Emit C, compile, and run\n"
               << "  luasharp emit-c <file.ls> [-o output.c]   Emit C only\n"
+              << "  --debug-hooks after <file.ls> emits an instrumented build for the debugger\n"
               << "  luasharp check <file.ls> [more files]\n"
               << "check and emit-c use the declarations of the nearest luasharp.json above each file.\n";
 }
@@ -112,12 +115,14 @@ int main(int argc, char** argv) {
         if (command == "emit-c" || command == "run-native" || command == "run") {
             if (argc < 3) { Usage(); return 2; }
             const std::filesystem::path input = argv[2];
-            const auto output = OutputArgument(argc, argv, 3, input.parent_path() / (input.stem().string() + ".c"));
-            return CompileNative(input, output, command != "emit-c", cliStart);
+            const bool debugHooks = IsDebugFlag(argc, argv, 3);
+            const auto output = OutputArgument(argc, argv, debugHooks ? 4 : 3, input.parent_path() / (input.stem().string() + ".c"));
+            return CompileNative(input, output, command != "emit-c", debugHooks, cliStart);
         }
         const std::filesystem::path input = argv[1];
-        const auto output = OutputArgument(argc, argv, 2, input.parent_path() / (input.stem().string() + ".c"));
-        return CompileNative(input, output, true, cliStart);
+        const bool debugHooks = IsDebugFlag(argc, argv, 2);
+        const auto output = OutputArgument(argc, argv, debugHooks ? 3 : 2, input.parent_path() / (input.stem().string() + ".c"));
+        return CompileNative(input, output, true, debugHooks, cliStart);
     } catch (const std::exception& error) {
         std::cerr << "luasharp: " << error.what() << '\n';
         return 1;
