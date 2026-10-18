@@ -123,6 +123,7 @@ class Property:
 
         self.is_static = False
         self.is_virtual = False
+        self.initializer = ""  # variables: the C++ text after '=', for docs
 
         self.tooltip = ""
         self.custom_type = ""
@@ -780,6 +781,7 @@ def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, Cla
         # Variable
         # Remove trailing ';' or '=' and value
         if "=" in cur_line:
+            prop.initializer = cur_line[cur_line.find("=") + 1:].rstrip().removesuffix(";").strip()
             cur_line = cur_line[:cur_line.find("=")].strip()
         if ";" in cur_line:
             cur_line = cur_line[:cur_line.find(";")].strip()

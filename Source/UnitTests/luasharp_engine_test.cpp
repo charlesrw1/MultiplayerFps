@@ -504,7 +504,7 @@ TEST_F(LuaSharpEngineTest, LoadErrors) {
 
 // A STRUCT_BODY struct is a LuaSharp struct. Values copy through the thunks field by field.
 TEST_F(LuaSharpEngineTest, StructsCrossByValue) {
-	EXPECT_NE(engine->declarations().find("extern struct LsTestPoint {\n    Vec3 pos;\n    LsTestMode mode;\n    string name;\n    // skipped tags: std::vector<int>\n}"), std::string::npos);
+	EXPECT_NE(engine->declarations().find("extern struct LsTestPoint {\n    Vec3 pos; // = glm::vec3(0, 1, 0)\n    LsTestMode mode; // = LsTestMode::Fast\n    string name; // = \"unnamed\"\n    // skipped tags: std::vector<int>\n}"), std::string::npos);
 	LsTestThing thing;
 	LsTestThing::first = &thing;
 	thing.point = {glm::vec3(1, 2, 3), LsTestMode::Fast, "start", {1, 2}, 9};

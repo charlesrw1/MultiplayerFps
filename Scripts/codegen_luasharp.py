@@ -47,6 +47,7 @@ class BoundStruct:
     cdef: ClassDef
     fields: list[tuple[BoundType, str]]
     skipped: list[str]
+    initializers: dict[str, str] = field(default_factory=dict)  # field -> C++ initializer text
 
     @property
     def name(self) -> str:
@@ -111,6 +112,7 @@ def bind_struct(cdef: ClassDef) -> BoundStruct | None:
     _structs[name] = None
     fields: list[tuple[BoundType, str]] = []
     skipped: list[str] = []
+    initializers: dict[str, str] = {}
     for p in cdef.properties:
         if p.new_type.type in (FUNCTION_TYPE, MULTICAST_TYPE):
             skipped.append(f"{p.name}(): struct methods do not cross")
@@ -126,7 +128,9 @@ def bind_struct(cdef: ClassDef) -> BoundStruct | None:
             skipped.append(f"{p.name}: {t.get_raw_type_string()}")
             continue
         fields.append((bound, p.name))
-    result = BoundStruct(cdef, fields, skipped) if fields else None
+        if p.initializer:
+            initializers[p.name] = p.initializer
+    result = BoundStruct(cdef, fields, skipped, initializers) if fields else None
     _structs[name] = result
     return result
 
@@ -238,7 +242,8 @@ def declare_struct(bound: BoundStruct) -> str:
     c = bound.cdef
     out = f"// {c.classname} ({c.source_file})\nextern struct {bound.name} {{\n"
     for t, name in bound.fields:
-        out += f"    {t.ls} {name};\n"
+        initializer = bound.initializers.get(name)
+        out += f"    {t.ls} {name};" + (f" // = {initializer}" if initializer else "") + "\n"
     for s in bound.skipped:
         out += f"    // skipped {s}\n"
     return out + "}\n"

@@ -586,7 +586,7 @@ struct Hit {
 struct Wrap {
     STRUCT_BODY();
     REF Hit inner;
-    REF int n = 0;
+    REF int n = 3;
 };
 class Animal : public ClassBase {
 public:
@@ -678,8 +678,8 @@ public:
 
     def test_struct_declarations(self):
         declarations = self.generate().declarations
-        self.assertIn("extern struct Hit {\n    Animal who;\n    Animal owner;\n    Mode mode;\n    float dist;\n    // skipped tags: std::vector<int>\n}", declarations)
-        self.assertIn("extern struct Wrap {\n    Hit inner;\n    int n;\n}", declarations)
+        self.assertIn("extern struct Hit {\n    Animal who; // = nullptr\n    Animal owner;\n    Mode mode; // = Mode::Off\n    float dist; // = 0\n    // skipped tags: std::vector<int>\n}", declarations)
+        self.assertIn("extern struct Wrap {\n    Hit inner;\n    int n; // = 3\n}", declarations)  # the C++ initializer as a comment
         self.assertIn("    Hit probe(Hit h);\n    Animal leader;\n    Hit last;\n", declarations)
         self.assertIn("    virtual Wrap wrap(Wrap w);\n", declarations)
 
