@@ -157,7 +157,7 @@ int readOnly = t.read_only;
 }
 
 TEST_F(LuaSharpEngineTest, GenericMethodsAndTypeOf) {
-	EXPECT_NE(engine->declarations().find("T get_component<T : Component>(ClassTypeInfo ti);"), std::string::npos);
+	EXPECT_NE(engine->declarations().find("T get_component<T : Component>();"), std::string::npos);
 	EXPECT_NE(engine->declarations().find("[TypeOf] static ClassTypeInfo find(string classname);"), std::string::npos);
 	LsTestThing thing, partner;
 	thing.partner = &partner;

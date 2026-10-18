@@ -107,6 +107,13 @@ struct Symbol {
     bool isTypeOf{};    // Methods: [TypeOf], the static extern method that typeof(T) calls with the name of T
     std::string typeParameter; // Generic methods: the name of the type parameter. `type` is its constraint.
 };
+// A generic method's symbol takes the type info first; `x.f<A>(...)` passes typeof(A) there.
+inline constexpr std::string_view GenericTypeParameterName = "type";
+// The parameters a generic call `f<A>(...)` spells: all but the hidden type info.
+inline std::span<const std::string> ExplicitParameters(const Symbol& method) {
+    const std::span<const std::string> all = method.parameters;
+    return method.typeParameter.empty() || all.empty() ? all : all.subspan(1);
+}
 struct ExternalType {
     std::string name;
     std::string baseType;

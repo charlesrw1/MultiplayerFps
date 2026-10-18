@@ -345,8 +345,8 @@ private:
             typeOfMethod_ = index; result_.symbols[index].isTypeOf = true;
         }
     }
-    // `T f<T : Base>(TypeInfo type, ...)` on an extern class, where TypeInfo is the result of the [TypeOf] method.
-    // The call `x.f<A>(...)` passes typeof(A) for `type` and has the type A.
+    // `T f<T : Base>(...)` on an extern class. The symbol takes a hidden first parameter, the result of the [TypeOf] method:
+    // the call `x.f<A>(...)` passes typeof(A) there and has the type A.
     void CheckGenericMethods() {
         for (const auto& value : result_.syntax.root.classes) for (const auto& function : value.functions) {
             if (!function.typeParameter) continue;
@@ -357,9 +357,9 @@ private:
             const auto constraint = types_.Intern(parameter.constraint);
             if (knownTypes_.contains(parameter.constraint) && !IsClassType(constraint)) AddDiagnostic("The constraint of type parameter '" + parameter.name + "' must be a class, got '" + parameter.constraint + "'", parameter.span);
             if (function.returnType != parameter.name) AddDiagnostic(where + " must return its type parameter '" + parameter.name + "'", function.span);
-            if (!typeOfMethod_) AddDiagnostic(where + " needs a [TypeOf] method to make its type argument", parameter.span);
-            else if (const auto& typeInfo = result_.symbols[*typeOfMethod_].type; function.parameters.empty() || function.parameters.front().type != typeInfo)
-                AddDiagnostic(where + " must take '" + typeInfo + "' as its first parameter: the call passes typeof of its type argument there", function.span);
+            if (!typeOfMethod_) { AddDiagnostic(where + " needs a [TypeOf] method to make its type argument", parameter.span); continue; }
+            auto& parameters = result_.symbols[functionSymbols_.at(&function)].parameters;
+            parameters.insert(parameters.begin(), result_.symbols[*typeOfMethod_].type + " " + std::string(GenericTypeParameterName));
         }
     }
     // The type info of a class: the host makes it for extern classes and for the script classes that derive from them.

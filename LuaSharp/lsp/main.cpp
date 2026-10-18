@@ -133,7 +133,7 @@ template <typename Visit> void ForEachVisible(const Document& from, Visit&& visi
 
 // Positions are ignored: moving a declaration does not change what other files see.
 bool SameExports(const std::vector<luasharp::ExternalType>& left, const std::vector<luasharp::ExternalType>& right) {
-    const auto sameMember = [](const luasharp::Symbol& a, const luasharp::Symbol& b) { return a.name == b.name && a.type == b.type && a.kind == b.kind && a.parameters == b.parameters && a.owner == b.owner && a.access == b.access && a.isStatic == b.isStatic; };
+    const auto sameMember = [](const luasharp::Symbol& a, const luasharp::Symbol& b) { return a.name == b.name && a.type == b.type && a.kind == b.kind && a.parameters == b.parameters && a.owner == b.owner && a.access == b.access && a.isStatic == b.isStatic && a.typeParameter == b.typeParameter && a.isTypeOf == b.isTypeOf; };
     const auto sameType = [&](const luasharp::ExternalType& a, const luasharp::ExternalType& b) { return a.name == b.name && a.baseType == b.baseType && a.isEnum == b.isEnum && a.isNative == b.isNative && a.hostDefault == b.hostDefault && std::equal(a.members.begin(), a.members.end(), b.members.begin(), b.members.end(), sameMember); };
     return std::equal(left.begin(), left.end(), right.begin(), right.end(), sameType);
 }
@@ -243,19 +243,32 @@ std::string DisplayType(const std::string& type) {
     std::string display = "function("; for (size_t i{}; i < arity; ++i) { if (i) display += ", "; display += "any"; }
     return display + ") -> " + result;
 }
+std::string JoinLabels(std::span<const std::string> labels) {
+    std::string result; for (size_t i{}; i < labels.size(); ++i) { if (i) result += ", "; result += labels[i]; } return result;
+}
+// `name<T : Base>(params)` for a generic method, else `name(params)`.
+std::string MethodSignature(const luasharp::Symbol& method) {
+    const auto generic = method.typeParameter.empty() ? std::string() : "<" + method.typeParameter + " : " + method.type + ">";
+    return method.name + generic + "(" + JoinLabels(luasharp::ExplicitParameters(method)) + ")";
+}
+std::string ResultType(const luasharp::Symbol& method) { return method.typeParameter.empty() ? method.type : method.typeParameter; }
 std::string HoverLabel(const luasharp::Symbol& symbol) {
     if (symbol.kind == luasharp::SymbolKind::Class) return "class " + symbol.name;
     if (symbol.kind == luasharp::SymbolKind::Enum) return "enum " + symbol.name;
     if (symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Function) return DisplayType(symbol.type) + " " + symbol.name;
-    std::string result = symbol.type + " " + symbol.name + "(";
-    for (size_t i{}; i < symbol.parameters.size(); ++i) { if (i) result += ", "; result += symbol.parameters[i]; }
-    return result + ")";
+    return ResultType(symbol) + " " + MethodSignature(symbol);
+}
+// The symbol an expression names. A `typeof(T)` or `f<T>` type argument names the type T, not the [TypeOf] method it calls.
+const luasharp::Symbol* ExpressionSymbol(const luasharp::Analysis& analysis, const luasharp::BoundExpression* expression) {
+    if (!expression || !expression->symbolIndex || *expression->symbolIndex >= analysis.symbols.size()) return nullptr;
+    if (expression->syntax && expression->syntax->kind == luasharp::SyntaxExpression::Kind::TypeOf) return nullptr;
+    return &analysis.symbols[*expression->symbolIndex];
 }
 const luasharp::Symbol* SymbolAt(const luasharp::Analysis& analysis, size_t offset) {
     const auto declaration = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& symbol) { return !symbol.implicit && symbol.span.Contains(offset); });
     if (declaration != analysis.symbols.end()) return &*declaration;
     if (const auto* member = MemberAt(analysis, offset)) return member;
-    if (const auto* expression = luasharp::FindExpression(analysis, offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) return &analysis.symbols[*expression->symbolIndex];
+    if (const auto* symbol = ExpressionSymbol(analysis, luasharp::FindExpression(analysis, offset))) return symbol;
     const auto token = std::find_if(analysis.syntax.tokens.begin(), analysis.syntax.tokens.end(), [&](const auto& value) { return value.kind == luasharp::SyntaxTokenKind::Identifier && value.span.Contains(offset); });
     if (token != analysis.syntax.tokens.end()) { const auto type = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& value) { return (value.kind == luasharp::SymbolKind::Class || value.kind == luasharp::SymbolKind::Enum) && value.name == token->text; }); if (type != analysis.symbols.end()) return &*type; }
     return nullptr;
@@ -316,12 +329,18 @@ void PublishDiagnostics(const std::string& uri) {
 }
 void PublishOpenDiagnostics() { for (const auto& [uri, document] : documents) PublishDiagnostics(uri); }
 json MemberCompletion(const luasharp::Symbol& member) {
-    const auto signature = member.kind == luasharp::SymbolKind::Method ? "(" + [&] { std::string value; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) value += ", "; value += member.parameters[i]; } return value; }() + ")" : "";
-    json item{{"label", member.name + signature}, {"kind", member.kind == luasharp::SymbolKind::Method ? 2 : 5}, {"detail", member.type + signature}};
-    if (member.kind == luasharp::SymbolKind::Method) {
-        std::string insert = member.name + "("; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) insert += ", "; const auto label = luasharp::SplitParameterLabel(member.parameters[i]); const auto name = label.name.empty() ? std::string("value") : std::string(label.name); insert += "${" + std::to_string(i + 1) + ":" + name + "}"; } insert += ")";
-        item["insertTextFormat"] = 2; item["insertText"] = insert;
-    }
+    if (member.kind != luasharp::SymbolKind::Method) return {{"label", member.name}, {"kind", 5}, {"detail", member.type}};
+    const auto signature = MethodSignature(member);
+    json item{{"label", signature}, {"kind", 2}, {"detail", ResultType(member) + " " + signature}};
+    // A generic method's snippet starts with its type argument, the constraint by default.
+    size_t placeholder{};
+    const auto next = [&](std::string_view text) { return "${" + std::to_string(++placeholder) + ":" + std::string(text) + "}"; };
+    std::string insert = member.name;
+    if (!member.typeParameter.empty()) insert += "<" + next(member.type) + ">";
+    insert += "(";
+    const auto parameters = luasharp::ExplicitParameters(member);
+    for (size_t i{}; i < parameters.size(); ++i) { if (i) insert += ", "; const auto label = luasharp::SplitParameterLabel(parameters[i]); insert += next(label.name.empty() ? "value" : label.name); }
+    item["insertTextFormat"] = 2; item["insertText"] = insert + ")";
     return item;
 }
 // Members reachable without `this.`: statics always, instance members only outside static functions.
@@ -381,7 +400,7 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         return result;
     }
     const char* words[] = {"class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return", "void", "null",
-                           "virtual", "override", "abstract", "sealed", "extern", "inout", "is", "as", "base"};
+                           "virtual", "override", "abstract", "sealed", "extern", "inout", "is", "as", "typeof", "base"};
     for (const auto* word : words) result.push_back({{"label", word}, {"kind", 14}});
     for (const auto& type : luasharp::BuiltinTypes()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in type"}});
     for (const auto& type : luasharp::BuiltinStaticClasses()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in static class"}});
@@ -401,12 +420,27 @@ json SignatureHelp(const std::string& uri, const std::string& text, const json& 
     size_t limit{}; while (limit < tokens.size() && tokens[limit].span.offset < cursor) ++limit;
     size_t open = tokens.size(), depth{};
     for (size_t i = limit; i-- > 0;) { if (tokens[i].text == ")") ++depth; else if (tokens[i].text == "(") { if (depth == 0) { open = i; break; } --depth; } }
-    if (open < 1 || tokens[open - 1].kind != luasharp::SyntaxTokenKind::Identifier) return nullptr;
-    const auto name = tokens[open - 1].text; std::string returnType; std::vector<std::string> parameterLabels;
-    if (open >= 3 && tokens[open - 2].text == ".") {
-        const auto* receiver = luasharp::FindExpression(analysis, tokens[open - 3].span.End() ? tokens[open - 3].span.End() - 1 : tokens[open - 3].span.offset); if (!receiver || receiver->type == luasharp::TypeTable::Unknown) return nullptr;
+    // `f<A>(`: the name is before the type argument list.
+    size_t nameIndex = open - 1; std::string typeArguments;
+    if (open >= 1 && tokens[nameIndex].text == ">") {
+        size_t angles{}, at = nameIndex + 1;
+        while (at-- > 0) { if (tokens[at].text == ">") ++angles; else if (tokens[at].text == "<" && --angles == 0) break; }
+        if (at >= nameIndex) return nullptr;
+        for (size_t i = at + 1; i < nameIndex; ++i) typeArguments += tokens[i].text == "," ? ", " : tokens[i].text;
+        nameIndex = at - 1;
+    }
+    if (open < 1 || nameIndex >= open || tokens[nameIndex].kind != luasharp::SyntaxTokenKind::Identifier) return nullptr;
+    const auto name = tokens[nameIndex].text; std::string returnType; std::vector<std::string> parameterLabels;
+    const auto useMethod = [&](const luasharp::Symbol& method) {
+        if (method.typeParameter.empty() || typeArguments.empty()) { returnType = method.type; parameterLabels = method.parameters; return; }
+        const auto parameters = luasharp::ExplicitParameters(method);
+        returnType = typeArguments; parameterLabels.assign(parameters.begin(), parameters.end());
+    };
+    if (nameIndex >= 2 && tokens[nameIndex - 1].text == ".") {
+        const auto& receiverToken = tokens[nameIndex - 2];
+        const auto* receiver = luasharp::FindExpression(analysis, receiverToken.span.End() ? receiverToken.span.End() - 1 : receiverToken.span.offset); if (!receiver || receiver->type == luasharp::TypeTable::Unknown) return nullptr;
         const auto* member = luasharp::FindMember(analysis, analysis.types.Name(receiver->type), name);
-        if (!member || member->kind != luasharp::SymbolKind::Method) return nullptr; returnType = member->type; parameterLabels = member->parameters;
+        if (!member || member->kind != luasharp::SymbolKind::Method) return nullptr; useMethod(*member);
     } else if (open >= 2 && tokens[open - 2].text == "new") {
         const auto type = std::find_if(analysis.syntax.root.classes.begin(), analysis.syntax.root.classes.end(), [&](const auto& value) { return value.name == name; }); if (type == analysis.syntax.root.classes.end()) return nullptr;
         const auto constructor = std::find_if(type->functions.begin(), type->functions.end(), [](const auto& value) { return value.isConstructor; }); returnType = type->name;
@@ -418,16 +452,15 @@ json SignatureHelp(const std::string& uri, const std::string& text, const json& 
         if (builtin->variadic) parameterLabels.push_back("any values...");
     }
     else {
-        const luasharp::Symbol* callable = nullptr;
-        if (const auto* expression = luasharp::FindExpression(analysis, tokens[open - 1].span.offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) callable = &analysis.symbols[*expression->symbolIndex];
+        const luasharp::Symbol* callable = ExpressionSymbol(analysis, luasharp::FindExpression(analysis, tokens[nameIndex].span.offset));
         if (!callable) return nullptr;
-        if (callable->kind == luasharp::SymbolKind::Method) { returnType = callable->type; parameterLabels = callable->parameters; }
+        if (callable->kind == luasharp::SymbolKind::Method) useMethod(*callable);
         else {
             size_t arity{}; if (!LambdaSignature(callable->type, arity, returnType)) return nullptr;
             for (size_t i{}; i < arity; ++i) parameterLabels.push_back("any value" + std::to_string(i + 1));
         }
     }
-    std::string label = name + "("; for (size_t i{}; i < parameterLabels.size(); ++i) { if (i) label += ", "; label += parameterLabels[i]; } label += ") -> " + returnType;
+    std::string label = name + (typeArguments.empty() ? "" : "<" + typeArguments + ">") + "(" + JoinLabels(parameterLabels) + ") -> " + returnType;
     json parameters = json::array(); for (const auto& parameter : parameterLabels) parameters.push_back({{"label", parameter}});
     size_t activeParameter{}, argumentDepth{};
     for (size_t i = open + 1; i < limit; ++i) { if (tokens[i].text == "(" || tokens[i].text == "[" || tokens[i].text == "{") ++argumentDepth; else if (tokens[i].text == ")" || tokens[i].text == "]" || tokens[i].text == "}") { if (argumentDepth) --argumentDepth; } else if (tokens[i].text == "," && argumentDepth == 0) ++activeParameter; }
@@ -480,9 +513,6 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
         if (luasharp::IsNativeStruct(name)) return StructTokenKind;
         return luasharp::IsBuiltinStaticClass(name) ? ClassTokenKind : -1;
     };
-    const auto symbolOf = [&](const luasharp::BoundExpression* expression) -> const luasharp::Symbol* {
-        return expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size() ? &analysis.symbols[*expression->symbolIndex] : nullptr;
-    };
     // Same rule as MemberAt: a name after '.' resolves on its receiver's type.
     const auto memberAt = [&](size_t i) -> const luasharp::Symbol* {
         if (i < 2 || tokens[i - 1].text != ".") return nullptr;
@@ -499,7 +529,7 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
         const luasharp::Symbol* symbol = nullptr;
         if (const auto declaration = declarations.find(token.span.offset); declaration != declarations.end()) symbol = declaration->second;
         else symbol = memberAt(i);
-        if (!symbol) symbol = symbolOf(innermost[i]);
+        if (!symbol) symbol = ExpressionSymbol(analysis, innermost[i]);
         if (symbol) tokenKind = symbol->kind == luasharp::SymbolKind::Method && symbol->name == symbol->owner ? typeKind(symbol->owner) : TokenKind(*symbol); // a constructor name is the type
         else tokenKind = typeKind(token.text);
         if (tokenKind < 0 && i + 1 < tokens.size() && tokens[i + 1].text == "(" && luasharp::FindBuiltinFunction(token.text)) tokenKind = 2;
@@ -552,7 +582,7 @@ int main() {
         else if (method == "textDocument/hover" || method == "textDocument/definition") {
             const auto& p = (*message)["params"]; const auto uri = p["textDocument"].value("uri", ""); const auto& text = documents[uri].text; const auto& analysis = Editor(uri); const auto offset = OffsetAt(text, p["position"]);
             const luasharp::Symbol* symbol = MemberAt(analysis, offset);
-            if (const auto* expression = luasharp::FindExpression(analysis, offset); expression && expression->symbolIndex && *expression->symbolIndex < analysis.symbols.size()) symbol = &analysis.symbols[*expression->symbolIndex];
+            if (const auto* found = ExpressionSymbol(analysis, luasharp::FindExpression(analysis, offset))) symbol = found;
             if (!symbol) { const auto word = WordAt(text, p["position"]); const auto found = std::find_if(analysis.symbols.begin(), analysis.symbols.end(), [&](const auto& candidate) { return !candidate.implicit && candidate.name == word; }); if (found != analysis.symbols.end()) symbol = &*found; }
             if (method == "textDocument/definition") { json locations = json::array(); if (symbol && symbol->span.length) locations.push_back(Location(uri, text, *symbol)); else if (symbol) if (const auto external = ExternalLocation(documents[uri], *symbol)) locations.push_back(*external); Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", locations}}); }
             else Send({{"jsonrpc", "2.0"}, {"id", (*message)["id"]}, {"result", symbol ? json{{"contents", {{"kind", "markdown"}, {"value", "```luasharp\n" + HoverLabel(*symbol) + "\n```"}}}} : json(nullptr)}});

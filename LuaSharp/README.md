@@ -192,18 +192,18 @@ An extern class can declare a generic method. The method has one type parameter 
 ```
 extern class ClassTypeInfo { [TypeOf] static ClassTypeInfo find(string name); }
 extern class Entity {
-    T get_component<T : Component>(ClassTypeInfo type);
+    T get_component<T : Component>();
 }
 MeshComponent mesh = e.get_component<MeshComponent>();
-Component any = e.get_component(typeof(MeshComponent)); // without a type argument, the result is the constraint
+Component any = e.get_component(info); // without a type argument, pass the type info; the result is the constraint
 ```
 
-- `[TypeOf]` marks one static method of an extern class. It takes a `string` and returns an extern class. The first `typeof(T)` in a module calls it with the name of `T`. The module keeps the result in a slot that the collector traces, so later `typeof(T)` reads the slot. When the host destroys that type info, the next `typeof(T)` calls the method again.
+- `[TypeOf]` marks one static method of an extern class. It takes a `string` and returns an extern class. `typeof(T)` calls it with the name of `T`.
 - `typeof(T)` needs an extern class, or a script class that derives from one. The host has no type info for other types.
-- The first parameter of a generic method has the result type of the `[TypeOf]` method. The call `x.f<A>(args)` passes `typeof(A)` for it, then `args`.
+- A generic method has a hidden first parameter. Its type is the result of the `[TypeOf]` method. The call `x.f<A>(args)` passes `typeof(A)` for it, then `args`. A call without a type argument passes the type info itself.
 - The type argument must derive from the constraint. The call has the type of the type argument.
 - The type parameter can only be the result. Script classes, structs and fields cannot have type parameters.
-- The method is erased: the host thunk takes the type info and returns the constraint. The call converts the result with `as A`, so a result of a different type is `null`.
+- The method is erased: the host thunk takes the type info first and returns the constraint. The call converts the result with `as A`, so a result of a different type is `null`.
 - After a member name, `<` starts a type argument list when a matching `>` and then `(` follow. Otherwise it is "less than". This is the C# rule.
 
 Type names can have type arguments in all type positions: `map<string, int[]>[] m;`. No type takes type arguments yet, so the analyzer reports an error for them.

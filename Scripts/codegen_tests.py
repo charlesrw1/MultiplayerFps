@@ -656,7 +656,7 @@ public:
         self.assertIn("// skipped in(): name is a LuaSharp keyword", declarations)
         self.assertNotIn("hidden", declarations)
         self.assertIn("    [TypeOf] static ClassTypeInfo find(string classname);\n", declarations)
-        self.assertIn("    T pick<T : Animal>(ClassTypeInfo type, int n);\n    static T make<T : Animal>(ClassTypeInfo type);\n", declarations)
+        self.assertIn("    T pick<T : Animal>(int n);\n    static T make<T : Animal>();\n", declarations)
 
     def test_thunks(self):
         out = self.generate()

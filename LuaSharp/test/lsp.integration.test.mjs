@@ -131,6 +131,24 @@ try {
     const implicitSignature = await waitFor(m => m.id === 12, "implicit method signature");
     assert.match(implicitSignature.result.signatures[0].label, /target\(int count\) -> void/, "implicit method signature help was missing");
 
+    const genericLines = ["extern class Info { [TypeOf] static Info find(string name); }", "extern class Part {}", "extern class Mesh : Part {}",
+        "extern class Body { T get<T : Part>(); T near<T : Part>(int radius); }", "Body b = null;", "Mesh m = b.get<Mesh>();", "b.near<Mesh>(", "b."];
+    const genericSource = genericLines.join("\n"); const at = (line, text) => ({ line, character: genericLines[line].indexOf(text) });
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 15 }, contentChanges: [{ text: genericSource }] } });
+    send({ jsonrpc: "2.0", id: 300, method: "textDocument/hover", params: { textDocument: { uri }, position: at(5, "get") } });
+    assert.match((await waitFor(m => m.id === 300, "generic method hover")).result.contents.value, /T get<T : Part>\(\)/, "generic method hover must hide the type info parameter");
+    send({ jsonrpc: "2.0", id: 301, method: "textDocument/hover", params: { textDocument: { uri }, position: at(5, "Mesh>") } });
+    assert.match((await waitFor(m => m.id === 301, "type argument hover")).result.contents.value, /class Mesh/, "a type argument hover must show the type, not the [TypeOf] method");
+    send({ jsonrpc: "2.0", id: 302, method: "textDocument/signatureHelp", params: { textDocument: { uri }, position: { line: 6, character: genericLines[6].length } } });
+    assert.match((await waitFor(m => m.id === 302, "generic signature")).result.signatures[0].label, /^near<Mesh>\(int radius\) -> Mesh$/, "generic signature help must skip the type arguments and the type info");
+    send({ jsonrpc: "2.0", id: 303, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: 7, character: 2 } } });
+    const genericItem = (await waitFor(m => m.id === 303, "generic completion")).result.find(item => item.label.startsWith("near"));
+    assert.equal(genericItem?.label, "near<T : Part>(int radius)", "generic completion label");
+    assert.equal(genericItem.insertText, "near<${1:Part}>(${2:radius})", "generic completion snippet");
+    send({ jsonrpc: "2.0", id: 304, method: "textDocument/semanticTokens/full", params: { textDocument: { uri } } });
+    const genericTokens = decodeSemanticTokens((await waitFor(m => m.id === 304, "generic tokens")).result.data);
+    assert.ok(genericTokens.some(token => token.line === 5 && token.character === at(5, "Mesh>").character && token.type === classToken), "a type argument must be a class token");
+
     const selfSource = "class Other { void unrelated() {} }\nclass Base { public: void inherited() {} private: void hidden() {} }\nclass Self : Base { int count; void own(int amount) {} static void make() {} void caller() {\n\n} static void maker() {\n\n} }";
     const selfLines = selfSource.split("\n");
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 14 }, contentChanges: [{ text: selfSource }] } });

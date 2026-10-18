@@ -2307,13 +2307,13 @@ constexpr std::string_view GenericDeclarations = R"(extern class ClassInfo { str
 extern class Part { }
 extern class Mesh : Part { int size; int verts(); }
 extern class Light : Part { }
-extern class Body { static Body make(); T get<T : Part>(ClassInfo type); static T first<T : Part>(ClassInfo type); void plain(ClassInfo type); }
+extern class Body { static Body make(); T get<T : Part>(); static T first<T : Part>(); T near<T : Part>(int radius); void plain(ClassInfo type); }
 )";
 
 void TestGenericMethodSemantics() {
     const auto with = [](std::string_view body) { return std::string(GenericDeclarations) + "class Rock {}\nclass Gear : Part {}\n" + std::string(body); };
     {
-        const auto source = with("Body b; Mesh m = b.get<Mesh>(); int v = b.get<Mesh>().verts(); Part p = b.get(typeof(Mesh)); Gear g = b.get<Gear>(); auto f = Body.first<Light>();"
+        const auto source = with("Body b; Mesh m = b.get<Mesh>(); int v = b.get<Mesh>().verts(); Part p = b.get(typeof(Mesh)); Gear g = b.get<Gear>(); auto f = Body.first<Light>(); Mesh near = b.near<Mesh>(3);"
                                  "ClassInfo t = typeof(Gear); int n = 2; bool less = m.size < n && n > 1;");
         RequireClean(source, "valid generic calls");
         const auto analysis = luasharp::Analyze(source);
@@ -2327,14 +2327,14 @@ void TestGenericMethodSemantics() {
     RequireDiagnostic(with("ClassInfo t = typeof(Rock);"), "needs an extern class or a script class that derives from one");
     RequireDiagnostic(with("ClassInfo t = typeof(int);"), "needs an extern class or a script class that derives from one");
     RequireDiagnostic("extern class P {} P x = typeof(P);", "'typeof' needs a [TypeOf] method");
-    RequireDiagnostic("extern class P { T f<T : P>(P t); }", "needs a [TypeOf] method");
-    RequireDiagnostic(with("extern class Q { T f<T : Part>(); }"), "must take 'ClassInfo' as its first parameter");
-    RequireDiagnostic(with("extern class Q { int f<T : Part>(ClassInfo t); }"), "must return its type parameter 'T'");
-    RequireDiagnostic(with("extern class Q { T f<T>(ClassInfo t); }"), "needs a class constraint");
-    RequireDiagnostic(with("extern class Q { T f<T : int>(ClassInfo t); }"), "must be a class");
-    RequireDiagnostic(with("extern class Q { void f<T : Part>(ClassInfo t, T x); }"), "can only be the result of 'f'");
-    RequireDiagnostic(with("class Q { T f<T : Part>(ClassInfo t) { return null; } }"), "Only methods of extern classes can have a type parameter");
-    RequireDiagnostic(with("extern class Q { T f<T : Part, U>(ClassInfo t); }"), "only one type parameter");
+    RequireDiagnostic("extern class P { T f<T : P>(); }", "needs a [TypeOf] method");
+    RequireDiagnostic(with("Body b; b.near<Mesh>();"), "argument(s) for 'near'");
+    RequireDiagnostic(with("extern class Q { int f<T : Part>(); }"), "must return its type parameter 'T'");
+    RequireDiagnostic(with("extern class Q { T f<T>(); }"), "needs a class constraint");
+    RequireDiagnostic(with("extern class Q { T f<T : int>(); }"), "must be a class");
+    RequireDiagnostic(with("extern class Q { void f<T : Part>(T x); }"), "can only be the result of 'f'");
+    RequireDiagnostic(with("class Q { T f<T : Part>() { return null; } }"), "Only methods of extern classes can have a type parameter");
+    RequireDiagnostic(with("extern class Q { T f<T : Part, U>(); }"), "only one type parameter");
     RequireDiagnostic(with("extern class Q { int x<T>; }"), "Only methods can have a type parameter");
     RequireDiagnostic(with("extern class Q { [TypeOf] static int f(string s); }"), "[TypeOf] needs a static method");
     RequireDiagnostic(with("extern class Q { [TypeOf] static Q f(string s); }"), "Only one method can be [TypeOf]");
@@ -2385,6 +2385,7 @@ void* BodyGet(void*, void* type) {
     return nullptr;
 }
 void* BodyFirst(void*) { return HostProxy(g_generics.meshProxy, "Mesh", &g_generics.mesh); }
+void* BodyNear(void* self, void* type, long long radius) { return radius > 0 ? BodyGet(self, type) : nullptr; }
 void BodyPlain(void*, void*) {}
 long long MeshVerts(void*) { return 12; }
 long long MeshGetSize(void*) { return 3; }
@@ -2397,7 +2398,7 @@ void TestNativeGenericMethods() {
     options.runtime = g_generics.runtime; options.declarations = {std::string(GenericDeclarations)};
     options.symbols = {{"ls_native_ClassInfo_find", reinterpret_cast<const void*>(&TypeInfoFind)}, {"ls_native_ClassInfo_name", reinterpret_cast<const void*>(&TypeInfoName)},
                        {"ls_native_Body_make", reinterpret_cast<const void*>(&BodyMake)}, {"ls_native_Body_get", reinterpret_cast<const void*>(&BodyGet)},
-                       {"ls_native_Body_first", reinterpret_cast<const void*>(&BodyFirst)}, {"ls_native_Body_plain", reinterpret_cast<const void*>(&BodyPlain)},
+                       {"ls_native_Body_first", reinterpret_cast<const void*>(&BodyFirst)}, {"ls_native_Body_plain", reinterpret_cast<const void*>(&BodyPlain)}, {"ls_native_Body_near", reinterpret_cast<const void*>(&BodyNear)},
                        {"ls_native_Mesh_verts", reinterpret_cast<const void*>(&MeshVerts)}, {"ls_native_Mesh__get_size", reinterpret_cast<const void*>(&MeshGetSize)},
                        {"ls_native_Mesh__set_size", reinterpret_cast<const void*>(&MeshSetSize)}};
     {
@@ -2410,6 +2411,7 @@ bool partIsMesh = p is Mesh;
 Light wrong = Body.first<Light>();
 bool wrongNull = wrong == null;
 bool firstMesh = Body.first<Mesh>() != null;
+int nearVerts = b.near<Mesh>(3).verts();
 string meshName = typeof(Mesh).name();
 bool sameInfo = typeof(Light) == typeof(Light);
 auto meshAgain = () => typeof(Mesh) == typeof(Mesh);
@@ -2417,6 +2419,7 @@ auto meshAgain = () => typeof(Mesh) == typeof(Mesh);
         Require(module.LastError().empty(), "generic calls reported a runtime error: " + module.LastError());
         Require(NativeGlobal<long long>(module, "verts") == 12 && NativeGlobal<unsigned char>(module, "lightOk") == 1, "a generic call did not pass typeof of its type argument");
         Require(NativeGlobal<unsigned char>(module, "partIsMesh") == 1, "a generic method without a type argument was wrong");
+        Require(NativeGlobal<long long>(module, "nearVerts") == 12, "a generic method did not pass its arguments after the type info");
         Require(NativeGlobal<unsigned char>(module, "wrongNull") == 1 && NativeGlobal<unsigned char>(module, "firstMesh") == 1, "a generic result of the wrong type was not null");
         Require(NativeText(module, "meshName") == "Mesh" && NativeGlobal<unsigned char>(module, "sameInfo") == 1, "typeof gave the wrong type info");
         Require(g_generics.finds == 2, "typeof did not keep the type info of each type: " + std::to_string(g_generics.finds) + " lookups");

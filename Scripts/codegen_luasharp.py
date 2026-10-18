@@ -228,7 +228,7 @@ def bind_class(cdef: ClassDef, cache: dict[str, BoundClass]) -> BoundClass:
 # ---- declarations ----
 
 def is_generic(m: BoundMember) -> bool:
-    """`lua_generic` X* f(const ClassTypeInfo* type, ...) is `T f<T : X>(ClassTypeInfo type, ...)`: a call f<A>() passes typeof(A)."""
+    """`lua_generic` X* f(const ClassTypeInfo* type, ...) is `T f<T : X>(...)`: a call f<A>() passes typeof(A) as the type."""
     return (m.prop.lua_generic and m.type is not None and m.type.object is not None and not m.type.handle
             and bool(m.params) and m.params[0][0].ls == "ClassTypeInfo")
 
@@ -247,7 +247,8 @@ def declare_class(bound: BoundClass) -> str:
         params = ", ".join(f"{t.ls} {n}" for t, n in m.params)
         if is_generic(m):
             assert m.type is not None
-            out += f"    {attributes}{modifiers}T {m.name}<T : {m.type.ls}>({params});\n"
+            explicit = ", ".join(f"{t.ls} {n}" for t, n in m.params[1:])
+            out += f"    {attributes}{modifiers}T {m.name}<T : {m.type.ls}>({explicit});\n"
         else:
             out += f"    {attributes}{modifiers}{m.type.ls if m.type else 'void'} {m.name}({params});\n"
     for s in bound.skipped:

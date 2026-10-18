@@ -255,7 +255,7 @@ The engine binds its reflected classes with generated code (`Scripts/codegen_lua
 - `~ClassBase` calls `DestroyNative` on the proxy and removes the root slot.
 - A `REFLECT(script_read)` field has a setter that reports a runtime error.
 - `REFLECT(type_of)` declares a method as `[TypeOf]`. The engine marks `ClassTypeInfo::find(name)`, so `typeof(T)` gives the `ClassTypeInfo` of `T`.
-- A `REFLECT(lua_generic)` method that returns a class pointer and takes a `const ClassTypeInfo*` first is a generic method: `T get_component<T : Component>(ClassTypeInfo ti);`. The thunk does not change. `e.get_component<MeshComponent>()` passes `typeof(MeshComponent)`.
+- A `REFLECT(lua_generic)` method that returns a class pointer and takes a `const ClassTypeInfo*` first is a generic method. The declaration does not show the type info: `T get_component<T : Component>();`. The thunk does not change. `e.get_component<MeshComponent>()` passes `typeof(MeshComponent)` as the first thunk argument.
 - Each module has a slot `ls_typeof_<T>` for each type that it uses in `typeof`. The first use fills the slot through the `[TypeOf]` method. Later uses read it, the same as `&T::StaticType` in C++. `ls_module_trace_roots` marks the slots. A slot with a destroyed proxy is filled again.
 - A `STRUCT_BODY()` struct is a declared struct with its bindable `REF` fields. The declaration lists each other field as a `// skipped` comment. The pass that owns the header declares the struct.
 - Each pass that uses a struct writes a C++ mirror with the C layout, and functions that convert each field: `ls_to_ls_S` (C++ to script), `ls_assign_S` and `ls_to_cpp_S` (script to C++). These are before the classes, because the `ScriptImpl_X` slot calls use them.
