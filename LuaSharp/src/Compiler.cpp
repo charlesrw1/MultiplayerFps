@@ -298,6 +298,7 @@ private:
         }
         if (Is(";")) { Advance(); result.hasBody = false; }
         else result.body = ParseBlock();
+        result.bodySpan = Cover(name.span, PreviousSpan());
         return result;
     }
     // static, virtual, override, abstract and sealed, in any order.
@@ -363,7 +364,9 @@ private:
             }
             if (before == index_) Advance();
         }
-        Match("}"); return result;
+        const bool closed = Is("}"); Match("}");
+        result.bodySpan = closed ? Cover(name.span, PreviousSpan()) : TextSpan{name.span.offset, sourceLength_ - name.span.offset}; // unclosed: runs to the end while typing
+        return result;
     }
 
     static constexpr int TypeTestPrecedence = 5; // `is` and `as` bind like relational operators

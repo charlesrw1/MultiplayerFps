@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -131,6 +131,17 @@ try {
     const implicitSignature = await waitFor(m => m.id === 12, "implicit method signature");
     assert.match(implicitSignature.result.signatures[0].label, /target\(int count\) -> void/, "implicit method signature help was missing");
 
+    const selfSource = "class Other { void unrelated() {} }\nclass Base { public: void inherited() {} private: void hidden() {} }\nclass Self : Base { int count; void own(int amount) {} static void make() {} void caller() {\n\n} static void maker() {\n\n} }";
+    const selfLines = selfSource.split("\n");
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 14 }, contentChanges: [{ text: selfSource }] } });
+    send({ jsonrpc: "2.0", id: 92, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: 3, character: 0 } } });
+    const selfLabels = (await waitFor(m => m.id === 92, "enclosing class completion")).result.map(item => item.label);
+    for (const label of ["own(int amount)", "inherited()", "count", "make()"]) assert.ok(selfLabels.includes(label), `bare completion missing ${label}: ${selfLabels.join(", ")}`);
+    for (const label of ["hidden()", "unrelated()", "unrelated"]) assert.ok(!selfLabels.includes(label), `bare completion must not offer ${label}`);
+    send({ jsonrpc: "2.0", id: 93, method: "textDocument/completion", params: { textDocument: { uri }, position: { line: selfLines.length - 2, character: 0 } } });
+    const staticContextLabels = (await waitFor(m => m.id === 93, "static context completion")).result.map(item => item.label);
+    assert.ok(staticContextLabels.includes("make()") && !staticContextLabels.includes("own(int amount)"), "static functions must offer only static members");
+
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 15 }, contentChanges: [{ text: source }] } });
     const entityFieldLine = source.split("\n").indexOf("Entity e = null;");
     send({ jsonrpc: "2.0", id: 13, method: "textDocument/references", params: { textDocument: { uri }, position: { line: entityFieldLine, character: 2 }, context: { includeDeclaration: true } } });
@@ -146,7 +157,7 @@ try {
     const workspaceSymbols = await waitFor(m => m.id === 16, "workspace symbols");
     assert.ok(workspaceSymbols.result.some(symbol => symbol.name === "MyClass"), "workspace symbol search omitted an open document class");
 
-    const unicodeSource = 'string emoji = "😀"; int bad = "x";';
+    const unicodeSource = 'string emoji = "ðŸ˜€"; int bad = "x";';
     messages.splice(0);
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 16 }, contentChanges: [{ text: unicodeSource }] } });
     const unicodeDiagnostics = await waitFor(m => m.method === "textDocument/publishDiagnostics" && m.params.diagnostics.some(d => /Cannot assign/.test(d.message)), "UTF-16 diagnostic");

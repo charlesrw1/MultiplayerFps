@@ -312,6 +312,32 @@ void PublishDiagnostics(const std::string& uri) {
     Send({{"jsonrpc", "2.0"}, {"method", "textDocument/publishDiagnostics"}, {"params", {{"uri", uri}, {"diagnostics", diagnostics}}}});
 }
 void PublishOpenDiagnostics() { for (const auto& [uri, document] : documents) PublishDiagnostics(uri); }
+json MemberCompletion(const luasharp::Symbol& member) {
+    const auto signature = member.kind == luasharp::SymbolKind::Method ? "(" + [&] { std::string value; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) value += ", "; value += member.parameters[i]; } return value; }() + ")" : "";
+    json item{{"label", member.name + signature}, {"kind", member.kind == luasharp::SymbolKind::Method ? 2 : 5}, {"detail", member.type + signature}};
+    if (member.kind == luasharp::SymbolKind::Method) {
+        std::string insert = member.name + "("; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) insert += ", "; auto nameAt = member.parameters[i].find(' '); auto name = nameAt == std::string::npos ? "value" : member.parameters[i].substr(nameAt + 1); if (name.ends_with('?')) name.pop_back(); insert += "${" + std::to_string(i + 1) + ":" + name + "}"; } insert += ")";
+        item["insertTextFormat"] = 2; item["insertText"] = insert;
+    }
+    return item;
+}
+// Members reachable without `this.`: statics always, instance members only outside static functions.
+void AddEnclosingClassCompletions(const luasharp::Analysis& analysis, size_t offset, json& result) {
+    const auto& classes = analysis.syntax.root.classes;
+    const auto enclosing = std::find_if(classes.begin(), classes.end(), [&](const auto& value) { return value.bodySpan.Contains(offset); });
+    if (enclosing == classes.end()) return;
+    const auto function = std::find_if(enclosing->functions.begin(), enclosing->functions.end(), [&](const auto& value) { return value.bodySpan.Contains(offset); });
+    const bool staticContext = function != enclosing->functions.end() && function->isStatic;
+    const auto add = [&](const std::string& key) {
+        const auto members = analysis.members.find(key); if (members == analysis.members.end()) return;
+        for (const auto index : members->second) {
+            const auto& member = analysis.symbols[index];
+            if (member.access == "private" && member.owner != enclosing->name) continue;
+            if (!staticContext || member.isStatic) result.push_back(MemberCompletion(member));
+        }
+    };
+    add(enclosing->name); add("$type:" + enclosing->name);
+}
 json Completions(const std::string& uri, const std::string& text, const json& position) {
     const auto& analysis = Editor(uri); const auto offset = OffsetAt(text, position); const auto lineStart = offset == 0 ? 0 : text.rfind('\n', offset - 1) == std::string::npos ? 0 : text.rfind('\n', offset - 1) + 1; const auto lineEnd = text.find('\n', offset); const auto line = text.substr(lineStart, lineEnd == std::string::npos ? std::string::npos : lineEnd - lineStart); const auto character = offset - lineStart;
     json result = json::array();
@@ -326,16 +352,7 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         }
         if (type) {
             const auto members = analysis.members.find(*type);
-            if (members != analysis.members.end()) for (const auto index : members->second) {
-                const auto& member = analysis.symbols[index];
-                const auto signature = member.kind == luasharp::SymbolKind::Method ? "(" + [&] { std::string value; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) value += ", "; value += member.parameters[i]; } return value; }() + ")" : "";
-                json item{{"label", member.name + signature}, {"kind", member.kind == luasharp::SymbolKind::Method ? 2 : 5}, {"detail", member.type + signature}};
-                if (member.kind == luasharp::SymbolKind::Method) {
-                    std::string insert = member.name + "("; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) insert += ", "; auto nameAt = member.parameters[i].find(' '); auto name = nameAt == std::string::npos ? "value" : member.parameters[i].substr(nameAt + 1); if (name.ends_with('?')) name.pop_back(); insert += "${" + std::to_string(i + 1) + ":" + name + "}"; } insert += ")";
-                    item["insertTextFormat"] = 2; item["insertText"] = insert;
-                }
-                result.push_back(std::move(item));
-            }
+            if (members != analysis.members.end()) for (const auto index : members->second) result.push_back(MemberCompletion(analysis.symbols[index]));
         }
         return result;
     }
@@ -351,7 +368,8 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         signature += ")";
         result.push_back({{"label", function.name + signature}, {"kind", 3}, {"detail", function.returnType + signature}});
     }
-    for (const auto& symbol : analysis.symbols) if (!symbol.implicit) result.push_back({{"label", symbol.name}, {"kind", symbol.kind == luasharp::SymbolKind::Class || symbol.kind == luasharp::SymbolKind::Enum ? 7 : symbol.kind == luasharp::SymbolKind::Method ? 2 : 6}, {"detail", DisplayType(symbol.type)}});
+    AddEnclosingClassCompletions(analysis, offset, result);
+    for (const auto& symbol : analysis.symbols) if (!symbol.implicit && symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Field) result.push_back({{"label", symbol.name}, {"kind", symbol.kind == luasharp::SymbolKind::Class || symbol.kind == luasharp::SymbolKind::Enum ? 7 : 6}, {"detail", DisplayType(symbol.type)}});
     return result;
 }
 json SignatureHelp(const std::string& uri, const std::string& text, const json& position) {

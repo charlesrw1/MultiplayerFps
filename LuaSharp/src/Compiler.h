@@ -115,7 +115,8 @@ struct SyntaxFunction {
     TextSpan baseSpan;
     std::vector<SyntaxParameter> parameters;
     NodeRange body;
-    TextSpan span;
+    TextSpan span;     // the name
+    TextSpan bodySpan; // name through the closing brace
 };
 // Classes and structs share one syntax node; a struct is a value type.
 struct SyntaxClass {
@@ -127,7 +128,8 @@ struct SyntaxClass {
     bool isExtern{}; // declared by the host: members have no bodies
     std::vector<SyntaxField> fields;
     std::vector<SyntaxFunction> functions;
-    TextSpan span;
+    TextSpan span;     // the name
+    TextSpan bodySpan; // name through the closing brace
 };
 struct SyntaxEnumMember {
     std::string name;
