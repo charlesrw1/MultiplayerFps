@@ -362,6 +362,10 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 - **Caller frames:** a hook records the offset of `ls_locals` from `rbp` for its function. A frame of a function that has not run a hook while attached shows no locals and no line.
 - **Runtime errors:** `NativeRuntime::SetErrorHandler` tells the debugger about each error. The debugger unwinds the C++ frames with `RtlVirtualUnwind` to the first module frame, and stops with the reason `Exception`. Errors that do not come from script code do not stop.
 - **Values:** `Locals` and `Variables` read memory through the `LS_FieldInfo` tables. Objects, structs, lists and tables have children. A child reference is valid until the script resumes. An `any` shows the type of its value.
+- **Extern objects:** an instrumented module has a getter shim (`LS_DebugProperty` in `LS_DebugModule::classes`) for each own field and each `[DebugView]` method of each extern class. A live extern object shows its script fields, then these properties of its class and of its bases. The debugger calls no other host method, because other methods can have side effects. A getter error shows as `<error: message>`. It does not stop the script, and the script does not see it. The summary shows the name from a string property `name`, `get_name()` or `get_editor_name()`, as in `Entity "player"`.
+- **`[DebugView]`:** put it on a method of an extern class that takes no arguments and returns a value. In CsRemake, `REFLECT(debug_view)` on a bound method makes it.
+- **Inspection thread:** `Locals`, `Variables` and `Evaluate` run on the stopped script thread. A call from another thread gives the work to the stop wait and waits for the result. Host getters thus run on the thread of the scripts. Hooks do not stop while a getter runs.
+- **Evaluate:** `Evaluate(frame, expression)` reads a path: a local or a member of `this`, then `.member` (a field, a property, or a `[DebugView]` method with or without `()`) and `[index]`.
 - **Modules:** a module can move after `AddModule`. Remove it before you destroy it.
 
 ## Debug Adapter Protocol server
@@ -369,7 +373,7 @@ An instrumented build is for the script debugger (#49). Set `NativeCompileOption
 `NativeDapServer` (NativeDapServer.h) serves the Debug Adapter Protocol for a `NativeDebugger` on TCP `127.0.0.1`. VS Code connects to it with the `luasharp` debug type (an `attach` configuration with a `port`).
 
 - **Clients:** one client at a time. `attach` attaches the debugger. A `disconnect`, or a closed connection, detaches it and resumes a stopped script. The server then accepts the next client.
-- **Requests:** `initialize`, `attach`, `setBreakpoints`, `setExceptionBreakpoints`, `configurationDone`, `threads`, `stackTrace`, `scopes`, `variables`, `continue`, `next`, `stepIn`, `stepOut`, `pause` and `disconnect`. `launch` fails: the program starts the server, not the client.
+- **Requests:** `initialize`, `attach`, `setBreakpoints`, `setExceptionBreakpoints`, `configurationDone`, `threads`, `stackTrace`, `scopes`, `variables`, `evaluate` (watch, hover and debug console), `continue`, `next`, `stepIn`, `stepOut`, `pause` and `disconnect`. `launch` fails: the program starts the server, not the client.
 - **Events:** `initialized`, `stopped` (from the stop handler, on the script thread), `output` and `terminated`.
 - **Threads:** one thread, id 1.
 - **Scopes:** each frame has one scope, `Locals`. Its reference is `2^30 + frame`. Value references are less than `2^30`.

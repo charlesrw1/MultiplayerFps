@@ -53,7 +53,7 @@ public:
 
 	REFLECT();
 	bool is_subclass_of(const ClassTypeInfo* info) const;
-	REFLECT();
+	REFLECT(debug_view);
 	std::string get_classname() const;
 	REFLECT();
 	const ClassTypeInfo* get_super_type() const;

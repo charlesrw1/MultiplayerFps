@@ -105,6 +105,7 @@ struct Symbol {
     bool isNative{};   // Class symbols: an `extern class`; its objects are host proxies (LS_NativeObject)
     bool hostDefault{}; // Class symbols: an `extern struct`; the host makes T() (ls_native_T_new)
     bool isTypeOf{};    // Methods: [TypeOf], the static extern method that typeof(T) calls with the name of T
+    bool isDebugView{}; // Methods: [DebugView], an extern getter without side effects that the debugger can call
     std::string typeParameter; // Generic methods: the name of the type parameter. `type` is its constraint.
 };
 // A generic method's symbol takes the type info first; `x.f<A>(...)` passes typeof(A) there.

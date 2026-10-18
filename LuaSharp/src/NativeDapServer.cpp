@@ -163,7 +163,7 @@ struct NativeDapServer::Impl {
         const auto arguments = request.value("arguments", json::object());
         if (command == "initialize") {
             const json errors = {{"filter", "errors"}, {"label", "Runtime errors"}, {"default", true}};
-            Respond(request, {{"supportsConfigurationDoneRequest", true}, {"exceptionBreakpointFilters", json::array({errors})}});
+            Respond(request, {{"supportsConfigurationDoneRequest", true}, {"supportsEvaluateForHovers", true}, {"exceptionBreakpointFilters", json::array({errors})}});
             Event("initialized");
         } else if (command == "attach") {
             debugger.Attach();
@@ -188,6 +188,8 @@ struct NativeDapServer::Impl {
             const auto frame = arguments.value("frameId", uint64_t{});
             const json locals = {{"name", "Locals"}, {"presentationHint", "locals"}, {"variablesReference", ScopeBase + frame}, {"expensive", false}};
             Respond(request, {{"scopes", json::array({locals})}});
+        } else if (command == "evaluate") {
+            Evaluate(request, arguments);
         } else if (command == "variables") {
             const auto reference = arguments.value("variablesReference", uint64_t{});
             const auto variables = reference >= ScopeBase ? debugger.Locals(reference - ScopeBase) : debugger.Variables(reference);
@@ -228,6 +230,14 @@ struct NativeDapServer::Impl {
         auto result = json::array();
         for (size_t i{}; i < lines.size(); ++i) result.push_back({{"verified", bound[i] != 0}, {"line", bound[i] != 0 ? bound[i] : lines[i]}});
         Respond(request, {{"breakpoints", std::move(result)}});
+    }
+
+    // Watch, hover and debug console: a path such as `this.owner.get_ws_position()` (NativeDebugger::Evaluate).
+    void Evaluate(const json& request, const json& arguments) {
+        const auto result = debugger.Evaluate(arguments.value("frameId", size_t{}), arguments.value("expression", ""));
+        if (!result.value) return Fail(request, result.error);
+        assert(result.value->children < ScopeBase);
+        Respond(request, {{"result", result.value->value}, {"type", result.value->type}, {"variablesReference", result.value->children}});
     }
 
     void StackTrace(const json& request, const json& arguments) {

@@ -44,7 +44,8 @@ public:
 	template <typename T> T* create_component();
 	REFLECT(lua_generic, no_nil)
 	Component* create_component(const ClassTypeInfo* info);
-	REF Entity* get_parent() const { return parent; }
+	REFLECT(debug_view)
+	Entity* get_parent() const { return parent; }
 	// will also parent to this
 	REFLECT(no_nil)
 	Entity* create_child_entity();
@@ -59,15 +60,21 @@ public:
 	REF void set_ls_rotation(const glm::quat& quat);
 	REF void set_ls_scale(const glm::vec3& scale);
 	REF glm::mat4 get_ls_transform() const;
-	REF const glm::vec3& get_ls_position() const { return position; }
-	REF const glm::vec3& get_ls_scale() const { return scale; }
-	REF const glm::quat& get_ls_rotation() const { return rotation; }
+	REFLECT(debug_view)
+	const glm::vec3& get_ls_position() const { return position; }
+	REFLECT(debug_view)
+	const glm::vec3& get_ls_scale() const { return scale; }
+	REFLECT(debug_view)
+	const glm::quat& get_ls_rotation() const { return rotation; }
 	REF void set_ws_transform(const glm::mat4& transform);
 	REF void set_ws_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
 	REF const glm::mat4& get_ws_transform();
-	REF glm::vec3 get_ws_position();
-	REF glm::quat get_ws_rotation();
-	REF glm::vec3 get_ws_scale();
+	REFLECT(debug_view)
+	glm::vec3 get_ws_position();
+	REFLECT(debug_view)
+	glm::quat get_ws_rotation();
+	REFLECT(debug_view)
+	glm::vec3 get_ws_scale();
 	REF void set_ws_position(const glm::vec3& v);
 	REF void set_ws_position_rotation(const glm::vec3& pos, const glm::quat& rot);
 	REF void set_ls_position_rotation(const glm::vec3& pos, const glm::quat& rot);
@@ -81,8 +88,10 @@ public:
 
 	void move_child_entity_index(Entity* who, int move_to);
 	int get_child_entity_index(Entity* who) const;
+	REFLECT(debug_view)
 	const std::vector<Component*>& get_components() const { return all_components; }
-	REF const std::vector<Entity*>& get_children() const { return children; }
+	REFLECT(debug_view)
+	const std::vector<Entity*>& get_children() const { return children; }
 
 	EntityPtr get_self_ptr() const { return EntityPtr(this); }
 	void invalidate_transform(Component* skipthis);
@@ -99,12 +108,16 @@ public:
 	void set_cached_mesh_component(MeshComponent* c) { cached_mesh_component = c; }
 	REF glm::mat4 get_parent_transform() const;
 	REF void set_parent_bone(StringName name);
-	REF bool has_parent_bone() const;
-	REF StringName get_parent_bone() const { return parent_bone.name; }
+	REFLECT(debug_view)
+	bool has_parent_bone() const;
+	REFLECT(debug_view)
+	StringName get_parent_bone() const { return parent_bone.name; }
 	
-	REF bool get_is_top_level() const { return is_top_level; }
+	REFLECT(debug_view)
+	bool get_is_top_level() const { return is_top_level; }
 	REF void set_is_top_level(bool b);
-	REF const std::string& get_editor_name() const { return editor_name; }
+	REFLECT(debug_view)
+	const std::string& get_editor_name() const { return editor_name; }
 	void set_editor_name(const std::string& n) { editor_name = n; }
 #ifdef EDITOR_BUILD
 	bool get_hidden_in_editor() const { return hidden_in_editor; }

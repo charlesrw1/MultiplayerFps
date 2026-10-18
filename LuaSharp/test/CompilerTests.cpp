@@ -2351,6 +2351,15 @@ void TestGenericMethodSemantics() {
     RequireDiagnostic(with("extern class Q { [TypeOf] static int f(string s); }"), "[TypeOf] needs a static method");
     RequireDiagnostic(with("extern class Q { [TypeOf] static Q f(string s); }"), "Only one method can be [TypeOf]");
     RequireDiagnostic("extern class Q { [Other] static Q f(string s); }", "Only fields can have attributes");
+    for (const auto* invalid : {"extern class Q { [DebugView] int f(int a); }", "extern class Q { [DebugView] void f(); }", "extern class Q { [DebugView] static int f(); }",
+                                "class Q { [DebugView] int f() { return 1; } }", "extern class Q { [DebugView(\"x\")] int f(); }"})
+        RequireDiagnostic(invalid, "[DebugView]");
+    {
+        const auto declared = luasharp::DeclarationTypes({"extern class Q { [DebugView] int f(); int g(); }"});
+        const auto& members = declared.at(0).members;
+        const auto find = [&](std::string_view name) { return *std::ranges::find(members, name, &luasharp::Symbol::name); };
+        Require(find("f").isDebugView && !find("g").isDebugView, "[DebugView] did not reach the declaration types");
+    }
     // Type arguments parse in every type position; no type takes them yet.
     RequireDiagnostic("map<string, int[]>[] m;", "Type 'map' does not take type arguments");
     RequireDiagnostic("class A { map<string, int> f; }", "Type 'map' does not take type arguments");
@@ -2728,6 +2737,84 @@ int value = Values.check();
 }
 
 // The script thread waits while it is stopped; another thread inspects and resumes it.
+// An extern object in the debugger: its fields and [DebugView] methods, read through host getters on the script thread.
+struct HostProbe { long long hp; HostProbe* parent; void* proxy; };
+std::shared_ptr<luasharp::NativeRuntime> g_probeRuntime;
+HostProbe g_probeRoot{3, nullptr, nullptr}, g_probeChild{5, &g_probeRoot, nullptr};
+std::thread::id g_probeGetterThread;
+size_t g_probeCounterCalls{};
+void* ProbeProxy(HostProbe* probe) {
+    if (probe && !probe->proxy) probe->proxy = g_probeRuntime->NewNativeProxy(g_probeRuntime->FindNativeClass("Probe"), probe);
+    return probe ? probe->proxy : nullptr;
+}
+HostProbe& AsProbe(void* self) { return *static_cast<HostProbe*>(self); }
+long long ProbeGetHp(void* self) { return AsProbe(self).hp; }
+void ProbeSetHp(void* self, long long hp) { AsProbe(self).hp = hp; }
+void* ProbeGetName(void* self) { g_probeGetterThread = std::this_thread::get_id(); return g_probeRuntime->Intern(&AsProbe(self) == &g_probeRoot ? "root" : "child"); }
+HostVec3 ProbeGetPos(void* self) { return {1, 2, static_cast<float>(AsProbe(self).hp)}; }
+void* ProbeGetParent(void* self) { return ProbeProxy(AsProbe(self).parent); }
+long long ProbeBroken(void*) { g_probeRuntime->ReportError("the probe is broken"); return 0; }
+long long ProbeCounter(void*) { return static_cast<long long>(++g_probeCounterCalls); }
+void* ProbeMake() { return ProbeProxy(&g_probeChild); }
+
+void TestNativeDebuggerProperties() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    constexpr std::string_view source = R"(extern class Probe { int hp; [DebugView] string get_name(); [DebugView] Vec3 get_pos(); [DebugView] Probe get_parent(); [DebugView] int broken(); int counter(); static Probe make(); }
+class Game {
+    static int run(Probe p) {
+        int x = p.hp;
+        return x;
+    }
+}
+int result = Game.run(Probe.make());
+)";
+    g_probeRuntime = luasharp::NativeRuntime::Create();
+    {
+        luasharp::NativeCompileOptions options;
+        options.initialize = false; options.emitDebugHooks = true; options.sourceName = "probe.ls"; options.runtime = g_probeRuntime;
+        options.symbols = {{"ls_native_Probe__get_hp", reinterpret_cast<const void*>(&ProbeGetHp)}, {"ls_native_Probe__set_hp", reinterpret_cast<const void*>(&ProbeSetHp)},
+            {"ls_native_Probe_get_name", reinterpret_cast<const void*>(&ProbeGetName)}, {"ls_native_Probe_get_pos", reinterpret_cast<const void*>(&ProbeGetPos)},
+            {"ls_native_Probe_get_parent", reinterpret_cast<const void*>(&ProbeGetParent)}, {"ls_native_Probe_broken", reinterpret_cast<const void*>(&ProbeBroken)},
+            {"ls_native_Probe_counter", reinterpret_cast<const void*>(&ProbeCounter)}, {"ls_native_Probe_make", reinterpret_cast<const void*>(&ProbeMake)}};
+        auto module = luasharp::NativeModule::Compile(source, options);
+        luasharp::NativeDebugger debugger(module.Runtime());
+        debugger.AddModule(module);
+        debugger.Attach();
+        Require(debugger.SetBreakpoints("probe.ls", {5}) == std::vector<uint32_t>{5}, "the breakpoint did not bind");
+        std::thread script([&] { module.Initialize(); });
+        const auto scriptThread = script.get_id();
+        {
+            // A failed Require resumes the script, so that the thread joins.
+            struct Join { luasharp::NativeDebugger& debugger; std::thread& thread; ~Join() { debugger.Detach(); thread.join(); } } join{debugger, script};
+            Require(debugger.WaitUntilStopped(std::chrono::seconds(10)), "the breakpoint did not stop the script");
+
+            // This thread asks; the getters run on the stopped script thread.
+            const auto probe = FindVariable(debugger.Locals(0), "p");
+            Require(probe.value == "Probe \"child\"" && probe.children, "wrong extern object summary: " + probe.value);
+            Require(g_probeGetterThread == scriptThread, "a getter did not run on the script thread");
+            const auto members = debugger.Variables(probe.children);
+            Require(VariableNames(members) == std::vector<std::string>{"hp", "get_name()", "get_pos()", "get_parent()", "broken()"}, "wrong extern members");
+            Require(FindVariable(members, "hp").value == "5" && FindVariable(members, "get_pos()").value == "Vec3(1, 2, 5)", "wrong field or struct property");
+            Require(FindVariable(members, "get_parent()").value == "Probe \"root\"", "wrong object property: " + FindVariable(members, "get_parent()").value);
+            Require(FindVariable(members, "broken()").value == "<error: the probe is broken>", "a getter error did not become the value: " + FindVariable(members, "broken()").value);
+            Require(debugger.Stopped(), "a getter error stopped or resumed the script");
+
+            const auto evaluate = [&](std::string_view expression) { return debugger.Evaluate(0, expression); };
+            const auto shown = [&](std::string_view expression) { const auto result = evaluate(expression); return result.value ? result.value->value : "<" + result.error + ">"; };
+            Require(shown("p.get_parent().hp") == "3", "wrong evaluated path: " + shown("p.get_parent().hp"));
+            Require(shown("p.get_parent.get_name") == "\"root\"", "a method without () did not evaluate: " + shown("p.get_parent.get_name"));
+            Require(shown("x") == "5" && shown("p.get_pos().z") == "5", "wrong evaluated local or struct field: " + shown("p.get_pos().z"));
+            Require(!evaluate("p.counter()").value && !evaluate("p.nope").value && !evaluate("p.broken()").value && !evaluate("missing").value, "an invalid expression evaluated");
+            Require(evaluate("p.broken()").error == "the probe is broken", "wrong evaluation error: " + evaluate("p.broken()").error);
+            Require(g_probeCounterCalls == 0, "the debugger called a method without [DebugView]");
+            debugger.Continue();
+        }
+        Require(*static_cast<long long*>(module.FindGlobal("result")) == 5, "the script computed the wrong result");
+        g_probeRoot.proxy = g_probeChild.proxy = nullptr;
+    }
+    g_probeRuntime.reset();
+}
+
 void TestNativeDebuggerThreads() {
     if (!luasharp::NativeModule::IsLibTccAvailable()) return;
     constexpr std::string_view source = R"(int total = 0;
@@ -2832,6 +2919,7 @@ int main() {
         {"native debugger", TestNativeDebugger},
         {"native debugger values", TestNativeDebuggerValues},
         {"native debugger threads", TestNativeDebuggerThreads},
+        {"native debugger properties", TestNativeDebuggerProperties},
         {"project files", TestProjectFiles},
     };
 

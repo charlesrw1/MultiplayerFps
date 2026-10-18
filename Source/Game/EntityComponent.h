@@ -64,7 +64,7 @@ public:
 	// Override if this component instantiates children from a prefab path and needs to
 	// respawn them when the prefab's source data changes. See PrefabAssetComponent.
 	virtual void refresh_after_prefab_reload(PrefabAsset* reloaded) {}
-	REFLECT(no_nil)
+	REFLECT(no_nil, debug_view)
 	Entity* get_owner() const { return entity_owner; }
 	
 	// for convenience, just calls get_owner()->get_XYZ
@@ -75,15 +75,21 @@ public:
 	REF void set_ls_rotation(const glm::quat& quat);
 	REF void set_ls_scale(const glm::vec3& scale);
 	REF glm::mat4 get_ls_transform() const;
-	REF const glm::vec3& get_ls_position() const;
-	REF const glm::vec3& get_ls_scale() const;
-	REF const glm::quat& get_ls_rotation() const;
+	REFLECT(debug_view)
+	const glm::vec3& get_ls_position() const;
+	REFLECT(debug_view)
+	const glm::vec3& get_ls_scale() const;
+	REFLECT(debug_view)
+	const glm::quat& get_ls_rotation() const;
 	REF void set_ws_transform(const glm::mat4& transform);
 	REF void set_ws_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
 	REF const glm::mat4& get_ws_transform();
-	REF glm::vec3 get_ws_position();
-	REF glm::quat get_ws_rotation();
-	REF glm::vec3 get_ws_scale();
+	REFLECT(debug_view)
+	glm::vec3 get_ws_position();
+	REFLECT(debug_view)
+	glm::quat get_ws_rotation();
+	REFLECT(debug_view)
+	glm::vec3 get_ws_scale();
 	REF void set_ws_position(const glm::vec3& v);
 	REF void set_ws_position_rotation(const glm::vec3& pos, const glm::quat& rot);
 	REF void set_ls_position_rotation(const glm::vec3& pos, const glm::quat& rot);

@@ -52,6 +52,9 @@ public:
 		std::string function;
 		uint32_t line = 0;
 		std::map<std::string, std::string> locals;
+		std::string owner;                                // `this.get_owner()`: the [DebugView] getter of the extern base
+		std::map<std::string, std::string> owner_members; // the members of the owner entity
+		std::string evaluated;                            // evaluate "get_owner().get_ws_position()"
 	};
 
 	DapProbe(uint16_t port, std::string source) : thread_([this, port, source = std::move(source)] { run(port, source); }) {}
@@ -100,11 +103,29 @@ private:
 		result.line = frames[0].value("line", 0u);
 		const json scopes = request("scopes", {{"frameId", frames[0]["id"]}})["scopes"];
 		const json variables = request("variables", {{"variablesReference", scopes[0]["variablesReference"]}})["variables"];
-		for (const json& variable : variables)
+		json self;
+		for (const json& variable : variables) {
 			result.locals[variable.value("name", "")] = variable.value("value", "");
+			if (variable.value("name", "") == "this")
+				self = variable;
+		}
+		if (!self.is_null() && self.value("variablesReference", 0) != 0) {
+			for (const json& member : children(self)) {
+				if (member.value("name", "") != "get_owner()")
+					continue;
+				result.owner = member.value("value", "");
+				for (const json& owned : children(member))
+					result.owner_members[owned.value("name", "")] = owned.value("value", "");
+			}
+		}
+		result.evaluated = request("evaluate", {{"expression", "get_owner().get_ws_position()"}, {"frameId", frames[0]["id"]}, {"context", "watch"}}).value("result", "");
 		request("setBreakpoints", {{"source", {{"path", source}}}, {"breakpoints", json::array()}});
 		request("continue", {{"threadId", 1}});
 		request("disconnect", json::object());
+	}
+
+	json children(const json& variable) {
+		return request("variables", {{"variablesReference", variable["variablesReference"]}})["variables"];
 	}
 
 	void connect_to(uint16_t port) {
@@ -201,6 +222,13 @@ static TestTask test_luasharp_debugger_break_in_update(TestContext& t) {
 	t.check(result.locals.count("this") == 1, "the locals show this");
 	t.check(result.locals["doubled"] == "0", ("doubled is 0 in the first update: " + result.locals["doubled"]).c_str());
 	t.check(result.locals["label"] == "\"probe\"", ("label is the string: " + result.locals["label"]).c_str());
+	t.check(result.owner.starts_with("Entity"), ("this shows the owner through get_owner(): " + result.owner).c_str());
+	t.check(result.owner_members.count("get_ws_position()") == 1 && result.owner_members.count("get_components()") == 1,
+		"the owner shows its [DebugView] getters");
+	t.check(result.owner_members["get_components()"].find("[1]") != std::string::npos,
+		("the owner has the probe component: " + result.owner_members["get_components()"]).c_str());
+	t.check(result.owner_members.count("destroy()") == 0, "the debugger shows no method without [DebugView]");
+	t.check(result.evaluated.starts_with("Vec3("), ("evaluate reads the owner position: " + result.evaluated).c_str());
 	e->destroy();
 	co_await t.wait_ticks(1);
 }

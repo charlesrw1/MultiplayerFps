@@ -94,7 +94,7 @@ public:
 	// is this class a subclass or an instance of type T
 	template <typename T> bool is_a() const;
 
-	REFLECT();
+	REFLECT(debug_view);
 	const ClassTypeInfo* my_type() const;
 	REFLECT();
 	bool is_subclass_of(const ClassTypeInfo* type) const;

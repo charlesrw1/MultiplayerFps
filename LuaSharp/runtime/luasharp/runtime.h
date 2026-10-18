@@ -163,12 +163,18 @@ typedef void (*LS_DebugHook)(void* context, void* locals, void* frame, ls_wrap_b
 typedef struct LS_DebugState { volatile ls_wrap_bits active; LS_DebugHook hook; void* context; } LS_DebugState;
 /* Code of one instrumented function: [begin, end). locals: offsets in the locals struct, in NativeDebugFunction::locals order. */
 typedef struct LS_DebugFunction { const void* begin; const void* end; const LS_FieldInfo* locals; ls_wrap_bits local_count; } LS_DebugFunction;
+/* A host value of an extern class that the debugger reads: an own field, or a [DebugView] method ("name()"). get calls the
+   checked wrapper with the proxy and stores the result at out, as a field at offset 0 of value. */
+typedef struct LS_DebugProperty { LS_FieldInfo value; void (*get)(void* self, void* out); } LS_DebugProperty;
+typedef struct LS_DebugClass { const char* name; const LS_DebugProperty* properties; ls_wrap_bits property_count; } LS_DebugClass;
 typedef struct LS_DebugModule {
     LS_DebugState* state;
     const LS_DebugFunction* functions;
     ls_wrap_bits function_count;
     const void* text_begin;
     const void* text_end;
+    const LS_DebugClass* classes; /* each extern class of the declarations */
+    ls_wrap_bits class_count;
 } LS_DebugModule;
 static LS_DebugState ls_debug;
 /* Out of line, so each hook site stays short for TinyCC. Frame 1 is the rbp of the instrumented function. */

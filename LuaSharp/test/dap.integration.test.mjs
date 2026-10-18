@@ -48,11 +48,14 @@ class DapClient {
         });
     }
     event(name) { return this.waitFor((message) => message.type === "event" && message.event === name, `event ${name}`); }
-    async request(command, args = {}) {
+    async response(command, args = {}) {
         const seq = this.sequence++;
         const body = JSON.stringify({ seq, type: "request", command, arguments: args });
         this.socket.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
-        const response = await this.waitFor((message) => message.type === "response" && message.request_seq === seq, `response ${command}`);
+        return this.waitFor((message) => message.type === "response" && message.request_seq === seq, `response ${command}`);
+    }
+    async request(command, args = {}) {
+        const response = await this.response(command, args);
         assert.ok(response.success, `${command} failed: ${response.message}`);
         return response.body;
     }
@@ -110,6 +113,7 @@ try {
 
     const capabilities = await client.request("initialize", { adapterID: "luasharp", linesStartAt1: true });
     assert.equal(capabilities.supportsConfigurationDoneRequest, true);
+    assert.equal(capabilities.supportsEvaluateForHovers, true);
     await client.event("initialized");
     await client.request("attach", {});
     const { breakpoints } = await client.request("setBreakpoints", { source: { path: script.toUpperCase() }, breakpoints: [{ line: 2 }, { line: 40 }] });
@@ -144,6 +148,10 @@ try {
     await client.request("continue", { threadId: 1 });
     await client.stopped("breakpoint");
     assert.equal((await client.locals(0)).n, "1");
+    assert.equal((await client.request("evaluate", { expression: "n", frameId: 0, context: "hover" })).result, "1");
+    assert.equal((await client.request("evaluate", { expression: "total", frameId: 1, context: "watch" })).result, "0");
+    const missing = await client.response("evaluate", { expression: "nope", frameId: 0, context: "watch" });
+    assert.ok(!missing.success && /nope/.test(missing.message), `an unknown name evaluated: ${JSON.stringify(missing)}`);
 
     await client.request("setBreakpoints", { source: { path: script }, breakpoints: [] });
     await client.request("continue", { threadId: 1 });

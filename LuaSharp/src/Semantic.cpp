@@ -334,10 +334,17 @@ private:
         return function.typeParameter && function.returnType == function.typeParameter->name ? function.typeParameter->constraint : function.returnType;
     }
     // [TypeOf] marks `static C f(string name)` on an extern class, where C is an extern class. typeof(T) calls it with the name of T.
+    // [DebugView] marks `R f()` on an extern class: the debugger calls it to show the object.
     void CheckMethodAttributes(const SyntaxClass& owner, const SyntaxFunction& function, size_t index) {
         for (const auto& attribute : function.attributes) {
-            if (attribute.name != "TypeOf") { AddDiagnostic("Only fields can have attributes, except [TypeOf] on a method: '" + attribute.name + "'", attribute.span); continue; }
-            if (attribute.argument) { AddDiagnostic("[TypeOf] takes no argument", attribute.span); continue; }
+            if (attribute.name != "TypeOf" && attribute.name != "DebugView") { AddDiagnostic("Only fields can have attributes, except [TypeOf] and [DebugView] on a method: '" + attribute.name + "'", attribute.span); continue; }
+            if (attribute.argument) { AddDiagnostic("[" + attribute.name + "] takes no argument", attribute.span); continue; }
+            if (attribute.name == "DebugView") {
+                const bool getter = owner.isExtern && !owner.isStruct && !function.isStatic && !function.isConstructor && !function.typeParameter && function.parameters.empty() && function.returnType != "void";
+                if (!getter) { AddDiagnostic("[DebugView] needs a method of an extern class that takes no arguments and returns a value", attribute.span); continue; }
+                result_.symbols[index].isDebugView = true;
+                continue;
+            }
             const bool provider = owner.isExtern && !owner.isStruct && function.isStatic && !function.typeParameter && function.parameters.size() == 1
                 && function.parameters.front().type == "string" && nativeTypes_.contains(function.returnType);
             if (!provider) { AddDiagnostic("[TypeOf] needs a static method of an extern class that takes a string and returns an extern class", attribute.span); continue; }

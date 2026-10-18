@@ -625,6 +625,8 @@ public:
     Animal* pick(const ClassTypeInfo* type, int n);
     REFLECT(lua_generic)
     static Animal* make(const ClassTypeInfo* type);
+    REFLECT(debug_view)
+    int age() const;
 };
 """
 
@@ -656,7 +658,7 @@ public:
         self.assertIn("// skipped in(): name is a LuaSharp keyword", declarations)
         self.assertNotIn("hidden", declarations)
         self.assertIn("    [TypeOf] static ClassTypeInfo find(string classname);\n", declarations)
-        self.assertIn("    T pick<T : Animal>(int n);\n    static T make<T : Animal>();\n", declarations)
+        self.assertIn("    T pick<T : Animal>(int n);\n    static T make<T : Animal>();\n    [DebugView] int age();\n", declarations)
 
     def test_thunks(self):
         out = self.generate()

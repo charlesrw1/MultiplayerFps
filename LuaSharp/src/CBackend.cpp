@@ -462,6 +462,40 @@ struct CEmitter {
             Line(0, "};");
         }
     }
+    // ls_debug_classes: for each extern class, a getter shim for each own field and [DebugView] method, so the debugger can
+    // read host values (LS_DebugProperty). Other methods can have side effects; the debugger never calls them. Gives the class count.
+    size_t DebugClasses() {
+        std::vector<std::pair<const ExternalType*, std::vector<std::pair<const Symbol*, size_t>>>> debugClasses; // class, (member, shim)
+        size_t shim{};
+        for (const auto* type : orderedNatives) {
+            StringSet emitted;
+            std::vector<std::pair<const Symbol*, size_t>> properties;
+            for (const auto& member : type->members) {
+                if (member.owner != type->name || !emitted.insert(member.name).second) continue;
+                const bool field = member.kind == SymbolKind::Field;
+                if ((!field && !member.isDebugView) || !TryKindName(Find(member.type))) continue;
+                Line(0, "static void ls_debug_get_", shim, "(void* self, void* out) { *(", CTypeName{member.type}, "*)out = ", [&] {
+                    if (field) Put(Accessor(type->name, "get", member.name)); else Put(Fn{type->name, member.name});
+                }, "((LS_", Id{type->name}, "*)self); }");
+                properties.emplace_back(&member, shim++);
+            }
+            if (!properties.empty()) debugClasses.emplace_back(type, std::move(properties));
+        }
+        if (debugClasses.empty()) return 0;
+        for (const auto& [type, properties] : debugClasses) {
+            Line(0, "static const LS_DebugProperty ls_debug_properties_", Id{type->name}, "[] = {");
+            for (const auto& [member, index] : properties) {
+                const auto valueType = Find(member->type);
+                Line(1, "{{\"", member->name, member->kind == SymbolKind::Method ? "()" : "", "\", 0, ", [&] { FieldDescriptor(valueType); }, ", 0, (const char*)0, (const char*)0, ",
+                     [&] { if (IsEnum(valueType)) Put("&ls_enuminfo_", Id{member->type}); else Put("(const LS_EnumInfo*)0"); }, "}, ls_debug_get_", index, "},");
+            }
+            Line(0, "};");
+        }
+        Line(0, "static const LS_DebugClass ls_debug_classes[] = {");
+        for (const auto& [type, properties] : debugClasses) Line(1, "{\"", type->name, "\", ls_debug_properties_", Id{type->name}, ", ", properties.size(), "},");
+        Line(0, "};");
+        return debugClasses.size();
+    }
     static constexpr std::string_view LineReset = "#line ls_c";
     // The module table (LS_DebugModule). Then each LineReset becomes a #line of the generated C.
     void DebugTables() {
@@ -472,7 +506,9 @@ struct CEmitter {
         for (size_t i{}; i < debugSymbols.size(); ++i)
             Line(1, "{(const void*)", debugSymbols[i], ", (const void*)ls_debug_end_", i, ", ", [&] { if (debugInfo.functions[i].locals.empty()) Put("(const LS_FieldInfo*)0"); else Put("ls_debug_locals_", i); }, ", ", debugInfo.functions[i].locals.size(), "},");
         Line(0, "};");
-        Line(0, "static const LS_DebugModule ls_debug_module = {&ls_debug, ls_debug_functions, ", debugSymbols.size(), ", (const void*)ls_debug_text_begin, (const void*)ls_debug_text_end};");
+        const auto classCount = DebugClasses();
+        Line(0, "static const LS_DebugModule ls_debug_module = {&ls_debug, ls_debug_functions, ", debugSymbols.size(), ", (const void*)ls_debug_text_begin, (const void*)ls_debug_text_end, ",
+             [&] { if (classCount) Put("ls_debug_classes"); else Put("(const LS_DebugClass*)0"); }, ", ", classCount, "};");
         Line(0, "const LS_DebugModule* ls_module_debug(void) { return &ls_debug_module; }");
         std::string resolved;
         resolved.reserve(output.size());

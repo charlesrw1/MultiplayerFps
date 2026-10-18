@@ -420,7 +420,7 @@ extern class Model : IAsset {
     void set_physics_material(PhysicsMaterialWrapper mat);
     PhysicsMaterialWrapper get_physics_material();
     PhysicsMaterialWrapper get_physics_material_to_use();
-    bool has_skeleton();
+    [DebugView] bool has_skeleton();
 }
 )ls",
 	R"ls(// PostProcessSettings (PostProcessSettings.h)

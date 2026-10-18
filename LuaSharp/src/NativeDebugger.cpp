@@ -15,6 +15,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <thread>
 
 namespace luasharp {
 namespace {
@@ -40,6 +41,13 @@ struct Slot {
     const NativeEnumInfo* enumInfo{};
 };
 Slot SlotOf(const std::byte* base, const NativeFieldInfo& field) { return {base + field.offset, field.kind, field.elementKind, field.type, field.enumInfo}; }
+// A named value: a local, a field, an element or a property. error: the property getter failed, and slot is not valid.
+struct Child {
+    std::string name;
+    std::string type; // the declared type; empty to show the type of the value
+    Slot slot;
+    std::string error;
+};
 
 bool IsKind(uint64_t kind, NativeValueKind value) { return kind == KindOf(value); }
 
@@ -81,6 +89,13 @@ std::string EnumText(const NativeEnumInfo& info, int64_t value) {
 }
 
 bool IsProxy(const NativeTypeInfo& type) { return (type.flags & (TypeNative | TypeNativeBase)) != 0; }
+// The extern class of an object: the type of a proxy, or the nearest extern ancestor of a script class.
+const NativeTypeInfo* NativeClassOf(const NativeTypeInfo* type) {
+    while (type && !(type->flags & TypeNative)) type = type->base;
+    return type;
+}
+
+bool IsIdentifier(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }
 
 } // namespace
 
@@ -131,6 +146,12 @@ struct NativeDebugger::Impl {
     std::vector<Frame> frames;     // while stopped
     std::vector<Slot> references;  // while stopped; reference i + 1
     std::deque<NativeValue> copies; // while stopped: table entries that references point into
+    std::deque<std::vector<std::byte>> results; // while stopped: property values that references point into
+    std::thread::id scriptThread;   // while stopped
+    std::function<void()> task;     // inspection that another thread gives to the stopped script thread
+    std::condition_variable taskSignal;
+    std::atomic<bool> evaluating{}; // a property getter runs: hooks do not stop, and an error goes to evaluationError
+    std::optional<std::string> evaluationError;
 
     static void Hook(void* context, void* locals, void* frame, uint64_t function, uint64_t statement) {
         auto& module = *static_cast<Module*>(context);
@@ -138,6 +159,7 @@ struct NativeDebugger::Impl {
         const auto previous = std::exchange(current, statement);
         module.frameOffsets[function] = static_cast<std::byte*>(locals) - static_cast<std::byte*>(frame);
         auto& self = *module.debugger;
+        if (self.evaluating.load(std::memory_order_relaxed)) return;
         const auto mode = self.mode.load(std::memory_order_relaxed);
         const bool breakpoint = module.breakpoints[module.firstStatement[function] + statement].load(std::memory_order_relaxed) != 0;
         if (mode == Mode::Run && !breakpoint) return;
@@ -164,6 +186,8 @@ struct NativeDebugger::Impl {
     }
 
     void OnError(std::string_view message) {
+        // A getter runs on the stopped script thread, which holds the lock.
+        if (evaluating) { evaluationError = std::string(message); return; }
         std::unique_lock lock(mutex);
         if (!attached || !breakOnErrors || stopped) return;
         auto walked = ErrorFrames();
@@ -171,10 +195,11 @@ struct NativeDebugger::Impl {
         Stop(lock, {NativeStopReason::Exception, std::string(message)}, std::move(walked));
     }
 
-    // Runs on the script thread: calls the stop handler, then waits for a resume command.
+    // Runs on the script thread: calls the stop handler, then runs inspection tasks until a resume command.
     void Stop(std::unique_lock<std::mutex>& lock, const NativeStopEvent& event, std::vector<Frame> walked) {
         assert(!stopped);
         stopped = true;
+        scriptThread = std::this_thread::get_id();
         frames = std::move(walked);
         mode = Mode::Run;
         stoppedSignal.notify_all();
@@ -182,7 +207,26 @@ struct NativeDebugger::Impl {
         lock.unlock();
         if (handler) handler(event);
         lock.lock();
-        resumedSignal.wait(lock, [&] { return !stopped; });
+        for (;;) {
+            resumedSignal.wait(lock, [&] { return !stopped || task; });
+            if (!stopped) break;
+            std::exchange(task, {})();
+            taskSignal.notify_all();
+        }
+    }
+
+    // Runs inspect on the stopped script thread, under the lock, so that host getters run on the thread of the scripts.
+    // Gives an empty result when the script resumes first.
+    template <typename F> auto OnScriptThread(std::unique_lock<std::mutex>& lock, F inspect) -> decltype(inspect()) {
+        if (!stopped || std::this_thread::get_id() == scriptThread) return inspect();
+        taskSignal.wait(lock, [&] { return !task || !stopped; });
+        if (!stopped) return {};
+        std::optional<decltype(inspect())> result;
+        task = [&] { result = inspect(); };
+        resumedSignal.notify_all();
+        taskSignal.wait(lock, [&] { return result || !stopped; });
+        if (!result) return {};
+        return std::move(*result);
     }
 
     void Resume(Mode next) {
@@ -191,10 +235,13 @@ struct NativeDebugger::Impl {
         stepLocals = frames.empty() ? nullptr : frames.front().locals;
         mode = next;
         stopped = false;
+        task = {};
         frames.clear();
         references.clear();
         copies.clear();
+        results.clear();
         resumedSignal.notify_all();
+        taskSignal.notify_all();
     }
 
     const Module* FindModule(const void* address) const {
@@ -306,7 +353,49 @@ struct NativeDebugger::Impl {
         return {slot.address + offsetof(NativeValue, as), KindOf(value.kind)};
     }
 
-    static std::string Summary(const Slot& slot) {
+    const NativeDebugClass* FindDebugClass(std::string_view name) const {
+        for (const auto& module : modules)
+            for (uint64_t i{}; i < module->tables->classCount; ++i) if (name == module->tables->classes[i].name) return &module->tables->classes[i];
+        return nullptr;
+    }
+    // The properties of the extern class of an object and of its extern bases; the most derived first.
+    std::vector<const NativeDebugProperty*> Properties(const NativeTypeInfo& objectType) const {
+        std::vector<const NativeDebugProperty*> result;
+        for (const auto* type = NativeClassOf(&objectType); type; type = type->base)
+            if (const auto* found = FindDebugClass(type->name)) for (uint64_t i{}; i < found->propertyCount; ++i) result.push_back(&found->properties[i]);
+        return result;
+    }
+    // Calls the host getter of a live extern object. The value stays until resume; GC runs only between script calls.
+    Child Read(const NativeDebugProperty& property, const std::byte* object) {
+        assert(Load<NativeProxy>(object).native && "a getter needs a live object");
+        const auto& value = property.value;
+        const size_t size = std::max<size_t>(sizeof(NativeValue), IsKind(value.kind, NativeValueKind::Struct) ? static_cast<size_t>(value.type->size) : 0);
+        auto& buffer = results.emplace_back(size);
+        evaluationError.reset();
+        const bool hadError = !runtime->LastError().empty(); // the runtime keeps its first error
+        evaluating = true;
+        property.get(const_cast<std::byte*>(object), buffer.data());
+        evaluating = false;
+        if (evaluationError && !hadError) runtime->ClearError(); // the script does not see the error of a getter
+        Child child{value.name, {}, SlotOf(buffer.data(), value)};
+        if (evaluationError) child.error = *std::exchange(evaluationError, std::nullopt);
+        return child;
+    }
+    // `Entity "player"`: the name of an extern object, from a string property name, get_name() or get_editor_name().
+    std::string ObjectSummary(const std::byte* object) {
+        const auto& type = *Load<const NativeTypeInfo*>(object);
+        if (!IsProxy(type)) return type.name;
+        for (const auto* property : Properties(type)) {
+            const std::string_view name = property->value.name;
+            if (!IsKind(property->value.kind, NativeValueKind::String) || (name != "name" && name != "get_name()" && name != "get_editor_name()")) continue;
+            const auto child = Read(*property, object);
+            const auto* string = child.error.empty() ? Load<const RuntimeString*>(child.slot.address) : nullptr;
+            if (string && string->length > 0) return std::string(type.name) + ' ' + Quoted(string);
+        }
+        return type.name;
+    }
+
+    std::string Summary(const Slot& slot) {
         switch (slot.kind) {
         case SlotFloat32: return Number(Load<float>(slot.address));
         case SlotInt32: return Number(Load<int32_t>(slot.address));
@@ -330,7 +419,7 @@ struct NativeDebugger::Impl {
         case NativeValueKind::Object:
             if (!reference) return "null";
             if (IsProxy(*Load<const NativeTypeInfo*>(reference)) && !Load<NativeProxy>(reference).native) return "null (destroyed)";
-            return SlotTypeName(slot);
+            return ObjectSummary(reference);
         case NativeValueKind::Struct: {
             assert(slot.type);
             std::string result = std::string(slot.type->name) + '(';
@@ -346,7 +435,7 @@ struct NativeDebugger::Impl {
         }
     }
 
-    static bool HasChildren(const Slot& slot) {
+    bool HasChildren(const Slot& slot) const {
         if (IsInline(slot.kind)) return false;
         const auto* reference = Load<const std::byte*>(slot.address);
         switch (static_cast<NativeValueKind>(slot.kind)) {
@@ -354,7 +443,8 @@ struct NativeDebugger::Impl {
         case NativeValueKind::Object: {
             if (!reference) return false;
             const auto& type = *Load<const NativeTypeInfo*>(reference);
-            return type.fieldCount > 0 && (!IsProxy(type) || Load<NativeProxy>(reference).native);
+            if (!IsProxy(type)) return type.fieldCount > 0;
+            return Load<NativeProxy>(reference).native && (type.fieldCount > 0 || !Properties(type).empty());
         }
         case NativeValueKind::List: return reference && reinterpret_cast<const NativeList*>(reference)->count > 0;
         case NativeValueKind::Table: return reference != nullptr;
@@ -362,23 +452,26 @@ struct NativeDebugger::Impl {
         }
     }
 
-    std::vector<std::pair<std::string, Slot>> Children(const Slot& slot) {
-        std::vector<std::pair<std::string, Slot>> result;
+    // An extern object: its script fields, then its properties.
+    std::vector<Child> Children(const Slot& slot) {
+        std::vector<Child> result;
         if (!HasChildren(slot)) return result;
         switch (static_cast<NativeValueKind>(slot.kind)) {
         case NativeValueKind::Struct:
-            for (const auto& field : Fields(*slot.type)) result.emplace_back(field.name, Slot{FieldSlot(slot.address, field), field.kind, field.elementKind, field.type, field.enumInfo});
+            for (const auto& field : Fields(*slot.type)) result.push_back({field.name, {}, Slot{FieldSlot(slot.address, field), field.kind, field.elementKind, field.type, field.enumInfo}});
             break;
         case NativeValueKind::Object: {
             const auto* object = Load<const std::byte*>(slot.address);
-            for (const auto& field : Fields(*Load<const NativeTypeInfo*>(object))) result.emplace_back(field.name, SlotOf(object, field));
+            const auto& type = *Load<const NativeTypeInfo*>(object);
+            for (const auto& field : Fields(type)) result.push_back({field.name, {}, SlotOf(object, field)});
+            if (IsProxy(type)) for (const auto* property : Properties(type)) result.push_back(Read(*property, object));
             break;
         }
         case NativeValueKind::List: {
             const auto& list = *Load<const NativeList*>(slot.address);
             const auto count = std::min<size_t>(static_cast<size_t>(list.count), MaxChildren);
             for (size_t i{}; i < count; ++i)
-                result.emplace_back('[' + Number(i) + ']', Slot{list.data + i * list.elementSize, static_cast<uint64_t>(list.elementKind), 0, static_cast<const NativeTypeInfo*>(list.elementType)});
+                result.push_back({'[' + Number(i) + ']', {}, Slot{list.data + i * list.elementSize, static_cast<uint64_t>(list.elementKind), 0, static_cast<const NativeTypeInfo*>(list.elementType)}});
             break;
         }
         case NativeValueKind::Table: {
@@ -393,7 +486,7 @@ struct NativeDebugger::Impl {
                     const auto* string = reinterpret_cast<const RuntimeString*>(Load<const void*>(keySlot.address));
                     name.assign(string->data, static_cast<size_t>(string->length));
                 } else name = '[' + Summary(keySlot) + ']';
-                result.emplace_back(std::move(name), Slot{reinterpret_cast<const std::byte*>(&copies.emplace_back(value)), SlotValue});
+                result.push_back({std::move(name), {}, Slot{reinterpret_cast<const std::byte*>(&copies.emplace_back(value)), SlotValue}});
             }
             break;
         }
@@ -402,6 +495,10 @@ struct NativeDebugger::Impl {
         return result;
     }
 
+    NativeDebugVariable Describe(Child child) {
+        if (!child.error.empty()) return {std::move(child.name), std::move(child.type), "<error: " + child.error + '>', 0};
+        return Describe(std::move(child.name), std::move(child.type), child.slot);
+    }
     NativeDebugVariable Describe(std::string name, std::string type, const Slot& stored) {
         const auto slot = Unwrap(stored);
         // An `any` shows the type of its value; a function type has no readable spelling.
@@ -413,6 +510,74 @@ struct NativeDebugger::Impl {
             variable.children = references.size();
         }
         return variable;
+    }
+
+    // The visible locals of a stopped frame.
+    std::vector<Child> LocalSlots(size_t frameIndex) const {
+        std::vector<Child> result;
+        if (frameIndex >= frames.size()) return result;
+        const auto& frame = frames[frameIndex];
+        if (!frame.locals || frame.statement == NoStatement) return result;
+        const auto& locals = frame.module->info->functions[frame.function].locals;
+        const auto& range = frame.module->tables->functions[frame.function];
+        assert(range.localCount == locals.size());
+        for (size_t i{}; i < locals.size(); ++i) {
+            const auto& local = locals[i];
+            if (frame.statement < local.visibleFrom || frame.statement >= local.visibleTo) continue;
+            auto slot = SlotOf(frame.locals, range.locals[i]);
+            if (range.locals[i].flags & FieldIndirect) {
+                slot.address = Load<const std::byte*>(slot.address);
+                if (!slot.address) slot = {nullptr, NullValue};
+            }
+            result.push_back({local.name, local.type, slot});
+        }
+        return result;
+    }
+
+    // A child by name; a method matches without its "()".
+    std::optional<Child> FindChild(const Slot& parent, std::string_view name) {
+        for (auto& child : Children(Unwrap(parent)))
+            if (child.name == name || (child.name.ends_with("()") && std::string_view(child.name).substr(0, child.name.size() - 2) == name)) return std::move(child);
+        return std::nullopt;
+    }
+
+    NativeEvaluation Evaluate(size_t frameIndex, std::string_view expression) {
+        size_t at{};
+        const auto skipSpaces = [&] { while (at < expression.size() && expression[at] == ' ') ++at; };
+        const auto name = [&] {
+            skipSpaces();
+            const auto start = at;
+            while (at < expression.size() && IsIdentifier(expression[at])) ++at;
+            auto result = std::string(expression.substr(start, at - start));
+            if (expression.substr(at).starts_with("()")) { at += 2; result += "()"; }
+            return result;
+        };
+        const auto fail = [](std::string message) { return NativeEvaluation{std::nullopt, std::move(message)}; };
+
+        const auto first = name();
+        if (first.empty()) return fail("expected a name");
+        auto locals = LocalSlots(frameIndex);
+        std::optional<Child> current;
+        if (const auto local = std::ranges::find(locals, first, &Child::name); local != locals.end()) current = std::move(*local);
+        else if (const auto self = std::ranges::find(locals, "this", &Child::name); self != locals.end()) current = FindChild(self->slot, first);
+        if (!current) return fail("'" + first + "' is not a local or a member of this");
+        for (skipSpaces(); at < expression.size(); skipSpaces()) {
+            if (!current->error.empty()) break;
+            std::string member;
+            if (expression[at] == '.') { ++at; member = name(); if (member.empty()) return fail("expected a member after '.'"); }
+            else if (expression[at] == '[') {
+                const auto close = expression.find(']', at);
+                if (close == std::string_view::npos) return fail("expected ']'");
+                member = '[' + std::string(expression.substr(at + 1, close - at - 1)) + ']';
+                at = close + 1;
+            } else return fail("unexpected '" + std::string(1, expression[at]) + "'");
+            auto next = FindChild(current->slot, member);
+            if (!next) return fail("'" + member + "' is not a member of " + SlotTypeName(Unwrap(current->slot)));
+            current = std::move(next);
+        }
+        if (!current->error.empty()) return fail(current->error);
+        current->name = std::string(expression);
+        return {Describe(std::move(*current)), {}};
     }
 };
 
@@ -517,33 +682,30 @@ std::vector<NativeDebugFrame> NativeDebugger::StackTrace() const {
 }
 
 std::vector<NativeDebugVariable> NativeDebugger::Locals(size_t frameIndex) {
-    std::scoped_lock lock(impl_->mutex);
-    std::vector<NativeDebugVariable> result;
-    if (frameIndex >= impl_->frames.size()) return result;
-    const auto& frame = impl_->frames[frameIndex];
-    if (!frame.locals || frame.statement == NoStatement) return result;
-    const auto& locals = frame.module->info->functions[frame.function].locals;
-    const auto& range = frame.module->tables->functions[frame.function];
-    assert(range.localCount == locals.size());
-    for (size_t i{}; i < locals.size(); ++i) {
-        const auto& local = locals[i];
-        if (frame.statement < local.visibleFrom || frame.statement >= local.visibleTo) continue;
-        auto slot = SlotOf(frame.locals, range.locals[i]);
-        if (range.locals[i].flags & FieldIndirect) {
-            slot.address = Load<const std::byte*>(slot.address);
-            if (!slot.address) { result.push_back({local.name, local.type, "null", 0}); continue; }
-        }
-        result.push_back(impl_->Describe(local.name, local.type, slot));
-    }
-    return result;
+    std::unique_lock lock(impl_->mutex);
+    return impl_->OnScriptThread(lock, [&] {
+        std::vector<NativeDebugVariable> result;
+        for (auto& local : impl_->LocalSlots(frameIndex)) result.push_back(impl_->Describe(std::move(local)));
+        return result;
+    });
 }
 
 std::vector<NativeDebugVariable> NativeDebugger::Variables(uint64_t reference) {
-    std::scoped_lock lock(impl_->mutex);
-    std::vector<NativeDebugVariable> result;
-    if (!impl_->stopped || reference == 0 || reference > impl_->references.size()) return result;
-    const auto slot = impl_->references[reference - 1];
-    for (auto& [name, child] : impl_->Children(slot)) result.push_back(impl_->Describe(std::move(name), {}, child));
+    std::unique_lock lock(impl_->mutex);
+    return impl_->OnScriptThread(lock, [&] {
+        std::vector<NativeDebugVariable> result;
+        if (!impl_->stopped || reference == 0 || reference > impl_->references.size()) return result;
+        const auto slot = impl_->references[reference - 1];
+        for (auto& child : impl_->Children(slot)) result.push_back(impl_->Describe(std::move(child)));
+        return result;
+    });
+}
+
+NativeEvaluation NativeDebugger::Evaluate(size_t frame, std::string_view expression) {
+    std::unique_lock lock(impl_->mutex);
+    if (!impl_->stopped) return {std::nullopt, "the script is running"};
+    auto result = impl_->OnScriptThread(lock, [&] { return impl_->Evaluate(frame, expression); });
+    if (!result.value && result.error.empty()) result.error = "the script resumed";
     return result;
 }
 

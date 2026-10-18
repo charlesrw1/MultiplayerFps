@@ -91,12 +91,23 @@ struct NativeDebugFunctionRange {
     const abi::NativeFieldInfo* locals; // localCount entries; offsets in the locals struct, FieldIndirect for indirect locals
     uint64_t localCount;
 };
+struct NativeDebugProperty {
+    abi::NativeFieldInfo value; // the result slot: offset 0 of the buffer that get fills
+    void (*get)(void* proxy, void* out);
+};
+struct NativeDebugClass {
+    const char* name;
+    const NativeDebugProperty* properties;
+    uint64_t propertyCount;
+};
 struct NativeDebugModule {
     NativeDebugState* state;
     const NativeDebugFunctionRange* functions;
     uint64_t functionCount;
     const void* textBegin;          // all generated code of the module lies in [textBegin, textEnd)
     const void* textEnd;
+    const NativeDebugClass* classes; // the extern classes, each with its own getters
+    uint64_t classCount;
 };
 
 struct CEmitOptions {

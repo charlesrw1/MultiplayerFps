@@ -116,6 +116,7 @@ class Property:
         self.script_writable = True
         self.lua_generic = False
         self.type_of = False  # LuaSharp: [TypeOf], the method that typeof(T) calls
+        self.debug_view = False  # LuaSharp: [DebugView], a getter without side effects that the script debugger calls
 
         # or return type
         self.new_type : CppType
@@ -304,6 +305,8 @@ def parse_reflect_macro(line : str) -> Property:
                 current_prop.lua_generic = True
             elif t=="type_of":
                 current_prop.type_of = True
+            elif t=="debug_view":
+                current_prop.debug_view = True
             elif t=="tooltip":
                 if next(token_iter) != "=":
                     raise Exception("expected '=' after 'type'")

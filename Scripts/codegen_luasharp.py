@@ -242,7 +242,7 @@ def declare_class(bound: BoundClass) -> str:
             assert m.type is not None
             out += f"    {m.type.ls} {m.name};\n"
             continue
-        attributes = "[TypeOf] " if m.prop.type_of else ""
+        attributes = ("[TypeOf] " if m.prop.type_of else "") + ("[DebugView] " if m.prop.debug_view else "")
         modifiers = "static " if m.prop.is_static else "virtual " if m.prop.is_virtual else ""
         params = ", ".join(f"{t.ls} {n}" for t, n in m.params)
         if is_generic(m):

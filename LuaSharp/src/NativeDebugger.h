@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,9 +31,16 @@ struct NativeDebugVariable {
     uint64_t children{};
 };
 
+struct NativeEvaluation {
+    std::optional<NativeDebugVariable> value;
+    std::string error; // when there is no value
+};
+
 // Breakpoints, stepping and inspection for instrumented modules (NativeCompileOptions::emitDebugHooks).
 // Scripts run on one thread. At a stop, that thread calls the stop handler and then waits for a resume command.
 // A command that the handler gives resumes without a wait. Other threads can call all members.
+// Inspection runs on the stopped script thread: a call from another thread waits for it. An extern object shows its fields
+// and its [DebugView] methods; the debugger calls their host getters.
 class NativeDebugger {
 public:
     explicit NativeDebugger(std::shared_ptr<NativeRuntime> runtime);
@@ -70,6 +78,9 @@ public:
     [[nodiscard]] std::vector<NativeDebugFrame> StackTrace() const;
     std::vector<NativeDebugVariable> Locals(size_t frame);
     std::vector<NativeDebugVariable> Variables(uint64_t reference);
+    // A path in the frame: a local or a field of `this`, then `.member` (a field, a property or a [DebugView] method, with
+    // or without "()") and `[index]`.
+    NativeEvaluation Evaluate(size_t frame, std::string_view expression);
 
 private:
     struct Impl;
