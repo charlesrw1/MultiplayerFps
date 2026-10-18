@@ -57,6 +57,9 @@ public:
 	std::string get_classname() const;
 	REFLECT();
 	const ClassTypeInfo* get_super_type() const;
+	// LuaSharp `typeof` calls this
+	REFLECT(type_of);
+	static const ClassTypeInfo* find(const std::string& classname);
 	REFLECT(); // alias for scripts. tbh you should never really call this.
 	ClassBase* alloc() const { return allocate_this_type(); }
 	int get_prototype_index_table() const;

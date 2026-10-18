@@ -30,6 +30,10 @@ const ClassTypeInfo* ClassTypeInfo::get_super_type() const {
 	return super_typeinfo;
 }
 
+const ClassTypeInfo* ClassTypeInfo::find(const std::string& classname) {
+	return ClassBase::find_class(classname.c_str());
+}
+
 int ClassTypeInfo::get_prototype_index_table() const {
 	assert(lua_prototype_index_table != 0);
 	return lua_prototype_index_table;

@@ -69,6 +69,8 @@ public:
 	REF StringName tag(StringName n) { return n; }
 	REF LsTestMode next_mode(LsTestMode m) { return m == LsTestMode::Off ? LsTestMode::Slow : LsTestMode::Fast; }
 	REF LsTestThing* get_partner() { return partner; }
+	REFLECT(lua_generic)
+	LsTestBase* partner_as(const ClassTypeInfo* type) { return type && partner && partner->is_subclass_of(type) ? partner : nullptr; }
 	REF void set_partner(LsTestThing* p) { partner = p; }
 	REF bool is_partner(const LsTestThing* other) { return other == partner; }
 	REF int get_secret() { return secret; }

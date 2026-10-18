@@ -254,6 +254,9 @@ The engine binds its reflected classes with generated code (`Scripts/codegen_lua
 - `LuaSharpEngine::proxy_of` makes one proxy for each `ClassBase` and keeps it in `ClassBase::script_proxy`, which is a root slot. The type of the proxy is the nearest bound class of the object.
 - `~ClassBase` calls `DestroyNative` on the proxy and removes the root slot.
 - A `REFLECT(script_read)` field has a setter that reports a runtime error.
+- `REFLECT(type_of)` declares a method as `[TypeOf]`. The engine marks `ClassTypeInfo::find(name)`, so `typeof(T)` gives the `ClassTypeInfo` of `T`.
+- A `REFLECT(lua_generic)` method that returns a class pointer and takes a `const ClassTypeInfo*` first is a generic method: `T get_component<T : Component>(ClassTypeInfo ti);`. The thunk does not change. `e.get_component<MeshComponent>()` passes `typeof(MeshComponent)`.
+- `typeof(T)` calls the host each time. It does not keep the result, because a C static is not a GC root.
 - A `STRUCT_BODY()` struct is a declared struct with its bindable `REF` fields. The declaration lists each other field as a `// skipped` comment. The pass that owns the header declares the struct.
 - Each pass that uses a struct writes a C++ mirror with the C layout, and functions that convert each field: `ls_to_ls_S` (C++ to script), `ls_assign_S` and `ls_to_cpp_S` (script to C++). These are before the classes, because the `ScriptImpl_X` slot calls use them.
 - Each engine struct is an `extern struct`. The owning pass registers `ls_native_S_new`, which returns `ls_to_ls_S(S{})`, so `T()` in script has the C++ default values.

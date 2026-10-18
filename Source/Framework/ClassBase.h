@@ -32,7 +32,8 @@ private:
 //		- 'hide' : (edit_hide AND script_hide)
 //
 //		- 'lua_generic' : will treat arg as a generic parameter and return that when making the lua stub file (doesnt
-// affect runtime)
+// affect runtime). LuaSharp declares it as `T f<T : Ret>(ClassTypeInfo type, ...)`, so scripts call f<MeshComponent>()
+//		- 'type_of' : the static method LuaSharp typeof(T) calls (ClassTypeInfo::find)
 //		- 'transient' : dont serialize this property
 //		- 'type="my_custom_type"' : tags this for use with custom serializer/editor
 //		- 'name="some name"' : provides a name override

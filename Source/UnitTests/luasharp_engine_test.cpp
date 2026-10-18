@@ -156,6 +156,28 @@ int readOnly = t.read_only;
 	EXPECT_EQ(engine->proxy_of(&thing), global<void*>(module, "t"));
 }
 
+TEST_F(LuaSharpEngineTest, GenericMethodsAndTypeOf) {
+	EXPECT_NE(engine->declarations().find("T get_component<T : Component>(ClassTypeInfo ti);"), std::string::npos);
+	EXPECT_NE(engine->declarations().find("[TypeOf] static ClassTypeInfo find(string classname);"), std::string::npos);
+	LsTestThing thing, partner;
+	thing.partner = &partner;
+	LsTestThing::first = &thing;
+	auto module = engine->compile(R"(
+LsTestThing t = LsTestThing.find_first();
+LsTestThing p = t.partner_as<LsTestThing>();
+bool viaBase = t.partner_as<LsTestBase>() != null;
+LsTestBase raw = t.partner_as(typeof(LsTestThing));
+string name = typeof(LsTestThing).get_classname();
+bool sameInfo = typeof(LsTestThing) == t.my_type();
+)");
+	EXPECT_EQ(module.LastError(), "");
+	EXPECT_EQ(global<void*>(module, "p"), engine->proxy_of(&partner));
+	EXPECT_EQ(global<uint8_t>(module, "viaBase"), 1);
+	EXPECT_EQ(global<void*>(module, "raw"), engine->proxy_of(&partner));
+	EXPECT_EQ(text(module, "name"), "LsTestThing");
+	EXPECT_EQ(global<uint8_t>(module, "sameInfo"), 1);
+}
+
 TEST_F(LuaSharpEngineTest, ReadOnlyFieldReportsError) {
 	LsTestThing thing;
 	LsTestThing::first = &thing;

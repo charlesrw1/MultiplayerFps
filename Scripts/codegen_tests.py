@@ -596,6 +596,12 @@ public:
     REF virtual Animal* best(const std::string& tag) { return nullptr; }
     REF int legs = 4;
 };
+class ClassTypeInfo : public ClassBase {
+public:
+    CLASS_BODY(ClassTypeInfo);
+    REFLECT(type_of)
+    static const ClassTypeInfo* find(const std::string& classname);
+};
 class Dog : public Animal {
 public:
     CLASS_BODY(Dog);
@@ -615,6 +621,10 @@ public:
     float speed = 1;
     REFLECT(hide)
     int hidden = 0;
+    REFLECT(lua_generic)
+    Animal* pick(const ClassTypeInfo* type, int n);
+    REFLECT(lua_generic)
+    static Animal* make(const ClassTypeInfo* type);
 };
 """
 
@@ -645,6 +655,8 @@ public:
         self.assertIn("// skipped bark(): overload", declarations)
         self.assertIn("// skipped in(): name is a LuaSharp keyword", declarations)
         self.assertNotIn("hidden", declarations)
+        self.assertIn("    [TypeOf] static ClassTypeInfo find(string classname);\n", declarations)
+        self.assertIn("    T pick<T : Animal>(ClassTypeInfo type, int n);\n    static T make<T : Animal>(ClassTypeInfo type);\n", declarations)
 
     def test_thunks(self):
         out = self.generate()
