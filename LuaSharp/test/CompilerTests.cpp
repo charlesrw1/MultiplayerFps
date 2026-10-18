@@ -2162,8 +2162,11 @@ void TestInoutSemantics() {
     constexpr std::string_view util = "class Util { static void inc(inout int x) { x += 1; } static Vec3 make() { return Vec3(0, 0, 0); } static void f(inout float v) {} }\n";
     const auto with = [&](std::string_view body) { return std::string(util) + std::string(body); };
     RequireClean(with("int a = 1; Util.inc(inout a); int[] list = {1}; Util.inc(inout list[0]); Vec3 v; Util.f(inout v.x);"), "valid inout calls");
-    RequireClean("class A { static int pick(int x) { return 1; } static int pick(inout int x) { return 2; } } int a; int r = A.pick(a) + A.pick(inout a);", "inout and value overloads are distinct");
-    RequireDiagnostic(with("int a = 1; Util.inc(a);"), "is an inout parameter: write 'inout'");
+    RequireClean(with("int a = 1; Util.inc(a); int[] list = {1}; Util.inc(list[0]); Vec3 v; Util.f(v.x); Util.f((v.y));"), "inout calls without the optional marker");
+    RequireDiagnostic("class A { static int pick(int x) { return 1; } static int pick(inout int x) { return 2; } }", "already declared");
+    RequireDiagnostic(with("Util.inc(1 + 2);"), "is an inout parameter: pass a variable, a field or a list element");
+    RequireDiagnostic(with("Util.f(Util.make().x);"), "is an inout parameter: pass a variable, a field or a list element");
+    RequireDiagnostic(with("float a = 1; Util.inc(a);"), "must be exactly 'int'");
     RequireDiagnostic(with("class B { static void g(int x) {} } int a = 1; B.g(inout a);"), "is not an inout parameter: remove 'inout'");
     RequireDiagnostic(with("float a = 1; Util.inc(inout a);"), "must be exactly 'int'");
     RequireDiagnostic(with("Util.inc(inout 1 + 2);"), "An inout argument must be a variable, a field or a list element");
@@ -2179,8 +2182,8 @@ void TestInoutSemantics() {
         const auto analysis = luasharp::Analyze("class A { virtual void f(inout int x) {} } class B : A { override void f(int x) {} }");
         Require(std::any_of(analysis.diagnostics.begin(), analysis.diagnostics.end(), [](const auto& item) { return item.severity == luasharp::DiagnosticSeverity::Error; }), "an override without inout matched an inout method");
     }
-    const auto generated = luasharp::CompileToC("class A { static int pick(int x) { return 1; } static int pick(inout int x) { return 2; } }");
-    Require(std::any_of(generated.exports.begin(), generated.exports.end(), [](const auto& item) { return item.sourceName == "A.pick(inout int)"; }), "inout overload export name was wrong");
+    const auto generated = luasharp::CompileToC("class A { static int pick(int x) { return 1; } static int pick(inout float x) { return 2; } }");
+    Require(std::any_of(generated.exports.begin(), generated.exports.end(), [](const auto& item) { return item.sourceName == "A.pick(inout float)"; }), "inout overload export name was wrong");
 }
 
 void TestNativeInout() {
@@ -2199,7 +2202,7 @@ class Util {
     static void grow(inout int x, int[] list) { for (int i = 0; i < 100; i += 1) { list.push_back(i); } x = 99; }
     static int index() { calls += 1; return 0; }
     static int pick(int x) { return 1; }
-    static int pick(inout int x) { return 2; }
+    static int pick(inout float x) { return 2; }
     static void order(inout int a, int b) { a = a * 10 + b; }
 }
 class Box {
@@ -2240,7 +2243,8 @@ int boxed = 1;
 b.add(inout boxed);
 b.add(inout b.n);
 int boxN = b.n;
-int picks = Util.pick(boxed) * 10 + Util.pick(inout boxed);
+float pickedFloat = 1;
+int picks = Util.pick(boxed) * 10 + Util.pick(pickedFloat);
 int made = 0;
 Counter c1 = new Counter(inout made);
 Counter c2 = new Counter(inout made);
@@ -2254,8 +2258,14 @@ int accTotal = acc.total;
 int seen = 0;
 auto seenLater = () => seen;
 Util.inc(inout seen);
+int unmarked = 0;
+auto unmarkedLater = () => unmarked;
+Util.twice(unmarked);
+Util.scale(ps[0].pos, 1);
+Util.inc(nums[0]);
+int unmarkedList = nums[0];
 int o = 1;
-Util.order(inout o, 2);
+Util.order(o, 2);
 )");
     Require(module.LastError().empty(), "inout program reported a runtime error: " + module.LastError());
     Require(NativeGlobal<long long>(module, "q") == 3 && NativeGlobal<long long>(module, "r") == 2, "inout parameters did not return several results");
@@ -2273,6 +2283,7 @@ Util.order(inout o, 2);
     Require(NativeGlobal<long long>(module, "accTotal") == 4, "inout field of a struct receiver was not written back");
     Require(CallGlobalClosure(module, "seenLater").as.integer == 1, "a captured local passed as inout was not shared with the lambda");
     Require(NativeGlobal<long long>(module, "o") == 12, "inout argument order was wrong");
+    Require(CallGlobalClosure(module, "unmarkedLater").as.integer == 2 && NativeGlobal<long long>(module, "unmarkedList") == 101, "inout arguments without the marker were not written back");
 }
 
 void TestNativeInoutExternField() {
@@ -2284,9 +2295,10 @@ void TestNativeInoutExternField() {
         auto module = luasharp::NativeModule::Compile(R"(class Util { static void add(inout int x, int amount) { x += amount; } }
 Entity e = new Entity(10);
 Util.add(inout e.health, 5);
+Util.add(e.health, 1);
 int hp = e.health;
 )", options);
-        Require(module.LastError().empty() && NativeGlobal<long long>(module, "hp") == 15, "inout extern field did not use its accessors");
+        Require(module.LastError().empty() && NativeGlobal<long long>(module, "hp") == 16, "inout extern field did not use its accessors");
     }
     g_world = {};
 }

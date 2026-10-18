@@ -154,10 +154,12 @@ struct CEmitter {
         // A captured struct may be changed through its members or methods, so it always lives in a shared cell.
         for (const auto symbol : captured) if (const auto* binding = Binding(symbol); binding && IsStruct(binding->type)) cellSymbols.insert(symbol);
         for (const auto& item : program.expressions) {
-            if (item.kind == SyntaxExpression::Kind::Assignment || item.kind == SyntaxExpression::Kind::Inout) {
-                const auto& target = Unparenthesized(Child(item, 0));
+            const auto writes = [&](const BoundExpression& written) {
+                const auto& target = Unparenthesized(written);
                 if (target.kind == SyntaxExpression::Kind::Identifier && target.symbolIndex && captured.contains(*target.symbolIndex)) cellSymbols.insert(*target.symbolIndex);
-            }
+            };
+            if (item.kind == SyntaxExpression::Kind::Assignment) writes(Child(item, 0));
+            if (const auto* function = InoutFunction(item)) for (size_t i{}; i < function->parameters.size(); ++i) if (function->parameters[i].isInout) writes(InoutTarget(item, i));
             const bool dynamicMember = item.kind == SyntaxExpression::Kind::Member && IsDynamic(Child(item, 0).type);
             const bool keyedEntry = item.kind == SyntaxExpression::Kind::TableEntry && !item.Text().empty();
             if ((dynamicMember || keyedEntry) && std::find(dynamicNames.begin(), dynamicNames.end(), item.Text()) == dynamicNames.end()) dynamicNames.push_back(item.Text());
@@ -899,6 +901,8 @@ struct CEmitter {
             const auto& target = Child(callee, 0);
             const auto& type = Name(target.type);
             if (classes.contains(type) || structs.contains(type)) throw std::runtime_error("Native C backend cannot call unknown method '" + callee.Text() + "' on '" + type + "'");
+            if (const auto* member = ExternalMember(type, callee.Text()); member && std::any_of(member->parameters.begin(), member->parameters.end(), [](const std::string& label) { return SplitParameterLabel(label).isInout; }))
+                throw std::runtime_error("Native C backend cannot pass inout arguments to external method '" + type + "." + callee.Text() + "'");
             Put(Fn{type, callee.Text()}, '(', Emitted(target, owner));
             Arguments(ParameterTypes(ExternalMember(type, callee.Text())), value, 1, true, owner);
         } else {
@@ -949,9 +953,20 @@ struct CEmitter {
     auto ArgumentTemp(std::string_view name, size_t label, size_t index) { return [this, name, label, index] { Put("ls_", name, '_', label, '_', index); }; }
     auto PlaceTemp(const InoutPlace& place, std::string_view name) { return ArgumentTemp(name, place.label, place.index); }
     const BoundExpression& Unparenthesized(const BoundExpression& value) const { return value.kind == SyntaxExpression::Kind::Parenthesized ? Unparenthesized(Child(value, 0)) : value; }
-    bool IsInoutCall(const BoundExpression& call) const {
-        const auto arguments = program.Children(call);
-        return std::any_of(arguments.begin(), arguments.end(), [](const BoundExpression& argument) { return argument.kind == SyntaxExpression::Kind::Inout; });
+    // The module function a call or `new` runs when it has inout parameters; null otherwise.
+    const BoundFunction* InoutFunction(const BoundExpression& call) const {
+        if (call.kind != SyntaxExpression::Kind::Call && call.kind != SyntaxExpression::Kind::New) return nullptr;
+        const auto* ref = FindFunctionRef(call);
+        if (!ref) return nullptr;
+        const auto& parameters = ref->function->parameters;
+        return std::any_of(parameters.begin(), parameters.end(), [](const SyntaxParameter& parameter) { return parameter.isInout; }) ? ref->function : nullptr;
+    }
+    bool IsInoutCall(const BoundExpression& call) const { return InoutFunction(call) != nullptr; }
+    static size_t FirstArgument(const BoundExpression& call) { return call.kind == SyntaxExpression::Kind::New ? 0 : 1; }
+    // The storage passed for inout parameter `index`; the `inout` mark on the argument is optional.
+    const BoundExpression& InoutTarget(const BoundExpression& call, size_t index) const {
+        const auto& argument = Child(call, FirstArgument(call) + index);
+        return argument.kind == SyntaxExpression::Kind::Inout ? Child(argument, 0) : argument;
     }
     InoutPlace HoistPlace(const BoundExpression& target, size_t label, size_t index, std::string_view owner) {
         InoutPlace place{InoutPlace::Kind::Direct, &target, &target, NativeFieldOwner(target), label, index};
@@ -997,11 +1012,11 @@ struct CEmitter {
     // Copy-in, copy-out: evaluates every argument in order into ls_argument_<label>_<i>, passes each inout copy
     // by address, then writes the copies back in argument order.
     void InoutCall(const BoundExpression& value, std::string_view owner) {
-        const auto* ref = FindFunctionRef(value);
-        if (!ref) throw std::runtime_error("Native C backend can pass inout arguments only to methods of this module");
+        const auto* function = InoutFunction(value);
+        assert(function);
         const bool constructing = value.kind == SyntaxExpression::Kind::New;
-        const size_t first = constructing ? 0 : 1;
-        const auto parameters = ParameterTypes(ref->function);
+        const size_t first = FirstArgument(value);
+        const auto parameters = ParameterTypes(function);
         assert(value.children.count - first == parameters.size());
         const auto label = nextLabel++;
         HoistedArguments arguments{&value, label, {}};
@@ -1009,10 +1024,10 @@ struct CEmitter {
         Put("({ ");
         for (size_t i{}; i < parameters.size(); ++i) {
             const auto& argument = Child(value, first + i);
-            const bool inout = argument.kind == SyntaxExpression::Kind::Inout;
-            assert(inout == ref->function->parameters[i].isInout);
+            const bool inout = function->parameters[i].isInout;
+            assert(inout || argument.kind != SyntaxExpression::Kind::Inout);
             arguments.inout.push_back(inout);
-            places.push_back(inout ? std::optional(HoistPlace(Child(argument, 0), label, i, owner)) : std::nullopt);
+            places.push_back(inout ? std::optional(HoistPlace(InoutTarget(value, i), label, i, owner)) : std::nullopt);
             Put(Type(parameters[i]), ' ', ArgumentTemp("argument", label, i), " = ");
             if (inout) ReadPlace(*places.back(), owner); else Value(parameters[i], argument, owner);
             Put("; ");

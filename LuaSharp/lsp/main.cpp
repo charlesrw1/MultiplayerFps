@@ -319,7 +319,7 @@ json MemberCompletion(const luasharp::Symbol& member) {
     const auto signature = member.kind == luasharp::SymbolKind::Method ? "(" + [&] { std::string value; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) value += ", "; value += member.parameters[i]; } return value; }() + ")" : "";
     json item{{"label", member.name + signature}, {"kind", member.kind == luasharp::SymbolKind::Method ? 2 : 5}, {"detail", member.type + signature}};
     if (member.kind == luasharp::SymbolKind::Method) {
-        std::string insert = member.name + "("; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) insert += ", "; const auto label = luasharp::SplitParameterLabel(member.parameters[i]); const auto name = label.name.empty() ? std::string("value") : std::string(label.name); if (label.isInout) insert += "inout "; insert += "${" + std::to_string(i + 1) + ":" + name + "}"; } insert += ")";
+        std::string insert = member.name + "("; for (size_t i{}; i < member.parameters.size(); ++i) { if (i) insert += ", "; const auto label = luasharp::SplitParameterLabel(member.parameters[i]); const auto name = label.name.empty() ? std::string("value") : std::string(label.name); insert += "${" + std::to_string(i + 1) + ":" + name + "}"; } insert += ")";
         item["insertTextFormat"] = 2; item["insertText"] = insert;
     }
     return item;

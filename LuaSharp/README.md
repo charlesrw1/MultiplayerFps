@@ -113,11 +113,12 @@ class Util {
     static void scale(inout Vec3 v, float k) { v = v * k; }
 }
 int q; int r;
-Util.divmod(17, 5, inout q, inout r);   // q is 3, r is 2
-Util.scale(inout particles[i].pos, 2);
+Util.divmod(17, 5, q, r);         // q is 3, r is 2
+Util.scale(inout particles[i].pos, 2); // `inout` at the call is optional
 ```
 
-- Write `inout` before the parameter and before the argument. An inout parameter takes only an inout argument, and a value parameter takes no inout argument. Thus `f(int)` and `f(inout int)` are different overloads.
+- Write `inout` before the parameter. At the call, `inout` before the argument is optional. It shows the reader that the call writes to the argument. A value parameter cannot take an argument marked `inout`.
+- `f(int)` and `f(inout int)` cannot both be declared, because a call cannot choose between them.
 - The argument must be storage: a local, a parameter, a field, a static field, a list element, a struct member of storage, or an extern-class field. A temporary, a constant, a method, or a `table` or `any` entry is an error.
 - The argument type must be the same as the parameter type.
 - The call evaluates all arguments from left to right before the function starts. It evaluates a list and its index one time. After the return, it writes the copies back in argument order. If you pass the same storage two times, the last write stays. A list element is found again for the write, so the function can add items to that list.

@@ -292,7 +292,7 @@ private:
                 if (function.isConstructor && function.name != value.name) AddDiagnostic("Constructor name must match " + std::string(value.isStruct ? "struct" : "class") + " '" + value.name + "'", function.span);
                 if (!function.isConstructor) CheckType(types_.Intern(function.returnType), function.span);
                 std::vector<std::string> parameters, parameterTypes;
-                for (const auto& parameter : function.parameters) { CheckType(types_.Intern(parameter.type), ParameterNameSpan(parameter)); parameters.push_back(MakeParameterLabel(parameter)); parameterTypes.push_back((parameter.isInout ? "inout " : "") + parameter.type); }
+                for (const auto& parameter : function.parameters) { CheckType(types_.Intern(parameter.type), ParameterNameSpan(parameter)); parameters.push_back(MakeParameterLabel(parameter)); parameterTypes.push_back(parameter.type); }
                 if (function.isConstructor) {
                     const bool duplicate = std::any_of(constructors.begin(), constructors.end(), [&](size_t other) { return SameParameterTypes(result_.symbols[other].parameters, parameters); });
                     if (duplicate) AddDiagnostic("Constructor with the same parameters is already declared on " + value.name, function.span);
@@ -318,11 +318,12 @@ private:
         }
         CheckStructCycles();
     }
+    // Ignores inout: a call cannot choose between f(int) and f(inout int).
     static bool SameParameterTypes(const std::vector<std::string>& left, const std::vector<std::string>& right) {
         if (left.size() != right.size()) return false;
         for (size_t i{}; i < left.size(); ++i) {
             const auto a = SplitParameterLabel(left[i]), b = SplitParameterLabel(right[i]);
-            if (a.type != b.type || a.isInout != b.isInout) return false;
+            if (a.type != b.type) return false;
         }
         return true;
     }
@@ -558,13 +559,14 @@ private:
     }
     static bool IsInoutParameter(const Callable& callable, size_t index) { return index < callable.inout.size() && callable.inout[index]; }
     bool IsInoutArgument(NodeId argument) { return Node(argument).kind == SyntaxExpression::Kind::Inout; }
-    // An inout parameter takes only an inout argument of exactly its type; other parameters take no inout argument.
+    // Storage an inout parameter can write back to. A marked argument was checked when it was bound.
+    bool IsStorageArgument(NodeId argument) { return IsInoutArgument(argument) || IsInoutTarget(argument); }
+    // An inout parameter takes storage of exactly its type, marked `inout` or not. Other parameters take no `inout` argument.
     int ArgumentCost(const Callable& callable, size_t index, NodeId argument) {
-        const bool inout = IsInoutParameter(callable, index);
-        if (inout != IsInoutArgument(argument)) return -1;
         const auto expected = callable.parameters[index], actual = Node(argument).type;
-        if (inout) return expected == actual || actual == TypeTable::Unknown ? 0 : -1;
-        return ConversionCost(expected, actual);
+        if (!IsInoutParameter(callable, index)) return IsInoutArgument(argument) ? -1 : ConversionCost(expected, actual);
+        if (!IsStorageArgument(argument)) return -1;
+        return expected == actual || actual == TypeTable::Unknown ? 0 : -1;
     }
     // Total conversion cost of the arguments for one overload, or -1 when it does not apply.
     int Score(const Callable& callable, NodeId arguments, size_t count) {
@@ -607,7 +609,7 @@ private:
                 const auto argument = arguments + static_cast<NodeId>(i);
                 const auto actual = Node(argument).type;
                 const auto ordinal = std::to_string(i + 1);
-                if (IsInoutParameter(only, i) && !IsInoutArgument(argument)) AddDiagnostic("Argument " + ordinal + " of '" + std::string(name) + "' is an inout parameter: write 'inout' before the argument", argumentSpan(i));
+                if (IsInoutParameter(only, i) && !IsStorageArgument(argument)) AddDiagnostic("Argument " + ordinal + " of '" + std::string(name) + "' is an inout parameter: pass a variable, a field or a list element", argumentSpan(i));
                 else if (!IsInoutParameter(only, i) && IsInoutArgument(argument)) AddDiagnostic("Argument " + ordinal + " of '" + std::string(name) + "' is not an inout parameter: remove 'inout'", argumentSpan(i));
                 else if (IsInoutParameter(only, i) && ArgumentCost(only, i, argument) < 0) AddDiagnostic("Inout argument " + ordinal + " of '" + std::string(name) + "' must be exactly '" + Name(only.parameters[i]) + "', got " + DisplayType(actual), argumentSpan(i));
                 else if (ArgumentCost(only, i, argument) < 0)
