@@ -142,6 +142,16 @@ try {
     const staticContextLabels = (await waitFor(m => m.id === 93, "static context completion")).result.map(item => item.label);
     assert.ok(staticContextLabels.includes("make()") && !staticContextLabels.includes("own(int amount)"), "static functions must offer only static members");
 
+    // Members of a call result: `next().` while the rest of the file still parses.
+    const chainSource = "class Chain { int count; Chain next() { return this; } void run() {\n    next().\n    int after = 1;\n} }\nChain made = new Chain();\nmade.next().co\nint tail = 2;";
+    const chainCases = [[95, 1, "    next().".length, "method body"], [96, 5, "made.next().co".length, "top level with a prefix"]];
+    send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 14 }, contentChanges: [{ text: chainSource }] } });
+    for (const [id, line, character, where] of chainCases) {
+        send({ jsonrpc: "2.0", id, method: "textDocument/completion", params: { textDocument: { uri }, position: { line, character } } });
+        const labels = (await waitFor(m => m.id === id, `call result completion (${where})`)).result.map(item => item.label);
+        assert.ok(labels.includes("count") && labels.includes("next()"), `call result completion (${where}) is missing Chain members: ${labels.join(", ")}`);
+    }
+
     send({ jsonrpc: "2.0", method: "textDocument/didChange", params: { textDocument: { uri, version: 15 }, contentChanges: [{ text: source }] } });
     const entityFieldLine = source.split("\n").indexOf("Entity e = null;");
     send({ jsonrpc: "2.0", id: 13, method: "textDocument/references", params: { textDocument: { uri }, position: { line: entityFieldLine, character: 2 }, context: { includeDeclaration: true } } });

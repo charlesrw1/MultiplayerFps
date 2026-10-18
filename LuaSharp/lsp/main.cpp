@@ -134,7 +134,7 @@ template <typename Visit> void ForEachVisible(const Document& from, Visit&& visi
 // Positions are ignored: moving a declaration does not change what other files see.
 bool SameExports(const std::vector<luasharp::ExternalType>& left, const std::vector<luasharp::ExternalType>& right) {
     const auto sameMember = [](const luasharp::Symbol& a, const luasharp::Symbol& b) { return a.name == b.name && a.type == b.type && a.kind == b.kind && a.parameters == b.parameters && a.owner == b.owner && a.access == b.access && a.isStatic == b.isStatic; };
-    const auto sameType = [&](const luasharp::ExternalType& a, const luasharp::ExternalType& b) { return a.name == b.name && a.baseType == b.baseType && a.isEnum == b.isEnum && a.isNative == b.isNative && std::equal(a.members.begin(), a.members.end(), b.members.begin(), b.members.end(), sameMember); };
+    const auto sameType = [&](const luasharp::ExternalType& a, const luasharp::ExternalType& b) { return a.name == b.name && a.baseType == b.baseType && a.isEnum == b.isEnum && a.isNative == b.isNative && a.hostDefault == b.hostDefault && std::equal(a.members.begin(), a.members.end(), b.members.begin(), b.members.end(), sameMember); };
     return std::equal(left.begin(), left.end(), right.begin(), right.end(), sameType);
 }
 const luasharp::Analysis& Standalone(Document& document) {
@@ -144,15 +144,18 @@ const luasharp::Analysis& Standalone(Document& document) {
     if (!SameExports(exports, document.exports)) { document.exports = std::move(exports); ++exportsRevision; }
     return *document.standalone;
 }
+std::vector<luasharp::ExternalType> VisibleExports(Document& document) {
+    std::vector<luasharp::ExternalType> external;
+    ForEachVisible(document, [&](const std::string&, Document& value) { external.insert(external.end(), value.exports.begin(), value.exports.end()); });
+    return external;
+}
 // Refreshes every document's exports first, so exportsRevision is stable for the
 // rest of the request and earlier references from Editor() stay valid.
 const luasharp::Analysis& Editor(Document& document) {
     ForEachDocument([](const std::string&, Document& value) { Standalone(value); });
     for (auto& [uri, value] : declarationDocuments) Standalone(value);
     if (document.editor && document.editorRevision == exportsRevision) return *document.editor;
-    std::vector<luasharp::ExternalType> external;
-    ForEachVisible(document, [&](const std::string&, Document& value) { external.insert(external.end(), value.exports.begin(), value.exports.end()); });
-    document.editor = std::make_unique<luasharp::Analysis>(luasharp::Analyze(document.text, external));
+    document.editor = std::make_unique<luasharp::Analysis>(luasharp::Analyze(document.text, VisibleExports(document)));
     document.editorRevision = exportsRevision;
     return *document.editor;
 }
@@ -338,22 +341,43 @@ void AddEnclosingClassCompletions(const luasharp::Analysis& analysis, size_t off
     };
     add(enclosing->name); add("$type:" + enclosing->name);
 }
+// A half-typed member (`f().`, `f().co`) breaks the statement, so the receiver has no type. This analyzes a copy
+// that ends the member as a complete statement.
+luasharp::Analysis CompletedMemberAnalysis(Document& document, size_t dotOffset, size_t cursor) {
+    assert(dotOffset < cursor && cursor <= document.text.size());
+    auto text = document.text;
+    text.replace(dotOffset + 1, cursor - dotOffset - 1, "ls_completion;");
+    return luasharp::Analyze(text, VisibleExports(document));
+}
 json Completions(const std::string& uri, const std::string& text, const json& position) {
     const auto& analysis = Editor(uri); const auto offset = OffsetAt(text, position); const auto lineStart = offset == 0 ? 0 : text.rfind('\n', offset - 1) == std::string::npos ? 0 : text.rfind('\n', offset - 1) + 1; const auto lineEnd = text.find('\n', offset); const auto line = text.substr(lineStart, lineEnd == std::string::npos ? std::string::npos : lineEnd - lineStart); const auto character = offset - lineStart;
     json result = json::array();
     size_t memberStart = character; while (memberStart > 0 && (std::isalnum(static_cast<unsigned char>(line[memberStart - 1])) || line[memberStart - 1] == '_')) --memberStart;
     if (memberStart > 0 && line[memberStart - 1] == '.') {
         const size_t dotOffset = lineStart + memberStart - 1;
-        std::optional<std::string> type;
-        if (dotOffset > 0) if (const auto* expression = luasharp::FindExpression(analysis, dotOffset - 1); expression && expression->type != luasharp::TypeTable::Unknown) type = analysis.types.Name(expression->type);
-        if (!type) {
-            size_t end = memberStart - 1, begin = end; while (begin > 0 && (std::isalnum(static_cast<unsigned char>(line[begin - 1])) || line[begin - 1] == '_')) --begin;
-            type = luasharp::ResolveVariableType(analysis, line.substr(begin, end - begin), dotOffset);
-        }
-        if (type) {
-            const auto members = analysis.members.find(*type);
-            if (members != analysis.members.end()) for (const auto index : members->second) result.push_back(MemberCompletion(analysis.symbols[index]));
-        }
+        // Members come from the same analysis as the type: a broken statement can also drop the class's members.
+        const auto addMembers = [&](const luasharp::Analysis& value, const std::optional<std::string>& type) {
+            if (!type) return;
+            const auto members = value.members.find(*type);
+            if (members != value.members.end()) for (const auto index : members->second) result.push_back(MemberCompletion(value.symbols[index]));
+        };
+        // The receiver is the first child of the innermost member access over the dot: a call's span stops before
+        // its '(', so the expression at the character before the dot can be the member access itself.
+        const auto typeBefore = [&](const luasharp::Analysis& value) -> std::optional<std::string> {
+            const luasharp::BoundExpression* access = nullptr;
+            for (const auto& expression : value.bound.expressions)
+                if (expression.syntax && expression.syntax->kind == luasharp::SyntaxExpression::Kind::Member && expression.children.count && expression.span.Contains(dotOffset) && (!access || expression.span.length <= access->span.length)) access = &expression;
+            const auto* receiver = access ? &value.bound.expressions[access->children.first] : dotOffset > 0 ? luasharp::FindExpression(value, dotOffset - 1) : nullptr;
+            if (!receiver || receiver->type == luasharp::TypeTable::Unknown) return std::nullopt;
+            return value.types.Name(receiver->type);
+        };
+        addMembers(analysis, typeBefore(analysis));
+        if (!result.empty()) return result;
+        const auto completed = CompletedMemberAnalysis(documents[uri], dotOffset, offset);
+        addMembers(completed, typeBefore(completed));
+        if (!result.empty()) return result;
+        size_t end = memberStart - 1, begin = end; while (begin > 0 && (std::isalnum(static_cast<unsigned char>(line[begin - 1])) || line[begin - 1] == '_')) --begin;
+        addMembers(analysis, luasharp::ResolveVariableType(analysis, line.substr(begin, end - begin), dotOffset));
         return result;
     }
     const char* words[] = {"class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return", "void", "null",
