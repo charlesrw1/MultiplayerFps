@@ -104,6 +104,8 @@ struct Symbol {
     bool isSealed{};   // Methods that cannot be overridden; Class symbols that cannot be derived from
     bool isNative{};   // Class symbols: an `extern class`; its objects are host proxies (LS_NativeObject)
     bool hostDefault{}; // Class symbols: an `extern struct`; the host makes T() (ls_native_T_new)
+    bool isTypeOf{};    // Methods: [TypeOf], the static extern method that typeof(T) calls with the name of T
+    std::string typeParameter; // Generic methods: the name of the type parameter. `type` is its constraint.
 };
 struct ExternalType {
     std::string name;

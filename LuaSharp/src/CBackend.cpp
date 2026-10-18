@@ -742,6 +742,11 @@ struct CEmitter {
         }
         case SyntaxExpression::Kind::Slice: return Put("ls_list_slice(", child(0), ", ", child(1), ", ", child(2), ')');
         case SyntaxExpression::Kind::Is: case SyntaxExpression::Kind::As: return TypeTest(value, owner);
+        case SyntaxExpression::Kind::TypeOf: {
+            assert(value.symbolIndex && analysis.symbols[*value.symbolIndex].isTypeOf);
+            const auto& provider = analysis.symbols[*value.symbolIndex];
+            return Put(Fn{provider.owner, provider.name}, "(ls_intern(\"", text, "\"))");
+        }
         case SyntaxExpression::Kind::TableEntry: case SyntaxExpression::Kind::Range:
             throw std::runtime_error("Native C backend does not support this expression kind yet (type '" + Name(value.type) + "')");
         }
@@ -891,10 +896,15 @@ struct CEmitter {
         }
         if (const auto* member = NativeMember(value)) {
             // ls_<Owner>_<name> checks the receiver and calls the host thunk.
-            Put(Fn{member->owner, member->name}, '(');
-            if (!member->isStatic) Put("(LS_", Id{member->owner}, "*)", [&] { if (callee.lowering == Lowering::ImplicitMethod) Put("self"); else Expression(Child(callee, 0), owner); });
-            Arguments(ParameterTypes(member), value, 1, !member->isStatic, owner);
-            return Put(')');
+            const auto call = [&] {
+                Put(Fn{member->owner, member->name}, '(');
+                if (!member->isStatic) Put("(LS_", Id{member->owner}, "*)", [&] { if (callee.lowering == Lowering::ImplicitMethod) Put("self"); else Expression(Child(callee, 0), owner); });
+                Arguments(ParameterTypes(member), value, 1, !member->isStatic, owner);
+                Put(')');
+            };
+            // A generic method returns its constraint; the call has the type of its type argument.
+            if (!member->typeParameter.empty() && value.type != Find(member->type)) return Put("((", Type(value.type), ")ls_object_as(", call, ", &ls_type_", Id{Name(value.type)}, "))");
+            return call();
         }
         if (const auto* ref = FindFunctionRef(value)) return UserCall(value, callee, *ref, owner);
         if (callee.kind == SyntaxExpression::Kind::Member) {

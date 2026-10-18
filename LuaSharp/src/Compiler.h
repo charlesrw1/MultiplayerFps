@@ -64,7 +64,8 @@ struct SyntaxExpression {
         Missing, Identifier, Number, String, Null, Boolean, Table, TableEntry, New,
         Member, Call, Index, Slice, Range, Lambda, Unary, Binary, Assignment, Parenthesized,
         Is, As, // text is the type name; one child, the operand
-        Inout   // `inout x` call argument; one child, the target
+        Inout,  // `inout x` call argument; one child, the target
+        TypeOf  // `typeof(T)`; text is the type name
     } kind{Kind::Missing};
     std::string text;
     TextSpan span;
@@ -72,6 +73,9 @@ struct SyntaxExpression {
     NodeRange parameters; // lambda parameters
     NodeRange lambdaBody; // statement ids
     bool lambdaIsBlock{};
+    // A member `x.f<A>` that a call follows. The call passes typeof(A) before its other arguments.
+    std::vector<std::string> typeArguments;
+    TextSpan typeArgumentSpan;
 };
 
 // `[Name]` or `[Name("argument")]` before a member; several can share brackets: `[A, B("x")]`.
@@ -103,6 +107,8 @@ struct SyntaxStatement {
 struct SyntaxModifiers {
     bool isStatic{}, isVirtual{}, isOverride{}, isAbstract{}, isSealed{};
 };
+// `<T : Base>` after the name of a generic method.
+struct SyntaxTypeParameter { std::string name; std::string constraint; TextSpan span; };
 struct SyntaxFunction {
     std::string access;
     std::string name;
@@ -115,6 +121,8 @@ struct SyntaxFunction {
     NodeRange baseArguments; // expression ids
     TextSpan baseSpan;
     std::vector<SyntaxParameter> parameters;
+    std::optional<SyntaxTypeParameter> typeParameter;
+    std::vector<SyntaxAttribute> attributes;
     NodeRange body;
     TextSpan span;     // the name
     TextSpan bodySpan; // name through the closing brace

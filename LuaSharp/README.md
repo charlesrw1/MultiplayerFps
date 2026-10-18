@@ -185,6 +185,29 @@ int dealt = e.damage(3);
 - The host supplies one C function for each member. See [native-abi.md](docs/native-abi.md#extern-classes).
 - The CsRemake engine links `LuaSharpLib.vcxproj` and generates its declarations and thunks. See [native-abi.md](docs/native-abi.md#engine-binding).
 
+## Generic methods and `typeof`
+
+An extern class can declare a generic method. The method has one type parameter with a class constraint, and it returns the type parameter:
+
+```
+extern class ClassTypeInfo { [TypeOf] static ClassTypeInfo find(string name); }
+extern class Entity {
+    T get_component<T : Component>(ClassTypeInfo type);
+}
+MeshComponent mesh = e.get_component<MeshComponent>();
+Component any = e.get_component(typeof(MeshComponent)); // without a type argument, the result is the constraint
+```
+
+- `[TypeOf]` marks one static method of an extern class. It takes a `string` and returns an extern class. `typeof(T)` calls it with the name of `T`.
+- `typeof(T)` needs an extern class, or a script class that derives from one. The host has no type info for other types.
+- The first parameter of a generic method has the result type of the `[TypeOf]` method. The call `x.f<A>(args)` passes `typeof(A)` for it, then `args`.
+- The type argument must derive from the constraint. The call has the type of the type argument.
+- The type parameter can only be the result. Script classes, structs and fields cannot have type parameters.
+- The method is erased: the host thunk takes the type info and returns the constraint. The call converts the result with `as A`, so a result of a different type is `null`.
+- After a member name, `<` starts a type argument list when a matching `>` and then `(` follow. Otherwise it is "less than". This is the C# rule.
+
+Type names can have type arguments in all type positions: `map<string, int[]>[] m;`. No type takes type arguments yet, so the analyzer reports an error for them.
+
 ## Projects (`luasharp.json`)
 
 A `luasharp.json` file marks the root of a script project. It names the declaration files of the host:

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <stdexcept>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 
@@ -11,7 +12,7 @@ namespace {
 
 const std::unordered_set<std::string> Keywords{
     "class", "struct", "static", "enum", "public", "private", "auto", "new", "if", "else", "while", "for", "in", "break", "continue", "return",
-    "null", "true", "false", "virtual", "override", "abstract", "sealed", "is", "as", "extern", "inout"
+    "null", "true", "false", "virtual", "override", "abstract", "sealed", "is", "as", "extern", "inout", "typeof"
 };
 
 TextSpan Cover(TextSpan first, TextSpan last) {
@@ -209,16 +210,58 @@ private:
     }
     TextSpan Span(NodeId expression) const { return tree_.Expression(expression).span; }
 
-    std::pair<std::string, TextSpan> ParseType() {
-        const auto first = Identifier("type name"); std::string type = first.text; TextSpan span = first.span;
+    std::pair<std::string, TextSpan> ParseType() { return ParseTypeAfter(Identifier("type name")); }
+    // The type arguments and list suffixes after the type name `first`. The spelling is canonical: "Name<A,B>[]".
+    std::pair<std::string, TextSpan> ParseTypeAfter(const SyntaxToken& first) {
+        std::string type = first.text; TextSpan span = first.span;
+        if (Is("<")) {
+            auto [arguments, argumentSpan] = ParseTypeArguments();
+            type += '<';
+            for (size_t i{}; i < arguments.size(); ++i) { if (i) type += ','; type += arguments[i]; }
+            type += '>'; span = Cover(span, argumentSpan);
+        }
         while (Is("[")) { const auto open = Advance(); const auto close = Match("]"); type += "[]"; span = Cover(span, close.span.length ? close.span : open.span); }
         return {std::move(type), span};
     }
-    bool LooksLikeLocal() const {
-        if (Current().kind != SyntaxTokenKind::Identifier) return false;
-        size_t at = 1;
+    std::pair<std::vector<std::string>, TextSpan> ParseTypeArguments() {
+        const auto open = Match("<"); std::vector<std::string> arguments;
+        do arguments.push_back(ParseType().first); while (Is(",") && (Advance(), true));
+        Match(">"); return {std::move(arguments), Cover(open.span, PreviousSpan())};
+    }
+    // The lookahead just past a type that starts at `at`, or 0 when no type starts there.
+    size_t SkipType(size_t at) const {
+        if (Current(at).kind != SyntaxTokenKind::Identifier) return 0;
+        ++at;
+        if (Is("<", at) && !(at = SkipTypeArguments(at))) return 0;
         while (Is("[", at) && Is("]", at + 1)) at += 2;
-        return Current(at).kind == SyntaxTokenKind::Identifier && (Is("=", at + 1) || Is(";", at + 1));
+        return at;
+    }
+    // `at` is a '<'. The lookahead just past the matching '>', or 0.
+    size_t SkipTypeArguments(size_t at) const {
+        assert(Is("<", at));
+        do if (!(at = SkipType(at + 1))) return 0; while (Is(",", at));
+        return Is(">", at) ? at + 1 : 0;
+    }
+    bool LooksLikeLocal() const {
+        const size_t at = SkipType(0);
+        return at && Current(at).kind == SyntaxTokenKind::Identifier && (Is("=", at + 1) || Is(";", at + 1));
+    }
+    // `<A, B>(` after a member name. As in C#, this is a type argument list, not a comparison.
+    bool LooksLikeTypeArguments() const {
+        if (!Is("<")) return false;
+        const size_t at = SkipTypeArguments(0);
+        return at && Is("(", at);
+    }
+    SyntaxTypeParameter ParseTypeParameter() {
+        const auto open = Match("<"); const auto name = Identifier("type parameter name");
+        SyntaxTypeParameter result{name.text, {}, name.span};
+        if (Is(":")) { Advance(); result.constraint = ParseType().first; }
+        while (Is(",")) {
+            tree_.diagnostics.push_back({"A method can have only one type parameter", Advance().span});
+            Identifier("type parameter name"); if (Is(":")) { Advance(); ParseType(); }
+        }
+        Match(">"); result.span = Cover(open.span, PreviousSpan());
+        return result;
     }
     NodeRange ParseBlock() {
         Match("{"); const auto mark = scratch_.size();
@@ -344,17 +387,21 @@ private:
             while (Is("[")) { Advance(); ParseAttributes(attributes); Match("]"); }
             const auto modifiers = ParseModifiers();
             const auto first = Identifier();
-            const auto rejectAttributes = [&] { for (const auto& attribute : attributes) tree_.diagnostics.push_back({"Only fields can have attributes", attribute.span}); };
             if (Is("(")) {
-                rejectAttributes();
+                for (const auto& attribute : attributes) tree_.diagnostics.push_back({"Constructors cannot have attributes", attribute.span});
                 result.functions.push_back(ParseFunction(access, first, {}, true, modifiers));
                 if (modifiers.isStatic || modifiers.isVirtual || modifiers.isOverride || modifiers.isAbstract || modifiers.isSealed) tree_.diagnostics.push_back({"Constructors cannot have modifiers", first.span});
             } else {
-                std::string type = first.text;
-                while (Is("[")) { Advance(); Match("]"); type += "[]"; }
+                auto type = ParseTypeAfter(first).first;
                 const auto memberName = Identifier("member name");
-                if (Is("(")) { rejectAttributes(); result.functions.push_back(ParseFunction(access, memberName, std::move(type), false, modifiers)); }
+                std::optional<SyntaxTypeParameter> typeParameter;
+                if (Is("<")) typeParameter = ParseTypeParameter();
+                if (Is("(")) {
+                    auto& function = result.functions.emplace_back(ParseFunction(access, memberName, std::move(type), false, modifiers));
+                    function.typeParameter = std::move(typeParameter); function.attributes = std::move(attributes);
+                }
                 else {
+                    if (typeParameter) tree_.diagnostics.push_back({"Only methods can have a type parameter", typeParameter->span});
                     if (modifiers.isVirtual || modifiers.isOverride || modifiers.isAbstract || modifiers.isSealed) tree_.diagnostics.push_back({"Fields can only be 'static'", memberName.span});
                     SyntaxField field; field.access = access; field.type = std::move(type); field.name = memberName.text; field.span = memberName.span; field.isStatic = modifiers.isStatic;
                     field.attributes = std::move(attributes);
@@ -454,6 +501,10 @@ private:
             else tree_.diagnostics.push_back({"Expected '(' after constructed type", Current().span});
             return Add(std::move(result));
         }
+        if (token.text == "typeof") {
+            Match("("); auto type = ParseType().first; Match(")");
+            return Add(SyntaxExpression::Kind::TypeOf, std::move(type), Cover(token.span, PreviousSpan()));
+        }
         if (token.text == "(") { const auto value = ParseExpression(); const auto close = Match(")"); return Add(SyntaxExpression::Kind::Parenthesized, {}, Cover(token.span, close.span), Link({value})); }
         if (token.text == "{") {
             const auto mark = scratch_.size();
@@ -496,9 +547,15 @@ private:
         while (!AtEnd()) {
             const auto start = Span(value);
             if (Is(".")) {
-                Advance(); const auto name = MemberName(); value = Add(SyntaxExpression::Kind::Member, name.text, Cover(start, name.span), Link({value}));
+                Advance(); const auto name = MemberName();
+                SyntaxExpression member{SyntaxExpression::Kind::Member, name.text, Cover(start, name.span), Link({value})};
+                if (LooksLikeTypeArguments()) std::tie(member.typeArguments, member.typeArgumentSpan) = ParseTypeArguments();
+                value = Add(std::move(member));
             } else if (Is("(")) {
                 const auto mark = scratch_.size(); scratch_.push_back(value);
+                // Copies: Add can grow the pool.
+                const auto typeArguments = tree_.Expression(value).typeArguments; const auto typeArgumentSpan = tree_.Expression(value).typeArgumentSpan;
+                for (const auto& type : typeArguments) scratch_.push_back(Add(SyntaxExpression::Kind::TypeOf, type, typeArgumentSpan));
                 const auto span = PushArguments() ? Cover(start, Span(scratch_.back())) : start;
                 value = Add(SyntaxExpression::Kind::Call, {}, span, Link(mark));
             } else if (Is("[")) {

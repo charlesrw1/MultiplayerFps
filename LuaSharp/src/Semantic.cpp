@@ -157,7 +157,9 @@ public:
                 member.span = {source_.size(), 0}; member.implicit = true;
                 const bool constructor = member.kind == SymbolKind::Method && member.name == external.name;
                 const auto staticMember = member.isStatic;
+                const auto typeOf = member.isTypeOf;
                 const auto index = PushSymbol(std::move(member));
+                if (typeOf && !typeOfMethod_) typeOfMethod_ = index;
                 if (constructor) constructors_[external.name].push_back(index);
                 else result_.members[external.isEnum || staticMember ? "$type:" + external.name : external.name].push_back(index);
             }
@@ -209,7 +211,8 @@ private:
     }
     void CheckType(TypeId type, TextSpan span) {
         const auto base = types_.Base(type);
-        if (base != TypeTable::Unknown && base != TypeTable::Void && !knownTypes_.contains(Name(base))) AddDiagnostic("Unknown type '" + Name(base) + "'", span);
+        if (const auto arguments = Name(base).find('<'); arguments != std::string::npos) AddDiagnostic("Type '" + Name(base).substr(0, arguments) + "' does not take type arguments", span);
+        else if (base != TypeTable::Unknown && base != TypeTable::Void && !knownTypes_.contains(Name(base))) AddDiagnostic("Unknown type '" + Name(base) + "'", span);
         if (types_.IsList(type)) RegisterBuiltinType(Name(type));
     }
     static std::vector<std::string> ParameterLabels(const BuiltinMember& member) {
@@ -290,9 +293,14 @@ private:
             for (const auto& function : value.functions) {
                 if (value.isExtern && value.isStruct) AddDiagnostic("Extern struct '" + value.name + "' declares only fields: the host makes its default value", function.span);
                 if (function.isConstructor && function.name != value.name) AddDiagnostic("Constructor name must match " + std::string(value.isStruct ? "struct" : "class") + " '" + value.name + "'", function.span);
-                if (!function.isConstructor) CheckType(types_.Intern(function.returnType), function.span);
+                const auto& result = DeclaredResult(function);
+                if (!function.isConstructor && !result.empty()) CheckType(types_.Intern(result), function.span);
                 std::vector<std::string> parameters, parameterTypes;
-                for (const auto& parameter : function.parameters) { CheckType(types_.Intern(parameter.type), ParameterNameSpan(parameter)); parameters.push_back(MakeParameterLabel(parameter)); parameterTypes.push_back(parameter.type); }
+                for (const auto& parameter : function.parameters) {
+                    if (function.typeParameter && parameter.type == function.typeParameter->name) AddDiagnostic("Type parameter '" + parameter.type + "' can only be the result of '" + function.name + "'", ParameterNameSpan(parameter));
+                    else CheckType(types_.Intern(parameter.type), ParameterNameSpan(parameter));
+                    parameters.push_back(MakeParameterLabel(parameter)); parameterTypes.push_back(parameter.type);
+                }
                 if (function.isConstructor) {
                     const bool duplicate = std::any_of(constructors.begin(), constructors.end(), [&](size_t other) { return SameParameterTypes(result_.symbols[other].parameters, parameters); });
                     if (duplicate) AddDiagnostic("Constructor with the same parameters is already declared on " + value.name, function.span);
@@ -304,19 +312,68 @@ private:
                         AddDiagnostic("Extern method '" + function.name + "' cannot be overloaded", function.span);
                     declared.push_back({function.name, true, parameterTypes});
                 }
-                const auto index = AddSymbol(function.name, function.isConstructor ? value.name : function.returnType, SymbolKind::Method, function.span, std::move(parameters));
+                const auto index = AddSymbol(function.name, function.isConstructor ? value.name : result, SymbolKind::Method, function.span, std::move(parameters));
                 auto& symbol = result_.symbols[index];
                 const auto& modifiers = function.modifiers;
                 symbol.owner = value.name; symbol.access = function.access; symbol.isStatic = function.isStatic;
                 symbol.isVirtual = modifiers.isVirtual || modifiers.isOverride || modifiers.isAbstract;
                 symbol.isOverride = modifiers.isOverride; symbol.isAbstract = modifiers.isAbstract; symbol.isSealed = modifiers.isSealed;
+                if (function.typeParameter) symbol.typeParameter = function.typeParameter->name;
                 CheckMethodModifiers(value, function);
+                CheckMethodAttributes(value, function, index);
                 functionSymbols_.emplace(&function, index);
                 if (function.isConstructor) constructors.push_back(index);
                 else (function.isStatic ? statics : members).push_back(index);
             }
         }
         CheckStructCycles();
+        CheckGenericMethods();
+    }
+    // A generic method is erased to its constraint: `T f<T : Base>()` returns a Base.
+    static const std::string& DeclaredResult(const SyntaxFunction& function) {
+        return function.typeParameter && function.returnType == function.typeParameter->name ? function.typeParameter->constraint : function.returnType;
+    }
+    // [TypeOf] marks `static C f(string name)` on an extern class, where C is an extern class. typeof(T) calls it with the name of T.
+    void CheckMethodAttributes(const SyntaxClass& owner, const SyntaxFunction& function, size_t index) {
+        for (const auto& attribute : function.attributes) {
+            if (attribute.name != "TypeOf") { AddDiagnostic("Only fields can have attributes, except [TypeOf] on a method: '" + attribute.name + "'", attribute.span); continue; }
+            if (attribute.argument) { AddDiagnostic("[TypeOf] takes no argument", attribute.span); continue; }
+            const bool provider = owner.isExtern && !owner.isStruct && function.isStatic && !function.typeParameter && function.parameters.size() == 1
+                && function.parameters.front().type == "string" && nativeTypes_.contains(function.returnType);
+            if (!provider) { AddDiagnostic("[TypeOf] needs a static method of an extern class that takes a string and returns an extern class", attribute.span); continue; }
+            if (typeOfMethod_) { AddDiagnostic("Only one method can be [TypeOf]", attribute.span); continue; }
+            typeOfMethod_ = index; result_.symbols[index].isTypeOf = true;
+        }
+    }
+    // `T f<T : Base>(TypeInfo type, ...)` on an extern class, where TypeInfo is the result of the [TypeOf] method.
+    // The call `x.f<A>(...)` passes typeof(A) for `type` and has the type A.
+    void CheckGenericMethods() {
+        for (const auto& value : result_.syntax.root.classes) for (const auto& function : value.functions) {
+            if (!function.typeParameter) continue;
+            const auto& parameter = *function.typeParameter;
+            const auto where = "Generic method '" + function.name + "'";
+            if (!value.isExtern || value.isStruct) { AddDiagnostic("Only methods of extern classes can have a type parameter", parameter.span); continue; }
+            if (parameter.constraint.empty()) { AddDiagnostic("Type parameter '" + parameter.name + "' needs a class constraint, as in <" + parameter.name + " : Base>", parameter.span); continue; }
+            const auto constraint = types_.Intern(parameter.constraint);
+            if (knownTypes_.contains(parameter.constraint) && !IsClassType(constraint)) AddDiagnostic("The constraint of type parameter '" + parameter.name + "' must be a class, got '" + parameter.constraint + "'", parameter.span);
+            if (function.returnType != parameter.name) AddDiagnostic(where + " must return its type parameter '" + parameter.name + "'", function.span);
+            if (!typeOfMethod_) AddDiagnostic(where + " needs a [TypeOf] method to make its type argument", parameter.span);
+            else if (const auto& typeInfo = result_.symbols[*typeOfMethod_].type; function.parameters.empty() || function.parameters.front().type != typeInfo)
+                AddDiagnostic(where + " must take '" + typeInfo + "' as its first parameter: the call passes typeof of its type argument there", function.span);
+        }
+    }
+    // The type info of a class: the host makes it for extern classes and for the script classes that derive from them.
+    bool HasHostTypeInfo(std::string_view name) const { return nativeTypes_.contains(name) || (FindClass(name) && !FindClass(name)->isStruct && !NativeAncestor(name).empty()); }
+    // `x.f<A>(...)`: f is a generic method, and the call has the type A.
+    void ApplyTypeArguments(const SyntaxExpression& callee, std::optional<size_t> symbol, TypeId& type) {
+        if (!symbol) return; // the call did not resolve, and that is reported
+        const auto& method = result_.symbols[*symbol];
+        if (method.typeParameter.empty()) { AddDiagnostic("Method '" + method.name + "' does not take a type argument", callee.typeArgumentSpan); return; }
+        const auto& name = callee.typeArguments.front();
+        if (!knownTypes_.contains(name)) return; // typeof reported it
+        const auto argument = types_.Intern(name);
+        if (!IsClassType(argument) || !Assignable(types_.Intern(method.type), argument)) { AddDiagnostic("Type argument '" + name + "' of '" + method.name + "' must derive from '" + method.type + "'", callee.typeArgumentSpan); return; }
+        type = argument;
     }
     // Ignores inout: a call cannot choose between f(int) and f(inout int).
     static bool SameParameterTypes(const std::vector<std::string>& left, const std::vector<std::string>& right) {
@@ -903,6 +960,16 @@ private:
                 type = types_.Element(type); break;
             }
             ResolveCall(expression, callee, first, arguments, argumentCount, owner, type, symbol, lowering, nativeMember);
+            if (callee.typeArguments.size() > 1) AddDiagnostic("A call can pass only one type argument", callee.typeArgumentSpan);
+            else if (!callee.typeArguments.empty()) ApplyTypeArguments(callee, symbol, type);
+            break;
+        }
+        case Kind::TypeOf: {
+            const auto target = types_.Intern(expression.text); CheckType(target, expression.span);
+            if (!typeOfMethod_) { AddDiagnostic("'typeof' needs a [TypeOf] method from the host", expression.span); break; }
+            type = symbolTypes_[*typeOfMethod_]; symbol = typeOfMethod_;
+            if (knownTypes_.contains(expression.text) && !HasHostTypeInfo(expression.text))
+                AddDiagnostic("typeof(" + expression.text + ") needs an extern class or a script class that derives from one: the host has no type info for other types", expression.span);
             break;
         }
         case Kind::Index: {
@@ -1299,6 +1366,7 @@ private:
     StringSet registeredBuiltins_;
     StringSet enumTypes_;
     StringSet nativeTypes_; // extern classes, from this source or from external types
+    std::optional<size_t> typeOfMethod_; // the [TypeOf] method
 };
 
 } // namespace

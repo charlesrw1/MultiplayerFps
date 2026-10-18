@@ -54,7 +54,7 @@
       "patterns": [
         { "match": "\\b(?:public|private|static|virtual|override|abstract|sealed|extern|inout)\\b", "name": "storage.modifier.luasharp" },
         { "match": "\\b(?:if|else|while|for|in|break|continue|return|new|auto)\\b", "name": "keyword.control.luasharp" },
-        { "match": "\\b(?:is|as)\\b", "name": "keyword.operator.type.luasharp" },
+        { "match": "\\b(?:is|as|typeof)\\b", "name": "keyword.operator.type.luasharp" },
         { "match": "\\bvoid\\b", "name": "keyword.other.void.luasharp" },
         { "match": "\\b(?:this|base)\\b", "name": "variable.language.this.luasharp" }
       ]
