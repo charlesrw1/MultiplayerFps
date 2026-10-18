@@ -346,20 +346,20 @@ LuaSharpEngine::~LuaSharpEngine() {
 }
 
 luasharp::NativeModule LuaSharpEngine::compile(std::string_view source) {
-	auto module = compile_module(source, false, {});
+	const luasharp::SourceFile file{"module.ls", source};
+	auto module = compile_module(std::span(&file, 1), false);
 	module.Initialize();
 	return module;
 }
 
-luasharp::NativeModule LuaSharpEngine::compile_module(std::string_view source, bool debug, std::string_view source_name) {
+luasharp::NativeModule LuaSharpEngine::compile_module(std::span<const luasharp::SourceFile> files, bool debug) {
 	luasharp::NativeCompileOptions options;
 	options.externalTypes = types_;
 	options.symbols = symbols_;
 	options.runtime = runtime_;
 	options.initialize = false; // top-level code can call thunks that need the adopted struct types
 	options.emitDebugHooks = debug;
-	options.sourceName = source_name;
-	auto module = luasharp::NativeModule::Compile(source, options);
+	auto module = luasharp::NativeModule::Compile(files, options);
 	check_struct_layouts(module);
 	adopt_struct_types(module);
 	return module;
@@ -500,12 +500,17 @@ void* const* LuaSharpEngine::slots_of(const void* script_type, const lsbind::Scr
 }
 
 const luasharp::NativeModule& LuaSharpEngine::load(const std::string& name, std::string_view source) {
+	// A client sets breakpoints by the path of the file.
+	const luasharp::SourceFile file{debugger_ ? FileSys::get_full_path_from_game_path(name) : name, source};
+	return load(name, std::span(&file, 1));
+}
+
+const luasharp::NativeModule& LuaSharpEngine::load(const std::string& name, std::span<const luasharp::SourceFile> files) {
+	ASSERT(!files.empty());
 	if (modules_.contains(name))
 		throw std::runtime_error("LuaSharp module '" + name + "' is already loaded");
 	LoadedModule loaded;
-	// A client sets breakpoints by the path of the file.
-	const std::string source_name = debugger_ ? FileSys::get_full_path_from_game_path(name) : name;
-	loaded.module = std::make_unique<luasharp::NativeModule>(compile_module(source, debugger_ != nullptr, source_name));
+	loaded.module = std::make_unique<luasharp::NativeModule>(compile_module(files, debugger_ != nullptr));
 	if (debugger_)
 		debugger_->AddModule(*loaded.module);
 	try {
@@ -526,28 +531,40 @@ int LuaSharpEngine::load_script_files(const std::string& dir, std::span<const st
 				return true;
 		return path.find("/.luasharp/") != std::string::npos; // declarations for tools; compile() has them already
 	};
-	int loaded = 0;
+	std::vector<std::string> paths;
 	for (const std::string& full_path : FileSys::find_game_files_path(dir)) {
 		std::string path = FileSys::get_game_path_from_full_path(full_path);
 		std::replace(path.begin(), path.end(), '\\', '/');
-		if (StringUtils::get_extension_no_dot(path) != "ls" || skipped(path))
-			continue;
+		if (StringUtils::get_extension_no_dot(path) == "ls" && !skipped(path))
+			paths.push_back(std::move(path));
+	}
+	std::sort(paths.begin(), paths.end()); // top-level code runs in this order
+	std::vector<std::string> texts;
+	std::vector<luasharp::SourceFile> files;
+	for (const std::string& path : paths) {
 		auto file = FileSys::open_read_game(path);
 		if (!file) {
 			sys_print(Error, "LuaSharp: cannot read %s\n", path.c_str());
 			continue;
 		}
-		std::string source(file->size(), ' ');
+		std::string& source = texts.emplace_back(file->size(), ' ');
 		file->read(source.data(), source.size());
-		try {
-			load(path, source);
-			loaded++;
-			sys_print(Debug, "LuaSharp: loaded %s\n", path.c_str());
-		} catch (const std::exception& error) {
-			sys_print(Error, "LuaSharp: cannot load %s:\n%s\n", path.c_str(), error.what());
-		}
+		// A client sets breakpoints by the path of the file.
+		files.push_back({debugger_ ? FileSys::get_full_path_from_game_path(path) : path, {}});
 	}
-	return loaded;
+	if (files.empty())
+		return 0;
+	for (size_t i = 0; i < files.size(); i++)
+		files[i].text = texts[i]; // texts no longer grows
+	try {
+		const auto& times = load(dir, files).Times();
+		sys_print(Debug, "LuaSharp: loaded %s (%d files; frontend %.1f ms, C %.1f ms, tcc %.1f ms)\n", dir.c_str(),
+				  int(files.size()), times.frontend, times.emitC, times.tcc);
+		return static_cast<int>(files.size());
+	} catch (const std::exception& error) {
+		sys_print(Error, "LuaSharp: cannot load %s:\n%s\n", dir.c_str(), error.what());
+		return 0;
+	}
 }
 
 const luasharp::NativeModule* LuaSharpEngine::find_module(const std::string& name) const {

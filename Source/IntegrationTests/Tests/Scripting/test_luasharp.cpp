@@ -29,7 +29,7 @@
 
 namespace {
 
-constexpr const char* kModule = "scripts/tests/luasharp_spinner.ls";
+constexpr const char* kModule = "scripts"; // all script files are one module
 
 const luasharp::NativeModule* spinner_module() {
 	return LuaSharpEngine::inst ? LuaSharpEngine::inst->find_module(kModule) : nullptr;

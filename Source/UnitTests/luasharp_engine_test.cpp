@@ -383,6 +383,33 @@ TEST_F(LuaSharpEngineTest, LoadRegistersScriptClasses) {
 	engine = std::make_unique<LuaSharpEngine>();
 }
 
+// One module from several files: a script class uses a helper class and an enum of another file.
+TEST_F(LuaSharpEngineTest, LoadFilesAsOneModule) {
+	const luasharp::SourceFile files[] = {
+		{"scripts/a.ls", "class Gun : LsTestScriptable { Ammo ammo = new Ammo(); override int tick(int dt) { return ammo.left(dt); } }\n"
+						 "int loaded_a = Ammo.count;"},
+		{"scripts/b.ls", "class Ammo { static int count = 4; int left(int dt) { return count - dt; } }\nint loaded_b = 2;"},
+	};
+	const auto& module = engine->load("scripts", files);
+	EXPECT_EQ(engine->find_module("scripts"), &module);
+	EXPECT_EQ(*static_cast<int64_t*>(module.FindGlobal("loaded_a")), 4);
+	EXPECT_EQ(*static_cast<int64_t*>(module.FindGlobal("loaded_b")), 2);
+	std::unique_ptr<LsTestScriptable> gun(ClassBase::create_class<LsTestScriptable>("Gun"));
+	ASSERT_NE(gun, nullptr);
+	EXPECT_EQ(gun->tick(1), 3);
+}
+
+TEST_F(LuaSharpEngineTest, LoadFilesReportsTheFileOfAnError) {
+	const luasharp::SourceFile files[] = {{"scripts/a.ls", "class A { }"}, {"scripts/b.ls", "class B { }\nint x = \"text\";"}};
+	try {
+		engine->load("scripts", files);
+		ADD_FAILURE() << "a module with an error loaded";
+	} catch (const std::runtime_error& error) {
+		EXPECT_TRUE(std::string_view(error.what()).starts_with("scripts/b.ls(2,")) << error.what();
+	}
+	EXPECT_EQ(engine->find_module("scripts"), nullptr);
+}
+
 TEST_F(LuaSharpEngineTest, EditableFieldsArePropertyInfos) {
 	const auto& module = engine->load("turrets", EditableSource);
 	std::unique_ptr<ClassBase> object = engine->create(module, "Turret");

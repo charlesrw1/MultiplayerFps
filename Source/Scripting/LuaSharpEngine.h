@@ -19,6 +19,7 @@ class NativeModule;
 class NativeDebugger;
 class NativeDapServer;
 struct ExternalType;
+struct SourceFile;
 struct NativeSymbol;
 } // namespace luasharp
 namespace lsbind {
@@ -45,9 +46,12 @@ public:
 	// by name, and its [Editable] fields are its PropertyInfos (PROP_SCRIPT_FIELD).
 	// Throws std::runtime_error when the source does not compile or a class cannot be registered.
 	const luasharp::NativeModule& load(const std::string& name, std::string_view source);
-	// Loads each .ls file in the game folder `dir` and its subfolders, except the declarations for tools
-	// (.luasharp/) and files in a subfolder named in skip_dirs. The module name is the game path. Errors are logged.
-	// Returns the number of modules loaded.
+	// One module from several files: each file sees the types of the others. With the debugger on, give full paths
+	// as file names, so that breakpoints match.
+	const luasharp::NativeModule& load(const std::string& name, std::span<const luasharp::SourceFile> files);
+	// Loads the .ls files in the game folder `dir` and its subfolders as one module named `dir`, except the declarations
+	// for tools (.luasharp/) and files in a subfolder named in skip_dirs. Errors are logged.
+	// Returns the number of files loaded: 0 when the module does not compile.
 	int load_script_files(const std::string& dir, std::span<const std::string_view> skip_dirs = {});
 	const luasharp::NativeModule* find_module(const std::string& name) const;
 	void* proxy_of(const ClassBase* object);
@@ -82,7 +86,7 @@ private:
 	friend class LuaSharpClassTypeInfo;
 
 	// Compiles without Initialize(). The debugger needs the module before its top-level code runs.
-	luasharp::NativeModule compile_module(std::string_view source, bool debug, std::string_view source_name);
+	luasharp::NativeModule compile_module(std::span<const luasharp::SourceFile> files, bool debug);
 
 	std::unique_ptr<ClassBase> make(const luasharp::NativeModule& module, std::string_view script_class,
 									const LuaSharpClassTypeInfo* type);

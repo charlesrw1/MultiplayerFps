@@ -69,7 +69,7 @@ VS Code attach via `actboy168.lua-debug` — see [[scripting/vscode_debugger]].
 ## LuaSharp scripts
 
 - At startup the engine makes a `LuaSharpEngine` (`GameEngineLocal::luasharp`) when `tcc/libtcc.dll` is next to the executable.
-- It loads each `.ls` file in `scripts/` and its subfolders, except `scripts/tests/`, `scripts/lib/` and `scripts/.luasharp/`. In test mode it also loads `scripts/tests/`. The module name is the game path, for example `scripts/tests/luasharp_spinner.ls`.
+- It compiles all `.ls` files in `scripts/` and its subfolders as one module named `scripts`, except `scripts/tests/`, `scripts/lib/` and `scripts/.luasharp/`. In test mode the module also has `scripts/tests/`. Each file can use the classes of the other files. A compile error in one file stops the load of all files, and the log shows each error as `file(line,col): message`.
 - A file that does not compile is logged as an error, and the engine continues.
 - The engine compiles against the declarations in the binary. At startup the editor writes them to `scripts/.luasharp/engine.ls`, and writes `scripts/luasharp.json` if it is missing. The LSP and `LuaSharp.exe` read them from there. `App.exe --dump-luasharp-decls <scripts folder>` writes them without the editor.
 - Each frame, after `ScriptManager::update`, the engine calls `LuaSharpEngine::collect_if_needed`. It collects when the heap is two times its size after the last collection (minimum 4 MB).

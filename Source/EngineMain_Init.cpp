@@ -523,10 +523,13 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 				sys_print(Error, "LuaSharp: %s\n", error.what());
 			}
 		}
-		constexpr std::string_view skip[] = {"tests", "lib"};
-		luasharp->load_script_files("scripts", skip);
+		// One module: the tests use the classes of the game scripts.
+		constexpr std::string_view skip_game[] = {"tests", "lib"};
+		constexpr std::string_view skip_tests[] = {"lib"};
 		if (options.pending_test_runnner)
-			luasharp->load_script_files("scripts/tests");
+			luasharp->load_script_files("scripts", skip_tests);
+		else
+			luasharp->load_script_files("scripts", skip_game);
 		print_time("luasharp init");
 		printf("\n..............................\n");
 	} else if (!has_libtcc) {
