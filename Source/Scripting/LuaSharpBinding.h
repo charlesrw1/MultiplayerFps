@@ -1,6 +1,7 @@
 #pragma once
 // Helpers for the LuaSharp thunks that Scripts/codegen_luasharp.py appends to each *MEGA.gen.cpp.
 // Thunk signatures use C types only (see LuaSharp/docs/native-abi.md, "Extern classes").
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <span>
@@ -80,6 +81,19 @@ template <typename Impl> void attach(ClassBase* object, void* const* slots) {
 	impl->ls_slots = slots;
 }
 
+// A declared struct as its C++ mirror lays it out. LuaSharpEngine checks it against each module's type info.
+struct StructField
+{
+	const char* name;
+	size_t offset;
+};
+struct StructLayout
+{
+	const char* name;
+	size_t size;
+	std::span<const StructField> fields;
+};
+
 // The output of one codegen pass. Declarations are LuaSharp source chunks.
 struct Bindings
 {
@@ -88,6 +102,7 @@ struct Bindings
 	std::span<const Symbol> symbols;
 	std::span<const Class> classes;
 	std::span<const Scriptable> scriptables;
+	std::span<const StructLayout> structs; // the structs this pass declares
 };
 std::span<const Bindings* const> all_bindings();
 // The declarations of all passes as one source, in registration order.
@@ -97,7 +112,7 @@ std::string declaration_source();
 struct Registrar
 {
 	Registrar(const char* pass, std::span<const char* const> declarations, std::span<const Symbol> symbols,
-			  std::span<const Class> classes, std::span<const Scriptable> scriptables);
+			  std::span<const Class> classes, std::span<const Scriptable> scriptables, std::span<const StructLayout> structs);
 	Bindings bindings;
 };
 

@@ -20,7 +20,8 @@ struct NativeSymbol;
 } // namespace luasharp
 namespace lsbind {
 struct Scriptable;
-}
+struct StructLayout;
+} // namespace lsbind
 
 // Compiles LuaSharp modules against the reflected engine classes (the generated lsbind::Bindings).
 // Each engine object has at most one proxy. ClassBase::script_proxy holds it as a GC root slot, and
@@ -77,9 +78,12 @@ private:
 	const lsbind::Scriptable* scriptable_of(const ClassTypeInfo& engine_class) const;
 	void release(ClassBase* object);
 	void* const* slots_of(const void* script_type, const lsbind::Scriptable& scriptable);
+	// Throws std::runtime_error when a declared struct in the module differs from its C++ mirror.
+	void check_struct_layouts(const luasharp::NativeModule& module) const;
 
 	std::shared_ptr<luasharp::NativeRuntime> runtime_;
 	std::unordered_map<std::string_view, const lsbind::Scriptable*> scriptables_;
+	std::unordered_map<std::string_view, const lsbind::StructLayout*> struct_layouts_;
 	std::set<std::vector<void*>> slot_tables_; // ScriptImpl_X::ls_slots; elements do not move
 	std::vector<luasharp::ExternalType> types_;
 	std::vector<luasharp::NativeSymbol> symbols_;

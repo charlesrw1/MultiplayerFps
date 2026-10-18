@@ -67,7 +67,7 @@ def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuil
 
     #for o in output_files:
     #   generate.write_output_file(GENERATED_ROOT,o.filename,o.root,o.classes,o.additional_includes, typenames)
-    generate.write_output_file(lua_output_path, GENERATED_ROOT,mega_name+".h",".",mega_output.classes,mega_output.additional_includes,typenames,lua_stub_filename,luasharp.cpp,luasharp.slots)
+    generate.write_output_file(lua_output_path, GENERATED_ROOT,mega_name+".h",".",mega_output.classes,mega_output.additional_includes,typenames,lua_stub_filename,luasharp.cpp,luasharp.slots,luasharp.prelude)
 
     end_time = time.perf_counter()
     elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds

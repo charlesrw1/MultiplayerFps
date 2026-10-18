@@ -574,9 +574,24 @@ NEWENUM(Mode, uint8_t){
     Off = 2,
     On = 4,
 };
+class Animal;
+struct Hit {
+    STRUCT_BODY();
+    REF Animal* who = nullptr;
+    REF obj<Animal> owner;
+    REF Mode mode = Mode::Off;
+    REF float dist = 0;
+    REF std::vector<int> tags;
+};
+struct Wrap {
+    STRUCT_BODY();
+    REF Hit inner;
+    REF int n = 0;
+};
 class Animal : public ClassBase {
 public:
     CLASS_BODY(Animal, scriptable);
+    REF virtual Wrap wrap(const Wrap& w) { return w; }
     REF virtual void speak(int times) {}
     REF virtual Animal* best(const std::string& tag) { return nullptr; }
     REF int legs = 4;
@@ -588,6 +603,9 @@ public:
     REF static Dog* find(const std::string& name);
     REF glm::vec3 where(Mode m, Animal* other);
     REF std::vector<int> bones();
+    REF Hit probe(const Hit& h);
+    REF obj<Animal> leader;
+    REF Hit last;
     REF void bark();
     REF void bark(int loud);
     REF void in();
@@ -618,8 +636,8 @@ public:
     def test_declarations(self):
         declarations = self.generate().declarations
         self.assertIn("enum Mode { Off, On }", declarations)
-        self.assertIn("extern class Animal : ClassBase {\n    virtual void speak(int times);\n    virtual Animal best(string tag);\n    int legs;\n", declarations)
-        self.assertIn("extern class Dog : Animal {\n    static Dog find(string name);\n    Vec3 where(Mode m, Animal other);\n    void bark();\n    float speed;\n", declarations)
+        self.assertIn("extern class Animal : ClassBase {\n    virtual Wrap wrap(Wrap w);\n    virtual void speak(int times);\n    virtual Animal best(string tag);\n    int legs;\n", declarations)
+        self.assertIn("extern class Dog : Animal {\n    static Dog find(string name);\n    Vec3 where(Mode m, Animal other);\n    Hit probe(Hit h);\n    Animal leader;\n    Hit last;\n    void bark();\n    float speed;\n", declarations)
         self.assertNotIn("void speak", declarations.split("extern class Dog")[1])  # the Animal thunk dispatches the override
         self.assertIn("// skipped bones(): std::vector<int>", declarations)
         self.assertIn("// skipped bark(): overload", declarations)
@@ -627,7 +645,8 @@ public:
         self.assertNotIn("hidden", declarations)
 
     def test_thunks(self):
-        cpp = self.generate().cpp
+        out = self.generate()
+        cpp = out.prelude + out.cpp
         self.assertIn("static const int64_t ls_enum_Mode[] = {static_cast<int64_t>(Mode::Off), static_cast<int64_t>(Mode::On)};", cpp)
         self.assertIn("static void* ls_native_Dog_find(void* name) { return lsbind::proxy_of(Dog::find(std::string(lsbind::view(name)))); }", cpp)
         self.assertIn("lsbind::object<Dog>(self)->where(static_cast<Mode>(lsbind::enum_value(ls_enum_Mode, std::size(ls_enum_Mode), m)), lsbind::object<Animal>(other))", cpp)
@@ -635,15 +654,15 @@ public:
         self.assertIn("static void ls_native_Dog__set_speed(void*, double) { lsbind::report_error(\"field 'Dog.speed' is read-only\"); }", cpp)
         self.assertIn("{\"ls_native_Animal__get_legs\", reinterpret_cast<const void*>(&ls_native_Animal__get_legs)}", cpp)
         self.assertIn("\t{\"Dog\", \"Animal\"},\n", cpp)
-        self.assertIn("static const lsbind::Registrar ls_registrar{\"TEST\", ls_declarations, ls_symbols, ls_classes, ls_scriptables};", cpp)
+        self.assertIn("static const lsbind::Registrar ls_registrar{\"TEST\", ls_declarations, ls_symbols, ls_classes, ls_scriptables, ls_structs};", cpp)
 
     def test_scriptable_slots(self):
         out = self.generate()
         self.assertEqual(list(out.slots), ["Animal"])  # Dog is not scriptable
-        self.assertEqual(out.slots["Animal"]["speak"], "if (auto ls_fn = reinterpret_cast<void (*)(void*, int64_t)>(ls_slots[0])) { ls_fn(get_script_proxy(), static_cast<int64_t>(times)); return; }")
-        self.assertEqual(out.slots["Animal"]["best"], "if (auto ls_fn = reinterpret_cast<void* (*)(void*, void*)>(ls_slots[1])) return lsbind::object<Animal>(lsbind::native_of(ls_fn(get_script_proxy(), lsbind::string(tag))));")
+        self.assertEqual(out.slots["Animal"]["speak"], "if (auto ls_fn = reinterpret_cast<void (*)(void*, int64_t)>(ls_slots[1])) { ls_fn(get_script_proxy(), static_cast<int64_t>(times)); return; }")
+        self.assertEqual(out.slots["Animal"]["best"], "if (auto ls_fn = reinterpret_cast<void* (*)(void*, void*)>(ls_slots[2])) return lsbind::object<Animal>(lsbind::native_of(ls_fn(get_script_proxy(), lsbind::string(tag))));")
         self.assertIn("static void ls_native_Animal__base_speak(void* self, int64_t times) { lsbind::object<Animal>(self)->Animal::speak(static_cast<int>(times)); }", out.cpp)
-        self.assertIn("static const char* const ls_slot_names_Animal[] = {\n\t\"speak\",\n\t\"best\",\n};", out.cpp)
+        self.assertIn("static const char* const ls_slot_names_Animal[] = {\n\t\"wrap\",\n\t\"speak\",\n\t\"best\",\n};", out.cpp)
         self.assertIn("\t{\"Animal\", ls_slot_names_Animal, &lsbind::attach<ScriptImpl_Animal>},\n", out.cpp)
         self.assertIn("{\"ls_native_Animal__base_best\", reinterpret_cast<const void*>(&ls_native_Animal__base_best)}", out.cpp)
 
@@ -656,6 +675,40 @@ public:
         self.assertIn("void* const* ls_slots = nullptr;", impl)
         self.assertIn("if (ls_slots) { " + out.slots["Animal"]["speak"] + " return Animal::speak(times); }", impl)
         self.assertNotIn("ls_slots", gen.write_scriptable_class(animal))  # the Lua-only class is unchanged
+
+    def test_struct_declarations(self):
+        declarations = self.generate().declarations
+        self.assertIn("struct Hit {\n    Animal who;\n    Animal owner;\n    Mode mode;\n    float dist;\n    // skipped tags: std::vector<int>\n}", declarations)
+        self.assertIn("struct Wrap {\n    Hit inner;\n    int n;\n}", declarations)
+        self.assertIn("    Hit probe(Hit h);\n    Animal leader;\n    Hit last;\n", declarations)
+        self.assertIn("    virtual Wrap wrap(Wrap w);\n", declarations)
+
+    def test_struct_marshaling(self):
+        out = self.generate()
+        cpp = out.prelude + out.cpp
+        self.assertIn("struct ls_S_Hit { void* who; void* owner; int64_t mode; double dist; };", cpp)
+        self.assertIn("struct ls_S_Wrap { ls_S_Hit inner; int64_t n; };", cpp)
+        self.assertLess(cpp.index("struct ls_S_Hit"), cpp.index("struct ls_S_Wrap"))  # contained structs first
+        self.assertIn("r.who = lsbind::proxy_of(v.who); r.owner = lsbind::proxy_of(v.owner.get()); r.mode = lsbind::enum_ordinal(ls_enum_Mode, std::size(ls_enum_Mode), static_cast<int64_t>(v.mode));", cpp)
+        self.assertIn("out.who = lsbind::object<Animal>(lsbind::native_of(v.who)); out.owner = obj<Animal>(lsbind::object<Animal>(lsbind::native_of(v.owner)));", cpp)
+        self.assertIn("[[maybe_unused]] Hit ls_to_cpp_Hit(const ls_S_Hit& v) { Hit r{}; ls_assign_Hit(v, r); return r; }", cpp)
+        self.assertIn("static ls_S_Hit ls_native_Dog_probe(void* self, ls_S_Hit h) { return ls_to_ls_Hit(lsbind::object<Dog>(self)->probe(ls_to_cpp_Hit(h))); }", cpp)
+        self.assertIn("{ ls_assign_Hit(value, lsbind::field<Hit>(lsbind::object<Dog>(self), ls_offset_Dog_last())); }", cpp)  # in place
+        self.assertIn("static void* ls_native_Dog__get_leader(void* self) { return lsbind::proxy_of(lsbind::field<obj<Animal>>(lsbind::object<Dog>(self), ls_offset_Dog_leader()).get()); }", cpp)
+        self.assertIn("= obj<Animal>(lsbind::object<Animal>(value)); }", cpp)
+        self.assertIn("\t{\"Hit\", sizeof(ls_S_Hit), ls_layout_Hit},\n", cpp)
+        self.assertIn("\t{\"dist\", offsetof(ls_S_Hit, dist)},\n", cpp)
+        self.assertIn("ls_classes, ls_scriptables, ls_structs};", cpp)
+
+    def test_struct_conversions_come_before_classes(self):
+        out = self.generate()
+        self.assertIn("struct ls_S_Wrap", out.prelude)  # ScriptImpl_Animal::wrap calls ls_to_cpp_Wrap
+        self.assertIn("static const int64_t ls_enum_Mode[]", out.prelude)
+        self.assertNotIn("ls_S_Wrap {", out.cpp)
+
+    def test_struct_slot(self):
+        out = self.generate()
+        self.assertEqual(out.slots["Animal"]["wrap"], "if (auto ls_fn = reinterpret_cast<ls_S_Wrap (*)(void*, ls_S_Wrap)>(ls_slots[0])) return ls_to_cpp_Wrap(ls_fn(get_script_proxy(), ls_to_ls_Wrap(w)));")
 
     def test_empty_pass(self):
         import codegen_luasharp as ls

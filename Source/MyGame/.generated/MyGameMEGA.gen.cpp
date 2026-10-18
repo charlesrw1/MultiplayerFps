@@ -17,6 +17,11 @@ void push_lVec3_to_lua(lua_State* L, const lVec3& value);
 lVec3 get_lVec3_from_lua(lua_State* L, int index);
 void push_lQuat_to_lua(lua_State* L, const lQuat& value);
 lQuat get_lQuat_from_lua(lua_State* L, int index);
+
+// ---- LuaSharp binding values (Scripts/codegen_luasharp.py) ----
+static const int64_t ls_enum_AnimGraphTestMode[] = {static_cast<int64_t>(AnimGraphTestMode::BasicIK), static_cast<int64_t>(AnimGraphTestMode::LookAt), static_cast<int64_t>(AnimGraphTestMode::GunGripIK), static_cast<int64_t>(AnimGraphTestMode::FeetIK), static_cast<int64_t>(AnimGraphTestMode::BlendMasked), static_cast<int64_t>(AnimGraphTestMode::CopyBone), static_cast<int64_t>(AnimGraphTestMode::SlotPlaying), static_cast<int64_t>(AnimGraphTestMode::Additive), static_cast<int64_t>(AnimGraphTestMode::BlendByInt), static_cast<int64_t>(AnimGraphTestMode::DurationEventTest), static_cast<int64_t>(AnimGraphTestMode::BlendSpace2D), static_cast<int64_t>(AnimGraphTestMode::SpringBoneTest), static_cast<int64_t>(AnimGraphTestMode::CachedPoseTest)};
+static const int64_t ls_enum_Easing[] = {static_cast<int64_t>(Easing::Linear), static_cast<int64_t>(Easing::CubicEaseIn), static_cast<int64_t>(Easing::CubicEaseOut), static_cast<int64_t>(Easing::CubicEaseInOut), static_cast<int64_t>(Easing::Constant)};
+static const int64_t ls_enum_BodyType[] = {static_cast<int64_t>(BodyType::Static), static_cast<int64_t>(BodyType::Kinematic), static_cast<int64_t>(BodyType::Dynamic)};
 int lua_binding_fpsIDamageable_deal_damage(lua_State* L)
 {
 	ClassBase* obj = get_object_from_lua(L,1);
@@ -449,9 +454,6 @@ const PropertyInfoList* PhysicsLayerTesterRaycast::get_props()
 
 
 // ---- LuaSharp binding (Scripts/codegen_luasharp.py) ----
-static const int64_t ls_enum_AnimGraphTestMode[] = {static_cast<int64_t>(AnimGraphTestMode::BasicIK), static_cast<int64_t>(AnimGraphTestMode::LookAt), static_cast<int64_t>(AnimGraphTestMode::GunGripIK), static_cast<int64_t>(AnimGraphTestMode::FeetIK), static_cast<int64_t>(AnimGraphTestMode::BlendMasked), static_cast<int64_t>(AnimGraphTestMode::CopyBone), static_cast<int64_t>(AnimGraphTestMode::SlotPlaying), static_cast<int64_t>(AnimGraphTestMode::Additive), static_cast<int64_t>(AnimGraphTestMode::BlendByInt), static_cast<int64_t>(AnimGraphTestMode::DurationEventTest), static_cast<int64_t>(AnimGraphTestMode::BlendSpace2D), static_cast<int64_t>(AnimGraphTestMode::SpringBoneTest), static_cast<int64_t>(AnimGraphTestMode::CachedPoseTest)};
-static const int64_t ls_enum_Easing[] = {static_cast<int64_t>(Easing::Linear), static_cast<int64_t>(Easing::CubicEaseIn), static_cast<int64_t>(Easing::CubicEaseOut), static_cast<int64_t>(Easing::CubicEaseInOut), static_cast<int64_t>(Easing::Constant)};
-static const int64_t ls_enum_BodyType[] = {static_cast<int64_t>(BodyType::Static), static_cast<int64_t>(BodyType::Kinematic), static_cast<int64_t>(BodyType::Dynamic)};
 static uint16_t ls_offset_AnimGraphTester_mode() { static const uint16_t offset = lsbind::field_offset(AnimGraphTester::get_props(), "mode"); return offset; }
 static int64_t ls_native_AnimGraphTester__get_mode(void* self) { return lsbind::enum_ordinal(ls_enum_AnimGraphTestMode, std::size(ls_enum_AnimGraphTestMode), static_cast<int64_t>(lsbind::field<AnimGraphTestMode>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_mode()))); }
 static void ls_native_AnimGraphTester__set_mode(void* self, int64_t value) { lsbind::field<AnimGraphTestMode>(lsbind::object<AnimGraphTester>(self), ls_offset_AnimGraphTester_mode()) = static_cast<AnimGraphTestMode>(lsbind::enum_value(ls_enum_AnimGraphTestMode, std::size(ls_enum_AnimGraphTestMode), value)); }
@@ -918,4 +920,5 @@ static lsbind::Class const ls_classes[] = {
 static lsbind::Scriptable const ls_scriptables[] = {
 	{"fpsLuaBridge", ls_slot_names_fpsLuaBridge, &lsbind::attach<ScriptImpl_fpsLuaBridge>},
 };
-static const lsbind::Registrar ls_registrar{"MyGameMEGA", ls_declarations, ls_symbols, ls_classes, ls_scriptables};
+static const std::span<lsbind::StructLayout const> ls_structs;
+static const lsbind::Registrar ls_registrar{"MyGameMEGA", ls_declarations, ls_symbols, ls_classes, ls_scriptables, ls_structs};

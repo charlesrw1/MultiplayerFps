@@ -181,8 +181,9 @@ struct LsString
 
 namespace lsbind {
 Registrar::Registrar(const char* pass, std::span<const char* const> declarations, std::span<const Symbol> symbols,
-					 std::span<const Class> classes, std::span<const Scriptable> scriptables)
-	: bindings{pass, declarations, symbols, classes, scriptables} {
+					 std::span<const Class> classes, std::span<const Scriptable> scriptables,
+					 std::span<const StructLayout> structs)
+	: bindings{pass, declarations, symbols, classes, scriptables, structs} {
 	bindings_registry().push_back(&bindings);
 }
 std::span<const Bindings* const> all_bindings() { return bindings_registry(); }
@@ -259,6 +260,10 @@ LuaSharpEngine::LuaSharpEngine() : runtime_(luasharp::NativeRuntime::Create()) {
 			[[maybe_unused]] const bool added = scriptables_.emplace(s.name, &s).second;
 			ASSERT(added);
 		}
+		for (const lsbind::StructLayout& s : b->structs) {
+			[[maybe_unused]] const bool added = struct_layouts_.emplace(s.name, &s).second;
+			ASSERT(added); // one codegen pass owns each struct
+		}
 	}
 	// NativeClass needs the base first.
 	auto register_class = [&](auto& self, std::string_view name) -> void {
@@ -292,7 +297,26 @@ luasharp::NativeModule LuaSharpEngine::compile(std::string_view source) {
 	options.externalTypes = types_;
 	options.symbols = symbols_;
 	options.runtime = runtime_;
-	return luasharp::NativeModule::Compile(source, options);
+	auto module = luasharp::NativeModule::Compile(source, options);
+	check_struct_layouts(module);
+	return module;
+}
+
+void LuaSharpEngine::check_struct_layouts(const luasharp::NativeModule& module) const {
+	for (const std::string& name : module.Generated().externalStructs) {
+		const auto found = struct_layouts_.find(name);
+		ASSERT(found != struct_layouts_.end()); // every declared struct comes from a pass
+		const lsbind::StructLayout& host = *found->second;
+		const auto script = luasharp::NativeRuntime::StructLayout(module.ExternalStructType(name));
+		const auto mismatch = [&](const std::string& what) {
+			throw std::runtime_error("LuaSharp struct '" + name + "' does not match its C++ mirror: " + what);
+		};
+		if (script.size != host.size || script.fields.size() != host.fields.size())
+			mismatch("size " + std::to_string(script.size) + " vs " + std::to_string(host.size));
+		for (size_t i = 0; i < host.fields.size(); i++)
+			if (script.fields[i].name != host.fields[i].name || script.fields[i].offset != host.fields[i].offset)
+				mismatch("field '" + std::string(host.fields[i].name) + "'");
+	}
 }
 
 void* LuaSharpEngine::proxy_of(const ClassBase* object) {

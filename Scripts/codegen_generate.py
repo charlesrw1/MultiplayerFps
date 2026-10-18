@@ -661,7 +661,8 @@ def write_lua_class(newclass:ClassDef) -> str:
   
 
 # script_slots: the LuaSharp slot calls of each scriptable class (codegen_luasharp.Output.slots).
-def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef], lua_stub_filename:str = "lua_stubs.lua", extra_source:str = "", script_slots:dict[str,dict[str,str]] | None = None):
+# prelude_source: goes before the classes, which the slot calls are inside (codegen_luasharp.Output.prelude).
+def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef], lua_stub_filename:str = "lua_stubs.lua", extra_source:str = "", script_slots:dict[str,dict[str,str]] | None = None, prelude_source:str = ""):
     generated_path = root + "/" + os.path.splitext(filename)[0]
     if generated_path[0]=='.':
         generated_path=generated_path[2:]
@@ -687,8 +688,9 @@ def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,
                 output += f"void push_{c.classname}_to_lua(lua_State* L, const {c.classname}& value);\n"
                 output += f"{c.classname} get_{c.classname}_from_lua(lua_State* L, int index);\n"
         generated += output
+        generated += prelude_source
 
-        interfaces = [c for c in classes if c.object_type == ClassDef.TYPE_INTERFACE]
+        interfaces =[c for c in classes if c.object_type == ClassDef.TYPE_INTERFACE]
         non_interfaces = [c for c in classes if c.object_type != ClassDef.TYPE_INTERFACE]
         slots = script_slots or {}
         for c in interfaces:

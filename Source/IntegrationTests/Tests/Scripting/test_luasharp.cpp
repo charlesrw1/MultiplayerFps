@@ -15,6 +15,8 @@
 #include "Framework/Files.h"
 #include "Assets/AssetDatabase.h"
 #include "Scripting/LuaSharpEngine.h"
+#include "Game/Components/PhysicsComponents.h"
+#include "../LuaSharp/src/NativeRuntime.h"
 #include "../LuaSharp/src/CBackend.h"
 #include "LevelEditor/EditorDocLocal.h"
 #include <string>
@@ -274,3 +276,41 @@ static TestTask test_luasharp_editor_save_reload(TestContext& t) {
 	FileSys::delete_game_file(kPath);
 }
 EDITOR_TEST("luasharp/editor_save_reload", 30.f, test_luasharp_editor_save_reload);
+
+// A STRUCT_BODY struct crosses by value: cast_ray returns a HitResult whose obj<Entity> field is the proxy of the entity.
+static TestTask test_luasharp_struct_hit_result(TestContext& t) {
+	t.require(LuaSharpEngine::inst != nullptr, "LuaSharpEngine is created at startup");
+	eng->load_level("");
+	Entity* box = eng->get_level()->spawn_entity();
+	box->set_ws_position(glm::vec3(0.f));
+	box->create_component<BoxComponent>();
+	co_await t.wait_ticks(1);
+
+	const luasharp::NativeModule module = LuaSharpEngine::inst->compile(R"(
+HitResult hit = GameplayStatic.cast_ray(Vec3.new(0, 10, 0), Vec3.new(0, -10, 0), -1, null);
+bool didHit = hit.hit;
+float hitY = hit.pos.y;
+float normalY = hit.normal.y;
+Entity what = hit.what;
+HitResult miss = GameplayStatic.cast_ray(Vec3.new(100, 10, 0), Vec3.new(100, -10, 0), -1, null);
+bool missed = !miss.hit && miss.what == null;
+lColor color = lColor();
+color.g = 255;
+GameplayStatic.debug_sphere(hit.pos, 0.5, 0.1, color);
+)");
+	const auto global = [&]<typename T>(const char* name, T) {
+		const auto* value = static_cast<const T*>(module.FindGlobal(name));
+		ASSERT(value);
+		return *value;
+	};
+	t.check(module.LastError().empty(), "the script ran without a runtime error");
+	t.check(global("didHit", uint8_t{}) == 1, "the ray hit the box");
+	const double hit_y = global("hitY", double{});
+	t.check(hit_y > 0.0 && hit_y < 10.0, "the hit position is on top of the box");
+	t.check(global("normalY", double{}) > 0.9, "the hit normal points up");
+	t.check(luasharp::NativeRuntime::NativeOf(global("what", static_cast<void*>(nullptr))) == static_cast<ClassBase*>(box),
+			"HitResult.what is the proxy of the hit entity");
+	t.check(global("missed", uint8_t{}) == 1, "a miss has hit false and a null entity");
+	co_return;
+}
+GAME_TEST("luasharp/struct_hit_result", 10.f, test_luasharp_struct_hit_result);

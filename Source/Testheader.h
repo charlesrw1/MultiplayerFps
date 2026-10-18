@@ -21,6 +21,23 @@ NEWENUM(LsTestMode, uint8_t){
 	Fast = 9,
 };
 
+// Crosses LuaSharp by value. Script cannot see `hidden`, and `tags` does not bind.
+struct LsTestPoint
+{
+	STRUCT_BODY();
+	REF glm::vec3 pos = glm::vec3(0);
+	REF LsTestMode mode = LsTestMode::Off;
+	REF std::string name;
+	REF std::vector<int> tags;
+	int hidden = 5;
+};
+struct LsTestSegment
+{
+	STRUCT_BODY();
+	REF LsTestPoint a;
+	REF LsTestPoint b;
+};
+
 class LsTestBase : public ClassBase
 {
 public:
@@ -56,6 +73,14 @@ public:
 	REF bool is_partner(const LsTestThing* other) { return other == partner; }
 	REF int get_secret() { return secret; }
 	REF std::vector<int> numbers() { return {}; } // not bound in this milestone
+	REF LsTestPoint point;
+	REF LsTestPoint moved(const LsTestPoint& p, glm::vec3 by) {
+		LsTestPoint r = p;
+		r.pos += by;
+		return r;
+	}
+	REF int hidden_of(const LsTestPoint& p) { return p.hidden; }
+	REF LsTestSegment segment() { return {point, point}; }
 	REF static int instance_count() { return 3; }
 	REF static LsTestThing* find_first() { return first; }
 
@@ -78,6 +103,7 @@ public:
 	REF virtual std::string label_for(const std::string& prefix) { return prefix + "native"; }
 	REF virtual void notify(LsTestThing* other) { last = other; }
 	REF virtual LsTestThing* pick() { return nullptr; }
+	REF virtual LsTestPoint adjust(LsTestPoint p) { return p; }
 	REF int call_tick(int dt) { return tick(dt); } // a virtual call from C++
 	REF int hp = 100;
 	LsTestThing* last = nullptr;

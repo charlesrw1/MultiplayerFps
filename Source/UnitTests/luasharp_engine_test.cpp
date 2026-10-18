@@ -502,6 +502,66 @@ TEST_F(LuaSharpEngineTest, LoadErrors) {
 	EXPECT_NE(ClassBase::find_class("Turret"), nullptr);
 }
 
+// A STRUCT_BODY struct is a LuaSharp struct. Values copy through the thunks field by field.
+TEST_F(LuaSharpEngineTest, StructsCrossByValue) {
+	EXPECT_NE(engine->declarations().find("struct LsTestPoint {\n    Vec3 pos;\n    LsTestMode mode;\n    string name;\n    // skipped tags: std::vector<int>\n}"), std::string::npos);
+	LsTestThing thing;
+	LsTestThing::first = &thing;
+	thing.point = {glm::vec3(1, 2, 3), LsTestMode::Fast, "start", {1, 2}, 9};
+	auto module = engine->compile(R"(
+LsTestThing t = LsTestThing.find_first();
+LsTestPoint p = t.point;
+float x = p.pos.x;
+bool fast = p.mode == LsTestMode.Fast;
+string name = p.name;
+p.pos = Vec3.new(7, 8, 9);
+p.name = "moved";
+p.mode = LsTestMode.Slow;
+t.point = p;
+LsTestPoint m = t.moved(p, Vec3.new(1, 0, 0));
+float mx = m.pos.x;
+int hiddenArg = t.hidden_of(p);
+LsTestSegment s = t.segment();
+float segX = s.b.pos.x;
+bool freshZero = LsTestPoint().mode == LsTestMode.Off && LsTestPoint().pos.x == 0.0;
+)");
+	EXPECT_EQ(module.LastError(), "");
+	EXPECT_DOUBLE_EQ(global<double>(module, "x"), 1.0);
+	EXPECT_EQ(global<uint8_t>(module, "fast"), 1u);
+	EXPECT_EQ(text(module, "name"), "start");
+	EXPECT_EQ(thing.point.pos, glm::vec3(7, 8, 9));
+	EXPECT_EQ(thing.point.name, "moved");
+	EXPECT_EQ(thing.point.mode, LsTestMode::Slow);
+	EXPECT_EQ(thing.point.hidden, 9); // a field setter assigns in place
+	EXPECT_EQ(thing.point.tags, (std::vector<int>{1, 2}));
+	EXPECT_DOUBLE_EQ(global<double>(module, "mx"), 8.0);
+	EXPECT_EQ(global<int64_t>(module, "hiddenArg"), 5); // an argument starts from T{}
+	EXPECT_DOUBLE_EQ(global<double>(module, "segX"), 7.0);
+	EXPECT_EQ(global<uint8_t>(module, "freshZero"), 1u);
+}
+
+TEST_F(LuaSharpEngineTest, ScriptOverrideTakesAndReturnsStruct) {
+	auto module = engine->compile(R"(
+class Adjuster : LsTestScriptable {
+    override LsTestPoint adjust(LsTestPoint p) {
+        p.pos = p.pos + Vec3.new(0, 0, 10);
+        p.name = p.name + "!";
+        return p;
+    }
+}
+)");
+	std::unique_ptr<ClassBase> object = engine->create(module, "Adjuster");
+	auto* adjuster = dynamic_cast<LsTestScriptable*>(object.get());
+	ASSERT_NE(adjuster, nullptr);
+	LsTestPoint input{glm::vec3(1, 2, 3), LsTestMode::Fast, "p", {}, 9};
+	const LsTestPoint result = adjuster->adjust(input);
+	EXPECT_EQ(result.pos, glm::vec3(1, 2, 13));
+	EXPECT_EQ(result.name, "p!");
+	EXPECT_EQ(result.mode, LsTestMode::Fast);
+	EXPECT_EQ(result.hidden, 5); // a slot result starts from T{}
+	EXPECT_EQ(module.LastError(), "");
+}
+
 TEST_F(LuaSharpEngineTest, CompileErrorThrows) {
 	EXPECT_THROW(engine->compile("LsTestThing t = new LsTestThing();"), std::runtime_error);
 	EXPECT_THROW(engine->compile("int x = LsTestThing.no_such_member();"), std::runtime_error);
