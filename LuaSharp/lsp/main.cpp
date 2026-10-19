@@ -399,6 +399,9 @@ json Completions(const std::string& uri, const std::string& text, const json& po
     for (const auto* word : words) result.push_back({{"label", word}, {"kind", 14}});
     for (const auto& type : luasharp::BuiltinTypes()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in type"}});
     for (const auto& type : luasharp::BuiltinStaticClasses()) result.push_back({{"label", type}, {"kind", 7}, {"detail", "built-in static class"}});
+    result.push_back({{"label", "any"}, {"kind", 7}, {"detail", "dynamic value"}});
+    result.push_back({{"label", "Func"}, {"kind", 7}, {"detail", "function type: Func<Param, ..., Result>"}});
+    result.push_back({{"label", "Action"}, {"kind", 7}, {"detail", "function type without a result: Action<Param, ...>"}});
     for (const auto& function : luasharp::BuiltinFunctions()) {
         std::string signature = "(";
         for (size_t i{}; i < function.parameters.size(); ++i) { if (i) signature += ", "; signature += function.parameters[i].type + " " + function.parameters[i].name; }
