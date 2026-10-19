@@ -4,6 +4,7 @@
 #include "../../LuaSharp/src/Builtins.h"
 #include "../../LuaSharp/src/NativeDapServer.h"
 #include "../../LuaSharp/src/NativeDebugger.h"
+#include "../../LuaSharp/src/NativeReload.h"
 #include "Framework/ClassBase.h"
 #include "Framework/ClassTypeInfo.h"
 #include "Framework/ReflectionProp.h"
@@ -91,14 +92,21 @@ public:
 						  const ClassTypeInfo& engine_class, bool can_create)
 		: ClassTypeInfo("", &super, nullptr, can_create ? &allocate_object : nullptr, false, nullptr, 0, nullptr,
 						true /* LuaSharpEngine registers it */, can_create),
-		  module(module), script_type(script_type), engine_class(engine_class),
+		  module(&module), script_type(script_type), engine_class(engine_class),
 		  name(luasharp::NativeRuntime::TypeName(script_type)) {
 		classname = name.c_str();
 		make_props();
 	}
 
-	const luasharp::NativeModule& module;
-	const void* const script_type; // LS_TypeInfo
+	// A hot reload keeps this type for the same class of the new module. Its [Editable] fields must be the same.
+	void rebind(const luasharp::NativeModule& next, const void* next_type) {
+		ASSERT(luasharp::NativeRuntime::TypeName(next_type) == name);
+		module = &next;
+		script_type = next_type;
+	}
+
+	const luasharp::NativeModule* module;
+	const void* script_type; // LS_TypeInfo
 	const ClassTypeInfo& engine_class; // the nearest C++ class
 
 private:
@@ -106,7 +114,7 @@ private:
 		ASSERT(LuaSharpEngine::inst);
 		const auto& self = static_cast<const LuaSharpClassTypeInfo&>(*type);
 		try {
-			return LuaSharpEngine::inst->make(self.module, self.name, &self).release();
+			return LuaSharpEngine::inst->make(*self.module, self.name, &self).release();
 		} catch (const std::exception& error) {
 			sys_print(Error, "LuaSharp: cannot create %s: %s\n", self.classname, error.what());
 			return nullptr;
@@ -209,6 +217,25 @@ struct LsString
 	int64_t length;
 	char data[1];
 };
+
+std::string join_lines(const std::vector<std::string>& lines) {
+	std::string text;
+	for (const std::string& line : lines)
+		text += (text.empty() ? "" : "\n") + line;
+	return text;
+}
+
+// The PropertyInfos of a LuaSharpClassTypeInfo come from these, so a hot reload cannot change them.
+bool same_editable_fields(const void* type, const void* other) {
+	using luasharp::NativeEditableField;
+	using luasharp::NativeEnumMember;
+	const auto same_member = [](const NativeEnumMember& a, const NativeEnumMember& b) { return a.name == b.name && a.value == b.value; };
+	const auto same = [&](const NativeEditableField& a, const NativeEditableField& b) {
+		return a.name == b.name && a.offset == b.offset && a.kind == b.kind && a.typeName == b.typeName && a.editor == b.editor &&
+			   a.former == b.former && std::ranges::equal(a.enumMembers, b.enumMembers, same_member);
+	};
+	return std::ranges::equal(luasharp::NativeRuntime::EditableFields(type), luasharp::NativeRuntime::EditableFields(other), same);
+}
 } // namespace
 
 namespace lsbind {
@@ -511,23 +538,25 @@ const luasharp::NativeModule& LuaSharpEngine::load(const std::string& name, std:
 		throw std::runtime_error("LuaSharp module '" + name + "' is already loaded");
 	LoadedModule loaded;
 	loaded.module = std::make_unique<luasharp::NativeModule>(compile_module(files, debugger_ != nullptr));
+	if (const auto errors = check_classes(loaded, *loaded.module); !errors.empty())
+		throw std::runtime_error(join_lines(errors));
 	if (debugger_)
 		debugger_->AddModule(*loaded.module);
 	try {
 		loaded.module->Initialize();
-		register_classes(loaded); // throws before the module is kept
 	} catch (...) {
 		if (debugger_)
 			debugger_->RemoveModule(*loaded.module);
 		throw;
 	}
+	bind_classes(loaded, *loaded.module);
 	return *modules_.emplace(name, std::move(loaded)).first->second.module;
 }
 
-int LuaSharpEngine::load_script_files(const std::string& dir, std::span<const std::string_view> skip_dirs) {
+LuaSharpEngine::ScriptSources LuaSharpEngine::read_script_files(const std::string& dir, std::span<const std::string> skip_dirs) const {
 	auto skipped = [&](const std::string& path) {
-		for (std::string_view skip : skip_dirs)
-			if (path.find("/" + std::string(skip) + "/") != std::string::npos)
+		for (const std::string& skip : skip_dirs)
+			if (path.find("/" + skip + "/") != std::string::npos)
 				return true;
 		return path.find("/.luasharp/") != std::string::npos; // declarations for tools; compile() has them already
 	};
@@ -539,32 +568,109 @@ int LuaSharpEngine::load_script_files(const std::string& dir, std::span<const st
 			paths.push_back(std::move(path));
 	}
 	std::sort(paths.begin(), paths.end()); // top-level code runs in this order
-	std::vector<std::string> texts;
-	std::vector<luasharp::SourceFile> files;
+	ScriptSources sources;
 	for (const std::string& path : paths) {
 		auto file = FileSys::open_read_game(path);
 		if (!file) {
 			sys_print(Error, "LuaSharp: cannot read %s\n", path.c_str());
 			continue;
 		}
-		std::string& source = texts.emplace_back(file->size(), ' ');
+		std::string& source = sources.texts.emplace_back(file->size(), ' ');
 		file->read(source.data(), source.size());
 		// A client sets breakpoints by the path of the file.
-		files.push_back({debugger_ ? FileSys::get_full_path_from_game_path(path) : path, {}});
+		sources.files.push_back({debugger_ ? FileSys::get_full_path_from_game_path(path) : path, {}});
 	}
-	if (files.empty())
+	for (size_t i = 0; i < sources.files.size(); i++)
+		sources.files[i].text = sources.texts[i]; // texts no longer grows; moving the vector keeps its strings
+	return sources;
+}
+
+int LuaSharpEngine::load_script_files(const std::string& dir, std::span<const std::string_view> skip_dirs) {
+	auto& skips = script_folders_[dir];
+	skips.assign(skip_dirs.begin(), skip_dirs.end());
+	const ScriptSources sources = read_script_files(dir, skips);
+	if (sources.files.empty())
 		return 0;
-	for (size_t i = 0; i < files.size(); i++)
-		files[i].text = texts[i]; // texts no longer grows
 	try {
-		const auto& times = load(dir, files).Times();
+		const auto& times = load(dir, sources.files).Times();
 		sys_print(Debug, "LuaSharp: loaded %s (%d files; frontend %.1f ms, C %.1f ms, tcc %.1f ms)\n", dir.c_str(),
-				  int(files.size()), times.frontend, times.emitC, times.tcc);
-		return static_cast<int>(files.size());
+				  int(sources.files.size()), times.frontend, times.emitC, times.tcc);
+		return static_cast<int>(sources.files.size());
 	} catch (const std::exception& error) {
 		sys_print(Error, "LuaSharp: cannot load %s:\n%s\n", dir.c_str(), error.what());
 		return 0;
 	}
+}
+
+bool LuaSharpEngine::reload_script_files(const std::string& dir) {
+	const auto folder = script_folders_.find(dir);
+	ASSERT(folder != script_folders_.end()); // load_script_files names the folders
+	const auto found = modules_.find(dir);
+	if (found == modules_.end()) {
+		const std::vector<std::string_view> skips(folder->second.begin(), folder->second.end());
+		return load_script_files(dir, skips) > 0;
+	}
+	const ScriptSources sources = read_script_files(dir, folder->second);
+	if (sources.files.empty()) {
+		sys_print(Error, "LuaSharp: cannot reload %s: the folder has no .ls files\n", dir.c_str());
+		return false;
+	}
+	return reload(dir, sources.files);
+}
+
+bool LuaSharpEngine::reload(const std::string& name, std::span<const luasharp::SourceFile> files) {
+	ASSERT(!files.empty());
+	const auto found = modules_.find(name);
+	ASSERT(found != modules_.end());
+	LoadedModule& loaded = found->second;
+	auto report = [&](const std::string& errors) {
+		sys_print(Error, "LuaSharp: cannot reload %s; the scripts that run do not change:\n%s\n", name.c_str(), errors.c_str());
+		return false;
+	};
+	std::unique_ptr<luasharp::NativeModule> next;
+	try {
+		next = std::make_unique<luasharp::NativeModule>(compile_module(files, debugger_ != nullptr));
+	} catch (const std::exception& error) {
+		return report(error.what());
+	}
+	const luasharp::NativeReloadPlan plan = luasharp::PlanReload(*loaded.module, *next);
+	std::vector<std::string> errors = plan.errors;
+	for (std::string& error : check_classes(loaded, *next))
+		errors.push_back(std::move(error));
+	if (!errors.empty())
+		return report(join_lines(errors));
+	for (const std::string& warning : plan.warnings)
+		sys_print(Warning, "LuaSharp: %s\n", warning.c_str());
+
+	luasharp::NativeReloadResult result;
+	try {
+		result = luasharp::ApplyReload(*loaded.module, *next, plan);
+	} catch (const std::exception& error) {
+		loaded.retired.push_back(std::move(next)); // its static initializers can have made objects
+		return report(error.what());
+	}
+	if (debugger_) {
+		if (loaded.module->Debug()) // a module that loaded before start_debugger has no debug tables
+			debugger_->RemoveModule(*loaded.module);
+		debugger_->AddModule(*next);
+	}
+	bind_classes(loaded, *next);
+	loaded.retired.push_back(std::move(loaded.module));
+	loaded.module = std::move(next);
+	attach_slots();
+	const auto& times = loaded.module->Times();
+	sys_print(Info, "LuaSharp: reloaded %s (%d files; %d objects retyped, %d defaults updated; frontend %.1f ms, C %.1f ms, tcc %.1f ms)\n",
+			  name.c_str(), int(files.size()), int(result.retypedObjects), int(result.updatedDefaults), times.frontend,
+			  times.emitC, times.tcc);
+	return true;
+}
+
+void LuaSharpEngine::reload_if_requested() {
+	if (!reload_requested_)
+		return;
+	reload_requested_ = false;
+	for (const auto& [dir, skip_dirs] : script_folders_)
+		reload_script_files(dir);
 }
 
 const luasharp::NativeModule* LuaSharpEngine::find_module(const std::string& name) const {
@@ -572,20 +678,24 @@ const luasharp::NativeModule* LuaSharpEngine::find_module(const std::string& nam
 	return found != modules_.end() ? found->second.module.get() : nullptr;
 }
 
-void LuaSharpEngine::register_classes(LoadedModule& loaded) {
+LuaSharpClassTypeInfo* LuaSharpEngine::class_named(const LoadedModule& loaded, std::string_view name) {
+	for (const auto& type : loaded.classes)
+		if (type && type->classname == name)
+			return type.get();
+	return nullptr;
+}
+
+std::vector<std::string> LuaSharpEngine::check_classes(const LoadedModule& loaded, const luasharp::NativeModule& next) {
 	using luasharp::NativeRuntime;
-	const luasharp::NativeModule& module = *loaded.module;
-	auto find_loaded = [&](const void* script_type) -> const LuaSharpClassTypeInfo* {
-		for (const auto& type : loaded.classes)
-			if (type->script_type == script_type)
-				return type.get();
-		return nullptr;
-	};
-	for (const std::string& name : module.Generated().hostClasses) {
-		const void* script_type = module.HostClassType(name);
+	std::vector<std::string> errors;
+	for (const std::string& name : next.Generated().hostClasses) {
+		const void* script_type = next.HostClassType(name);
 		ASSERT(script_type);
-		if (ClassBase::find_class(name.c_str()))
-			throw std::runtime_error("LuaSharp class '" + name + "' has the name of a class that already exists");
+		const LuaSharpClassTypeInfo* existing = class_named(loaded, name);
+		if (!existing && ClassBase::find_class(name.c_str())) {
+			errors.push_back("LuaSharp class '" + name + "' has the name of a class that already exists");
+			continue;
+		}
 		const std::string base(NativeRuntime::NativeBaseTypeName(script_type));
 		const ClassTypeInfo* engine_class = ClassBase::find_class(base.c_str());
 		ASSERT(engine_class);
@@ -593,26 +703,76 @@ void LuaSharpEngine::register_classes(LoadedModule& loaded) {
 		if (!scriptable) {
 			// create() still makes these objects, but they have the type of the engine class.
 			if (!NativeRuntime::EditableFields(script_type).empty())
-				throw std::runtime_error("LuaSharp class '" + name + "' has [Editable] fields, but engine class '" + base +
-										 "' is not scriptable (CLASS_BODY(" + base + ", scriptable))");
+				errors.push_back("LuaSharp class '" + name + "' has [Editable] fields, but engine class '" + base +
+								 "' is not scriptable (CLASS_BODY(" + base + ", scriptable))");
 			continue;
 		}
-		static_cast<void>(slots_of(script_type, *scriptable)); // throws for overrides that ScriptImpl cannot call
-		const void* script_base = NativeRuntime::ScriptBaseType(script_type);
-		const ClassTypeInfo* super = script_base ? find_loaded(script_base) : engine_class;
-		ASSERT(super); // hostClasses lists base classes first
-		const bool can_create = module.FindSymbol("ls_" + name + "__host_alloc") != nullptr; // not abstract
-		loaded.classes.push_back(std::make_unique<LuaSharpClassTypeInfo>(module, script_type, *super, *engine_class, can_create));
+		if (existing && !same_editable_fields(existing->script_type, script_type)) {
+			errors.push_back("the [Editable] fields of LuaSharp class '" + name + "' changed; a restart applies this change");
+			continue;
+		}
+		try {
+			static_cast<void>(slots_of(script_type, *scriptable));
+		} catch (const std::exception& error) {
+			errors.push_back(error.what());
+		}
 	}
-	for (const auto& type : loaded.classes)
-		ClassBase::register_class(type.get());
+	return errors;
+}
+
+void LuaSharpEngine::bind_classes(LoadedModule& loaded, const luasharp::NativeModule& next) {
+	using luasharp::NativeRuntime;
+	std::vector<std::unique_ptr<LuaSharpClassTypeInfo>> classes;
+	std::vector<LuaSharpClassTypeInfo*> added;
+	auto bound = [&](const void* script_type) -> const LuaSharpClassTypeInfo* {
+		for (const auto& type : classes)
+			if (type->script_type == script_type)
+				return type.get();
+		return nullptr;
+	};
+	for (const std::string& name : next.Generated().hostClasses) {
+		const void* script_type = next.HostClassType(name);
+		const std::string base(NativeRuntime::NativeBaseTypeName(script_type));
+		const ClassTypeInfo* engine_class = ClassBase::find_class(base.c_str());
+		ASSERT(engine_class);
+		if (!scriptable_of(*engine_class))
+			continue; // check_classes: the objects have the type of the engine class
+		if (LuaSharpClassTypeInfo* existing = class_named(loaded, name)) {
+			ASSERT(&existing->engine_class == engine_class); // the layout, with the base, is the same (PlanReload)
+			existing->rebind(next, script_type);
+			const auto old = std::ranges::find(loaded.classes, existing, &std::unique_ptr<LuaSharpClassTypeInfo>::get);
+			classes.push_back(std::move(*old));
+			continue;
+		}
+		const void* script_base = NativeRuntime::ScriptBaseType(script_type);
+		const ClassTypeInfo* super = script_base ? bound(script_base) : engine_class;
+		ASSERT(super); // hostClasses lists base classes first
+		const bool can_create = next.FindSymbol("ls_" + name + "__host_alloc") != nullptr; // not abstract
+		added.push_back(classes.emplace_back(std::make_unique<LuaSharpClassTypeInfo>(next, script_type, *super, *engine_class, can_create)).get());
+	}
+	std::erase(loaded.classes, nullptr);
+	unregister_classes(loaded); // the classes that next removed
+	loaded.classes = std::move(classes);
+	for (LuaSharpClassTypeInfo* type : added)
+		ClassBase::register_class(type);
 	ClassBase::post_changes_class_init();
 	if (ScriptManager::inst) {
 		// Lua code can get these objects too (get_component and similar), so the classes need Lua prototypes.
-		for (const auto& type : loaded.classes)
-			ScriptManager::inst->init_this_class_type(type.get());
-		for (const auto& type : loaded.classes)
-			ScriptManager::inst->set_class_type_global(type.get());
+		for (LuaSharpClassTypeInfo* type : added)
+			ScriptManager::inst->init_this_class_type(type);
+		for (LuaSharpClassTypeInfo* type : added)
+			ScriptManager::inst->set_class_type_global(type);
+	}
+}
+
+void LuaSharpEngine::attach_slots() {
+	for (ClassBase* object : proxied_) {
+		const auto* type = dynamic_cast<const LuaSharpClassTypeInfo*>(&object->get_type());
+		if (!type)
+			continue; // a proxy of an engine object
+		const lsbind::Scriptable* scriptable = scriptable_of(type->engine_class);
+		ASSERT(scriptable);
+		scriptable->attach(object, slots_of(type->script_type, *scriptable));
 	}
 }
 

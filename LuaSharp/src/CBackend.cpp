@@ -757,7 +757,8 @@ struct CEmitter {
         case Kind::Missing: case Kind::Number: case Kind::String: case Kind::Boolean: case Kind::Null: return true;
         case Kind::Parenthesized: case Kind::Unary: case Kind::Binary: return constantFrom(0);
         case Kind::Member: return value.lowering == Lowering::NativeConstant || (value.lowering == Lowering::None && IsEnum(value.type) && types.Kind(Child(value, 0).type) == TypeKind::Meta);
-        case Kind::Call: return value.lowering == Lowering::Construct && IsNativeStruct(Name(value.type)) && constantFrom(1);
+        // Vec3(1, 2, 3) and Vec3.new(1, 2, 3)
+        case Kind::Call: return (value.lowering == Lowering::Construct || value.lowering == Lowering::NativeStatic) && IsNativeStruct(Name(value.type)) && constantFrom(1);
         default: return false;
         }
     }

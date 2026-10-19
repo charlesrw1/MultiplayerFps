@@ -24,6 +24,16 @@ Give several `.ls` files to compile them as one program: `luasharp run main.ls h
 - Each file ends its own declarations, so an unclosed brace gives an error in that file only.
 - Diagnostics have the file (`Diagnostic::file`) and a line in that file. `FormatErrors` gives `file(line,col): message`.
 
+## Hot reload
+
+A host can move a running program to new code without a restart (`NativeReload.h`, [native-abi.md](docs/native-abi.md#hot-reload)). The CsRemake editor does this when you save a `.ls` file.
+
+- The reload compiles the whole program again. Live objects then call the new methods.
+- The top-level code does not run again. Top-level variables and static fields keep their values.
+- When a value still equals the old constant of its initializer, it gets the new constant. This applies to top-level variables, static fields and instance fields. For example, `int hp = 10;` changed to `int hp = 20;` gives 20 to each object that still has 10. A value that the program changed, and a value whose initializer is not a constant, keep their value.
+- A reload is rejected when a class or struct changes its fields or its base, or removes a class that has live objects. The program that runs does not change. Restart to apply such a change.
+- Closures made before a reload still run the old code.
+
 The compiler supports the syntax in `example.ls`: classes and inheritance, enums with inferred or explicit integer values, expression-bodied and multiline brace-bodied lambdas, enforced public/private sections, typed fields, parameters and locals, constructors, methods, `auto`, `if`/`else if`/`else`, `while`, C-style `for`, value or zero-based index/value iteration over lists, key/value iteration over tables, inclusive integer ranges such as `1..10`, `break`, `continue`, `return`, `new`, `null`, arrays, indexing/slices, populated list literals, and Lua-style positional/keyed table values.
 
 ## Native backend

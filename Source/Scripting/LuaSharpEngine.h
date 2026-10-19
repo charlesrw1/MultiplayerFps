@@ -53,6 +53,17 @@ public:
 	// for tools (.luasharp/) and files in a subfolder named in skip_dirs. Errors are logged.
 	// Returns the number of files loaded: 0 when the module does not compile.
 	int load_script_files(const std::string& dir, std::span<const std::string_view> skip_dirs = {});
+	// Hot reload: compiles the folder of load_script_files again and moves the running module to the new code
+	// (LuaSharp/src/NativeReload.h). Loads the folder when it did not compile before. On errors it logs them, keeps
+	// the running module and returns false. Call it when no script function is on the stack.
+	bool reload_script_files(const std::string& dir);
+	// The same for a module that load() loaded, with the new files.
+	bool reload(const std::string& name, std::span<const luasharp::SourceFile> files);
+	// From the file watcher. reload_if_requested then reloads each folder of load_script_files.
+	void request_reload() { reload_requested_ = true; }
+	// Call when no script function is on the stack (once per frame).
+	void reload_if_requested();
+	// The module of `name`; it changes on each reload_script_files. Older modules stay loaded.
 	const luasharp::NativeModule* find_module(const std::string& name) const;
 	void* proxy_of(const ClassBase* object);
 	// An object of a script class that derives from an engine class X: a ScriptImpl_X whose virtual functions
@@ -81,16 +92,30 @@ private:
 	struct LoadedModule
 	{
 		std::unique_ptr<luasharp::NativeModule> module;
+		std::vector<std::unique_ptr<luasharp::NativeModule>> retired; // replaced by reloads; objects and closures use their code
 		std::vector<std::unique_ptr<LuaSharpClassTypeInfo>> classes; // base classes first
+	};
+	struct ScriptSources
+	{
+		std::vector<std::string> texts;
+		std::vector<luasharp::SourceFile> files; // views texts
 	};
 	friend class LuaSharpClassTypeInfo;
 
 	// Compiles without Initialize(). The debugger needs the module before its top-level code runs.
 	luasharp::NativeModule compile_module(std::span<const luasharp::SourceFile> files, bool debug);
+	ScriptSources read_script_files(const std::string& dir, std::span<const std::string> skip_dirs) const;
+	static LuaSharpClassTypeInfo* class_named(const LoadedModule& loaded, std::string_view name);
+	// Errors that stop bind_classes, for each class of `next` that derives from an engine class.
+	std::vector<std::string> check_classes(const LoadedModule& loaded, const luasharp::NativeModule& next);
+	// Gives the classes of `next` their ClassTypeInfos: a class that loaded has keeps its type, and the types of
+	// removed classes are unregistered. Needs check_classes without errors.
+	void bind_classes(LoadedModule& loaded, const luasharp::NativeModule& next);
+	// Each object of a script class calls the overrides of its current type.
+	void attach_slots();
 
 	std::unique_ptr<ClassBase> make(const luasharp::NativeModule& module, std::string_view script_class,
 									const LuaSharpClassTypeInfo* type);
-	void register_classes(LoadedModule& loaded);
 	void unregister_classes(LoadedModule& loaded);
 	const LuaSharpClassTypeInfo* find_type(const luasharp::NativeModule& module, std::string_view script_class) const;
 	const lsbind::Scriptable* scriptable_of(const ClassTypeInfo& engine_class) const;
@@ -112,5 +137,7 @@ private:
 	std::string declarations_;
 	std::unordered_set<ClassBase*> proxied_;
 	std::map<std::string, LoadedModule> modules_;
+	std::map<std::string, std::vector<std::string>> script_folders_; // load_script_files: dir -> skip_dirs
+	bool reload_requested_ = false;
 	size_t collect_threshold_ = 0;
 };

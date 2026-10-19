@@ -202,6 +202,11 @@ void GameEngineLocal::add_commands() {
 
 #endif
 	commands->add("dump_render_memory_usage", [](const Cmd_Args&) { dump_render_memory_usage(); });
+	// @cmd: hot reloads the LuaSharp scripts (.ls) at the next frame. The log shows the result.
+	commands->add("ls_reload", [](const Cmd_Args&) {
+		if (LuaSharpEngine::inst)
+			LuaSharpEngine::inst->request_reload(); // when no script runs
+	});
 	static int blah = 0;
 	commands->add("stress-test", [](const Cmd_Args&) {
 		int size = 20;

@@ -6,6 +6,7 @@
 #include "Scripting/LuaSharpDeclarations.h"
 #include "../../LuaSharp/src/CBackend.h"
 #include "Testheader.h"
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -408,6 +409,66 @@ TEST_F(LuaSharpEngineTest, LoadFilesReportsTheFileOfAnError) {
 		EXPECT_TRUE(std::string_view(error.what()).starts_with("scripts/b.ls(2,")) << error.what();
 	}
 	EXPECT_EQ(engine->find_module("scripts"), nullptr);
+}
+
+std::array<luasharp::SourceFile, 1> drone_file(std::string_view source) { return {luasharp::SourceFile{"scripts/drone.ls", source}}; }
+
+std::string drone_source(std::string_view power, std::string_view extra) {
+	return "class Drone : LsTestScriptable {\n"
+		   "	[Editable] int power = " + std::string(power) + ";\n"
+		   "	int boost = 10;\n"
+		   "	override int tick(int dt) { return " + std::string(extra) + "; }\n"
+		   "}\n";
+}
+
+// Hot reload: live objects keep their ClassTypeInfo and call the overrides of the new code.
+TEST_F(LuaSharpEngineTest, ReloadMovesObjectsToTheNewCode) {
+	const std::string v1 = drone_source("2", "power + boost + dt");
+	engine->load("drones", drone_file(v1));
+	const ClassTypeInfo* type = ClassBase::find_class("Drone");
+	ASSERT_NE(type, nullptr);
+	std::unique_ptr<LsTestScriptable> plain(ClassBase::create_class<LsTestScriptable>("Drone"));
+	std::unique_ptr<LsTestScriptable> tuned(ClassBase::create_class<LsTestScriptable>("Drone"));
+	ASSERT_TRUE(plain && tuned);
+	set<int64_t>(*type, *tuned, "power", 4);
+	EXPECT_EQ(plain->tick(1), 13);
+	EXPECT_EQ(plain->label_for("x"), "xnative");
+
+	const std::string v2 = drone_source("5", "(power + boost + dt) * 100; }\n	override string label_for(string prefix) { return prefix + \"drone\"") +
+						   "class Added : LsTestScriptable { override int tick(int dt) { return 7; } }\n";
+	ASSERT_TRUE(engine->reload("drones", drone_file(v2)));
+	EXPECT_EQ(ClassBase::find_class("Drone"), type);
+	EXPECT_EQ(&plain->get_type(), type);
+	EXPECT_EQ(plain->tick(1), 1600) << "the [Editable] field at its old default gets the new default";
+	EXPECT_EQ(tuned->tick(1), 1500) << "a changed [Editable] field keeps its value";
+	EXPECT_EQ(plain->label_for("x"), "xdrone") << "an override that the reload added";
+	EXPECT_EQ(get<int64_t>(*type, *tuned, "power"), 4);
+	std::unique_ptr<LsTestScriptable> added(ClassBase::create_class<LsTestScriptable>("Added"));
+	ASSERT_NE(added, nullptr);
+	EXPECT_EQ(added->tick(0), 7);
+	std::unique_ptr<LsTestScriptable> fresh(ClassBase::create_class<LsTestScriptable>("Drone"));
+	ASSERT_NE(fresh, nullptr);
+	EXPECT_EQ(fresh->tick(1), 1600) << "a new object uses the new module";
+	engine->collect();
+	EXPECT_EQ(plain->tick(1), 1600);
+}
+
+TEST_F(LuaSharpEngineTest, ReloadKeepsTheProgramOnErrors) {
+	const std::string v1 = drone_source("2", "power + dt");
+	engine->load("drones", drone_file(v1));
+	std::unique_ptr<LsTestScriptable> drone(ClassBase::create_class<LsTestScriptable>("Drone"));
+	ASSERT_NE(drone, nullptr);
+	const auto* module = engine->find_module("drones");
+	auto reload = [&](const std::string& source) {
+		return engine->reload("drones", drone_file(source));
+	};
+	EXPECT_FALSE(reload(drone_source("2", "power + \"text\"")));
+	EXPECT_FALSE(reload("class Drone : LsTestScriptable { [Editable] int power = 2; int boost = 10; int more = 1; override int tick(int dt) { return 0; } }"))
+		<< "an added field changes the layout";
+	EXPECT_FALSE(reload("class Drone : LsTestScriptable { int power = 2; int boost = 10; override int tick(int dt) { return 0; } }"))
+		<< "the [Editable] fields are PropertyInfos";
+	EXPECT_EQ(engine->find_module("drones"), module);
+	EXPECT_EQ(drone->tick(1), 3);
 }
 
 TEST_F(LuaSharpEngineTest, EditableFieldsArePropertyInfos) {

@@ -157,6 +157,7 @@ void AssetRegistrySystem::init() {
 #include "Render/MaterialPublic.h"
 #include "Render/Model.h"
 #include "Scripting/ScriptManager.h"
+#include "Scripting/LuaSharpEngine.h"
 #include "Game/Particles/ParticleAsset.h"
 #include "Render/PostProcessSettings.h"
 #include "Game/Prefab.h"
@@ -309,6 +310,10 @@ void AssetRegistrySystem::update() {
 		} else if (ext == "lua") {
 			ScriptManager::inst->reload_one_file(rel_path);
 			lua_changed = true;
+		} else if (ext == "ls") {
+			// .luasharp/ has the declarations that the editor writes for tools.
+			if (LuaSharpEngine::inst && rel_path.find(".luasharp/") == std::string::npos)
+				LuaSharpEngine::inst->request_reload();
 		} else if (ext == "particle") {
 			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
 				auto asset = g_assets.find<ParticleAsset>(rel_path);

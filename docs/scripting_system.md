@@ -71,11 +71,17 @@ VS Code attach via `actboy168.lua-debug` — see [[scripting/vscode_debugger]].
 - At startup the engine makes a `LuaSharpEngine` (`GameEngineLocal::luasharp`) when `tcc/libtcc.dll` is next to the executable.
 - It compiles all `.ls` files in `scripts/` and its subfolders as one module named `scripts`, except `scripts/tests/`, `scripts/lib/` and `scripts/.luasharp/`. In test mode the module also has `scripts/tests/`. Each file can use the classes of the other files. A compile error in one file stops the load of all files, and the log shows each error as `file(line,col): message`.
 - A file that does not compile is logged as an error, and the engine continues.
+- Hot reload (editor build): when a `.ls` file in `scripts/` changes, `AssetRegistrySystem::update` calls `LuaSharpEngine::request_reload`. At the next frame, `reload_if_requested` (beside `collect_if_needed`) compiles the folder again. The console command `ls_reload` (also from cscli) does the same in each build. The rules are in `LuaSharp/README.md` (Hot reload).
+  - Each `LuaSharpClassTypeInfo` stays the same object, so the editor, the level and serialization keep their pointers. The type points to the new module, and each live object gets the slot table of the new overrides (`attach_slots`).
+  - The reload is rejected, and the scripts that run do not change, when the code does not compile, a class changes its fields, its base or its `[Editable]` fields, or a removed class has live objects. The log shows the reasons.
+  - A successful reload logs `LuaSharp: reloaded scripts (N files; N objects retyped, N defaults updated; ...)`.
+  - When the module did not compile at startup, a reload loads it.
+  - Old modules stay loaded until the engine stops.
 - The engine compiles against the declarations in the binary. At startup the editor writes them to `scripts/.luasharp/engine.ls`, and writes `scripts/luasharp.json` if it is missing. The LSP and `LuaSharp.exe` read them from there. `App.exe --dump-luasharp-decls <scripts folder>` writes them without the editor.
 - Each frame, after `ScriptManager::update`, the engine calls `LuaSharpEngine::collect_if_needed`. It collects when the heap is two times its size after the last collection (minimum 4 MB).
 - `GameEngineLocal::cleanup` destroys the engine after the level and the application.
 - Class methods cannot use top-level variables. Use `static` fields. The host reads a static field as the global `Type.field`.
-- The integration tests are in `Source/IntegrationTests/Tests/Scripting/test_luasharp.cpp`.
+- The integration tests are in `Source/IntegrationTests/Tests/Scripting/test_luasharp.cpp` and `test_luasharp_reload.cpp`.
 
 ## `lua_table_id` and `lua_prototype_index_table`
 

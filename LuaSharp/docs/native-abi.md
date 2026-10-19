@@ -96,9 +96,11 @@ Interning is weak: identical live strings share one object, but the intern table
 
 ## Module state
 
-Top-level variables and static fields live in a generated `LS_ModuleState`, persist after `ls_module_init`, and are discoverable through generated address getters. A static field is the global `Type.field` (C getter `ls_global_static_Type__field`). Static fields initialize at the start of `ls_module_init`, in declaration order. Then `ls_module_init` calls `ls_module_init__N` for each file `N` that has top-level code, in file order. `NativeModule::FindGlobal` resolves those getters using compiler-generated metadata.
+Top-level variables and static fields live in a generated `LS_ModuleState`, persist after `ls_module_init`, and are discoverable through generated address getters. A static field is the global `Type.field` (C getter `ls_global_static_Type__field`). `ls_module_init` first calls `ls_module_init_statics`, which initializes the static fields in declaration order. Then it calls `ls_module_init__N` for each file `N` that has top-level code, in file order. `NativeModule::FindGlobal` resolves those getters using compiler-generated metadata.
 
-Module state remains inside the TinyCC module and therefore dies when that module is destroyed. Reload validates global types but does not migrate their values yet.
+For hot reload, each global `ls_global_X` also has `ls_global_X__size`. A top-level variable has `ls_global_X__reset`, which sets the default value of its type. An initializer that is a constant has a function `ls_wrap_bits ls_constant_...(void* out)`, which writes the value and returns its size. `NativeGlobal::constant` and `NativeFieldLayout::constant` name it. A constant is a literal, a negated number, an enum member, `null`, a math-struct constructor with constant arguments, or an operator on constants. A missing initializer is the default value, which is also a constant for numbers, bools, enums, strings, math structs and class references.
+
+Module state remains inside the TinyCC module and therefore dies when that module is destroyed. See Hot reload for how it moves to a new module.
 
 ## Native symbols
 
@@ -110,6 +112,7 @@ External object types are opaque. Generated code may pass their pointers to decl
 
 A class is a C `struct LS_Name` on the GC heap. Its first field is `const LS_TypeInfo* ls_type`. A derived class repeats the fields of its base first, in the same order, so a `LS_Derived*` is a valid `LS_Base*`.
 
+- `LS_TypeInfo.trace` is the trace function of the objects of a script class (`ls_trace_T`). Each class has its own, so the runtime finds the objects of a class in its heap by it (`NativeRuntime::ObjectsOf`).
 - `LS_TypeInfo.base` points to the type info of the base class, or is null. `ls_is_a` walks this chain. `is`, `as` and unboxing from `any` use it.
 - `LS_TypeInfo.vtable` holds one function pointer for each virtual slot. A `virtual` or `abstract` method adds a slot. An `override` uses the slot of the method it overrides. An abstract slot holds null; code cannot create an abstract class, so an object never has a null slot.
 - A call to a virtual method loads the function from `obj->ls_type->vtable[slot]`. The function type uses the class that declared the slot as `self`. A call through `base`, a call to a sealed method and a call on a value of a sealed class are direct calls.
@@ -319,11 +322,18 @@ Block closures can return values. `return` boxes the value into the result.
 
 Closure invoke pointers currently point into their TinyCC module. `ReloadableNativeProgram` retains old generations, so those pointers remain valid there. A later ABI will replace raw invoke pointers with stable function-slot IDs before retired code can be unloaded.
 
-## Reload direction
+## Hot reload
 
-Hot reload requires module manifests containing stable function IDs, signatures, type IDs, and layout hashes. Reload will compile and validate a new module before atomically replacing function slots. Old code cannot be unloaded until active calls drain, and incompatible persistent state requires an explicit migration or a rejected reload.
+`NativeReload.h` moves a running module to a replacement module on the same runtime. The host compiles the replacement without `Initialize`.
 
-The first reload layer is implemented by `ReloadableNativeProgram`. A `NativeFunctionSlot` has a stable identity and atomically changes its implementation address after validation. Reload currently:
+1. `PlanReload(current, next)` changes nothing. Its errors stop the reload: a class or struct with other fields (names, types or order) or another base, and a removed class that has live objects. A global that changed its type, and a new top-level variable whose initializer is not a constant, are warnings.
+2. `ApplyReload(current, next, plan)` runs `ls_module_init_statics` of `next`. The top-level code does not run again. Then it moves each top-level variable and static field by name when its type is the same. A value that equals the old constant of its initializer gets the new constant. Other values keep their value. A new top-level variable gets its constant, or the default value of its type. A new static field keeps the value of its initializer.
+3. `NativeRuntime::Retype` gives each object of an old class the type info and trace function of the new class. Then virtual calls, `is` and `as` use the new code. Lists get the new element type.
+4. For each object, an instance field with a changed constant gets the new constant when its value equals the old one.
+
+The old module must stay loaded. Closures that it made call its code, and they see its module state. Objects that such a closure makes have the old types.
+
+`ReloadableNativeProgram` is an older layer for hosts that call exports through function slots. A `NativeFunctionSlot` has a stable identity and atomically changes its implementation address after validation. Reload currently:
 
 - rejects removed exports and changed function signatures;
 - rejects removed classes and changed field layouts;
@@ -331,9 +341,7 @@ The first reload layer is implemented by `ReloadableNativeProgram`. A `NativeFun
 - permits new functions, classes, and globals;
 - retains old TinyCC modules so a call that loaded the previous address can finish safely.
 
-Module-global values are not migrated yet, and retired generations are intentionally retained until the reloadable program is destroyed. Host-owned state and active-call epochs will replace those temporary policies.
-
-Type infos and vtables live in each module. An object keeps the type info of the generation that created it, so its virtual calls use the code of that generation. [`design.md`](design.md) describes the planned change: one type info for each class, owned by the runtime and updated in place.
+`ReloadableNativeProgram` does not move global values or objects; use `ApplyReload` for that. Retired generations stay loaded until the reloadable program is destroyed.
 
 ## Debug hooks
 

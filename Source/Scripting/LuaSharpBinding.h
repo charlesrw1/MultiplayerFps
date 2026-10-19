@@ -113,11 +113,12 @@ struct Scriptable
 {
 	const char* name;
 	std::span<const char* const> slot_names;
-	void (*attach)(ClassBase* object, void* const* slots); // object was made by X's scriptable_allocate
+	// object was made by X's scriptable_allocate. A hot reload attaches the slots of the new module.
+	void (*attach)(ClassBase* object, void* const* slots);
 };
 template <typename Impl> void attach(ClassBase* object, void* const* slots) {
 	auto* impl = dynamic_cast<Impl*>(object);
-	ASSERT(impl && !impl->ls_slots);
+	ASSERT(impl && slots);
 	impl->ls_slots = slots;
 }
 

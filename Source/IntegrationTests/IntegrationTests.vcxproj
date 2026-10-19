@@ -121,6 +121,7 @@
     <ClCompile Include="Tests\Level\test_static_strip.cpp" />
     <ClCompile Include="Tests\Scripting\test_luasharp.cpp" />
     <ClCompile Include="Tests\Scripting\test_luasharp_debugger.cpp" />
+    <ClCompile Include="Tests\Scripting\test_luasharp_reload.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TestTask.h" />
