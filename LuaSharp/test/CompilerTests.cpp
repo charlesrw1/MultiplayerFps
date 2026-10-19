@@ -880,6 +880,116 @@ int parsedHex = int("0x10");
     RequireNativeError("int bad = int(\"abc\");", "string is not a number");
 }
 
+void TestNativeStringLibrary() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(
+string s = "  a,b,,c  ";
+string trimmed = s.trim();
+string trimStart = s.trim_start();
+string trimEnd = s.trim_end();
+string[] parts = trimmed.split(",");
+int partCount = parts.size();
+string secondEmpty = parts[2];
+string[] chars = "abc".split("");
+int charCount = chars.size();
+int found = "hello world".index_of("o");
+int foundFrom = "hello world".index_of("o", 5);
+int foundLast = "hello world".last_index_of("o");
+int missing = "hello".index_of("z");
+int occurrences = "aaaa".count("aa");
+string replaced = "one two one".replace("one", "1");
+string replacedLonger = "a-b".replace("-", "---");
+string unchanged = "abc".replace("", "x");
+string repeated = "ab".repeat(3);
+string zeroRepeat = "ab".repeat(0);
+string left = "7".pad_left(3, "0");
+string right = "7".pad_right(3);
+string cyclic = "x".pad_left(6, "ab");
+string noPad = "long".pad_left(2);
+string inserted = "held".insert(2, "llo wor");
+string letter = "hello".char_at(1);
+string lastLetter = "hello".char_at(-1);
+int code = "A".byte_at(0);
+bool blank = "".is_empty();
+int ordering = "apple".compare("banana");
+int sameOrder = "a".compare("a");
+bool ignoreCase = "HeLLo".equals_ignore_case("hello");
+string joined = parts.join("|");
+)");
+    Require(NativeText(module, "trimmed") == "a,b,,c" && NativeText(module, "trimStart") == "a,b,,c  " && NativeText(module, "trimEnd") == "  a,b,,c", "trim was wrong");
+    Require(NativeGlobal<long long>(module, "partCount") == 4 && NativeText(module, "secondEmpty").empty(), "split was wrong");
+    Require(NativeGlobal<long long>(module, "charCount") == 3, "split by an empty separator was wrong");
+    Require(NativeGlobal<long long>(module, "found") == 4 && NativeGlobal<long long>(module, "foundFrom") == 7 && NativeGlobal<long long>(module, "foundLast") == 7 && NativeGlobal<long long>(module, "missing") == -1, "index_of was wrong");
+    Require(NativeGlobal<long long>(module, "occurrences") == 2, "count was wrong");
+    Require(NativeText(module, "replaced") == "1 two 1" && NativeText(module, "replacedLonger") == "a---b" && NativeText(module, "unchanged") == "abc", "replace was wrong");
+    Require(NativeText(module, "repeated") == "ababab" && NativeText(module, "zeroRepeat").empty(), "repeat was wrong");
+    Require(NativeText(module, "left") == "007" && NativeText(module, "right") == "7  " && NativeText(module, "cyclic") == "ababax" && NativeText(module, "noPad") == "long", "padding was wrong");
+    Require(NativeText(module, "inserted") == "hello world", "insert was wrong");
+    Require(NativeText(module, "letter") == "e" && NativeText(module, "lastLetter") == "o" && NativeGlobal<long long>(module, "code") == 65, "char_at or byte_at was wrong");
+    Require(NativeGlobal<unsigned char>(module, "blank") == 1 && NativeGlobal<long long>(module, "ordering") == -1 && NativeGlobal<long long>(module, "sameOrder") == 0 && NativeGlobal<unsigned char>(module, "ignoreCase") == 1, "string comparison was wrong");
+    Require(NativeText(module, "joined") == "a|b||c", "join was wrong");
+    RequireNativeError("string bad = \"abc\".char_at(5);", "string index out of range");
+}
+
+void TestNativeListLibrary() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(
+class Item { int id; }
+int[] values = {5, 1, 4};
+values.insert(0, 9);
+values.insert(4, 7);
+values.insert(2, 3);
+int[] afterInsert = values.copy();
+values.remove_at(0);
+values.remove_at(-1);
+bool removed = values.remove(4);
+bool notRemoved = values.remove(100);
+int firstValue = values.first();
+int lastValue = values.last();
+int indexOfOne = values.index_of(1);
+bool hasThree = values.contains(3);
+bool hasEight = values.contains(8);
+values.extend(afterInsert);
+values.sort();
+int[] sorted = values.copy();
+sorted.reverse();
+int total = sorted.sum();
+int smallest = sorted.min();
+int largest = sorted.max();
+string text = values.join(", ");
+float[] floats = {2.5, 1.5, 3};
+floats.sort();
+float floatMin = floats.min();
+float floatSum = floats.sum();
+string[] names = {"pear", "apple", "fig"};
+names.sort();
+string sortedNames = names.join("/");
+bool hasFig = names.contains("fig");
+int figAt = names.index_of("fig");
+Item a = new Item();
+Item b = new Item();
+Item[] items = {a};
+items.insert(0, b);
+bool hasA = items.contains(a);
+int aIndex = items.index_of(a);
+Item firstItem = items.first();
+bool same = firstItem == b;
+bool[] flags = {true, false};
+string flagText = flags.join(",");
+)");
+    Require(NativeText(module, "text") == "1, 1, 3, 3, 4, 5, 5, 7, 9", "extend, sort, or join on ints was wrong: " + std::string(NativeText(module, "text")));
+    Require(NativeGlobal<unsigned char>(module, "removed") == 1 && NativeGlobal<unsigned char>(module, "notRemoved") == 0, "remove(value) was wrong");
+    Require(NativeGlobal<long long>(module, "firstValue") == 5 && NativeGlobal<long long>(module, "lastValue") == 1, "first, last, or remove_at was wrong");
+    Require(NativeGlobal<long long>(module, "indexOfOne") == 2 && NativeGlobal<unsigned char>(module, "hasThree") == 1 && NativeGlobal<unsigned char>(module, "hasEight") == 0, "index_of or contains was wrong");
+    Require(NativeGlobal<long long>(module, "total") == 38 && NativeGlobal<long long>(module, "smallest") == 1 && NativeGlobal<long long>(module, "largest") == 9, "reverse, sum, min, or max was wrong");
+    Require(NativeGlobal<double>(module, "floatMin") == 1.5 && NativeGlobal<double>(module, "floatSum") == 7.0, "float list sort, min, or sum was wrong");
+    Require(NativeText(module, "sortedNames") == "apple/fig/pear" && NativeGlobal<unsigned char>(module, "hasFig") == 1 && NativeGlobal<long long>(module, "figAt") == 1, "string list library was wrong");
+    Require(NativeGlobal<unsigned char>(module, "hasA") == 1 && NativeGlobal<long long>(module, "aIndex") == 1 && NativeGlobal<unsigned char>(module, "same") == 1, "object list library was wrong");
+    Require(NativeText(module, "flagText") == "true,false", "bool join was wrong");
+    RequireNativeError("int[] values = {}; int bad = values.min();", "min or max of an empty list");
+    RequireNativeError("int[] values = {1}; values.insert(5, 0);", "list index out of range");
+}
+
 void TestNativeLoops() {
     if (!luasharp::NativeModule::IsLibTccAvailable()) return;
     auto module = luasharp::NativeModule::Compile(R"(
@@ -3156,6 +3266,8 @@ int main() {
         {"libtcc errors do not crash host", TestLibTccErrorsDoNotCrashHost},
         {"native lists", TestNativeLists},
         {"native strings", TestNativeStrings},
+        {"native string library", TestNativeStringLibrary},
+        {"native list library", TestNativeListLibrary},
         {"native loops", TestNativeLoops},
         {"native dynamic tables", TestNativeDynamicTables},
         {"native closure captures", TestNativeClosureCaptures},

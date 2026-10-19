@@ -68,7 +68,7 @@ private:
 
 enum class Lowering : uint8_t {
     None, ImplicitField, ImplicitMethod, StaticCall, StaticField, Base, NativeMethod, NativeStatic, NativeConstant, Construct, Printf, Concat, CompoundConcat, ListIndex, ListSet,
-    ListPushBack, ListPopBack, ListSize, ListEmpty, ListClear,
+    ListPushBack, ListPopBack, ListSize, ListEmpty, ListClear, ListFirst, ListLast, ListElementArgument,
     StringLength, StringContains, StringStartsWith, StringEndsWith, StringSubstring, StringLower, StringUpper,
     CastIdentity, CastString, CastBoolNumber, CastBoolString, CastIntFloat, CastNumberBool, CastNumberString, CastDynamic
 };

@@ -38,6 +38,7 @@ struct RuntimeAbi {
     void* (*stringCase)(void*, void*, int){};
     void* (*toString)(void*, const NativeValue*){};
     void (*toNumber)(void*, void*, NativeValue*){};
+    void* (*stringCreate)(void*, const char*, std::int64_t){};
 };
 
 // Mirrors LS_TypeInfo / LS_FieldInfo in runtime.h.

@@ -3,7 +3,7 @@
 #ifndef LUASHARP_RUNTIME_H
 #define LUASHARP_RUNTIME_H
 
-#define LS_ABI_VERSION 14
+#define LS_ABI_VERSION 15
 
 typedef signed long long ls_int;          /* public LuaSharp int: signed 64-bit */
 typedef unsigned long long ls_wrap_bits;  /* internal arithmetic bits; never a LuaSharp value */
@@ -137,6 +137,7 @@ typedef struct LS_RuntimeApi {
     void* (*string_case)(void* context, void* value, int upper);
     void* (*to_string)(void* context, const LS_Value* value);
     void (*to_number)(void* context, void* value, LS_Value* out);
+    void* (*string_create)(void* context, const char* data, ls_int length);
 } LS_RuntimeApi;
 
 static LS_RuntimeApi* ls_runtime;
@@ -150,7 +151,7 @@ int ls_module_bind(LS_RuntimeApi* runtime) {
     if (!runtime->allocate || !runtime->mark || !runtime->intern || !runtime->report_error || !runtime->print) return -1;
     if (!runtime->table_create || !runtime->table_get || !runtime->table_set || !runtime->table_next) return -1;
     if (!runtime->list_create || !runtime->list_reserve || !runtime->list_slice) return -1;
-    if (!runtime->string_concat || !runtime->string_substring || !runtime->string_case || !runtime->to_string || !runtime->to_number) return -1;
+    if (!runtime->string_concat || !runtime->string_substring || !runtime->string_case || !runtime->to_string || !runtime->to_number || !runtime->string_create) return -1;
     ls_runtime = runtime;
     return 0;
 }
@@ -717,6 +718,351 @@ static void ls_list_clear(LS_List* list) {
 /* Elements [start, end); negative bounds count from the end. */
 static LS_List* ls_list_slice(LS_List* list, ls_int start, ls_int end) {
     return (LS_List*)ls_runtime->list_slice(ls_runtime->context, list, start, end);
+}
+
+/* ---- string library. Strings are byte strings; indexes and lengths count bytes. ----
+   A helper never runs the collector, so its scratch memory and raw pointers stay valid until it returns. */
+
+static ls_string ls_string_new(const char* data, ls_int length) {
+    return (ls_string)ls_runtime->string_create(ls_runtime->context, data, length);
+}
+
+static char* ls_scratch(ls_int size) {
+    return (char*)ls_runtime->allocate(ls_runtime->context, (ls_wrap_bits)(size > 0 ? size : 1), 0);
+}
+
+static ls_bool ls_string_is_empty(ls_string s) { return !s || s->length == 0; }
+
+/* First match at or after start, or -1. */
+static ls_int ls_string_index_of(ls_string s, ls_string part, ls_int start) {
+    ls_int i, j;
+    if (!s || !part) return -1;
+    if (start < 0) start = 0;
+    for (i = start; i + part->length <= s->length; ++i) {
+        for (j = 0; j < part->length && s->data[i + j] == part->data[j]; ++j) {}
+        if (j == part->length) return i;
+    }
+    return -1;
+}
+
+static ls_int ls_string_last_index_of(ls_string s, ls_string part) {
+    ls_int i, j;
+    if (!s || !part) return -1;
+    for (i = s->length - part->length; i >= 0; --i) {
+        for (j = 0; j < part->length && s->data[i + j] == part->data[j]; ++j) {}
+        if (j == part->length) return i;
+    }
+    return -1;
+}
+
+/* Non-overlapping matches. */
+static ls_int ls_string_count(ls_string s, ls_string part) {
+    ls_int count = 0, at = 0, found;
+    if (!s || !part || !part->length) return 0;
+    while ((found = ls_string_index_of(s, part, at)) >= 0) { ++count; at = found + part->length; }
+    return count;
+}
+
+static int ls_string_index_ok(ls_string s, ls_int* index) {
+    if (!s) { ls_report_error("attempt to index a null string"); return 0; }
+    if (*index < 0) *index += s->length;
+    if (*index < 0 || *index >= s->length) { ls_report_error("string index out of range"); return 0; }
+    return 1;
+}
+
+/* One-byte string; a negative index counts from the end. */
+static ls_string ls_string_char_at(ls_string s, ls_int index) {
+    return ls_string_index_ok(s, &index) ? ls_string_new(s->data + index, 1) : ls_string_new("", 0);
+}
+
+static ls_int ls_string_byte_at(ls_string s, ls_int index) {
+    return ls_string_index_ok(s, &index) ? (ls_int)(unsigned char)s->data[index] : 0;
+}
+
+static int ls_is_space(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'; }
+
+static ls_string ls_string_trim_sides(ls_string s, int start, int end) {
+    ls_int first = 0, last;
+    if (!s) return ls_string_new("", 0);
+    last = s->length;
+    if (start) while (first < last && ls_is_space(s->data[first])) ++first;
+    if (end) while (last > first && ls_is_space(s->data[last - 1])) --last;
+    if (first == 0 && last == s->length) return s;
+    return ls_string_new(s->data + first, last - first);
+}
+static ls_string ls_string_trim(ls_string s) { return ls_string_trim_sides(s, 1, 1); }
+static ls_string ls_string_trim_start(ls_string s) { return ls_string_trim_sides(s, 1, 0); }
+static ls_string ls_string_trim_end(ls_string s) { return ls_string_trim_sides(s, 0, 1); }
+
+/* An empty `from` replaces nothing. */
+static ls_string ls_string_replace(ls_string s, ls_string from, ls_string to) {
+    ls_int count = ls_string_count(s, from), at = 0, found, size;
+    char* out;
+    if (!count || !to) return s;
+    size = s->length + count * (to->length - from->length);
+    out = ls_scratch(size);
+    size = 0;
+    while ((found = ls_string_index_of(s, from, at)) >= 0) {
+        ls_int i;
+        for (i = at; i < found; ++i) out[size++] = s->data[i];
+        for (i = 0; i < to->length; ++i) out[size++] = to->data[i];
+        at = found + from->length;
+    }
+    while (at < s->length) out[size++] = s->data[at++];
+    return ls_string_new(out, size);
+}
+
+static ls_string ls_string_repeat(ls_string s, ls_int times) {
+    ls_int i, j, size = 0;
+    char* out;
+    if (!s || times <= 0 || !s->length) return ls_string_new("", 0);
+    out = ls_scratch(s->length * times);
+    for (i = 0; i < times; ++i) for (j = 0; j < s->length; ++j) out[size++] = s->data[j];
+    return ls_string_new(out, size);
+}
+
+/* Fill characters repeat in order. */
+static ls_string ls_string_pad(ls_string s, ls_int width, ls_string fill, int left) {
+    ls_int missing, i;
+    char* out;
+    if (!s) return ls_string_new("", 0);
+    missing = width - s->length;
+    if (missing <= 0 || !fill || !fill->length) return s;
+    out = ls_scratch(width);
+    for (i = 0; i < s->length; ++i) out[(left ? missing : 0) + i] = s->data[i];
+    for (i = 0; i < missing; ++i) out[(left ? 0 : s->length) + i] = fill->data[i % fill->length];
+    return ls_string_new(out, width);
+}
+static ls_string ls_string_pad_left(ls_string s, ls_int width, ls_string fill) { return ls_string_pad(s, width, fill, 1); }
+static ls_string ls_string_pad_right(ls_string s, ls_int width, ls_string fill) { return ls_string_pad(s, width, fill, 0); }
+
+/* Inserts before byte `index`; 0 and the length are valid. */
+static ls_string ls_string_insert(ls_string s, ls_int index, ls_string value) {
+    ls_int i, size = 0;
+    char* out;
+    if (!s || !value) { ls_report_error("attempt to insert into a null string"); return s; }
+    if (index < 0 || index > s->length) { ls_report_error("string index out of range"); return s; }
+    out = ls_scratch(s->length + value->length);
+    for (i = 0; i < index; ++i) out[size++] = s->data[i];
+    for (i = 0; i < value->length; ++i) out[size++] = value->data[i];
+    for (i = index; i < s->length; ++i) out[size++] = s->data[i];
+    return ls_string_new(out, size);
+}
+
+/* -1, 0 or 1 by byte order. */
+static ls_int ls_string_compare(ls_string a, ls_string b) {
+    ls_int i, la = a ? a->length : 0, lb = b ? b->length : 0;
+    for (i = 0; i < la && i < lb; ++i) {
+        unsigned char x = (unsigned char)a->data[i], y = (unsigned char)b->data[i];
+        if (x != y) return x < y ? -1 : 1;
+    }
+    return la == lb ? 0 : la < lb ? -1 : 1;
+}
+
+static char ls_ascii_lower(char c) { return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c; }
+
+static ls_bool ls_string_equals_ignore_case(ls_string a, ls_string b) {
+    ls_int i;
+    if (!a || !b) return a == b;
+    if (a->length != b->length) return 0;
+    for (i = 0; i < a->length; ++i) if (ls_ascii_lower(a->data[i]) != ls_ascii_lower(b->data[i])) return 0;
+    return 1;
+}
+
+/* ---- list library ---- */
+
+static int ls_list_valid(LS_List* list) {
+    if (!list) { ls_report_error("attempt to use a null list"); return 0; }
+    return 1;
+}
+
+/* Splits at each `separator`; an empty separator splits into single bytes. */
+static LS_List* ls_string_split(ls_string s, ls_string separator) {
+    LS_List* list = ls_list_create(sizeof(ls_string), LS_KIND_STRING, 0, 4);
+    ls_int at = 0, found, i;
+    if (!s || !separator) { ls_report_error("attempt to split a null string"); return list; }
+    if (!separator->length) {
+        for (i = 0; i < s->length; ++i) *(ls_string*)ls_list_push(list) = ls_string_new(s->data + i, 1);
+        return list;
+    }
+    while ((found = ls_string_index_of(s, separator, at)) >= 0) {
+        *(ls_string*)ls_list_push(list) = ls_string_new(s->data + at, found - at);
+        at = found + separator->length;
+    }
+    *(ls_string*)ls_list_push(list) = ls_string_new(s->data + at, s->length - at);
+    return list;
+}
+
+static int ls_element_compare(ls_wrap_bits kind, const char* a, const char* b) {
+    if (kind == LS_KIND_INT) { ls_int x = *(const ls_int*)a, y = *(const ls_int*)b; return x < y ? -1 : x > y; }
+    if (kind == LS_KIND_FLOAT) { ls_float x = *(const ls_float*)a, y = *(const ls_float*)b; return x < y ? -1 : x > y; }
+    return (int)ls_string_compare(*(const ls_string*)a, *(const ls_string*)b);
+}
+
+/* Equality by value for numbers and by identity for interned strings and references. */
+static int ls_element_equal(const LS_List* list, const char* a, const char* b) {
+    ls_wrap_bits i;
+    if (list->element_kind == LS_KIND_FLOAT) return *(const ls_float*)a == *(const ls_float*)b;
+    for (i = 0; i < list->element_size; ++i) if (a[i] != b[i]) return 0;
+    return 1;
+}
+
+static ls_int ls_list_index_of(LS_List* list, const void* value) {
+    ls_int i;
+    if (!ls_list_valid(list)) return -1;
+    for (i = 0; i < list->count; ++i) if (ls_element_equal(list, list->data + i * (ls_int)list->element_size, (const char*)value)) return i;
+    return -1;
+}
+
+static ls_bool ls_list_contains(LS_List* list, const void* value) { return ls_list_index_of(list, value) >= 0; }
+
+static void ls_list_erase(LS_List* list, ls_int index) {
+    char* at = list->data + index * (ls_int)list->element_size;
+    ls_copy_bytes(at, at + list->element_size, (list->count - index - 1) * (ls_int)list->element_size);
+    --list->count;
+}
+
+static void ls_list_remove_at(LS_List* list, ls_int index) {
+    if (!ls_list_valid(list)) return;
+    if (index < 0) index += list->count;
+    if (index < 0 || index >= list->count) { ls_report_error("list index out of range"); return; }
+    ls_list_erase(list, index);
+}
+
+static ls_bool ls_list_remove(LS_List* list, const void* value) {
+    ls_int index = ls_list_index_of(list, value);
+    if (index < 0) return 0;
+    ls_list_erase(list, index);
+    return 1;
+}
+
+/* Inserts before `index`; 0 and the size are valid. */
+static void ls_list_insert(LS_List* list, ls_int index, const void* value) {
+    ls_int size, b;
+    if (!ls_list_valid(list)) return;
+    if (index < 0 || index > list->count) { ls_report_error("list index out of range"); return; }
+    ls_list_push(list);
+    size = (ls_int)list->element_size;
+    for (b = (list->count - 1) * size - 1; b >= index * size; --b) list->data[b + size] = list->data[b];
+    ls_copy_bytes(list->data + index * size, (const char*)value, size);
+}
+
+static void ls_list_reverse(LS_List* list) {
+    ls_int i, j, b, size;
+    if (!ls_list_valid(list)) return;
+    size = (ls_int)list->element_size;
+    for (i = 0, j = list->count - 1; i < j; ++i, --j) {
+        for (b = 0; b < size; ++b) {
+            char tmp = list->data[i * size + b];
+            list->data[i * size + b] = list->data[j * size + b];
+            list->data[j * size + b] = tmp;
+        }
+    }
+}
+
+/* Appends a copy of `other`; a list can extend itself. */
+static void ls_list_extend(LS_List* list, LS_List* other) {
+    ls_int i, count;
+    if (!ls_list_valid(list) || !ls_list_valid(other)) return;
+    count = other->count;
+    for (i = 0; i < count; ++i) {
+        char* slot = ls_list_push(list);
+        ls_copy_bytes(slot, other->data + i * (ls_int)other->element_size, (ls_int)other->element_size);
+    }
+}
+
+static LS_List* ls_list_copy(LS_List* list) {
+    return ls_list_valid(list) ? ls_list_slice(list, 0, list->count) : 0;
+}
+
+static void ls_list_swap(LS_List* list, ls_int a, ls_int b) {
+    ls_int i, size = (ls_int)list->element_size;
+    for (i = 0; i < size; ++i) {
+        char tmp = list->data[a * size + i];
+        list->data[a * size + i] = list->data[b * size + i];
+        list->data[b * size + i] = tmp;
+    }
+}
+
+static void ls_list_sift_down(LS_List* list, ls_int root, ls_int end) {
+    ls_int size = (ls_int)list->element_size;
+    while (2 * root + 1 < end) {
+        ls_int child = 2 * root + 1;
+        if (child + 1 < end && ls_element_compare(list->element_kind, list->data + child * size, list->data + (child + 1) * size) < 0) ++child;
+        if (ls_element_compare(list->element_kind, list->data + root * size, list->data + child * size) >= 0) return;
+        ls_list_swap(list, root, child);
+        root = child;
+    }
+}
+
+/* Ascending heap sort of int, float or string elements; not stable, which equal primitives cannot show. */
+static void ls_list_sort(LS_List* list) {
+    ls_int i;
+    if (!ls_list_valid(list)) return;
+    for (i = list->count / 2 - 1; i >= 0; --i) ls_list_sift_down(list, i, list->count);
+    for (i = list->count - 1; i > 0; --i) { ls_list_swap(list, 0, i); ls_list_sift_down(list, 0, i); }
+}
+
+static ls_int ls_list_sum_int(LS_List* list) {
+    ls_int i; ls_wrap_bits total = 0;
+    if (!ls_list_valid(list)) return 0;
+    for (i = 0; i < list->count; ++i) total += (ls_wrap_bits)((ls_int*)list->data)[i];
+    return (ls_int)total;
+}
+
+static ls_float ls_list_sum_float(LS_List* list) {
+    ls_int i; ls_float total = 0;
+    if (!ls_list_valid(list)) return 0;
+    for (i = 0; i < list->count; ++i) total += ((ls_float*)list->data)[i];
+    return total;
+}
+
+static ls_int ls_list_extreme_int(LS_List* list, int want_max) {
+    ls_int i, best;
+    if (!ls_list_valid(list)) return 0;
+    if (!list->count) { ls_report_error("min or max of an empty list"); return 0; }
+    best = ((ls_int*)list->data)[0];
+    for (i = 1; i < list->count; ++i) { ls_int v = ((ls_int*)list->data)[i]; if (want_max ? v > best : v < best) best = v; }
+    return best;
+}
+static ls_int ls_list_min_int(LS_List* list) { return ls_list_extreme_int(list, 0); }
+static ls_int ls_list_max_int(LS_List* list) { return ls_list_extreme_int(list, 1); }
+
+static ls_float ls_list_extreme_float(LS_List* list, int want_max) {
+    ls_int i; ls_float best;
+    if (!ls_list_valid(list)) return 0;
+    if (!list->count) { ls_report_error("min or max of an empty list"); return 0; }
+    best = ((ls_float*)list->data)[0];
+    for (i = 1; i < list->count; ++i) { ls_float v = ((ls_float*)list->data)[i]; if (want_max ? v > best : v < best) best = v; }
+    return best;
+}
+static ls_float ls_list_min_float(LS_List* list) { return ls_list_extreme_float(list, 0); }
+static ls_float ls_list_max_float(LS_List* list) { return ls_list_extreme_float(list, 1); }
+
+/* Joins the elements with `separator`; numbers and bools print as `string(x)` does. */
+static ls_string ls_list_join(LS_List* list, ls_string separator) {
+    ls_int i, size = 0, k;
+    ls_string* parts;
+    char* out;
+    if (!ls_list_valid(list)) return ls_string_new("", 0);
+    if (!separator) separator = ls_string_new("", 0);
+    parts = (ls_string*)ls_scratch(list->count * (ls_int)sizeof(ls_string));
+    for (i = 0; i < list->count; ++i) {
+        char* slot = list->data + i * (ls_int)list->element_size;
+        if (list->element_kind == LS_KIND_STRING) parts[i] = *(ls_string*)slot;
+        else if (list->element_kind == LS_KIND_INT) parts[i] = ls_to_string(ls_box_int(*(ls_int*)slot));
+        else if (list->element_kind == LS_KIND_FLOAT) parts[i] = ls_to_string(ls_box_float(*(ls_float*)slot));
+        else parts[i] = ls_to_string(ls_box_bool(*(ls_bool*)slot));
+        size += parts[i] ? parts[i]->length : 0;
+    }
+    if (list->count > 1) size += (list->count - 1) * separator->length;
+    out = ls_scratch(size);
+    size = 0;
+    for (i = 0; i < list->count; ++i) {
+        if (i) for (k = 0; k < separator->length; ++k) out[size++] = separator->data[k];
+        if (parts[i]) for (k = 0; k < parts[i]->length; ++k) out[size++] = parts[i]->data[k];
+    }
+    return ls_string_new(out, size);
 }
 
 /* ---- dynamic access on `any`: tables, and class objects through their LS_TypeInfo ---- */

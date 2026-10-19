@@ -12,7 +12,7 @@
 namespace luasharp {
 
 // Must equal LS_ABI_VERSION in runtime/luasharp/runtime.h.
-constexpr unsigned long long NativeAbiVersion = 14;
+constexpr unsigned long long NativeAbiVersion = 15;
 
 using NativeTraceFunction =void (*)(void* runtimeContext, void* object);
 using NativeFinalizeFunction = void (*)(void* object);

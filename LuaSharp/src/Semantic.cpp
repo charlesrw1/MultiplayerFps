@@ -98,6 +98,9 @@ std::string_view LoweringName(Lowering lowering) {
     case Lowering::ListSize: return "list_size";
     case Lowering::ListEmpty: return "list_empty";
     case Lowering::ListClear: return "list_clear";
+    case Lowering::ListFirst: return "list_first";
+    case Lowering::ListLast: return "list_last";
+    case Lowering::ListElementArgument: return "list_element_argument";
     case Lowering::StringLength: return "string_length";
     case Lowering::StringContains: return "string_contains";
     case Lowering::StringStartsWith: return "string_starts_with";

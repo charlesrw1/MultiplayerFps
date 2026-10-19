@@ -1147,6 +1147,9 @@ struct CEmitter {
         case Lowering::ListSize: return Put("ls_list_size(", receiver, ')');
         case Lowering::ListEmpty: return Put("(ls_list_size(", receiver, ") == 0)");
         case Lowering::ListClear: return Put("ls_list_clear(", receiver, ')');
+        case Lowering::ListFirst: return Put("(*(", Type(value.type), "*)ls_list_at(", receiver, ", 0))");
+        case Lowering::ListLast: return Put("(*(", Type(value.type), "*)ls_list_at(", receiver, ", -1))");
+        case Lowering::ListElementArgument: return ListElementCall(value, Child(callee, 0), owner);
         default: break;
         }
         // Lua receiver:name(...) on a table or `any` value.
@@ -1207,6 +1210,24 @@ struct CEmitter {
         if (!value.symbolIndex) return nullptr;
         const auto& symbol = analysis.symbols[*value.symbolIndex];
         return symbol.kind == SymbolKind::Method && natives.contains(symbol.owner) ? &symbol : nullptr;
+    }
+    // A list member that takes an element: the native function gets the element by address and compares or copies its bytes.
+    void ListElementCall(const BoundExpression& value, const BoundExpression& list, std::string_view owner) {
+        assert(value.nativeMember);
+        const auto& member = *value.nativeMember;
+        const auto element = types.Element(list.type);
+        if (IsUserStruct(Name(element))) throw std::runtime_error("Native C backend cannot use '" + member.name + "' on a list of structs");
+        const auto label = nextLabel++;
+        const auto firstArgument = nextLabel;
+        nextLabel += member.parameters.size();
+        Put("({ LS_List* ", Temp("list", label), " = ", Emitted(list, owner), "; ");
+        for (size_t i{}; i < member.parameters.size(); ++i) {
+            const auto type = Find(member.parameters[i].type);
+            Put(Type(type), ' ', Temp("argument", firstArgument + i), " = ", Converted(type, Child(value, i + 1), owner), "; ");
+        }
+        Put(Id{member.cName}, '(', Temp("list", label));
+        for (size_t i{}; i < member.parameters.size(); ++i) Put(", ", member.parameters[i].name == "value" ? "&" : "", Temp("argument", firstArgument + i));
+        Put("); })");
     }
     // Native arguments from child `first`; omitted optional parameters use their default C expression.
     void NativeArguments(const BuiltinMember& member, const BoundExpression& value, size_t first, bool leadingComma, std::string_view owner) {

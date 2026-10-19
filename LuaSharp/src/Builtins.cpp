@@ -23,6 +23,23 @@ const std::vector<M> Members{
     {"string", "substring", "string", {{"int", "start"}, {"int", "length", true}}, SymbolKind::Method, false, Lowering::StringSubstring},
     {"string", "lower", "string", {}, SymbolKind::Method, false, Lowering::StringLower},
     {"string", "upper", "string", {}, SymbolKind::Method, false, Lowering::StringUpper},
+    {"string", "is_empty", "bool", {}, SymbolKind::Method, false, Lowering::None, "ls_string_is_empty"},
+    {"string", "index_of", "int", {{"string", "value"}, {"int", "start", true, "0"}}, SymbolKind::Method, false, Lowering::None, "ls_string_index_of"},
+    {"string", "last_index_of", "int", {{"string", "value"}}, SymbolKind::Method, false, Lowering::None, "ls_string_last_index_of"},
+    {"string", "count", "int", {{"string", "value"}}, SymbolKind::Method, false, Lowering::None, "ls_string_count"},
+    {"string", "char_at", "string", {{"int", "index"}}, SymbolKind::Method, false, Lowering::None, "ls_string_char_at"},
+    {"string", "byte_at", "int", {{"int", "index"}}, SymbolKind::Method, false, Lowering::None, "ls_string_byte_at"},
+    {"string", "trim", "string", {}, SymbolKind::Method, false, Lowering::None, "ls_string_trim"},
+    {"string", "trim_start", "string", {}, SymbolKind::Method, false, Lowering::None, "ls_string_trim_start"},
+    {"string", "trim_end", "string", {}, SymbolKind::Method, false, Lowering::None, "ls_string_trim_end"},
+    {"string", "replace", "string", {{"string", "from"}, {"string", "to"}}, SymbolKind::Method, false, Lowering::None, "ls_string_replace"},
+    {"string", "repeat", "string", {{"int", "times"}}, SymbolKind::Method, false, Lowering::None, "ls_string_repeat"},
+    {"string", "pad_left", "string", {{"int", "width"}, {"string", "fill", true, "ls_intern(\" \")"}}, SymbolKind::Method, false, Lowering::None, "ls_string_pad_left"},
+    {"string", "pad_right", "string", {{"int", "width"}, {"string", "fill", true, "ls_intern(\" \")"}}, SymbolKind::Method, false, Lowering::None, "ls_string_pad_right"},
+    {"string", "insert", "string", {{"int", "index"}, {"string", "value"}}, SymbolKind::Method, false, Lowering::None, "ls_string_insert"},
+    {"string", "split", "string[]", {{"string", "separator"}}, SymbolKind::Method, false, Lowering::None, "ls_string_split"},
+    {"string", "compare", "int", {{"string", "other"}}, SymbolKind::Method, false, Lowering::None, "ls_string_compare"},
+    {"string", "equals_ignore_case", "bool", {{"string", "other"}}, SymbolKind::Method, false, Lowering::None, "ls_string_equals_ignore_case"},
 
 
 #include "BuiltinMathMembers.inc"
@@ -62,13 +79,36 @@ const std::vector<BuiltinMember>& ListMembers(std::string_view type) {
     auto found = lists.find(type);
     if (found != lists.end()) return found->second;
     const auto element = ElementType(type);
-    return lists.emplace(std::string(type), std::vector<BuiltinMember>{
-        {std::string(type), "push_back", "void", {{element, "value"}}, SymbolKind::Method, false, Lowering::ListPushBack},
-        {std::string(type), "pop_back", element, {}, SymbolKind::Method, false, Lowering::ListPopBack},
-        {std::string(type), "size", "int", {}, SymbolKind::Method, false, Lowering::ListSize},
-        {std::string(type), "empty", "bool", {}, SymbolKind::Method, false, Lowering::ListEmpty},
-        {std::string(type), "clear", "void", {}, SymbolKind::Method, false, Lowering::ListClear},
-    }).first->second;
+    const std::string owner(type);
+    const auto native = [&](const char* name, std::string result, std::vector<BuiltinParameter> parameters, std::string cName, Lowering lowering = Lowering::None) {
+        return M{owner, name, std::move(result), std::move(parameters), SymbolKind::Method, false, lowering, std::move(cName)};
+    };
+    const bool numeric = element == "int" || element == "float";
+    const bool ordered = numeric || element == "string";
+    std::vector<M> members{
+        {owner, "push_back", "void", {{element, "value"}}, SymbolKind::Method, false, Lowering::ListPushBack},
+        {owner, "pop_back", element, {}, SymbolKind::Method, false, Lowering::ListPopBack},
+        {owner, "size", "int", {}, SymbolKind::Method, false, Lowering::ListSize},
+        {owner, "empty", "bool", {}, SymbolKind::Method, false, Lowering::ListEmpty},
+        {owner, "clear", "void", {}, SymbolKind::Method, false, Lowering::ListClear},
+        {owner, "first", element, {}, SymbolKind::Method, false, Lowering::ListFirst},
+        {owner, "last", element, {}, SymbolKind::Method, false, Lowering::ListLast},
+        native("insert", "void", {{"int", "index"}, {element, "value"}}, "ls_list_insert", Lowering::ListElementArgument),
+        native("remove_at", "void", {{"int", "index"}}, "ls_list_remove_at"),
+        native("reverse", "void", {}, "ls_list_reverse"),
+        native("extend", "void", {{owner, "other"}}, "ls_list_extend"),
+        native("copy", owner, {}, "ls_list_copy"),
+    };
+    // Equality compares number values and reference identity; native math structs are not comparable this way.
+    if (!IsNativeStruct(element)) {
+        members.push_back(native("index_of", "int", {{element, "value"}}, "ls_list_index_of", Lowering::ListElementArgument));
+        members.push_back(native("contains", "bool", {{element, "value"}}, "ls_list_contains", Lowering::ListElementArgument));
+        members.push_back(native("remove", "bool", {{element, "value"}}, "ls_list_remove", Lowering::ListElementArgument));
+    }
+    if (ordered) members.push_back(native("sort", "void", {}, "ls_list_sort"));
+    if (numeric) for (const char* name : {"sum", "min", "max"}) members.push_back(native(name, element, {}, std::string("ls_list_") + name + "_" + element));
+    if (ordered || element == "bool") members.push_back(native("join", "string", {{"string", "separator", true, "ls_intern(\"\")"}}, "ls_list_join"));
+    return lists.emplace(owner, std::move(members)).first->second;
 }
 } // namespace
 

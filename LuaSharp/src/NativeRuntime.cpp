@@ -411,6 +411,11 @@ void* AbiStringSubstring(void* context, void* value, std::int64_t start, std::in
     if (first > last) return runtime.Intern({});
     return runtime.Intern(text.substr(static_cast<size_t>(first - 1), static_cast<size_t>(last - first + 1)));
 }
+void* AbiStringCreate(void* context, const char* data, std::int64_t length) {
+    auto& runtime = *static_cast<NativeRuntime*>(context);
+    assert(length >= 0 && (data || length == 0));
+    return runtime.Intern(std::string_view(data, static_cast<size_t>(length)));
+}
 void* AbiStringCase(void* context, void* value, int upper) {
     auto& runtime = *static_cast<NativeRuntime*>(context);
     if (!value) { runtime.ReportError("attempt to change the case of a null string"); return runtime.Intern({}); }
@@ -483,7 +488,7 @@ void AbiToNumber(void* context, void* value, NativeValue* out) {
 
 NativeRuntime::NativeRuntime() : impl_(std::make_unique<Impl>()) {
     impl_->abi = {AbiVersion, this, AbiAllocate, AbiMark, AbiIntern, AbiTableCreate, AbiTableGet, AbiTableSet, AbiPrint, AbiReportError,
-        AbiTableNext, AbiListCreate, AbiListReserve, AbiListSlice, AbiStringConcat, AbiStringSubstring, AbiStringCase, AbiToString, AbiToNumber};
+        AbiTableNext, AbiListCreate, AbiListReserve, AbiListSlice, AbiStringConcat, AbiStringSubstring, AbiStringCase, AbiToString, AbiToNumber, AbiStringCreate};
 }
 
 NativeRuntime::~NativeRuntime() {

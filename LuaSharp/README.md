@@ -271,3 +271,11 @@ node LuaSharp/test/dap.integration.test.mjs
 ```
 
 The DAP test runs `LuaSharp run <file.ls> --debug` and debugs it as VS Code does. See `docs/native-abi.md` (Debug Adapter Protocol server).
+
+## String and list members
+
+Strings are byte strings: indexes and lengths count bytes, and `lower`/`upper` change ASCII only.
+
+- `string`: `length`, `size`, `is_empty`, `contains`, `starts_with`, `ends_with`, `index_of(value, start = 0)`, `last_index_of`, `count`, `char_at`, `byte_at`, `substring`, `trim`, `trim_start`, `trim_end`, `replace(from, to)`, `repeat`, `pad_left(width, fill = " ")`, `pad_right`, `insert(index, value)`, `split(separator)`, `compare`, `equals_ignore_case`, `lower`, `upper`.
+- `T[]`: `push_back`, `pop_back`, `size`, `empty`, `clear`, `first`, `last`, `insert(index, value)`, `remove_at`, `remove(value)`, `index_of`, `contains`, `reverse`, `extend`, `copy`. Lists of `int`, `float` and `string` also have `sort`. Lists of `int` and `float` also have `sum`, `min` and `max`. Lists of `int`, `float`, `bool` and `string` also have `join(separator = "")`.
+- `index_of`, `contains` and `remove` compare numbers by value and other elements by identity. They are not available on lists of native math structs, and the native backend rejects them on lists of user structs.

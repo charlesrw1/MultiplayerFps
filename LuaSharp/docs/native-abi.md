@@ -1,6 +1,6 @@
 # LuaSharp native ABI
 
-This document defines the native backend contract. The ABI version is currently `13`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
+This document defines the native backend contract. The ABI version is currently `15`. Generated modules expose `ls_module_abi_version`, reject incompatible runtime API tables in `ls_module_bind`, and are initialized through `ls_module_init`.
 
 ## Scalar semantics
 
