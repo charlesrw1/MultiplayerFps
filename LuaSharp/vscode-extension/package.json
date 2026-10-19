@@ -2,7 +2,7 @@
   "name": "luasharp",
   "publisher": "charl",
   "displayName": "LuaSharp",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "engines": { "vscode": "^1.95.0" },
   "categories": ["Programming Languages", "Debuggers"],

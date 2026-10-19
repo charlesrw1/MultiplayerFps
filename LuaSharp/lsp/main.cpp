@@ -505,7 +505,7 @@ json SemanticTokens(const std::string& uri, const std::string& text) {
     }
     const auto typeKind = [&](std::string_view name) {
         if (const auto found = typeKinds.find(name); found != typeKinds.end()) return found->second;
-        if (luasharp::IsNativeStruct(name)) return StructTokenKind;
+        if (luasharp::IsNativeStruct(name) || name == "Func" || name == "Action") return StructTokenKind;
         return luasharp::IsBuiltinStaticClass(name) ? ClassTokenKind : -1;
     };
     // Same rule as MemberAt: a name after '.' resolves on its receiver's type.
