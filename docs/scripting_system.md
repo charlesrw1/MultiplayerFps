@@ -76,6 +76,7 @@ VS Code attach via `actboy168.lua-debug` — see [[scripting/vscode_debugger]].
   - The reload is rejected, and the scripts that run do not change, when the code does not compile, a class changes its fields, its base or its `[Editable]` fields, or a removed class has live objects. The log shows the reasons.
   - A successful reload logs `LuaSharp: reloaded scripts (N files; N objects retyped, N defaults updated; ...)`.
   - When the module did not compile at startup, a reload loads it.
+  - After a successful reload, the main loop calls `AssetRegistrySystem::refresh_component_types`. New script components show in the asset browser, and removed ones go away.
   - Old modules stay loaded until the engine stops.
 - The engine compiles against the declarations in the binary. At startup the editor writes them to `scripts/.luasharp/engine.ls`, and writes `scripts/luasharp.json` if it is missing. The LSP and `LuaSharp.exe` read them from there. `App.exe --dump-luasharp-decls <scripts folder>` writes them without the editor.
 - Each frame, after `ScriptManager::update`, the engine calls `LuaSharpEngine::collect_if_needed`. It collects when the heap is two times its size after the last collection (minimum 4 MB).

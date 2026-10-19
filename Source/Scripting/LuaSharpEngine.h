@@ -61,8 +61,9 @@ public:
 	bool reload(const std::string& name, std::span<const luasharp::SourceFile> files);
 	// From the file watcher. reload_if_requested then reloads each folder of load_script_files.
 	void request_reload() { reload_requested_ = true; }
-	// Call when no script function is on the stack (once per frame).
-	void reload_if_requested();
+	// Call when no script function is on the stack (once per frame). True when a folder reloaded, so the classes can
+	// have changed.
+	bool reload_if_requested();
 	// The module of `name`; it changes on each reload_script_files. Older modules stay loaded.
 	const luasharp::NativeModule* find_module(const std::string& name) const;
 	void* proxy_of(const ClassBase* object);

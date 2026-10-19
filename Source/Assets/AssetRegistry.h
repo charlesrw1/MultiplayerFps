@@ -47,6 +47,8 @@ public:
 	void init();
 
 	void update();
+	// Rebuilds the component entries from the registered classes, e.g. after a script reload.
+	void refresh_component_types();
 
 	void register_asset_type(AssetMetadata* metadata) {
 		metadata->self_index = all_assettypes.size();
@@ -78,6 +80,8 @@ private:
 	uptr<ConsoleCmdGroup> consoleCommands;
 	void reindex_all_assets();
 	void rebuild_linear_list_();
+	void replace_component_types_();
+	void commit_tree_();
 	std::unique_ptr<AssetFilesystemNode> root;
 	std::vector<AssetFilesystemNode*> linear_list;
 	std::vector<std::unique_ptr<AssetMetadata>> all_assettypes;

@@ -12,6 +12,9 @@
 #include "Framework/Files.h"
 #include "Framework/ReflectionProp.h"
 #include "Scripting/LuaSharpEngine.h"
+#ifdef EDITOR_BUILD
+#include "Assets/AssetRegistryLocal.h"
+#endif
 #include <string>
 
 #ifdef EDITOR_BUILD
@@ -48,6 +51,16 @@ int64_t ticks_of(ClassBase* object) {
 	return 0;
 }
 
+bool browser_lists_component(std::string_view classname) {
+	auto& registry = AssetRegistrySystem::get();
+	const AssetMetadata* component_type = registry.find_type("Component-Entity");
+	ASSERT(component_type);
+	for (const AssetFilesystemNode* node : registry.get_linear_list())
+		if (node->asset.type == component_type && node->asset.filename == classname)
+			return true;
+	return false;
+}
+
 } // namespace
 
 // Writes the file, then waits until the engine has a new module (the watcher debounces for 300 ms).
@@ -75,6 +88,7 @@ static TestTask test_luasharp_reload_on_save(TestContext& t) {
 	CO_AWAIT_RELOAD(t, write_game_file(kPath, probe_source(1)), "a new file");
 	const ClassTypeInfo* type = ClassBase::find_class("LsReloadProbe");
 	t.require(type != nullptr, "the reload registered the class of the new file");
+	t.check(browser_lists_component("LsReloadProbe"), "the asset browser shows the new component");
 
 	Entity* e = eng->get_level()->spawn_entity();
 	Component* probe = e->create_component(type);
@@ -96,6 +110,7 @@ static TestTask test_luasharp_reload_on_save(TestContext& t) {
 	LuaSharpEngine::inst->collect();
 	CO_AWAIT_RELOAD(t, FileSys::delete_game_file(kPath), "the file was deleted");
 	t.check(ClassBase::find_class("LsReloadProbe") == nullptr, "the reload removed the class of the deleted file");
+	t.check(!browser_lists_component("LsReloadProbe"), "the asset browser no longer shows the removed component");
 }
 GAME_TEST("luasharp/reload_on_save", 30.f, test_luasharp_reload_on_save);
 #endif

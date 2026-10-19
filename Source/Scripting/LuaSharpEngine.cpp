@@ -665,12 +665,14 @@ bool LuaSharpEngine::reload(const std::string& name, std::span<const luasharp::S
 	return true;
 }
 
-void LuaSharpEngine::reload_if_requested() {
+bool LuaSharpEngine::reload_if_requested() {
 	if (!reload_requested_)
-		return;
+		return false;
 	reload_requested_ = false;
+	bool reloaded = false;
 	for (const auto& [dir, skip_dirs] : script_folders_)
-		reload_script_files(dir);
+		reloaded |= reload_script_files(dir);
+	return reloaded;
 }
 
 const luasharp::NativeModule* LuaSharpEngine::find_module(const std::string& name) const {

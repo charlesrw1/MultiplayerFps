@@ -437,25 +437,42 @@ void AssetRegistrySystem::update() {
 	}
 
 	if (lua_changed) {
+		replace_component_types_();
 		tree_dirty = true;
-		auto* ctype = find_type("Component-Entity");
-		ASSERT(ctype);
-		std::vector<std::string> extras;
-		ctype->fill_extra_assets(extras);
-		auto add = [&](AssetOnDisk aod) { root->add_path(aod, split(aod.filename, '/')); };
-		for (auto& e : extras) {
-			AssetOnDisk aod;
-			aod.filename = std::move(e);
-			aod.type = (AssetMetadata*)ctype;
-			add(std::move(aod));
-		}
 	}
 
-	if (tree_dirty) {
-		root->sort_R();
-		root->set_parent_R();
-		rebuild_linear_list_();
+	if (tree_dirty)
+		commit_tree_();
+}
+
+void AssetRegistrySystem::refresh_component_types() {
+	if (!root)
+		return; // init has not indexed the assets
+	replace_component_types_();
+	commit_tree_();
+}
+
+void AssetRegistrySystem::replace_component_types_() {
+	auto* ctype = (AssetMetadata*)find_type("Component-Entity");
+	ASSERT(ctype);
+	// Component types are root entries named by their class; remove them so that removed classes go away.
+	std::erase_if(root->children, [&](const auto& child) {
+		return !child.second.is_folder() && child.second.asset.type == ctype;
+	});
+	std::vector<std::string> extras;
+	ctype->fill_extra_assets(extras);
+	for (auto& e : extras) {
+		AssetOnDisk aod;
+		aod.filename = std::move(e);
+		aod.type = ctype;
+		root->add_path(aod, split(aod.filename, '/'));
 	}
+}
+
+void AssetRegistrySystem::commit_tree_() {
+	root->sort_R();
+	root->set_parent_R();
+	rebuild_linear_list_();
 }
 
 void AssetRegistrySystem::reindex_all_assets() {
@@ -589,9 +606,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 		}
 	}
 
-	root->sort_R();
-	root->set_parent_R();
-	rebuild_linear_list_();
+	commit_tree_();
 
 	sys_print(Debug, "AssetRegistry: reindexed %zu assets in %.1f ms\n", linear_list.size(), (GetTime() - t0) * 1000.0);
 }

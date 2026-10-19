@@ -473,7 +473,11 @@ void GameEngineLocal::loop() {
 #endif
 		ScriptManager::inst->update();
 		if (luasharp) {
-			luasharp->reload_if_requested();
+			if (luasharp->reload_if_requested()) {
+#ifdef EDITOR_BUILD
+				AssetRegistrySystem::get().refresh_component_types(); // new script components show in the browser
+#endif
+			}
 			luasharp->collect_if_needed();
 		}
 		idraw->pre_sync_update();
