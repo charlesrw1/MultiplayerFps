@@ -65,6 +65,7 @@ public:
 	int get_prototype_index_table() const;
 	static void set_typenum_R(TypeInfoWithExtra* node);
 	bool get_is_lua_class() const { return is_lua_implemented; }
+	bool get_is_luasharp_class() const { return is_luasharp_implemented; }
 
 	static constexpr int MAX_INTERFACES = 4;
 	struct InterfaceEntry {
@@ -82,6 +83,7 @@ protected:
 	friend struct ClassTypeIterator;
 	friend class ScriptManager;
 	bool is_lua_implemented = false;
+	bool is_luasharp_implemented = false;
 	int32_t id = 0;
 	int32_t last_child = 0;
 	CreateObjectFunc allocate = nullptr;

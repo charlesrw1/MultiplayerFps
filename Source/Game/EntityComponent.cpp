@@ -127,11 +127,16 @@ void Component::ensure_lua_shadow() {
 	ScriptManager::ensure_shadow_for(this);
 }
 
+static constexpr std::string_view LUASHARP_COMPONENT_BILLBOARD = "eng/editor/luasharp_component.png";
+
 void Component::activate_internal_step2() {
 	ASSERT(init_state == initialization_state::HAS_ID);
 	ASSERT(entity_owner);
-	if (eng->is_editor_level())
+	if (eng->is_editor_level()) {
+		if (get_type().get_is_luasharp_class())
+			editor_set_billboard(LUASHARP_COMPONENT_BILLBOARD);
 		editor_start();
+	}
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		// Only bake shadow values into the raw Lua table outside the editor: it's a one-time
 		// lua_rawset (see sync_shadow_to_lua_table) that permanently defeats __index/__newindex

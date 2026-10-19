@@ -10,6 +10,7 @@
 #include "Level.h"
 #include "Game/Entity.h"
 #include "Game/EntityComponent.h"
+#include "Game/Components/BillboardComponent.h"
 #include "Framework/ClassBase.h"
 #include "Framework/ReflectionProp.h"
 #include "Framework/Files.h"
@@ -203,6 +204,7 @@ static TestTask test_luasharp_editor_save_reload(TestContext& t) {
 	Component* comp = doc->attach_component(type, e);
 	t.require(comp != nullptr, "attached the script component in the editor");
 	t.check(module_int("Counters.editor_starts") == editor_starts0 + 1, "editor_start() override ran");
+	t.check(e->get_component<BillboardComponent>() != nullptr, "script component got an editor billboard");
 
 	set_field(comp, "speed", 0.25);
 	set_field(comp, "boost", int64_t(42));

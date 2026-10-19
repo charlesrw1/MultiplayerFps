@@ -95,6 +95,7 @@ public:
 		  module(&module), script_type(script_type), engine_class(engine_class),
 		  name(luasharp::NativeRuntime::TypeName(script_type)) {
 		classname = name.c_str();
+		is_luasharp_implemented = true;
 		make_props();
 	}
 
