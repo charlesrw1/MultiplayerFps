@@ -29,7 +29,7 @@ using TypeId = uint32_t;
 enum class TypeKind : uint8_t { Unknown, Void, Null, Any, Table, Int, Float, Bool, String, Range, Named, List, Function, Meta, Builtin };
 
 // Interns every type the analyzer sees. Name() returns the canonical spelling:
-// "int", "Item[]", "$function:<arity>:<result>", "$type:<name>", "$builtin:<name>", "" for unknown.
+// "int", "Item[]", "Func<int,bool>" (parameters then result), "$type:<name>", "$builtin:<name>", "" for unknown.
 class TypeTable {
 public:
     static constexpr TypeId Unknown = 0, Void = 1, Null = 2, Any = 3, Table = 4, Int = 5, Float = 6, Bool = 7, String = 8, Range = 9;
@@ -38,7 +38,8 @@ public:
     TypeId Intern(std::string_view spelling);
     [[nodiscard]] std::optional<TypeId> Find(std::string_view spelling) const;
     TypeId List(TypeId element);
-    TypeId Function(size_t arity, TypeId result);
+    // `Action<A>` interns as `Func<A,void>`.
+    TypeId Function(std::span<const TypeId> parameters, TypeId result);
     TypeId Meta(std::string_view name);
     TypeId Builtin(std::string_view name);
 
@@ -49,17 +50,19 @@ public:
     [[nodiscard]] bool IsFunction(TypeId id) const { return Kind(id) == TypeKind::Function; }
     // List element or function result.
     [[nodiscard]] TypeId Element(TypeId id) const { assert(IsList(id) || IsFunction(id)); return At(id).element; }
-    [[nodiscard]] size_t Arity(TypeId id) const { assert(IsFunction(id)); return At(id).arity; }
+    [[nodiscard]] size_t Arity(TypeId id) const { assert(IsFunction(id)); return At(id).parameters.size(); }
+    [[nodiscard]] std::span<const TypeId> Parameters(TypeId id) const { assert(IsFunction(id)); return At(id).parameters; }
     // The named type behind a list ("Item[][]" -> "Item"); other types map to themselves.
     [[nodiscard]] TypeId Base(TypeId id) const { while (IsList(id)) id = Element(id); return id; }
     // Bare name of a Meta or Builtin type.
     [[nodiscard]] std::string_view Target(TypeId id) const;
 
 private:
-    struct Entry { TypeKind kind{}; std::string name; TypeId element{}; uint32_t arity{}; };
+    struct Entry { TypeKind kind{}; std::string name; TypeId element{}; uint32_t arity{}; std::vector<TypeId> parameters; };
     const Entry& At(TypeId id) const { assert(id < entries_.size()); return entries_[id]; }
     TypeId Add(TypeKind kind, std::string name, TypeId element = {}, uint32_t arity = {});
     TypeId Composite(TypeKind kind, TypeId element, uint32_t arity, std::string name);
+    TypeId InternFunction(std::string_view arguments, bool action);
 
     std::vector<Entry> entries_;
     StringMap<TypeId> byName_;

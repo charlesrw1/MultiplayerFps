@@ -40,22 +40,40 @@ TypeId TypeTable::Intern(std::string_view spelling) {
     if (spelling.ends_with("[]")) return List(Intern(spelling.substr(0, spelling.size() - 2)));
     if (spelling.starts_with("$type:")) return Meta(spelling.substr(6));
     if (spelling.starts_with("$builtin:")) return Builtin(spelling.substr(9));
-    if (spelling.starts_with("$function:")) {
-        const auto separator = spelling.find(':', 10);
-        size_t arity{};
-        for (const char digit : spelling.substr(10, separator - 10)) arity = arity * 10 + static_cast<size_t>(digit - '0');
-        return Function(arity, separator == std::string_view::npos ? Any : Intern(spelling.substr(separator + 1)));
-    }
+    if (spelling.starts_with("Func<") && spelling.ends_with('>')) return InternFunction(spelling.substr(5, spelling.size() - 6), false);
+    if (spelling.starts_with("Action<") && spelling.ends_with('>')) return InternFunction(spelling.substr(7, spelling.size() - 8), true);
     return Add(TypeKind::Named, std::string(spelling));
+}
+
+// `arguments` is the text between the outer angle brackets: parameter types, then the result unless `action`.
+TypeId TypeTable::InternFunction(std::string_view arguments, bool action) {
+    std::vector<TypeId> types;
+    size_t depth{}, start{};
+    for (size_t at{}; at <= arguments.size(); ++at) {
+        if (at < arguments.size()) {
+            if (arguments[at] == '<') ++depth;
+            else if (arguments[at] == '>') --depth;
+        }
+        if (at == arguments.size() || (arguments[at] == ',' && depth == 0)) { types.push_back(Intern(arguments.substr(start, at - start))); start = at + 1; }
+    }
+    const auto result = action ? Void : types.back();
+    if (!action) types.pop_back();
+    return Function(types, result);
 }
 
 TypeId TypeTable::List(TypeId element) {
     return Composite(TypeKind::List, element, 0, Name(element) + "[]");
 }
 
-TypeId TypeTable::Function(size_t arity, TypeId result) {
-    assert(arity <= std::numeric_limits<uint16_t>::max());
-    return Composite(TypeKind::Function, result, static_cast<uint32_t>(arity), "$function:" + std::to_string(arity) + ":" + Name(result));
+TypeId TypeTable::Function(std::span<const TypeId> parameters, TypeId result) {
+    assert(parameters.size() <= std::numeric_limits<uint16_t>::max());
+    std::string name = "Func<";
+    for (const auto parameter : parameters) name += Name(parameter) + ',';
+    name += Name(result) + '>';
+    if (const auto found = byName_.find(name); found != byName_.end()) return found->second;
+    const auto id = Add(TypeKind::Function, std::move(name), result, static_cast<uint32_t>(parameters.size()));
+    entries_[id].parameters.assign(parameters.begin(), parameters.end());
+    return id;
 }
 
 TypeId TypeTable::Meta(std::string_view name) {
@@ -144,6 +162,7 @@ public:
         result_.bound.statements.reserve(result_.syntax.tokens.size() / 2);
         result_.bound.expressions.emplace_back(); // shared missing expression
         for (const auto& type : BuiltinTypes()) knownTypes_.insert(type);
+        knownTypes_.insert("any");
         for (const auto& type : NativeStructTypes()) structTypes_.insert(type);
         RegisterBuiltinType("string"); RegisterBuiltinType("math");
         for (const auto& type : NativeStructTypes()) RegisterBuiltinType(type);
@@ -210,7 +229,11 @@ private:
     }
     void CheckType(TypeId type, TextSpan span) {
         const auto base = types_.Base(type);
-        if (const auto arguments = Name(base).find('<'); arguments != std::string::npos) AddDiagnostic("Type '" + Name(base).substr(0, arguments) + "' does not take type arguments", span);
+        if (types_.IsFunction(base)) {
+            const std::vector<TypeId> components = [&] { auto all = std::vector<TypeId>(types_.Parameters(base).begin(), types_.Parameters(base).end()); all.push_back(types_.Element(base)); return all; }();
+            for (const auto component : components) CheckType(component, span);
+        }
+        else if (const auto arguments = Name(base).find('<'); arguments != std::string::npos) AddDiagnostic("Type '" + Name(base).substr(0, arguments) + "' does not take type arguments", span);
         else if (base != TypeTable::Unknown && base != TypeTable::Void && !knownTypes_.contains(Name(base))) AddDiagnostic("Unknown type '" + Name(base) + "'", span);
         if (types_.IsList(type)) RegisterBuiltinType(Name(type));
     }
@@ -741,30 +764,71 @@ private:
         else if (structTypes_.contains(expression.text)) lowering = Lowering::Construct;
         CoerceArguments(chosen, arguments, count);
     }
-    // Calls to methods, static functions, struct constructors (`Vec3(1, 2, 3)`) and native members. Sets the call's type, symbol and lowering.
-    void ResolveCall(const SyntaxExpression& call, const SyntaxExpression& callee, NodeId calleeSlot, NodeId arguments, size_t argumentCount, const SyntaxClass* owner, TypeId& type, std::optional<size_t>& symbol, Lowering& lowering, const BuiltinMember*& nativeMember) {
-        using Kind = SyntaxExpression::Kind;
+    // A callee of function type is a value to call, unless a name or member access resolved to a method (whose type is its return type).
+    bool CallsFunctionValue(const SyntaxExpression& callee, NodeId calleeSlot, TypeId calleeType) {
+        if (!types_.IsFunction(calleeType)) return false;
+        const auto symbol = Node(calleeSlot).symbolIndex;
+        const bool named = callee.kind == SyntaxExpression::Kind::Identifier || callee.kind == SyntaxExpression::Kind::Member;
+        return !named || !symbol || result_.symbols[*symbol].kind != SymbolKind::Method;
+    }
+    // The overloads a call can reach. `report` is false when only probing, as for lambda argument types.
+    struct CallTarget {
         std::vector<Callable> candidates;
-        bool staticAccess = false, constructing = false;
+        bool staticAccess = false, constructing = false, failed = false;
         std::string typeName;
+    };
+    CallTarget FindCallTarget(const SyntaxExpression& call, const SyntaxExpression& callee, NodeId calleeSlot, const SyntaxClass* owner, TypeId type, bool report) {
+        using Kind = SyntaxExpression::Kind;
+        CallTarget target;
+        auto& candidates = target.candidates;
         const auto methodsOf = [&](std::string_view key, std::string_view name) {
             for (const auto index : FindMembers(key, name)) if (result_.symbols[index].kind == SymbolKind::Method) candidates.push_back(MakeCallable(index));
         };
         if (callee.kind == Kind::Member) {
             const auto receiver = Node(Node(calleeSlot).children.first).type;
             if (types_.IsList(receiver)) RegisterBuiltinType(Name(receiver));
-            staticAccess = types_.Kind(receiver) == TypeKind::Meta;
-            typeName = staticAccess ? std::string(types_.Target(receiver)) : Name(receiver);
+            target.staticAccess = types_.Kind(receiver) == TypeKind::Meta;
+            target.typeName = target.staticAccess ? std::string(types_.Target(receiver)) : Name(receiver);
             methodsOf(Name(receiver), callee.text);
-            if (candidates.empty()) methodsOf(staticAccess ? typeName : "$type:" + typeName, callee.text); // the other kind of method: misuse is reported below
+            if (candidates.empty()) methodsOf(target.staticAccess ? target.typeName : "$type:" + target.typeName, callee.text); // the other kind of method: misuse is reported by the caller
         } else if (callee.kind == Kind::Identifier && types_.Kind(type) == TypeKind::Meta) {
-            constructing = true; typeName = std::string(types_.Target(type));
-            if (structTypes_.contains(typeName)) candidates = ConstructorCandidates(typeName);
-            else if (FindClass(typeName)) { AddDiagnostic("Use 'new' to create an instance of class '" + typeName + "'", call.span); return; }
-            else { AddDiagnostic("Type '" + typeName + "' cannot be called", callee.span); return; }
+            target.constructing = true; target.typeName = std::string(types_.Target(type));
+            if (structTypes_.contains(target.typeName)) candidates = ConstructorCandidates(target.typeName);
+            else {
+                target.failed = true;
+                if (!report) return target;
+                if (FindClass(target.typeName)) AddDiagnostic("Use 'new' to create an instance of class '" + target.typeName + "'", call.span);
+                else AddDiagnostic("Type '" + target.typeName + "' cannot be called", callee.span);
+            }
         } else if (callee.kind == Kind::Identifier && owner) {
             methodsOf(owner->name, callee.text); methodsOf("$type:" + owner->name, callee.text);
         }
+        return target;
+    }
+    // The parameter type that every overload taking `count` arguments has at `index`, when it is a function type.
+    TypeId ExpectedArgumentType(const std::vector<Callable>& candidates, size_t index, size_t count) const {
+        TypeId agreed = TypeTable::Unknown;
+        for (const auto& candidate : candidates) {
+            if (count < candidate.required || count > candidate.parameters.size()) continue;
+            const auto parameter = candidate.parameters[index];
+            if (!types_.IsFunction(parameter) || (agreed != TypeTable::Unknown && agreed != parameter)) return TypeTable::Unknown;
+            agreed = parameter;
+        }
+        return agreed;
+    }
+    // Type a lambda at call argument `index` is bound to, or Unknown when the callee does not fix it.
+    TypeId LambdaArgumentType(const SyntaxExpression& call, const SyntaxExpression& callee, NodeId calleeSlot, bool callsValue, TypeId calleeType, const SyntaxClass* owner, size_t index, size_t count) {
+        if (callsValue) return types_.Arity(calleeType) == count ? types_.Parameters(calleeType)[index] : TypeTable::Unknown;
+        return ExpectedArgumentType(FindCallTarget(call, callee, calleeSlot, owner, calleeType, false).candidates, index, count);
+    }
+    // Calls to methods, static functions, struct constructors (`Vec3(1, 2, 3)`) and native members. Sets the call's type, symbol and lowering.
+    void ResolveCall(const SyntaxExpression& call, const SyntaxExpression& callee, NodeId calleeSlot, NodeId arguments, size_t argumentCount, const SyntaxClass* owner, TypeId& type, std::optional<size_t>& symbol, Lowering& lowering, const BuiltinMember*& nativeMember) {
+        using Kind = SyntaxExpression::Kind;
+        auto target = FindCallTarget(call, callee, calleeSlot, owner, type, true);
+        if (target.failed) return;
+        auto& candidates = target.candidates;
+        const bool staticAccess = target.staticAccess, constructing = target.constructing;
+        const std::string& typeName = target.typeName;
         if (candidates.empty()) {
             RejectInoutArguments(callee.text, arguments, argumentCount);
             if (type != TypeTable::Unknown && type != TypeTable::Any) AddDiagnostic("Expression of type " + DisplayType(type) + " is not callable", callee.span);
@@ -854,7 +918,8 @@ private:
     }
     // Binds expression into pool slot `slot`. Never holds a node reference across
     // a recursive call, since recursion grows the pool.
-    TypeId Infer(const SyntaxExpression& expression, std::vector<Local>& locals, const SyntaxClass* owner, NodeId slot) {
+    // `expected` is the function type a lambda is being bound to; other expressions ignore it.
+    TypeId Infer(const SyntaxExpression& expression, std::vector<Local>& locals, const SyntaxClass* owner, NodeId slot, TypeId expected = TypeTable::Unknown) {
         using Kind = SyntaxExpression::Kind;
         const bool baseAllowed = std::exchange(baseAllowed_, false); // only the target of a member access may be `base`
         const bool inoutAllowed = std::exchange(inoutAllowed_, false); // only a call argument may be `inout`
@@ -862,10 +927,10 @@ private:
         const NodeId first = AllocateExpressions(childCount);
         NodeId visited{};
         const auto syntaxChild = [&](size_t index) -> const SyntaxExpression& { return Syntax().Child(expression, index); };
-        const auto child = [&](size_t index) {
+        const auto child = [&](size_t index, TypeId childExpected = TypeTable::Unknown) {
             assert(index == visited && index < childCount);
             ++visited;
-            return Infer(syntaxChild(index), locals, owner, first + static_cast<NodeId>(index));
+            return Infer(syntaxChild(index), locals, owner, first + static_cast<NodeId>(index), childExpected);
         };
         TypeId type{}; std::optional<size_t> symbol; Lowering lowering{}; NodeRange lambdaBody;
         const BuiltinMember* nativeMember = nullptr; const BuiltinOperator* nativeOperator = nullptr;
@@ -882,7 +947,11 @@ private:
             type = TypeTable::Any; break;
         case Kind::New: {
             type = types_.Intern(expression.text); CheckType(type, expression.span);
-            for (size_t i{}; i < childCount; ++i) { inoutAllowed_ = true; child(i); }
+            const auto constructors = ConstructorCandidates(expression.text);
+            for (size_t i{}; i < childCount; ++i) {
+                inoutAllowed_ = true;
+                child(i, syntaxChild(i).kind == Kind::Lambda ? ExpectedArgumentType(constructors, i, childCount) : TypeTable::Unknown);
+            }
             if (enumTypes_.contains(expression.text)) AddDiagnostic("Enum type '" + expression.text + "' cannot be constructed", expression.span);
             else if (IsBuiltinType(expression.text) && !IsNativeStruct(expression.text)) AddDiagnostic("Type '" + expression.text + "' cannot be constructed with 'new'", expression.span);
             else ResolveConstruction(expression, first, childCount, type, symbol, lowering, nativeMember);
@@ -954,15 +1023,21 @@ private:
                 break;
             }
             type = child(0);
-            for (size_t i = 1; i < childCount; ++i) { inoutAllowed_ = true; child(i); }
+            const bool callsValue = CallsFunctionValue(callee, first, type);
+            for (size_t i = 1; i < childCount; ++i) {
+                inoutAllowed_ = true;
+                const bool lambda = syntaxChild(i).kind == Kind::Lambda;
+                child(i, lambda ? LambdaArgumentType(expression, callee, first, callsValue, type, owner, i - 1, argumentCount) : TypeTable::Unknown);
+            }
             if (callee.kind == Kind::Identifier) if (const auto* builtin = FindBuiltinFunction(callee.text)) {
                 CheckBuiltinArguments(builtin->name, builtin->parameters, builtin->variadic, expression, arguments, argumentCount);
                 type = types_.Intern(builtin->returnType); lowering = builtin->lowering; break;
             }
-            if (types_.IsFunction(type)) {
-                RejectInoutArguments("lambda", arguments, argumentCount);
-                const auto expected = types_.Arity(type);
-                if (argumentCount != expected) AddDiagnostic("Expected " + std::to_string(expected) + " argument(s) for lambda, got " + std::to_string(argumentCount), expression.span);
+            if (callsValue) {
+                RejectInoutArguments("function", arguments, argumentCount);
+                const std::vector<TypeId> parameterTypes(types_.Parameters(type).begin(), types_.Parameters(type).end());
+                if (argumentCount != parameterTypes.size()) AddDiagnostic("Expected " + std::to_string(parameterTypes.size()) + " argument(s) for '" + Name(type) + "', got " + std::to_string(argumentCount), expression.span);
+                else for (size_t i{}; i < argumentCount; ++i) if (!Accepts(parameterTypes[i], arguments + static_cast<NodeId>(i))) AddDiagnostic("Argument " + std::to_string(i + 1) + " expects '" + Name(parameterTypes[i]) + "', got " + DisplayType(Node(arguments + static_cast<NodeId>(i)).type), Syntax().Child(expression, i + 1).span);
                 type = types_.Element(type); break;
             }
             ResolveCall(expression, callee, first, arguments, argumentCount, owner, type, symbol, lowering, nativeMember);
@@ -998,7 +1073,15 @@ private:
         case Kind::Lambda: {
             auto lambdaLocals = locals; const size_t lambdaDepth = lambdaLocals.empty() ? 1 : lambdaLocals.back().depth + 1;
             const auto parameters = Syntax().Parameters(expression);
-            for (const auto& parameter : parameters) AddLocal(lambdaLocals, parameter.name, TypeTable::Any, SymbolKind::Parameter, parameter.span, expression.span, lambdaDepth);
+            const bool typed = types_.IsFunction(expected) && types_.Arity(expected) == parameters.size();
+            if (types_.IsFunction(expected) && !typed) AddDiagnostic("Lambda has " + std::to_string(parameters.size()) + " parameter(s), but '" + Name(expected) + "' takes " + std::to_string(types_.Arity(expected)), expression.span);
+            const std::vector<TypeId> expectedParameters = typed ? std::vector<TypeId>(types_.Parameters(expected).begin(), types_.Parameters(expected).end()) : std::vector<TypeId>();
+            std::vector<TypeId> parameterTypes;
+            for (size_t i{}; i < parameters.size(); ++i) {
+                parameterTypes.push_back(typed ? expectedParameters[i] : TypeTable::Any);
+                AddLocal(lambdaLocals, parameters[i].name, parameterTypes.back(), SymbolKind::Parameter, parameters[i].span, expression.span, lambdaDepth);
+            }
+            const auto expectedResult = typed ? types_.Element(expected) : TypeTable::Unknown;
             TypeId resultType{};
             ++lambdaNesting_;
             if (expression.lambdaIsBlock) {
@@ -1006,10 +1089,13 @@ private:
                 resultType = LambdaResult(expression, lambdaBody);
             } else {
                 assert(childCount == 1);
-                ++visited; resultType = Infer(syntaxChild(0), lambdaLocals, owner, first);
+                ++visited; resultType = Infer(syntaxChild(0), lambdaLocals, owner, first, expectedResult);
             }
             --lambdaNesting_;
-            type = types_.Function(parameters.size(), resultType == TypeTable::Unknown ? TypeTable::Any : resultType); break;
+            if (resultType == TypeTable::Unknown) resultType = TypeTable::Any;
+            if (!typed) { type = types_.Function(parameterTypes, resultType); break; }
+            if (expectedResult != TypeTable::Void && !Assignable(expectedResult, resultType)) AddDiagnostic("Lambda returns " + DisplayType(resultType) + ", but '" + Name(expected) + "' returns '" + Name(expectedResult) + "'", expression.span);
+            type = expected; break;
         }
         case Kind::Is: case Kind::As: {
             const auto operand = child(0);
@@ -1041,7 +1127,7 @@ private:
             break;
         }
         case Kind::Assignment: {
-            const auto left = child(0), right = child(1); type = left;
+            const auto left = child(0), right = child(1, expression.text == "=" ? left : TypeTable::Unknown); type = left;
             const auto targetKind = syntaxChild(0).kind;
             if (targetKind != Kind::Identifier && targetKind != Kind::Member && targetKind != Kind::Index) AddDiagnostic("Invalid assignment target", syntaxChild(0).span);
             if (targetKind == Kind::Index && types_.IsList(ChildType(first, 0))) lowering = Lowering::ListSet;
@@ -1116,7 +1202,6 @@ private:
         return result;
     }
     std::string DisplayType(TypeId type) const {
-        if (types_.IsFunction(type)) return "'lambda with " + std::to_string(types_.Arity(type)) + " parameter(s) returning " + Name(types_.Element(type)) + "'";
         return type == TypeTable::Unknown ? "unknown value" : "'" + Name(type) + "'";
     }
     // A table literal in a list context becomes a list literal, nested literals included.
@@ -1132,9 +1217,21 @@ private:
         CoerceLiteral(slot, expected);
         return Assignable(expected, Node(slot).type);
     }
+    // Same arity; each parameter matches exactly or through `any`; the result converts, and a void result accepts any.
+    bool FunctionAssignable(TypeId expected, TypeId actual) const {
+        const auto expectedParameters = types_.Parameters(expected), actualParameters = types_.Parameters(actual);
+        if (expectedParameters.size() != actualParameters.size()) return false;
+        for (size_t i{}; i < expectedParameters.size(); ++i) {
+            const auto from = expectedParameters[i], to = actualParameters[i];
+            if (from != to && from != TypeTable::Any && to != TypeTable::Any) return false;
+        }
+        const auto result = types_.Element(expected);
+        return result == TypeTable::Void || Assignable(result, types_.Element(actual));
+    }
     bool Assignable(TypeId expected, TypeId actual) const {
         if (expected == TypeTable::Unknown || actual == TypeTable::Unknown || expected == TypeTable::Any || actual == TypeTable::Any || expected == actual) return true;
         if (actual == TypeTable::Null) return expected == TypeTable::Table || types_.IsList(expected) || (!IsBuiltinType(Name(expected)) && !enumTypes_.contains(Name(expected)) && !IsStructType(expected) && expected != TypeTable::Void);
+        if (types_.IsFunction(expected) && types_.IsFunction(actual)) return FunctionAssignable(expected, actual);
         if (types_.IsList(expected) && actual == TypeTable::Table) return true;
         if (expected == TypeTable::Float && actual == TypeTable::Int) return true;
         if (expected == TypeTable::Table && types_.IsList(actual)) return true;
@@ -1176,9 +1273,10 @@ private:
             const auto& expression = Syntax().Expression(statement.expression);
             if (unreachable) AddDiagnostic("Unreachable code", statement.span, DiagnosticSeverity::Warning);
             BoundStatement bound; bound.kind = statement.kind; bound.inferredType = statement.inferredType; bound.span = statement.span; bound.syntax = &statement;
-            const auto infer = [&](const SyntaxExpression& value, NodeId& slot) { slot = AllocateExpressions(1); return Infer(value, locals, owner, slot); };
+            const auto infer = [&](const SyntaxExpression& value, NodeId& slot, TypeId expected = TypeTable::Unknown) { slot = AllocateExpressions(1); return Infer(value, locals, owner, slot, expected); };
             if (statement.kind == StatementKind::Local) {
-                const auto actual = infer(expression, bound.expression); const auto type = statement.inferredType ? actual : types_.Intern(statement.type); bound.type = type;
+                const auto declared = statement.inferredType ? TypeTable::Unknown : types_.Intern(statement.type);
+                const auto actual = infer(expression, bound.expression, declared); const auto type = statement.inferredType ? actual : declared; bound.type = type;
                 const TextSpan nameSpan = statement.nameSpan;
                 if (!statement.inferredType) {
                     CheckType(type, nameSpan); if (expression.kind != SyntaxExpression::Kind::Missing && !Accepts(type, bound.expression)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + Name(type) + "'", expression.span);
@@ -1195,7 +1293,7 @@ private:
                 if (statement.inferredType && type == TypeTable::Void) AddDiagnostic("Cannot initialize '" + statement.name + "' with a void expression", expression.span);
                 AddLocal(locals, statement.name, type, SymbolKind::Variable, nameSpan, {statement.span.offset, scopeEnd - statement.span.offset}, depth);
             } else if (statement.kind == StatementKind::Return) {
-                const auto actual = infer(expression, bound.expression);
+                const auto actual = infer(expression, bound.expression, returnType == InferReturn ? TypeTable::Unknown : returnType);
                 const bool hasValue = expression.kind != SyntaxExpression::Kind::Missing;
                 if (returnType == InferReturn) { }
                 else if (returnType == TypeTable::Void && hasValue) AddDiagnostic("Void function cannot return a value", expression.span);
@@ -1278,7 +1376,7 @@ private:
                 if (initializer.kind != SyntaxExpression::Kind::Missing) {
                     std::vector<Local> none; boundField.initializer = AllocateExpressions(1);
                     staticContext_ = field.isStatic;
-                    const auto actual = Infer(initializer, none, &value, boundField.initializer);
+                    const auto actual = Infer(initializer, none, &value, boundField.initializer, types_.Intern(field.type));
                     staticContext_ = false;
                     if (!Accepts(types_.Intern(field.type), boundField.initializer)) AddDiagnostic("Cannot assign " + DisplayType(actual) + " to '" + field.type + "'", initializer.span);
                 }

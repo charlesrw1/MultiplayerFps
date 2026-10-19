@@ -61,7 +61,7 @@
     },
     "types": {
       "patterns": [
-        { "match": "\\b(?:int|float|bool|string|table)\\b", "name": "storage.type.primitive.luasharp" }
+        { "match": "\\b(?:int|float|bool|string|table|any|Func|Action)\\b", "name": "storage.type.primitive.luasharp" }
       ]
     },
     "constants": {

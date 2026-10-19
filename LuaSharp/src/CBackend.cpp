@@ -52,7 +52,7 @@ std::optional<std::string_view> ScalarCType(std::string_view type, const StringS
     if (type == "table") return "ls_table";
     if (type == "any") return "LS_Value";
     if (type == "null") return "void*";
-    if (type.starts_with("$function:")) return "LS_Closure*";
+    if (type.starts_with("Func<")) return "LS_Closure*";
     return std::nullopt;
 }
 
@@ -615,7 +615,7 @@ struct CEmitter {
         default: return false;
         }
     }
-    bool IsManagedObject(std::string_view type) const { return type == "string" || type == "table" || type == "any" || type.starts_with("$function:") || type.ends_with("[]") || classes.contains(type) || natives.contains(type); }
+    bool IsManagedObject(std::string_view type) const { return type == "string" || type == "table" || type == "any" || type.starts_with("Func<") || type.ends_with("[]") || classes.contains(type) || natives.contains(type); }
     const BoundExpression& Child(const BoundExpression& value, size_t index) const { return program.Child(value, index); }
     const VariableBinding* Binding(size_t symbol) const { assert(symbol < bindingsBySymbol.size()); return bindingsBySymbol[symbol]; }
     const VariableBinding* BindingAt(size_t offset) const { const auto found = bindingAt.find(offset); return found == bindingAt.end() ? nullptr : found->second; }
@@ -1100,6 +1100,13 @@ struct CEmitter {
         Put("({ ", Type(type), "* ", slot, " = &(", Emitted(target, owner), "); ", [&] { OperandType(type, value.lowering); }, ' ', update, " = ", operand, "; *", slot, " = ", store, "; })");
     }
 
+    // A callee of function type is a value to call, unless a name or member access resolved to a method (whose type is its return type).
+    bool CallsFunctionValue(const BoundExpression& callee) const {
+        if (!types.IsFunction(callee.type)) return false;
+        const bool named = callee.kind == SyntaxExpression::Kind::Identifier || callee.kind == SyntaxExpression::Kind::Member;
+        return !named || !callee.symbolIndex || analysis.symbols[*callee.symbolIndex].kind != SymbolKind::Method;
+    }
+
     void Call(const BoundExpression& value, std::string_view owner) {
         assert(value.kind == SyntaxExpression::Kind::Call && value.children.count >= 1);
         const auto& callee = Child(value, 0);
@@ -1111,7 +1118,7 @@ struct CEmitter {
             const auto arguments = DynamicArguments(value, 2, owner);
             return Put("ls_printf(", argument(0), ", ", childCount - 2, ", ", arguments, "); })");
         }
-        if (types.IsFunction(callee.type)) {
+        if (CallsFunctionValue(callee)) {
             Put("({ ");
             const auto arguments = DynamicArguments(value, 1, owner);
             const auto call = [&] { Put("ls_closure_call(", Emitted(callee, owner), ", ", arguments, ')'); };
@@ -2080,8 +2087,10 @@ struct CEmitter {
                 }
                 Line(1, "(void)arguments; (void)result;");
                 const auto parameters = analysis.syntax.Parameters(*lambda.syntax);
-                for (size_t parameter{}; parameter < parameters.size(); ++parameter)
-                    Declare(1, ParameterBinding(parameters[parameter]), TypeTable::Any, parameters[parameter].name, [&] { Put("arguments[", parameter, ']'); });
+                for (size_t parameter{}; parameter < parameters.size(); ++parameter) {
+                    const auto parameterType = types.Parameters(lambda.type)[parameter];
+                    Declare(1, ParameterBinding(parameters[parameter]), parameterType, parameters[parameter].name, [&] { Unbox(parameterType, [&] { Put("arguments[", parameter, ']'); }); });
+                }
                 const auto returnType = types.Element(lambda.type);
                 activeLambda = i;
                 if (lambda.LambdaIsBlock()) Statements(lambda.lambdaBody, 1, owner);

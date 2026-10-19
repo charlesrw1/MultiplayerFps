@@ -469,7 +469,7 @@ auto distance = distanceSquared(3, 4);
     const auto analysis = luasharp::Analyze(source);
     Require(analysis.diagnostics.empty(), "valid lambdas, calls, or captures produced diagnostics");
     const auto evenType = luasharp::ResolveVariableType(analysis, "even", source.find("even(4)"));
-    Require(evenType && evenType->find("$function:1:bool") == 0, "lambda return type was not inferred");
+    Require(evenType && evenType->find("Func<any,bool>") == 0, "lambda return type was not inferred");
 
     const auto invalid = luasharp::Analyze(R"(auto pair = (x, x) => x;
 pair(1);
@@ -481,7 +481,7 @@ auto empty = () => {};
 auto invalidVoid = empty();
 )" );
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("already declared") != std::string::npos; }), "duplicate lambda parameter was not diagnosed");
-    Require(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("argument(s) for lambda") != std::string::npos; }) == 2, "lambda arity mismatches were not diagnosed");
+    Require(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("argument(s) for 'Func<") != std::string::npos; }) == 2, "lambda arity mismatches were not diagnosed");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("return types are inconsistent") != std::string::npos; }), "inconsistent block-lambda returns were not diagnosed");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("Not all lambda code paths") != std::string::npos; }), "missing block-lambda return path was not diagnosed");
     Require(std::any_of(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic) { return diagnostic.message.find("mix value and valueless") != std::string::npos; }), "mixed block-lambda returns were not diagnosed");
@@ -1170,6 +1170,89 @@ void RequireDiagnostic(std::string_view source, std::string_view expected) {
     Require(HasDiagnostic(analysis, expected), "expected diagnostic '" + std::string(expected) + "' for: " + std::string(source));
 }
 
+void TestFuncTypeSemantics() {
+    RequireClean(R"(
+class Util {
+    static int apply(Func<int,int> f, int v) { return f(v); }
+    static Func<int,int> adder(int n) { return x => x + n; }
+}
+class Button { Func<int,int> onClick; Action<int> notify; }
+Func<int,bool> even = x => x % 2 == 0;
+Func<string,int> size = s => s.length();
+Func<int,Func<int,int>> curried = a => b => a + b;
+Action<int> sink = x => {};
+Func<int,void> same = sink;
+Func<int,int> none = null;
+Func<any,any> dynamic = x => x;
+Func<int,int> viaDynamic = dynamic;
+Func<int,int>[] stages = { x => x + 1, x => x * 2 };
+int applied = Util.apply(x => x * 3, 4);
+int added = Util.adder(2)(3);
+)", "typed function values");
+    RequireDiagnostic("Func<int,int> f = x => \"s\";", "Lambda returns");
+    RequireDiagnostic("Func<int,int> f = (a, b) => a;", "Lambda has 2 parameter(s)");
+    RequireDiagnostic("Func<int,int> f = x => x; f(\"a\");", "Argument 1 expects 'int'");
+    RequireDiagnostic("Func<int,int> f = x => x; f(1, 2);", "argument(s) for 'Func<int,int>'");
+    RequireDiagnostic("Func<int,int> f = x => x; Func<string,int> g = f;", "Cannot assign");
+    RequireDiagnostic("Func<int,int> f = x => x + \"a\";", "Operator");
+    RequireDiagnostic("Func<int,Nope> f;", "Unknown type 'Nope'");
+    RequireDiagnostic("class A { static void run(Func<int,int> f) {} } A.run((a, b) => a);", "Lambda has 2 parameter(s)");
+    const auto analysis = luasharp::Analyze("Action<int> a = x => {};");
+    Require(analysis.types.Find("Func<int,void>").has_value(), "Action<T> was not interned as Func<T,void>");
+}
+
+void TestNativeFuncTypes() {
+    if (!luasharp::NativeModule::IsLibTccAvailable()) return;
+    auto module = luasharp::NativeModule::Compile(R"(
+class Util {
+    static int apply(Func<int,int> f, int v) { return f(v); }
+    static Func<int,int> adder(int n) { return x => x + n; }
+}
+class Button {
+    Func<int,int> onClick;
+    int fire(int v) { return onClick(v); }
+}
+Func<int,bool> even = x => x % 2 == 0;
+bool four = even(4);
+bool three = even(3);
+int applied = Util.apply(x => x * 3, 5);
+Func<int,int> add10 = Util.adder(10);
+int added = add10(5);
+int addedDirect = Util.adder(1)(2);
+Func<int,Func<int,int>> curried = a => b => a * 10 + b;
+int curriedValue = curried(4)(2);
+Func<int,int>[] stages = { x => x + 1, x => x * 2 };
+int staged = stages[1](stages[0](4));
+Button button = new Button();
+button.onClick = x => x + 100;
+int fired = button.fire(1);
+int total = 0;
+Action<int> add = x => { total += x; };
+add(3);
+add(4);
+Func<string,string> shout = s => s.upper() + "!";
+string shouted = shout("hey");
+Func<float,float> half = x => x / 2;
+float halved = half(5);
+Func<any,any> dynamic = x => x;
+Func<int,int> viaDynamic = dynamic;
+int dynamicResult = viaDynamic(9);
+Func<int,int> missing = null;
+bool isNull = missing == null;
+)");
+    Require(NativeGlobal<unsigned char>(module, "four") == 1 && NativeGlobal<unsigned char>(module, "three") == 0, "typed lambda parameter was wrong");
+    Require(NativeGlobal<long long>(module, "applied") == 15, "lambda passed as an argument was wrong");
+    Require(NativeGlobal<long long>(module, "added") == 15 && NativeGlobal<long long>(module, "addedDirect") == 3, "returned lambda was wrong");
+    Require(NativeGlobal<long long>(module, "curriedValue") == 42, "nested function types were wrong");
+    Require(NativeGlobal<long long>(module, "staged") == 10, "list of functions was wrong");
+    Require(NativeGlobal<long long>(module, "fired") == 101, "function field was wrong");
+    Require(NativeGlobal<long long>(module, "total") == 7, "Action capture was wrong");
+    Require(NativeText(module, "shouted") == "HEY!", "string lambda parameter was wrong");
+    Require(NativeGlobal<double>(module, "halved") == 2.5, "float lambda was wrong");
+    Require(NativeGlobal<long long>(module, "dynamicResult") == 9, "Func<any,any> assigned to a typed function was wrong");
+    Require(NativeGlobal<unsigned char>(module, "isNull") == 1, "null function was wrong");
+    RequireNativeError("Func<int,int> f = x => x; Func<any,any> g = f; auto r = g(\"text\");", "expected int");
+}
 void TestStructSemantics() {
     RequireClean(R"(struct Pair {
     int a = 1;
@@ -2837,7 +2920,7 @@ int value = Values.check();
         Require(FindVariable(check, "boxed").type == "any: int" && FindVariable(check, "boxed").value == "5", "wrong any value");
         Require(FindVariable(check, "nothing").type == "any: null" && FindVariable(check, "nothing").value == "null", "wrong null any");
         Require(FindVariable(check, "counter").value == "2", "wrong cell value");
-        Require(FindVariable(check, "bump").type == "function" && FindVariable(check, "bump").value == "function", "wrong closure");
+        Require(FindVariable(check, "bump").type == "Func<any,void>" && FindVariable(check, "bump").value == "function", "wrong closure");
         const auto fields = debugger.Variables(FindVariable(check, "pair").children);
         Require(VariableNames(fields) == std::vector<std::string>{"a", "where"} && FindVariable(fields, "where").value == "Vec3(0, 0, 0)", "wrong struct fields");
         const auto components = debugger.Variables(FindVariable(fields, "where").children);
@@ -3268,6 +3351,8 @@ int main() {
         {"native strings", TestNativeStrings},
         {"native string library", TestNativeStringLibrary},
         {"native list library", TestNativeListLibrary},
+        {"function type semantics", TestFuncTypeSemantics},
+        {"native function types", TestNativeFuncTypes},
         {"native loops", TestNativeLoops},
         {"native dynamic tables", TestNativeDynamicTables},
         {"native closure captures", TestNativeClosureCaptures},

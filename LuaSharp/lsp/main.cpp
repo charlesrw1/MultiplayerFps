@@ -231,17 +231,12 @@ const luasharp::Symbol* MemberAt(const luasharp::Analysis& analysis, size_t offs
     }
     return nullptr;
 }
-bool LambdaSignature(const std::string& type, size_t& arity, std::string& result) {
-    if (!type.starts_with("$function:")) return false;
-    const auto separator = type.find(':', 10); if (separator == std::string::npos) return false;
-    try { arity = static_cast<size_t>(std::stoull(type.substr(10, separator - 10))); } catch (...) { return false; }
-    result = type.substr(separator + 1); return true;
-}
-std::string DisplayType(const std::string& type) {
-    size_t arity{}; std::string result;
-    if (!LambdaSignature(type, arity, result)) return type;
-    std::string display = "function("; for (size_t i{}; i < arity; ++i) { if (i) display += ", "; display += "any"; }
-    return display + ") -> " + result;
+bool FunctionSignature(const luasharp::Analysis& analysis, const std::string& type, std::vector<std::string>& parameters, std::string& result) {
+    const auto id = analysis.types.Find(type);
+    if (!id || !analysis.types.IsFunction(*id)) return false;
+    for (const auto parameter : analysis.types.Parameters(*id)) parameters.push_back(analysis.types.Name(parameter));
+    result = analysis.types.Name(analysis.types.Element(*id));
+    return true;
 }
 std::string JoinLabels(std::span<const std::string> labels) {
     std::string result; for (size_t i{}; i < labels.size(); ++i) { if (i) result += ", "; result += labels[i]; } return result;
@@ -255,7 +250,7 @@ std::string ResultType(const luasharp::Symbol& method) { return method.typeParam
 std::string HoverLabel(const luasharp::Symbol& symbol) {
     if (symbol.kind == luasharp::SymbolKind::Class) return "class " + symbol.name;
     if (symbol.kind == luasharp::SymbolKind::Enum) return "enum " + symbol.name;
-    if (symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Function) return DisplayType(symbol.type) + " " + symbol.name;
+    if (symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Function) return symbol.type + " " + symbol.name;
     return ResultType(symbol) + " " + MethodSignature(symbol);
 }
 // The symbol an expression names. A `typeof(T)` or `f<T>` type argument names the type T, not the [TypeOf] method it calls.
@@ -412,7 +407,7 @@ json Completions(const std::string& uri, const std::string& text, const json& po
         result.push_back({{"label", function.name + signature}, {"kind", 3}, {"detail", function.returnType + signature}});
     }
     AddEnclosingClassCompletions(analysis, offset, result);
-    for (const auto& symbol : analysis.symbols) if (!symbol.implicit && symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Field) result.push_back({{"label", symbol.name}, {"kind", symbol.kind == luasharp::SymbolKind::Class || symbol.kind == luasharp::SymbolKind::Enum ? 7 : 6}, {"detail", DisplayType(symbol.type)}});
+    for (const auto& symbol : analysis.symbols) if (!symbol.implicit && symbol.kind != luasharp::SymbolKind::Method && symbol.kind != luasharp::SymbolKind::Field) result.push_back({{"label", symbol.name}, {"kind", symbol.kind == luasharp::SymbolKind::Class || symbol.kind == luasharp::SymbolKind::Enum ? 7 : 6}, {"detail", symbol.type}});
     return result;
 }
 json SignatureHelp(const std::string& uri, const std::string& text, const json& position) {
@@ -456,8 +451,8 @@ json SignatureHelp(const std::string& uri, const std::string& text, const json& 
         if (!callable) return nullptr;
         if (callable->kind == luasharp::SymbolKind::Method) useMethod(*callable);
         else {
-            size_t arity{}; if (!LambdaSignature(callable->type, arity, returnType)) return nullptr;
-            for (size_t i{}; i < arity; ++i) parameterLabels.push_back("any value" + std::to_string(i + 1));
+            std::vector<std::string> types; if (!FunctionSignature(analysis, callable->type, types, returnType)) return nullptr;
+            for (size_t i{}; i < types.size(); ++i) parameterLabels.push_back(types[i] + " value" + std::to_string(i + 1));
         }
     }
     std::string label = name + (typeArguments.empty() ? "" : "<" + typeArguments + ">") + "(" + JoinLabels(parameterLabels) + ") -> " + returnType;

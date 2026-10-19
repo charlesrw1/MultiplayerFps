@@ -279,3 +279,21 @@ Strings are byte strings: indexes and lengths count bytes, and `lower`/`upper` c
 - `string`: `length`, `size`, `is_empty`, `contains`, `starts_with`, `ends_with`, `index_of(value, start = 0)`, `last_index_of`, `count`, `char_at`, `byte_at`, `substring`, `trim`, `trim_start`, `trim_end`, `replace(from, to)`, `repeat`, `pad_left(width, fill = " ")`, `pad_right`, `insert(index, value)`, `split(separator)`, `compare`, `equals_ignore_case`, `lower`, `upper`.
 - `T[]`: `push_back`, `pop_back`, `size`, `empty`, `clear`, `first`, `last`, `insert(index, value)`, `remove_at`, `remove(value)`, `index_of`, `contains`, `reverse`, `extend`, `copy`. Lists of `int`, `float` and `string` also have `sort`. Lists of `int` and `float` also have `sum`, `min` and `max`. Lists of `int`, `float`, `bool` and `string` also have `join(separator = "")`.
 - `index_of`, `contains` and `remove` compare numbers by value and other elements by identity. They are not available on lists of native math structs, and the native backend rejects them on lists of user structs.
+
+## Function types
+
+`Func<A, B, R>` is the type of a function (or lambda) that takes `A` and `B` and returns `R`: the last type argument is the result. `Action<A, B>` is `Func<A, B, void>`, and `Func<R>` takes no arguments. A function type can be a local, parameter, field, return type or list element, and it can hold `null`.
+
+```
+Func<int, bool> even = x => x % 2 == 0;
+Action<string> log = s => printf("%s", s);
+Func<int, Func<int, int>> adder = a => b => a + b;
+class Button { Func<int, int> onClick; }
+static int apply(Func<int, int> f, int v) { return f(v); }
+apply(x => x * 3, 5);
+```
+
+- A lambda takes its parameter types from the function type it is assigned to, passed as, returned as, or stored in. Inside `Func<string, int> size = s => s.length();` the parameter `s` is a `string`. A lambda with no such type (`auto f = x => x;`) has `any` parameters, as before.
+- A lambda inside a list literal has `any` parameters, because the literal does not pass its element type down.
+- Two function types are compatible when they have the same number of parameters and each parameter type is equal or is `any`. A result converts as an assignment does, and an `Action` result accepts any function. `Func<any, any>` therefore works as a duck-typed function. Calling it with a wrong type is a run-time error, not a compile error.
+- `any` can now be written as a type name.
